@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Allocation, FrontKey } from '../../engine'
 import { COLORS } from '../theme'
@@ -22,13 +21,18 @@ const FRONTS: { key: FrontKey; label: string; icon: string }[] = [
   { key: 'remate', label: 'Remate', icon: '🎯' },
 ]
 
-/** A glowing energy pip. `layoutId` lets framer-motion fly it pool <-> front. */
-function Pip({ id, color, reduced }: { id: string; color: string; reduced: boolean }) {
+/**
+ * A glowing energy pip. Identity is stable per container (pool / each front),
+ * so changing one front never reshuffles another's pips. Pips pop in/out in place
+ * rather than flying between containers (which caused phantom "sum" animations).
+ */
+function Pip({ color, reduced }: { color: string; reduced: boolean }) {
   return (
     <motion.span
       layout={!reduced}
-      layoutId={reduced ? undefined : id}
-      initial={false}
+      initial={reduced ? false : { scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={reduced ? undefined : { scale: 0, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 600, damping: 34 }}
       style={{
         width: 14,
@@ -46,26 +50,6 @@ function Pip({ id, color, reduced }: { id: string; color: string; reduced: boole
 export function EnergyAllocator({ alloc, available, onChange, accentColor, reducedMotion, disabled = false }: Props) {
   const spent = alloc.apertura + alloc.choque + alloc.remate
   const pool = available - spent
-
-  // Stable per-token ids so framer-motion can animate the same node moving
-  // between the pool and a front (shared layoutId).
-  const ids = useMemo(
-    () => Array.from({ length: available }, (_, i) => `pip-${i}`),
-    [available],
-  )
-
-  // Deterministic assignment of token ids: first `pool` ids stay in pool,
-  // then apertura, choque, remate consume the rest in order.
-  const poolEnd = pool
-  const aEnd = poolEnd + alloc.apertura
-  const cEnd = aEnd + alloc.choque
-  const rEnd = cEnd + alloc.remate
-  const poolIds = ids.slice(0, poolEnd)
-  const frontIds: Record<FrontKey, string[]> = {
-    apertura: ids.slice(poolEnd, aEnd),
-    choque: ids.slice(aEnd, cEnd),
-    remate: ids.slice(cEnd, rEnd),
-  }
 
   function add(key: FrontKey) {
     if (disabled || pool <= 0) return
@@ -119,8 +103,8 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
           }}
         >
           <AnimatePresence>
-            {poolIds.map((id) => (
-              <Pip key={id} id={id} color={accentColor} reduced={reducedMotion} />
+            {Array.from({ length: pool }, (_, i) => (
+              <Pip key={`pool-${i}`} color={accentColor} reduced={reducedMotion} />
             ))}
           </AnimatePresence>
           {pool === 0 && (
@@ -245,8 +229,8 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                   style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}
                 >
                   <AnimatePresence>
-                    {frontIds[f.key].map((id) => (
-                      <Pip key={id} id={id} color={accentColor} reduced={reducedMotion} />
+                    {Array.from({ length: value }, (_, i) => (
+                      <Pip key={`${f.key}-${i}`} color={accentColor} reduced={reducedMotion} />
                     ))}
                   </AnimatePresence>
                 </motion.div>
