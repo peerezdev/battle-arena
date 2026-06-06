@@ -1,0 +1,230 @@
+[
+  {
+    "name": "spec-2.6-barata-gana",
+    "cardA": {
+      "valueUsd": 1200,
+      "grade": 8
+    },
+    "cardB": {
+      "valueUsd": 950,
+      "grade": 7
+    },
+    "cfg": {
+      "roundsToWin": 2,
+      "baseEnergy": 10,
+      "maxEdge": 4,
+      "valueRatioCap": 4,
+      "maxRounds": 5,
+      "rakeBps": 0,
+      "edgeEnabled": true
+    },
+    "rounds": [
+      {
+        "allocA": {
+          "apertura": 3,
+          "choque": 4,
+          "remate": 3
+        },
+        "allocB": {
+          "apertura": 4,
+          "choque": 0,
+          "remate": 3
+        }
+      },
+      {
+        "allocA": {
+          "apertura": 4,
+          "choque": 3,
+          "remate": 3
+        },
+        "allocB": {
+          "apertura": 5,
+          "choque": 0,
+          "remate": 5
+        }
+      },
+      {
+        "allocA": {
+          "apertura": 1,
+          "choque": 4,
+          "remate": 5
+        },
+        "allocB": {
+          "apertura": 5,
+          "choque": 5,
+          "remate": 3
+        }
+      }
+    ],
+    "expected": {
+      "winner": "b",
+      "winsA": 1,
+      "winsB": 2
+    }
+  },
+  {
+    "name": "sweep-a-2-0",
+    "cardA": {
+      "valueUsd": 1000,
+      "grade": 9
+    },
+    "cardB": {
+      "valueUsd": 1000,
+      "grade": 5
+    },
+    "cfg": {
+      "roundsToWin": 2,
+      "baseEnergy": 10,
+      "maxEdge": 4,
+      "valueRatioCap": 4,
+      "maxRounds": 5,
+      "rakeBps": 0,
+      "edgeEnabled": true
+    },
+    "rounds": [
+      {
+        "allocA": {
+          "apertura": 6,
+          "choque": 4,
+          "remate": 0
+        },
+        "allocB": {
+          "apertura": 0,
+          "choque": 0,
+          "remate": 10
+        }
+      },
+      {
+        "allocA": {
+          "apertura": 5,
+          "choque": 5,
+          "remate": 0
+        },
+        "allocB": {
+          "apertura": 0,
+          "choque": 0,
+          "remate": 10
+        }
+      }
+    ],
+    "expected": {
+      "winner": "a",
+      "winsA": 2,
+      "winsB": 0
+    }
+  },
+  {
+    "name": "edge-a-bonus-1",
+    "cardA": {
+      "valueUsd": 4000,
+      "grade": 6
+    },
+    "cardB": {
+      "valueUsd": 1000,
+      "grade": 6
+    },
+    "cfg": {
+      "roundsToWin": 2,
+      "baseEnergy": 10,
+      "maxEdge": 4,
+      "valueRatioCap": 0,
+      "maxRounds": 5,
+      "rakeBps": 0,
+      "edgeEnabled": true
+    },
+    "rounds": [
+      {
+        "allocA": {
+          "apertura": 6,
+          "choque": 5,
+          "remate": 0
+        },
+        "allocB": {
+          "apertura": 5,
+          "choque": 5,
+          "remate": 0
+        }
+      },
+      {
+        "allocA": {
+          "apertura": 0,
+          "choque": 6,
+          "remate": 5
+        },
+        "allocB": {
+          "apertura": 0,
+          "choque": 5,
+          "remate": 5
+        }
+      }
+    ],
+    "expected": {
+      "winner": "a",
+      "winsA": 2,
+      "winsB": 0
+    }
+  },
+  {
+    "name": "b-banking-comeback",
+    "cardA": {
+      "valueUsd": 2000,
+      "grade": 5
+    },
+    "cardB": {
+      "valueUsd": 2000,
+      "grade": 5
+    },
+    "cfg": {
+      "roundsToWin": 2,
+      "baseEnergy": 10,
+      "maxEdge": 4,
+      "valueRatioCap": 4,
+      "maxRounds": 5,
+      "rakeBps": 0,
+      "edgeEnabled": true
+    },
+    "rounds": [
+      {
+        "allocA": {
+          "apertura": 5,
+          "choque": 5,
+          "remate": 0
+        },
+        "allocB": {
+          "apertura": 0,
+          "choque": 0,
+          "remate": 4
+        }
+      },
+      {
+        "allocA": {
+          "apertura": 5,
+          "choque": 5,
+          "remate": 0
+        },
+        "allocB": {
+          "apertura": 6,
+          "choque": 6,
+          "remate": 0
+        }
+      },
+      {
+        "allocA": {
+          "apertura": 5,
+          "choque": 5,
+          "remate": 0
+        },
+        "allocB": {
+          "apertura": 6,
+          "choque": 6,
+          "remate": 2
+        }
+      }
+    ],
+    "expected": {
+      "winner": "b",
+      "winsA": 1,
+      "winsB": 2
+    }
+  }
+]
