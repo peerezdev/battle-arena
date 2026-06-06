@@ -4,6 +4,7 @@ import { hashAllocation } from './hash'
 import { solidez } from './solidez'
 
 export function createMatch(cardA: Card, cardB: Card, config: MatchConfig): MatchState {
+  if (cardA.valueUsd <= 0 || cardB.valueUsd <= 0) throw new Error('valueUsd debe ser > 0')
   const high = cardA.valueUsd >= cardB.valueUsd ? cardA.valueUsd : cardB.valueUsd
   const low = cardA.valueUsd >= cardB.valueUsd ? cardB.valueUsd : cardA.valueUsd
   const ratio = low > 0 ? high / low : Infinity
@@ -43,6 +44,8 @@ function allocTotal(a: Allocation): number {
 
 export function commit(state: MatchState, player: Player, hash: string): MatchState {
   if (state.phase !== 'committing') throw new Error('No se puede commitear fuera de la fase committing')
+  if (player === 'a' && state.rounds[state.round].commitA) throw new Error('Jugador a ya ha commiteado')
+  if (player === 'b' && state.rounds[state.round].commitB) throw new Error('Jugador b ya ha commiteado')
   const round = { ...state.rounds[state.round] }
   if (player === 'a') round.commitA = hash
   else round.commitB = hash
@@ -61,6 +64,8 @@ export async function reveal(
   if (state.phase !== 'revealing') throw new Error('No se puede revelar fuera de la fase revealing')
   if (allocation.apertura < 0 || allocation.choque < 0 || allocation.remate < 0)
     throw new Error('Asignación inválida: valores negativos')
+  if (!Number.isInteger(allocation.apertura) || !Number.isInteger(allocation.choque) || !Number.isInteger(allocation.remate))
+    throw new Error('Asignación inválida: debe ser entera')
   if (allocTotal(allocation) > availableEnergy(state, player))
     throw new Error('Asignación excede el disponible')
 
@@ -69,8 +74,8 @@ export async function reveal(
   if (actual !== expected) throw new Error('El hash del reveal no casa con el commit')
 
   const round = { ...state.rounds[state.round] }
-  if (player === 'a') { round.revealA = allocation; round.saltA = salt }
-  else { round.revealB = allocation; round.saltB = salt }
+  if (player === 'a') { round.revealA = { ...allocation }; round.saltA = salt }
+  else { round.revealB = { ...allocation }; round.saltB = salt }
   const rounds = [...state.rounds]
   rounds[state.round] = round
   return { ...state, rounds }
@@ -141,7 +146,7 @@ export function resolveBattle(state: MatchState): MatchState {
 }
 
 export function nextRound(state: MatchState): MatchState {
-  if (state.phase === 'settled') throw new Error('La batalla ya terminó')
+  if (state.phase !== 'roundResolved') throw new Error('nextRound requiere fase roundResolved')
   const rounds = [...state.rounds, {}]
   return { ...state, round: state.round + 1, rounds, phase: 'committing' }
 }
