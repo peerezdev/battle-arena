@@ -4,10 +4,10 @@ use {litesvm::LiteSVM, solana_keypair::Keypair, solana_signer::Signer};
 ///
 /// El instruction de plantilla `initialize` fue reemplazado por las 7
 /// instrucciones reales (initialize_battle, join_battle, commit, reveal,
-/// resolve_round, settle, claim_timeout). Esas se ejercitan en los tests de
-/// integración TypeScript sobre localnet (Task 11+), donde se pueden construir
-/// las cuentas SPL, la NFT y la instrucción Ed25519 del oráculo. Aquí solo se
-/// confirma que el binario compilado se despliega sin error.
+/// resolve_round, settle, claim_timeout). El flujo end-to-end (incluyendo
+/// cuentas SPL, NFT y la atestación Ed25519 del oráculo) se ejercita en
+/// `tests/integration.rs` sobre LiteSVM. Aquí solo se confirma que el binario
+/// compilado se despliega sin error.
 #[test]
 fn program_loads() {
     let program_id = battle_arena::id();
