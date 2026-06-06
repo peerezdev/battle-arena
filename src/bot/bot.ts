@@ -21,7 +21,7 @@ function splitHeuristic(budget: number, spendRatio: number): Allocation {
   // elige 2 frentes fuertes
   const fronts: (keyof Allocation)[] = ['apertura', 'choque', 'remate']
   const strong = fronts.filter(() => Math.random() < 0.66).slice(0, 2)
-  const picks = strong.length >= 2 ? strong : ['apertura', 'remate']
+  const picks = strong.length >= 2 ? strong : (['apertura', 'remate'] as (keyof Allocation)[])
   const half = Math.floor(spend / 2)
   const alloc: Allocation = { apertura: 0, choque: 0, remate: 0 }
   alloc[picks[0]] = half

@@ -20,4 +20,9 @@ describe('playtest instrumentation', () => {
     const parsed = JSON.parse(exportJson())
     expect(parsed[0].funRating).toBe(4)
   })
+
+  it('devuelve [] si localStorage está corrupto', () => {
+    localStorage.setItem('battlearena.playtest.v1', '{{not json}}')
+    expect(getRecords()).toEqual([])
+  })
 })

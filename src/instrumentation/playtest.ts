@@ -25,7 +25,11 @@ export function getRecords(): PlaytestRecord[] {
 export function recordMatch(record: PlaytestRecord): void {
   const all = getRecords()
   all.push(record)
-  localStorage.setItem(KEY, JSON.stringify(all))
+  try {
+    localStorage.setItem(KEY, JSON.stringify(all))
+  } catch {
+    // cuota excedida u otro fallo de storage: no romper la partida
+  }
 }
 
 export function clearRecords(): void {
