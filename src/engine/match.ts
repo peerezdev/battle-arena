@@ -1,6 +1,7 @@
-import type { Card, MatchConfig, MatchState, Player, Allocation } from './types'
+import type { Card, MatchConfig, MatchState, Player, Allocation, FrontKey, FrontWinner } from './types'
 import { computeEdge } from './edge'
 import { hashAllocation } from './hash'
+import { solidez } from './solidez'
 
 export function createMatch(cardA: Card, cardB: Card, config: MatchConfig): MatchState {
   const high = cardA.valueUsd >= cardB.valueUsd ? cardA.valueUsd : cardB.valueUsd
@@ -73,4 +74,62 @@ export async function reveal(
   const rounds = [...state.rounds]
   rounds[state.round] = round
   return { ...state, rounds }
+}
+
+const FRONTS: FrontKey[] = ['apertura', 'choque', 'remate']
+
+function resolveFront(
+  aVal: number, bVal: number, solA: number, solB: number,
+): FrontWinner {
+  if (aVal > bVal) return 'a'
+  if (bVal > aVal) return 'b'
+  // empate -> Aguante por Solidez
+  if (solA > solB) return 'a'
+  if (solB > solA) return 'b'
+  return 'disputed'
+}
+
+export function resolveRound(state: MatchState): MatchState {
+  if (state.phase !== 'revealing') throw new Error('La ronda no está lista para resolverse')
+  const r = state.rounds[state.round]
+  if (!r.revealA || !r.revealB) throw new Error('Faltan reveals para resolver')
+
+  const solA = solidez(state.cardA)
+  const solB = solidez(state.cardB)
+
+  const frontWinners = {} as Record<FrontKey, FrontWinner>
+  let aFronts = 0, bFronts = 0
+  for (const f of FRONTS) {
+    const w = resolveFront(r.revealA[f], r.revealB[f], solA, solB)
+    frontWinners[f] = w
+    if (w === 'a') aFronts++
+    else if (w === 'b') bFronts++
+  }
+
+  const totalA = r.revealA.apertura + r.revealA.choque + r.revealA.remate
+  const totalB = r.revealB.apertura + r.revealB.choque + r.revealB.remate
+
+  let roundWinner: FrontWinner
+  if (aFronts > bFronts) roundWinner = 'a'
+  else if (bFronts > aFronts) roundWinner = 'b'
+  else if (totalA > totalB) roundWinner = 'a'      // desempate 1: energía total
+  else if (totalB > totalA) roundWinner = 'b'
+  else if (solA > solB) roundWinner = 'a'          // desempate 2: Solidez
+  else if (solB > solA) roundWinner = 'b'
+  else roundWinner = 'disputed'                    // ronda nula
+
+  // banking: el sobrante (disponible - gastado) se banca para la siguiente ronda
+  const bankedEnergy = {
+    a: availableEnergy(state, 'a') - totalA,
+    b: availableEnergy(state, 'b') - totalB,
+  }
+
+  const roundWins = { ...state.roundWins }
+  if (roundWinner === 'a') roundWins.a++
+  else if (roundWinner === 'b') roundWins.b++
+
+  const rounds = [...state.rounds]
+  rounds[state.round] = { ...r, frontWinners, roundWinner }
+
+  return { ...state, rounds, roundWins, bankedEnergy, phase: 'roundResolved' }
 }
