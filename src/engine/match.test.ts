@@ -237,6 +237,53 @@ describe('nextRound guard', () => {
   })
 })
 
+describe('phase guards', () => {
+  it('commit llamado cuando phase es revealing lanza /committing/', async () => {
+    let s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
+    s = commit(s, 'a', 'hashA')
+    s = commit(s, 'b', 'hashB')
+    expect(s.phase).toBe('revealing')
+    expect(() => commit(s, 'a', 'hashA2')).toThrow(/committing/)
+  })
+
+  it('reveal llamado cuando phase es committing (solo un commit) lanza /revealing/', async () => {
+    let s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
+    const allocA = { apertura: 4, choque: 3, remate: 3 }
+    const hA = await hashAllocation(allocA, 'sA')
+    s = commit(s, 'a', hA)
+    expect(s.phase).toBe('committing')
+    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/revealing/)
+  })
+
+  it('resolveRound llamado cuando phase es committing lanza /lista/', () => {
+    const s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
+    expect(s.phase).toBe('committing')
+    expect(() => resolveRound(s)).toThrow(/lista/)
+  })
+
+  it('resolveRound con solo un reveal lanza /faltan/i', async () => {
+    let s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
+    const allocA = { apertura: 4, choque: 3, remate: 3 }
+    const hA = await hashAllocation(allocA, 'sA')
+    s = commit(s, 'a', hA)
+    s = commit(s, 'b', 'hashB')
+    expect(s.phase).toBe('revealing')
+    s = await reveal(s, 'a', allocA, 'sA')
+    expect(() => resolveRound(s)).toThrow(/faltan/i)
+  })
+
+  it('double-resolve: resolveRound tras roundResolved lanza', async () => {
+    let s = await staged(
+      card('A', 1000, 9), card('B', 1000, 8),
+      { apertura: 4, choque: 3, remate: 3 },
+      { apertura: 3, choque: 4, remate: 3 },
+    )
+    s = resolveRound(s)
+    expect(s.phase).toBe('roundResolved')
+    expect(() => resolveRound(s)).toThrow(/lista/)
+  })
+})
+
 describe('resolveBattle + nextRound', () => {
   it('declara ganador al llegar a roundsToWin', async () => {
     let s = await staged(

@@ -6,6 +6,10 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
   const [comment, setComment] = useState('')
   const [done, setDone] = useState(false)
   const download = () => {
+    if (!done) {
+      onSubmit(rating, comment)
+      setDone(true)
+    }
     const blob = new Blob([exportJson()], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'playtest.json'; a.click()

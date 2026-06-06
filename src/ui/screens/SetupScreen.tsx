@@ -50,7 +50,10 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
           </select>
         </>
       )}
-      <button className="w-full bg-blue-600 text-white rounded p-3 font-semibold" onClick={() => onStart(s)}>Empezar</button>
+      {s.cardAId === s.cardBId && (
+        <p className="text-red-600 text-sm mb-2">Las dos cartas deben ser distintas.</p>
+      )}
+      <button className="w-full bg-blue-600 text-white rounded p-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed" disabled={s.cardAId === s.cardBId} onClick={() => onStart(s)}>Empezar</button>
     </div>
   )
 }

@@ -102,7 +102,7 @@ export default function App() {
         // Single record per finished match — recorded here with the real funRating
         const ratio = Math.max(state.cardA.valueUsd, state.cardB.valueUsd) / Math.min(state.cardA.valueUsd, state.cardB.valueUsd)
         recordMatch({
-          ts: Date.now(), winner: state.winner, rounds: state.round + 1,
+          ts: Date.now(), winner: state.winner, rounds: state.roundWins.a + state.roundWins.b,
           edgeEnabled: state.config.edgeEnabled, valueRatio: Number(ratio.toFixed(2)),
           mode: state.config.mode, difficulty: setup!.opponent === 'hotseat' ? 'n/a' : setup!.difficulty, funRating: rating, comment,
         })
