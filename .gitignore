@@ -3,3 +3,7 @@ dist/
 .superpowers/
 *.local
 .DS_Store
+onchain/target/
+onchain/.anchor/
+onchain/node_modules/
+onchain/test-ledger/
