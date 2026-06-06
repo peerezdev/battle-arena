@@ -20,7 +20,7 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
   return (
     <div className="max-w-md mx-auto p-6">
       <h2 className="text-lg font-bold mb-1">Ronda {round + 1} · {playerLabel}</h2>
-      <EnergyHeader available={available} unassigned={remaining} winsA={winsA} winsB={winsB} round={round} />
+      <EnergyHeader available={available} unassigned={remaining} winsA={winsA} winsB={winsB} />
       <FrontSlider label="Apertura" icon="⚔️" value={a.apertura} max={maxFor('apertura')} onChange={(v) => setA({ ...a, apertura: v })} />
       <FrontSlider label="Choque" icon="💥" value={a.choque} max={maxFor('choque')} onChange={(v) => setA({ ...a, choque: v })} />
       <FrontSlider label="Remate" icon="🎯" value={a.remate} max={maxFor('remate')} onChange={(v) => setA({ ...a, remate: v })} />

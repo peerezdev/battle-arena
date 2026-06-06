@@ -47,16 +47,21 @@ export default function App() {
   }
 
   async function resolveBoth(a: Allocation, b: Allocation) {
-    let st = state!
-    const saltA = crypto.randomUUID(), saltB = crypto.randomUUID()
-    st = commit(st, 'a', await hashAllocation(a, saltA))
-    st = commit(st, 'b', await hashAllocation(b, saltB))
-    st = await reveal(st, 'a', a, saltA)
-    st = await reveal(st, 'b', b, saltB)
-    st = resolveRound(st)
-    st = resolveBattle(st)
-    setState(st)
-    setScreen('reveal')
+    try {
+      let st = state!
+      const saltA = crypto.randomUUID(), saltB = crypto.randomUUID()
+      st = commit(st, 'a', await hashAllocation(a, saltA))
+      st = commit(st, 'b', await hashAllocation(b, saltB))
+      st = await reveal(st, 'a', a, saltA)
+      st = await reveal(st, 'b', b, saltB)
+      st = resolveRound(st)
+      st = resolveBattle(st)
+      setState(st)
+      setScreen('reveal')
+    } catch (e) {
+      setError((e as Error).message)
+      setScreen('setup')
+    }
   }
 
   function continueAfterReveal() {
@@ -99,7 +104,7 @@ export default function App() {
         recordMatch({
           ts: Date.now(), winner: state.winner, rounds: state.round + 1,
           edgeEnabled: state.config.edgeEnabled, valueRatio: Number(ratio.toFixed(2)),
-          mode: state.config.mode, difficulty: setup!.difficulty, funRating: rating, comment,
+          mode: state.config.mode, difficulty: setup!.opponent === 'hotseat' ? 'n/a' : setup!.difficulty, funRating: rating, comment,
         })
       }}
       onPlayAgain={() => { setState(null); setSetup(null); setScreen('setup') }}

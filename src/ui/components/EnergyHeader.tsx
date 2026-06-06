@@ -3,10 +3,9 @@ interface Props {
   unassigned: number
   winsA: number
   winsB: number
-  round: number
 }
 
-export function EnergyHeader({ available, unassigned, winsA, winsB, round }: Props) {
+export function EnergyHeader({ available, unassigned, winsA, winsB }: Props) {
   const box = 'flex-1 text-center bg-slate-100 rounded p-2'
   return (
     <div className="flex gap-3 mb-4">
