@@ -75,6 +75,19 @@ input[type="range"].slider-red {
   animation: flipIn 0.4s ease-out forwards;
 }
 
+/* Respect reduced-motion: neutralize CSS animations/transitions as a safety net.
+   (JS paths also branch on the useReducedMotion hook.) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Select dropdown dark style */
 select {
   background-color: #121a30;

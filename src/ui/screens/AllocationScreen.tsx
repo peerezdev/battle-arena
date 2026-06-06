@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { FrontSlider } from '../components/FrontSlider'
+import { motion } from 'framer-motion'
 import { EnergyHeader } from '../components/EnergyHeader'
 import { PlayerCard } from '../components/PlayerCard'
 import { AdvantageBanner } from '../components/AdvantageBanner'
+import { EnergyAllocator } from '../components/EnergyAllocator'
 import type { Allocation, MatchState } from '../../engine'
 import { COLORS, player as playerTheme } from '../theme'
+import { useReducedMotion } from '../useReducedMotion'
+import { playSfx, haptic } from '../sound'
 
 interface Props {
   available: number
@@ -21,14 +24,25 @@ interface Props {
 
 export function AllocationScreen({ available, winsA, winsB, round, playerLabel, onCommit, state, playerKey }: Props) {
   const [a, setA] = useState<Allocation>({ apertura: 0, choque: 0, remate: 0 })
+  const [committing, setCommitting] = useState(false)
+  const reduced = useReducedMotion()
+
   const total = a.apertura + a.choque + a.remate
   const remaining = available - total
-  const maxFor = (k: keyof Allocation) => a[k] + remaining
 
   const t = playerTheme[playerKey]
   const base = state.config.baseEnergyPerRound
   const edge = state.edgePerRound[playerKey]
   const banked = state.bankedEnergy[playerKey]
+
+  function handleCommit() {
+    if (committing) return
+    setCommitting(true)
+    playSfx('commit')
+    haptic([12, 30, 12])
+    const delay = reduced ? 0 : 260
+    setTimeout(() => onCommit(a), delay)
+  }
 
   return (
     <div
@@ -60,7 +74,7 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
         {/* Advantage banner */}
         <AdvantageBanner state={state} currentPlayer={playerKey} />
 
-        {/* Energy header with breakdown */}
+        {/* Energy header with breakdown (base + edge + banked) */}
         <EnergyHeader
           available={available}
           unassigned={remaining}
@@ -72,82 +86,39 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
           playerColor={t.color}
         />
 
-        {/* Sliders */}
-        <div
-          style={{
-            background: COLORS.panel,
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '14px',
-          }}
-        >
-          <FrontSlider
-            label="Apertura"
-            icon="⚔️"
-            value={a.apertura}
-            max={maxFor('apertura')}
-            onChange={(v) => setA({ ...a, apertura: v })}
-            accentColor={t.color}
-            sliderClass={t.sliderClass}
-          />
-          <FrontSlider
-            label="Choque"
-            icon="💥"
-            value={a.choque}
-            max={maxFor('choque')}
-            onChange={(v) => setA({ ...a, choque: v })}
-            accentColor={t.color}
-            sliderClass={t.sliderClass}
-          />
-          <FrontSlider
-            label="Remate"
-            icon="🎯"
-            value={a.remate}
-            max={maxFor('remate')}
-            onChange={(v) => setA({ ...a, remate: v })}
-            accentColor={t.color}
-            sliderClass={t.sliderClass}
-          />
+        {/* Tap-to-allocate energy tokens */}
+        <EnergyAllocator
+          alloc={a}
+          available={available}
+          onChange={setA}
+          accentColor={t.color}
+          reducedMotion={reduced}
+        />
 
-          {/* Running total */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              color: COLORS.muted,
-              borderTop: `1px solid ${COLORS.border}`,
-              paddingTop: '10px',
-              marginTop: '4px',
-            }}
-          >
-            <span>Total asignado</span>
-            <span style={{ color: total > available ? COLORS.red : COLORS.text, fontWeight: 700 }}>
-              {total} / {available}
-            </span>
-          </div>
-        </div>
-
-        {/* Commit button */}
-        <button
-          onClick={() => onCommit(a)}
+        {/* Commit button — always enabled (sum ≤ available guaranteed). */}
+        <motion.button
+          onClick={handleCommit}
+          whileTap={reduced ? undefined : { scale: 0.96 }}
+          animate={committing && !reduced ? { scale: [1, 1.04, 1] } : undefined}
+          transition={{ duration: 0.26 }}
+          aria-label="Confirmar asignación de energía"
           style={{
             width: '100%',
-            background: COLORS.green,
-            color: '#04130c',
+            background: t.color,
+            color: playerKey === 'a' ? '#04130c' : '#1a040a',
             border: 'none',
-            borderRadius: '6px',
-            padding: '14px',
-            fontSize: '15px',
+            borderRadius: '10px',
+            padding: '16px',
+            fontSize: '16px',
             fontWeight: 800,
             cursor: 'pointer',
             letterSpacing: '.03em',
-            boxShadow: '0 0 12px #34e29b55',
+            boxShadow: `0 0 14px ${t.color}66`,
+            minHeight: '52px',
           }}
         >
-          🔒 COMMIT
-        </button>
+          🔒 COMMIT · {total} asignada{remaining > 0 ? ` · ${remaining} se banca` : ''}
+        </motion.button>
       </div>
     </div>
   )
