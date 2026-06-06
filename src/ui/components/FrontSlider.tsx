@@ -20,8 +20,7 @@ export function FrontSlider({ label, icon, value, max, onChange, accentColor, sl
     if (!inputRef.current) return
     const pct = max > 0 ? (value / max) * 100 : 0
     inputRef.current.style.setProperty('--slider-pct', `${pct}%`)
-    inputRef.current.style.setProperty('--slider-color', accentColor)
-  }, [value, max, accentColor])
+  }, [value, max])
 
   return (
     <div style={{ marginBottom: '14px' }}>

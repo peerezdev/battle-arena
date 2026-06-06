@@ -24,17 +24,12 @@ export default {
         'neon-red-lg': '0 0 16px #ff5c7244',
       },
       keyframes: {
-        'flip-in': {
-          '0%': { transform: 'rotateY(90deg)', opacity: '0' },
-          '100%': { transform: 'rotateY(0deg)', opacity: '1' },
-        },
         'glow-pulse': {
           '0%, 100%': { boxShadow: '0 0 6px #34e29b55' },
           '50%': { boxShadow: '0 0 16px #34e29baa' },
         },
       },
       animation: {
-        'flip-in': 'flip-in 0.4s ease-out',
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
       },
     },

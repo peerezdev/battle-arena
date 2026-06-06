@@ -14,10 +14,11 @@ interface Props {
 
 export function EnergyHeader({ available, unassigned, winsA, winsB, base, edge, banked, playerColor }: Props) {
   // Build breakdown string: "10 base + 2 edge + 3 bancado" (omit zeroes)
-  const parts: string[] = [`${base} base`]
+  const parts: string[] = []
+  if (base > 0) parts.push(`${base} base`)
   if (edge > 0) parts.push(`${edge} edge`)
   if (banked > 0) parts.push(`${banked} bancado`)
-  const breakdown = parts.join(' + ')
+  const breakdown = parts.length > 0 ? parts.join(' + ') : '—'
 
   const box = {
     background: COLORS.panel,

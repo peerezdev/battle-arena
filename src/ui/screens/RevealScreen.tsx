@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import type { Allocation, FrontKey, FrontWinner, MatchState } from '../../engine'
 import { solidez } from '../../engine'
 import { COLORS, player as playerTheme } from '../theme'
@@ -21,13 +20,6 @@ const FRONTS: { key: FrontKey; label: string; icon: string }[] = [
 ]
 
 export function RevealScreen({ allocA, allocB, frontWinners, roundWinner, nameA, nameB, onContinue, state }: Props) {
-  const [visible, setVisible] = useState(false)
-  useEffect(() => {
-    // Slight delay so the flip-in animation plays after mount
-    const t = setTimeout(() => setVisible(true), 50)
-    return () => clearTimeout(t)
-  }, [])
-
   const solA = solidez(state.cardA)
   const solB = solidez(state.cardB)
 
@@ -104,8 +96,6 @@ export function RevealScreen({ allocA, allocB, frontWinners, roundWinner, nameA,
                 padding: '10px 12px',
                 marginBottom: '6px',
                 animationDelay: `${i * 120}ms`,
-                opacity: visible ? 1 : 0,
-                transition: 'opacity 0.3s',
               }}
             >
               <div
@@ -120,7 +110,7 @@ export function RevealScreen({ allocA, allocB, frontWinners, roundWinner, nameA,
                 <span
                   style={{
                     textAlign: 'right',
-                    fontWeight: 800,
+                    fontWeight: frontWinners[f.key] === 'a' ? 700 : 400,
                     fontSize: '18px',
                     color: frontWinners[f.key] === 'a' ? COLORS.green : COLORS.text,
                   }}
@@ -130,7 +120,7 @@ export function RevealScreen({ allocA, allocB, frontWinners, roundWinner, nameA,
                 <span
                   style={{
                     textAlign: 'right',
-                    fontWeight: 800,
+                    fontWeight: frontWinners[f.key] === 'b' ? 700 : 400,
                     fontSize: '18px',
                     color: frontWinners[f.key] === 'b' ? COLORS.red : COLORS.text,
                   }}

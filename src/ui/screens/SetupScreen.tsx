@@ -146,6 +146,7 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
 
           {/* Edge toggle */}
           <label
+            onClick={() => upd({ edgeEnabled: !s.edgeEnabled })}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -157,7 +158,6 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
             }}
           >
             <div
-              onClick={() => upd({ edgeEnabled: !s.edgeEnabled })}
               style={{
                 width: '40px',
                 height: '22px',
