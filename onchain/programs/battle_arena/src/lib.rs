@@ -3,6 +3,7 @@ pub mod edge;
 pub mod error;
 pub mod hashing;
 pub mod instructions;
+pub mod oracle;
 pub mod rules;
 pub mod state;
 

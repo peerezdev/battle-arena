@@ -646,8 +646,10 @@ dependencies = [
  "anchor-lang",
  "litesvm",
  "sha2 0.10.9",
+ "solana-instructions-sysvar",
  "solana-keypair",
  "solana-message",
+ "solana-sdk-ids",
  "solana-signer",
  "solana-transaction",
 ]
