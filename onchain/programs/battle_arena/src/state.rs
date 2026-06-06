@@ -29,6 +29,7 @@ pub enum Phase {
     Revealing,
     RoundResolved,
     Settled,
+    Closed,
 }
 
 /// Parámetros de configuración del match.
@@ -55,6 +56,7 @@ pub struct Battle {
     pub grade_a: u8,
     pub grade_b: u8,
     pub oracle: Pubkey,
+    pub treasury: Pubkey,
     pub stake_mint: Pubkey,
     pub stake: u64,
     pub cfg: MatchConfig,
@@ -82,7 +84,7 @@ pub struct Battle {
 impl Battle {
     /// Tamaño generoso (sobreestimado) en bytes, incluyendo el discriminador de 8 bytes.
     pub const SPACE: usize = 8        // discriminator
-        + 32 * 6                      // player_a, player_b, nft_mint_a, nft_mint_b, oracle, stake_mint
+        + 32 * 7                      // player_a, player_b, nft_mint_a, nft_mint_b, oracle, treasury, stake_mint
         + 8 * 2                       // value_usd_a, value_usd_b
         + 1 * 2                       // grade_a, grade_b
         + 8                           // stake

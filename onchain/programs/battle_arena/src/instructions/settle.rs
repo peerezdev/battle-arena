@@ -18,12 +18,23 @@ pub struct Settle<'info> {
         bump = battle.vault_bump
     )]
     pub escrow_vault: Account<'info, TokenAccount>,
-    #[account(mut, constraint = winner_token.mint == battle.stake_mint)]
-    pub winner_token: Box<Account<'info, TokenAccount>>,
-    /// En draw: token account del otro jugador; en victoria: ignorado salvo convención.
-    #[account(mut, constraint = loser_token.mint == battle.stake_mint)]
-    pub loser_token: Box<Account<'info, TokenAccount>>,
-    #[account(mut, constraint = treasury.mint == battle.stake_mint)]
+    #[account(
+        mut,
+        constraint = player_a_token.owner == battle.player_a,
+        constraint = player_a_token.mint == battle.stake_mint
+    )]
+    pub player_a_token: Box<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        constraint = player_b_token.owner == battle.player_b,
+        constraint = player_b_token.mint == battle.stake_mint
+    )]
+    pub player_b_token: Box<Account<'info, TokenAccount>>,
+    #[account(
+        mut,
+        constraint = treasury.key() == battle.treasury,
+        constraint = treasury.mint == battle.stake_mint
+    )]
     pub treasury: Box<Account<'info, TokenAccount>>,
     pub token_program: Program<'info, Token>,
 }
@@ -41,14 +52,14 @@ pub fn handler(ctx: Context<Settle>) -> Result<()> {
     let signer: &[&[&[u8]]] = &[seeds];
 
     if b.is_draw {
-        // Reembolsar el stake a cada jugador (winner_token = A, loser_token = B por convención del cliente).
+        // Reembolsar el stake a cada jugador en sus token accounts vinculadas on-chain.
         let stake = b.stake;
         token::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.key(),
                 Transfer {
                     from: ctx.accounts.escrow_vault.to_account_info(),
-                    to: ctx.accounts.winner_token.to_account_info(),
+                    to: ctx.accounts.player_a_token.to_account_info(),
                     authority: ctx.accounts.battle.to_account_info(),
                 },
                 signer,
@@ -60,7 +71,7 @@ pub fn handler(ctx: Context<Settle>) -> Result<()> {
                 ctx.accounts.token_program.key(),
                 Transfer {
                     from: ctx.accounts.escrow_vault.to_account_info(),
-                    to: ctx.accounts.loser_token.to_account_info(),
+                    to: ctx.accounts.player_b_token.to_account_info(),
                     authority: ctx.accounts.battle.to_account_info(),
                 },
                 signer,
@@ -73,6 +84,26 @@ pub fn handler(ctx: Context<Settle>) -> Result<()> {
             .ok_or(error!(ErrorCode::MathOverflow))?
             / 10_000;
         let payout = pot.checked_sub(rake).ok_or(error!(ErrorCode::MathOverflow))?;
+
+        // El ganador se determina por `battle.winner`, no por convención del cliente.
+        let winner_token = if b.winner == Some(0) {
+            ctx.accounts.player_a_token.to_account_info()
+        } else {
+            ctx.accounts.player_b_token.to_account_info()
+        };
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.escrow_vault.to_account_info(),
+                    to: winner_token,
+                    authority: ctx.accounts.battle.to_account_info(),
+                },
+                signer,
+            ),
+            payout,
+        )?;
         if rake > 0 {
             token::transfer(
                 CpiContext::new_with_signer(
@@ -87,18 +118,10 @@ pub fn handler(ctx: Context<Settle>) -> Result<()> {
                 rake,
             )?;
         }
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.key(),
-                Transfer {
-                    from: ctx.accounts.escrow_vault.to_account_info(),
-                    to: ctx.accounts.winner_token.to_account_info(),
-                    authority: ctx.accounts.battle.to_account_info(),
-                },
-                signer,
-            ),
-            payout,
-        )?;
     }
+
+    // Fase terminal: previene un segundo settle (anti-replay).
+    let b = &mut ctx.accounts.battle;
+    b.phase = Phase::Closed;
     Ok(())
 }

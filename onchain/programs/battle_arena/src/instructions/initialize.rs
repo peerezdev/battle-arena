@@ -53,6 +53,7 @@ pub fn handler(
     stake: u64,
     cfg: MatchConfig,
     oracle: Pubkey,
+    treasury: Pubkey,
     nft_mint_a: Pubkey,
     value_usd_a: u64,
     grade_a: u8,
@@ -107,6 +108,7 @@ pub fn handler(
     b.grade_a = grade_a;
     b.grade_b = 0;
     b.oracle = oracle;
+    b.treasury = treasury;
     b.stake_mint = ctx.accounts.stake_mint.key();
     b.stake = stake;
     b.cfg = cfg;
