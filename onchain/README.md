@@ -75,6 +75,16 @@ onchain/
   scripts/gen-vectors.ts
 ```
 
+## Riesgos residuales (resolver ANTES de mainnet / fondos reales)
+
+Aceptables para un MVP de localnet, pero registrados explícitamente porque importan con dinero real (salieron de la revisión final):
+
+1. **Rent bloqueado:** las cuentas `Battle` y `escrow_vault` no se cierran tras `settle`. El USDC del escrow siempre sale, pero el rent en SOL queda atrapado por batalla. Falta un cierre terminal (`close` en `settle`/instrucción `close_battle`) que devuelva el rent al pagador.
+2. **Atestación del oráculo sin nonce ligado a la batalla:** una atestación `(mint, value, grade, ts)` válida es reutilizable por cualquiera dentro de la ventana de 5 min. Antes de mainnet: ligar la atestación al PDA de la batalla / jugador / nonce, y considerar rotación de clave o oráculo multi-firma.
+3. **NFT no bloqueada:** solo se verifica propiedad (`amount ≥ 1`) en el momento; la misma NFT puede respaldar varias batallas simultáneas. Revisar si la escasez debe imponerse.
+4. **Cranking permissionless:** `resolve_round`/`settle`/`claim_timeout` no requieren firmante (correcto y determinista, pero sin modelo de keeper/rate-limit). Decidir y documentar para mainnet.
+5. **Auditoría de seguridad obligatoria** (el escrow custodia USDC) y verificación legal antes de cualquier despliegue con fondos reales.
+
 ## Próximos pasos (otros ciclos)
 
-Servicio de oráculo real (TCG Pricing Intelligence), backend/ELO/matchmaking, frontend + wallet adapter, integración slug, y — antes de mainnet con fondos reales — **auditoría de seguridad** y verificación legal.
+Servicio de oráculo real (TCG Pricing Intelligence), backend/ELO/matchmaking, frontend + wallet adapter, integración slug.
