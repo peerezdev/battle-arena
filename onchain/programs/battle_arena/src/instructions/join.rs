@@ -34,7 +34,7 @@ pub struct JoinBattle<'info> {
     pub nft_token_b: Box<Account<'info, TokenAccount>>,
     /// CHECK: validado por `address` y leído por introspección en `verify_oracle_ed25519`.
     #[account(address = INSTRUCTIONS_SYSVAR_ID)]
-    pub instructions_sysvar: AccountInfo<'info>,
+    pub instructions_sysvar: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -66,7 +66,7 @@ pub fn handler(
     let oracle = ctx.accounts.battle.oracle;
     let msg = attestation_msg(&nft_mint_b, value_usd_b, grade_b, ts_b);
     verify_oracle_ed25519(
-        &ctx.accounts.instructions_sysvar,
+        &ctx.accounts.instructions_sysvar.to_account_info(),
         ed25519_ix_index,
         &oracle,
         &msg,

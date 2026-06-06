@@ -5,6 +5,9 @@ pub const COMMIT_WINDOW: i64 = 300;
 pub const REVEAL_WINDOW: i64 = 300;
 pub const STALE_SECS: i64 = 300;
 
+/// Máximo rake permitido on-chain (5 %).
+pub const MAX_RAKE_BPS: u16 = 500;
+
 /// Reparto de energía entre los tres frentes de una ronda.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Allocation {

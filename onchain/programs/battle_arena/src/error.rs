@@ -26,4 +26,6 @@ pub enum ErrorCode {
     DeadlineNotReached,
     #[msg("Overflow aritmetico")]
     MathOverflow,
+    #[msg("rake_bps excede el máximo permitido")]
+    RakeTooHigh,
 }

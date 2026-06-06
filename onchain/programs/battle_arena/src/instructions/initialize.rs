@@ -40,7 +40,7 @@ pub struct InitializeBattle<'info> {
     pub nft_token_a: Box<Account<'info, TokenAccount>>,
     /// CHECK: validado por `address` y leído por introspección en `verify_oracle_ed25519`.
     #[account(address = INSTRUCTIONS_SYSVAR_ID)]
-    pub instructions_sysvar: AccountInfo<'info>,
+    pub instructions_sysvar: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -77,13 +77,15 @@ pub fn handler(
     // Verificación de la firma del oráculo por introspección.
     let msg = attestation_msg(&nft_mint_a, value_usd_a, grade_a, ts_a);
     verify_oracle_ed25519(
-        &ctx.accounts.instructions_sysvar,
+        &ctx.accounts.instructions_sysvar.to_account_info(),
         ed25519_ix_index,
         &oracle,
         &msg,
     )?;
 
+    require!(stake > 0, ErrorCode::NonPositiveValue);
     require!(value_usd_a > 0, ErrorCode::NonPositiveValue);
+    require!(cfg.rake_bps <= MAX_RAKE_BPS, ErrorCode::RakeTooHigh);
 
     // Depósito de A en el vault de escrow.
     token::transfer(
