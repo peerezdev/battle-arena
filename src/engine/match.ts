@@ -133,3 +133,15 @@ export function resolveRound(state: MatchState): MatchState {
 
   return { ...state, rounds, roundWins, bankedEnergy, phase: 'roundResolved' }
 }
+
+export function resolveBattle(state: MatchState): MatchState {
+  if (state.roundWins.a >= state.config.roundsToWin) return { ...state, winner: 'a', phase: 'settled' }
+  if (state.roundWins.b >= state.config.roundsToWin) return { ...state, winner: 'b', phase: 'settled' }
+  return state
+}
+
+export function nextRound(state: MatchState): MatchState {
+  if (state.phase === 'settled') throw new Error('La batalla ya terminó')
+  const rounds = [...state.rounds, {}]
+  return { ...state, round: state.round + 1, rounds, phase: 'committing' }
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createMatch, availableEnergy, commit, reveal, resolveRound } from './match'
+import { createMatch, availableEnergy, commit, reveal, resolveRound, resolveBattle, nextRound } from './match'
 import { DEFAULT_CONFIG, type Card, type Allocation } from './types'
 import { hashAllocation } from './hash'
 import { solidez } from './solidez'
@@ -169,5 +169,48 @@ describe('resolveRound', () => {
     // empata energía 8-8 y frentes 1-1 -> remate 1-1 disputed; desempate energía empata -> Solidez igual -> ronda nula
     s = resolveRound(s)
     expect(s.rounds[0].roundWinner).toBe('disputed')
+  })
+})
+
+describe('resolveBattle + nextRound', () => {
+  it('declara ganador al llegar a roundsToWin', async () => {
+    let s = await staged(
+      card('A', 1000, 9), card('B', 1000, 9),
+      { apertura: 5, choque: 5, remate: 0 },
+      { apertura: 3, choque: 3, remate: 4 },
+    )
+    s = resolveRound(s)        // A gana ronda 1 (1-0)
+    s = resolveBattle(s)
+    expect(s.winner).toBeNull() // aún 1-0
+    s = nextRound(s)
+    expect(s.round).toBe(1)
+    expect(s.phase).toBe('committing')
+
+    // ronda 2: A gana otra vez (bankedEnergy=0 para ambos, disponible=10)
+    const allocA = { apertura: 5, choque: 5, remate: 0 }
+    const allocB = { apertura: 3, choque: 3, remate: 4 }
+    const hA = await hashAllocation(allocA, 'sA2')
+    const hB = await hashAllocation(allocB, 'sB2')
+    s = commit(s, 'a', hA); s = commit(s, 'b', hB)
+    s = await reveal(s, 'a', allocA, 'sA2')
+    s = await reveal(s, 'b', allocB, 'sB2')
+    s = resolveRound(s)        // A 2-0
+    s = resolveBattle(s)
+    expect(s.winner).toBe('a')
+    expect(s.phase).toBe('settled')
+  })
+
+  it('una ronda nula no avanza el marcador y rejuega', async () => {
+    let s = await staged(
+      card('A', 1000, 9), card('B', 1000, 9),
+      { apertura: 6, choque: 1, remate: 1 },
+      { apertura: 1, choque: 6, remate: 1 },
+    )
+    s = resolveRound(s)        // disputed
+    expect(s.roundWins).toEqual({ a: 0, b: 0 })
+    s = resolveBattle(s)
+    expect(s.winner).toBeNull()
+    s = nextRound(s)
+    expect(s.phase).toBe('committing')
   })
 })
