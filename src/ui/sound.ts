@@ -32,8 +32,9 @@ export function setMuted(next: boolean): void {
 }
 
 export function toggleMuted(): boolean {
-  setMuted(!muted)
-  return muted
+  const next = !isMuted()
+  setMuted(next)
+  return next
 }
 
 function getCtx(): AudioContext | null {

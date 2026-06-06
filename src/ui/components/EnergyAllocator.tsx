@@ -8,9 +8,12 @@ interface Props {
   alloc: Allocation
   /** Total energy available this round. */
   available: number
-  onChange: (a: Allocation) => void
+  /** Called with the front key and a +1 or -1 delta; parent owns clamping. */
+  onChange: (key: FrontKey, delta: number) => void
   accentColor: string
   reducedMotion: boolean
+  /** When true, all controls become no-ops and are visually inactive. */
+  disabled?: boolean
 }
 
 const FRONTS: { key: FrontKey; label: string; icon: string }[] = [
@@ -40,7 +43,7 @@ function Pip({ id, color, reduced }: { id: string; color: string; reduced: boole
   )
 }
 
-export function EnergyAllocator({ alloc, available, onChange, accentColor, reducedMotion }: Props) {
+export function EnergyAllocator({ alloc, available, onChange, accentColor, reducedMotion, disabled = false }: Props) {
   const spent = alloc.apertura + alloc.choque + alloc.remate
   const pool = available - spent
 
@@ -65,15 +68,15 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
   }
 
   function add(key: FrontKey) {
-    if (pool <= 0) return
-    onChange({ ...alloc, [key]: alloc[key] + 1 })
+    if (disabled || pool <= 0) return
+    onChange(key, +1)
     playSfx('tick')
     haptic(8)
   }
 
   function remove(key: FrontKey) {
-    if (alloc[key] <= 0) return
-    onChange({ ...alloc, [key]: alloc[key] - 1 })
+    if (disabled || alloc[key] <= 0) return
+    onChange(key, -1)
     playSfx('tick')
     haptic(8)
   }
@@ -129,10 +132,22 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
       </div>
 
       {/* Three tappable front zones. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          marginBottom: '14px',
+          opacity: disabled ? 0.5 : 1,
+          pointerEvents: disabled ? 'none' : undefined,
+          transition: 'opacity .15s',
+        }}
+        aria-disabled={disabled || undefined}
+      >
         {FRONTS.map((f) => {
           const value = alloc[f.key]
-          const disabledAdd = pool <= 0
+          const disabledAdd = disabled || pool <= 0
+          const disabledRemove = disabled || value <= 0
           return (
             <div
               key={f.key}
@@ -151,6 +166,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                   type="button"
                   onClick={() => add(f.key)}
                   disabled={disabledAdd}
+                  aria-disabled={disabledAdd || undefined}
                   aria-label={`Añadir 1 energía a ${f.label}`}
                   style={{
                     flex: 1,
@@ -199,7 +215,8 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                 <button
                   type="button"
                   onClick={() => remove(f.key)}
-                  disabled={value <= 0}
+                  disabled={disabledRemove}
+                  aria-disabled={disabledRemove || undefined}
                   aria-label={`Quitar 1 energía de ${f.label}`}
                   style={{
                     width: '44px',
@@ -208,10 +225,10 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                     borderRadius: '10px',
                     background: COLORS.bg,
                     border: `1px solid ${COLORS.border}`,
-                    color: value <= 0 ? COLORS.border : COLORS.text,
+                    color: disabledRemove ? COLORS.border : COLORS.text,
                     fontSize: '24px',
                     fontWeight: 700,
-                    cursor: value <= 0 ? 'default' : 'pointer',
+                    cursor: disabledRemove ? 'default' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

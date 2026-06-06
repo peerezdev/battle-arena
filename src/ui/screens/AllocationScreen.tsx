@@ -22,6 +22,16 @@ interface Props {
   playerKey: 'a' | 'b'
 }
 
+/** Apply a delta to one key of an Allocation, clamping each field ≥ 0 and sum ≤ available. */
+function clampApply(prev: Allocation, key: keyof Allocation, delta: number, available: number): Allocation {
+  const next = Math.max(0, prev[key] + delta)
+  const others = (Object.keys(prev) as (keyof Allocation)[])
+    .filter(k => k !== key)
+    .reduce((s, k) => s + prev[k], 0)
+  const clamped = Math.min(next, available - others)
+  return { ...prev, [key]: clamped }
+}
+
 export function AllocationScreen({ available, winsA, winsB, round, playerLabel, onCommit, state, playerKey }: Props) {
   const [a, setA] = useState<Allocation>({ apertura: 0, choque: 0, remate: 0 })
   const [committing, setCommitting] = useState(false)
@@ -90,14 +100,17 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
         <EnergyAllocator
           alloc={a}
           available={available}
-          onChange={setA}
+          onChange={(key, delta) => setA(prev => clampApply(prev, key, delta, available))}
           accentColor={t.color}
           reducedMotion={reduced}
+          disabled={committing}
         />
 
-        {/* Commit button — always enabled (sum ≤ available guaranteed). */}
+        {/* Commit button — disabled once committing to prevent double-submit. */}
         <motion.button
           onClick={handleCommit}
+          disabled={committing}
+          aria-disabled={committing}
           whileTap={reduced ? undefined : { scale: 0.96 }}
           animate={committing && !reduced ? { scale: [1, 1.04, 1] } : undefined}
           transition={{ duration: 0.26 }}
@@ -111,10 +124,12 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
             padding: '16px',
             fontSize: '16px',
             fontWeight: 800,
-            cursor: 'pointer',
+            cursor: committing ? 'default' : 'pointer',
             letterSpacing: '.03em',
             boxShadow: `0 0 14px ${t.color}66`,
             minHeight: '52px',
+            opacity: committing ? 0.7 : 1,
+            pointerEvents: committing ? 'none' : undefined,
           }}
         >
           🔒 COMMIT · {total} asignada{remaining > 0 ? ` · ${remaining} se banca` : ''}

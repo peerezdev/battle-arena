@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 
+const DEFAULT_COLORS = ['#34e29b', '#ff5c72', '#e7ecf5', '#5ad1ff']
+
 interface Props {
   /** Confetti colors (defaults to the neon palette). */
   colors?: string[]
@@ -19,7 +21,7 @@ interface Particle {
 }
 
 /** Lightweight canvas confetti burst — no asset images. Auto-stops after ~2.4s. */
-export function Confetti({ colors = ['#34e29b', '#ff5c72', '#e7ecf5', '#5ad1ff'], active }: Props) {
+export function Confetti({ colors = DEFAULT_COLORS, active }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
