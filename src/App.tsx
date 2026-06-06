@@ -80,16 +80,49 @@ export default function App() {
   const cur = state.rounds[state.round]
 
   if (screen === 'allocateA')
-    return <AllocationScreen available={availableEnergy(state, 'a')} winsA={state.roundWins.a} winsB={state.roundWins.b} round={state.round} playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Jugador A)` : `Tú — ${nameA}`} onCommit={commitA} />
+    return (
+      <AllocationScreen
+        available={availableEnergy(state, 'a')}
+        winsA={state.roundWins.a}
+        winsB={state.roundWins.b}
+        round={state.round}
+        playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Jugador A)` : `Tú — ${nameA}`}
+        onCommit={commitA}
+        state={state}
+        playerKey="a"
+      />
+    )
 
   if (screen === 'passToB')
     return <PassDeviceScreen nextPlayer={`${nameB} (Jugador B)`} onReady={() => setScreen('allocateB')} />
 
   if (screen === 'allocateB')
-    return <AllocationScreen available={availableEnergy(state, 'b')} winsA={state.roundWins.a} winsB={state.roundWins.b} round={state.round} playerLabel={`${nameB} (Jugador B)`} onCommit={commitB} />
+    return (
+      <AllocationScreen
+        available={availableEnergy(state, 'b')}
+        winsA={state.roundWins.a}
+        winsB={state.roundWins.b}
+        round={state.round}
+        playerLabel={`${nameB} (Jugador B)`}
+        onCommit={commitB}
+        state={state}
+        playerKey="b"
+      />
+    )
 
   if (screen === 'reveal')
-    return <RevealScreen allocA={cur.revealA!} allocB={cur.revealB!} frontWinners={cur.frontWinners!} roundWinner={cur.roundWinner!} nameA={nameA} nameB={nameB} onContinue={continueAfterReveal} />
+    return (
+      <RevealScreen
+        allocA={cur.revealA!}
+        allocB={cur.revealB!}
+        frontWinners={cur.frontWinners!}
+        roundWinner={cur.roundWinner!}
+        nameA={nameA}
+        nameB={nameB}
+        onContinue={continueAfterReveal}
+        state={state}
+      />
+    )
 
   if (screen === 'result') {
     const wl = state.winner === 'a' ? `Gana ${nameA}` : `Gana ${nameB}`

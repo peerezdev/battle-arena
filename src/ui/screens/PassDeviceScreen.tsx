@@ -1,9 +1,60 @@
+import { COLORS } from '../theme'
+
 export function PassDeviceScreen({ nextPlayer, onReady }: { nextPlayer: string; onReady: () => void }) {
   return (
-    <div className="max-w-md mx-auto p-6 text-center min-h-[60vh] flex flex-col justify-center">
-      <h2 className="text-xl font-bold mb-4">📲 Pasa el dispositivo a {nextPlayer}</h2>
-      <p className="opacity-70 mb-6">Que el otro jugador no vea la pantalla anterior.</p>
-      <button className="bg-blue-600 text-white rounded p-3 font-semibold" onClick={onReady}>Listo</button>
+    <div
+      style={{
+        minHeight: '100dvh',
+        background: COLORS.bg,
+        color: COLORS.text,
+        fontFamily: 'Inter, system-ui, sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 16px',
+        textAlign: 'center',
+      }}
+    >
+      <div
+        style={{
+          background: COLORS.panel,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: '12px',
+          padding: '32px 24px',
+          maxWidth: '360px',
+          width: '100%',
+        }}
+      >
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📲</div>
+        <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', color: COLORS.text }}>
+          Pasa el dispositivo a
+        </div>
+        <div style={{ fontSize: '22px', fontWeight: 800, color: COLORS.red, marginBottom: '16px' }}>
+          {nextPlayer}
+        </div>
+        <div style={{ fontSize: '13px', color: COLORS.muted, marginBottom: '28px', lineHeight: 1.5 }}>
+          Que el otro jugador no vea la pantalla anterior.
+        </div>
+        <button
+          onClick={onReady}
+          style={{
+            width: '100%',
+            background: COLORS.green,
+            color: '#04130c',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '14px',
+            fontSize: '15px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            letterSpacing: '.03em',
+            boxShadow: '0 0 12px #34e29b55',
+          }}
+        >
+          Listo ✓
+        </button>
+      </div>
     </div>
   )
 }
