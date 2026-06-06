@@ -41,6 +41,8 @@ solana-program-option = "3.1.0"
 spl-token-interface = "2.0.0"
 solana-system-interface = { version = "3.2.0", features = ["bincode"] }
 ed25519-dalek = "2.2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 
 [lints.rust]
