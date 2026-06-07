@@ -4,6 +4,37 @@ from app.services.matches import register_match, list_open, sync_match, MatchErr
 from app.services.users import get_or_create_user
 
 
+async def test_register_rejects_duplicate(Session):
+    chain = MockChainSource(); chain.set_battle("B1", player_a="A", stake=100)
+    with Session() as s:
+        await register_match(s, chain, creator="A", battle_pubkey="B1", min_elo=None, max_elo=None, elo_start=1200)
+        s.commit()
+    with Session() as s:
+        with pytest.raises(MatchError):
+            await register_match(s, chain, creator="A", battle_pubkey="B1", min_elo=None, max_elo=None, elo_start=1200)
+
+
+async def test_sync_settled_without_opponent(Session):
+    chain = MockChainSource(); chain.set_battle("B1", player_a="A", stake=100)
+    with Session() as s:
+        await register_match(s, chain, creator="A", battle_pubkey="B1", min_elo=None, max_elo=None, elo_start=1200)
+        s.commit()
+    chain.settle("B1", winner=None)  # liquidada sin que nadie se uniera
+    with Session() as s:
+        m = await sync_match(s, chain, "B1", elo_start=1200, k=32)
+        s.commit()
+        assert m.status == "settled" and m.elo_applied is True and m.opponent is None
+
+
+async def test_list_open_without_viewer_no_enrichment(Session):
+    chain = MockChainSource(); chain.set_battle("B1", player_a="A", stake=100)
+    with Session() as s:
+        await register_match(s, chain, creator="A", battle_pubkey="B1", min_elo=None, max_elo=None, elo_start=1200)
+        s.commit()
+        rows = list_open(s, viewer=None)
+        assert "joinable" not in rows[0] and rows[0]["battle_pubkey"] == "B1"
+
+
 async def test_register_requires_created_and_creator(Session):
     chain = MockChainSource()
     chain.set_battle("B1", player_a="A", stake=100)

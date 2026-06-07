@@ -6,6 +6,14 @@ from sqlalchemy.orm import Session
 from ..models import User, RatingHistory
 
 
+def read_user_view(session: Session, wallet: str, elo_start: int) -> dict:
+    """Lectura sin efectos: devuelve el usuario si existe, o una vista por defecto (sin persistir)."""
+    u = session.get(User, wallet)
+    if u is None:
+        return {"wallet": wallet, "alias": None, "elo": elo_start, "games_played": 0}
+    return {"wallet": u.wallet, "alias": u.alias, "elo": u.elo, "games_played": u.games_played}
+
+
 def get_or_create_user(session: Session, wallet: str, elo_start: int) -> User:
     user = session.get(User, wallet)
     if user is None:

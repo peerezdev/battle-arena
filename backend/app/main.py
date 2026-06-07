@@ -10,7 +10,7 @@ from .db import make_engine, make_session_factory, init_db
 from .auth import AuthService, AuthError
 from .chain.base import ChainSource
 from .chain.mock import MockChainSource
-from .services.users import get_or_create_user, set_alias, leaderboard, history
+from .services.users import get_or_create_user, read_user_view, set_alias, leaderboard, history
 from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
 
@@ -74,9 +74,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
 
     @app.get("/users/{wallet}")
     async def get_user(wallet: str, s: Session = Depends(db)):
-        u = get_or_create_user(s, wallet, elo_start)
-        s.commit()
-        return {"wallet": u.wallet, "alias": u.alias, "elo": u.elo, "games_played": u.games_played}
+        return read_user_view(s, wallet, elo_start)
 
     @app.get("/users/{wallet}/history")
     async def get_history(wallet: str, s: Session = Depends(db)):
@@ -112,10 +110,10 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
 
     @app.get("/elo/compare")
     async def elo_compare(a: str, b: str, s: Session = Depends(db)):
-        ua = get_or_create_user(s, a, elo_start); ub = get_or_create_user(s, b, elo_start)
-        s.commit()
-        diff = ua.elo - ub.elo
-        return {"elo_a": ua.elo, "elo_b": ub.elo, "diff": diff, "gap_label": gap_label(diff)}
+        va = read_user_view(s, a, elo_start)["elo"]
+        vb = read_user_view(s, b, elo_start)["elo"]
+        diff = va - vb
+        return {"elo_a": va, "elo_b": vb, "diff": diff, "gap_label": gap_label(diff)}
 
     @app.get("/leaderboard")
     async def get_leaderboard(limit: int = 50, s: Session = Depends(db)):

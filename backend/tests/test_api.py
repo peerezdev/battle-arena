@@ -56,6 +56,14 @@ def test_create_match_requires_auth():
     assert r.status_code == 401
 
 
+def test_get_unknown_user_is_readonly():
+    c, _, _ = _client()
+    r = c.get("/users/SomeUnknownWalletPubkey1111111111111111")
+    assert r.status_code == 200 and r.json()["elo"] == 1200
+    lb = c.get("/leaderboard").json()
+    assert lb == []  # la lectura no creó ningún usuario
+
+
 def test_sync_applies_elo_and_compare():
     c, chain, _ = _client()
     ka, kb = SigningKey.generate(), SigningKey.generate()
