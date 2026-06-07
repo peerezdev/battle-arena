@@ -38,6 +38,16 @@ def test_verify_without_nonce_rejected():
         auth.verify(_wallet(key), "00")
 
 
+def test_nonce_single_use_replay():
+    key = SigningKey.generate(); wallet = _wallet(key)
+    auth = AuthService(nonce_fn=lambda: "N", token_fn=lambda: "T", now_fn=lambda: 0, ttl=3600)
+    auth.issue_nonce(wallet)
+    sig = key.sign(auth_message("N").encode()).signature.hex()
+    auth.verify(wallet, sig)            # primer uso OK
+    with pytest.raises(AuthError):
+        auth.verify(wallet, sig)        # replay del mismo nonce/firma -> rechazado
+
+
 def test_expired_token_returns_none():
     t = {"v": 0}
     auth = AuthService(nonce_fn=lambda: "N", token_fn=lambda: "T", now_fn=lambda: t["v"], ttl=10)

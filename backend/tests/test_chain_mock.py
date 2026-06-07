@@ -16,6 +16,14 @@ async def test_get_battle_missing():
         await src.get_battle("NOPE")
 
 
+def test_join_settle_missing_raises():
+    src = MockChainSource()
+    with pytest.raises(BattleNotFound):
+        src.join("NOPE", player_b="B")
+    with pytest.raises(BattleNotFound):
+        src.settle("NOPE", winner="A")
+
+
 async def test_advance_joined_and_settled():
     src = MockChainSource()
     src.set_battle("B1", player_a="A", stake=100)

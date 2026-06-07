@@ -17,11 +17,15 @@ class MockChainSource:
         }
 
     def join(self, battle: str, player_b: str) -> None:
+        if battle not in self._battles:
+            raise BattleNotFound(battle)
         b = self._battles[battle]
         b["player_b"] = player_b
         b["phase"] = "Committing"
 
     def settle(self, battle: str, winner: Optional[str] = None, is_draw: bool = False) -> None:
+        if battle not in self._battles:
+            raise BattleNotFound(battle)
         b = self._battles[battle]
         b["phase"] = "Settled"
         b["winner"] = winner

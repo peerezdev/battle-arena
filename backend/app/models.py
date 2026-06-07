@@ -15,7 +15,7 @@ class User(Base):
     alias: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     elo: Mapped[int] = mapped_column(Integer, default=1200)
     games_played: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class Match(Base):
@@ -30,8 +30,8 @@ class Match(Base):
     winner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_draw: Mapped[bool] = mapped_column(Boolean, default=False)
     elo_applied: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
-    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RatingHistory(Base):
@@ -42,4 +42,4 @@ class RatingHistory(Base):
     elo_before: Mapped[int] = mapped_column(Integer)
     elo_after: Mapped[int] = mapped_column(Integer)
     result: Mapped[str] = mapped_column(String)  # win|loss|draw
-    ts: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

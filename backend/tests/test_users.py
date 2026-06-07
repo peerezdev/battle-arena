@@ -1,4 +1,5 @@
 from app.services.users import get_or_create_user, set_alias, leaderboard, history
+from app.models import RatingHistory
 
 
 def test_get_or_create(Session):
@@ -26,3 +27,12 @@ def test_leaderboard_orders_by_elo(Session):
         s.commit()
         top = leaderboard(s, limit=2)
         assert [u.wallet for u in top] == ["B", "A"]
+
+
+def test_history_returns_rows_desc(Session):
+    with Session() as s:
+        get_or_create_user(s, "A", elo_start=1200)
+        s.add(RatingHistory(wallet="A", battle_pubkey="B1", elo_before=1200, elo_after=1216, result="win"))
+        s.commit()
+        rows = history(s, "A")
+        assert len(rows) == 1 and rows[0].result == "win" and rows[0].elo_after == 1216
