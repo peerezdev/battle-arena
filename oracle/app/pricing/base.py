@@ -23,6 +23,8 @@ def parse_insured_value(raw: Optional[str]) -> int:
     dollars = int(d.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     if dollars <= 0:
         raise ValueUnavailable(f"insuredValue no positivo: {raw!r}")
+    if dollars > 2**64 - 1:
+        raise ValueUnavailable(f"insuredValue desborda u64: {raw!r}")
     return dollars
 
 

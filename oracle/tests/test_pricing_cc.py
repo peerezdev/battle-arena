@@ -55,6 +55,14 @@ def test_extract_no_fallback_to_listing_price():
 
 
 @respx.mock
+async def test_get_value_http_error_raises_unavailable():
+    respx.get("https://api.collectorcrypt.com/marketplace").mock(return_value=httpx.Response(500))
+    src = CollectorCryptSource(base_url="https://api.collectorcrypt.com", cache_ttl=0)
+    with pytest.raises(ValueUnavailable):
+        await src.get_value(MINT_OK)
+
+
+@respx.mock
 async def test_get_value_caches_within_ttl():
     route = respx.get("https://api.collectorcrypt.com/marketplace").mock(
         return_value=httpx.Response(200, json=_payload())

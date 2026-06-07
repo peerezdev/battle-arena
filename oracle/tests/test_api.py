@@ -34,4 +34,4 @@ def test_attest_unavailable(client):
 def test_attest_invalid_mint(client):
     c, _ = client
     r = c.get("/attest", params={"mint": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"})  # 32 chars but decodes to <32 bytes
-    assert r.status_code in (409, 422)  # nunca 500
+    assert r.status_code == 422  # mint de longitud inválida → siempre 422

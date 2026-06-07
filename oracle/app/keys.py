@@ -14,6 +14,7 @@ def load_or_create_signing_key(path: str) -> SigningKey:
     key = SigningKey.generate()
     with open(path, "w") as f:
         json.dump({"seed_hex": bytes(key).hex()}, f)
+    os.chmod(path, 0o600)
     return key
 
 

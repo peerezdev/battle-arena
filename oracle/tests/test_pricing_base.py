@@ -15,6 +15,11 @@ def test_parse_insured_value_rejects_bad():
             parse_insured_value(bad)
 
 
+def test_parse_insured_value_rejects_overflow_u64():
+    with pytest.raises(ValueUnavailable):
+        parse_insured_value("99999999999999999999999999")
+
+
 def test_parse_grade_ok_and_bad():
     assert parse_grade(9) == 9
     # bool es subclase de int en Python (True == 1): el guard debe rechazarlos

@@ -33,7 +33,7 @@ def create_app(signing_key: SigningKey, pricing: PricingSource,
         ts = now_fn()
         try:
             signed = sign_attestation(signing_key, mint, card["value_usd"], card["grade"], ts)
-        except ValueError as e:
+        except (ValueError, OverflowError) as e:
             raise HTTPException(status_code=422, detail=str(e))
         return {
             "mint": mint, "value_usd": card["value_usd"], "grade": card["grade"],
