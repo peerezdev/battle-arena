@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { MOCK_CARDS } from '../../data/cards'
 import type { Mode } from '../../engine'
 import type { Difficulty } from '../../bot/bot'
+import { COLORS, formatUsd } from '../theme'
+import { solidez } from '../../engine'
 
 export interface Setup {
   opponent: 'vs-bot' | 'hotseat'
@@ -12,48 +14,218 @@ export interface Setup {
   difficulty: Difficulty
 }
 
+const S = {
+  label: {
+    display: 'block',
+    fontSize: '11px',
+    fontWeight: 700,
+    letterSpacing: '.05em',
+    color: COLORS.muted,
+    marginBottom: '4px',
+    textTransform: 'uppercase' as const,
+  },
+  select: {
+    width: '100%',
+    background: COLORS.panel,
+    color: COLORS.text,
+    border: `1px solid ${COLORS.border}`,
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: '14px',
+    marginBottom: '14px',
+    outline: 'none',
+    appearance: 'auto' as const,
+  },
+}
+
+function CardPreview({ cardId, playerKey }: { cardId: string; playerKey: 'a' | 'b' }) {
+  const card = MOCK_CARDS.find((c) => c.id === cardId)
+  if (!card) return null
+  const color = playerKey === 'a' ? COLORS.green : COLORS.red
+  const label = playerKey === 'a' ? '🟢' : '🔴'
+  return (
+    <div
+      style={{
+        background: COLORS.panel,
+        border: `1px solid ${color}44`,
+        borderRadius: '6px',
+        padding: '8px 10px',
+        marginBottom: '14px',
+        fontSize: '12px',
+      }}
+    >
+      <span style={{ color, fontWeight: 700 }}>{label} {card.name}</span>
+      <span style={{ color: COLORS.muted, marginLeft: '8px' }}>
+        {formatUsd(card.valueUsd)} · {card.gradeCompany}{card.grade} · Sol {solidez(card)}
+      </span>
+    </div>
+  )
+}
+
 export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; error?: string }) {
   const [s, setS] = useState<Setup>({
     opponent: 'vs-bot', cardAId: MOCK_CARDS[0].id, cardBId: MOCK_CARDS[1].id,
     mode: 'ranked', edgeEnabled: true, difficulty: 'medium',
   })
   const upd = (p: Partial<Setup>) => setS({ ...s, ...p })
-  const sel = 'border rounded p-2 w-full mb-3'
+
+  const sameCard = s.cardAId === s.cardBId
+
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">🃏 TCG Battle Arena — Fase 0</h1>
-      {error && <p className="bg-red-100 text-red-700 p-2 rounded mb-3">{error}</p>}
-      <label className="block text-sm font-semibold">Rival</label>
-      <select className={sel} value={s.opponent} onChange={(e) => upd({ opponent: e.target.value as Setup['opponent'] })}>
-        <option value="vs-bot">vs Bot</option>
-        <option value="hotseat">Hotseat (2 jugadores)</option>
-      </select>
-      <label className="block text-sm font-semibold">Carta A</label>
-      <select className={sel} value={s.cardAId} onChange={(e) => upd({ cardAId: e.target.value })}>
-        {MOCK_CARDS.map((c) => <option key={c.id} value={c.id}>{c.name} (${c.valueUsd} · {c.gradeCompany}{c.grade})</option>)}
-      </select>
-      <label className="block text-sm font-semibold">Carta B</label>
-      <select className={sel} value={s.cardBId} onChange={(e) => upd({ cardBId: e.target.value })}>
-        {MOCK_CARDS.map((c) => <option key={c.id} value={c.id}>{c.name} (${c.valueUsd} · {c.gradeCompany}{c.grade})</option>)}
-      </select>
-      <label className="block text-sm font-semibold">Modo</label>
-      <select className={sel} value={s.mode} onChange={(e) => upd({ mode: e.target.value as Mode })}>
-        <option value="ranked">Ranked (cap 4x)</option>
-        <option value="challenge">Challenge (sin cap)</option>
-      </select>
-      <label className="block mb-3"><input type="checkbox" checked={s.edgeEnabled} onChange={(e) => upd({ edgeEnabled: e.target.checked })} /> Edge de carta activado</label>
-      {s.opponent === 'vs-bot' && (
-        <>
-          <label className="block text-sm font-semibold">Dificultad bot</label>
-          <select className={sel} value={s.difficulty} onChange={(e) => upd({ difficulty: e.target.value as Difficulty })}>
-            <option value="easy">Fácil</option><option value="medium">Medio</option><option value="hard">Difícil</option>
+    <div
+      style={{
+        minHeight: '100dvh',
+        background: COLORS.bg,
+        color: COLORS.text,
+        fontFamily: 'Inter, system-ui, sans-serif',
+        padding: '0 16px 32px',
+      }}
+    >
+      <div style={{ maxWidth: '420px', margin: '0 auto', paddingTop: '32px' }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px', color: COLORS.green }}>
+            ⚡ TCG Battle Arena
+          </div>
+          <div style={{ fontSize: '12px', color: COLORS.muted, marginTop: '4px' }}>Fase 0 · Arena Oscura</div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div
+            style={{
+              background: '#300a0f',
+              border: `1px solid ${COLORS.red}`,
+              color: COLORS.red,
+              borderRadius: '6px',
+              padding: '10px 12px',
+              fontSize: '13px',
+              marginBottom: '16px',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Panel */}
+        <div
+          style={{
+            background: COLORS.panel,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: '8px',
+            padding: '20px',
+          }}
+        >
+          <label style={S.label}>Rival</label>
+          <select style={S.select} value={s.opponent} onChange={(e) => upd({ opponent: e.target.value as Setup['opponent'] })}>
+            <option value="vs-bot">vs Bot</option>
+            <option value="hotseat">Hotseat (2 jugadores)</option>
           </select>
-        </>
-      )}
-      {s.cardAId === s.cardBId && (
-        <p className="text-red-600 text-sm mb-2">Las dos cartas deben ser distintas.</p>
-      )}
-      <button className="w-full bg-blue-600 text-white rounded p-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed" disabled={s.cardAId === s.cardBId} onClick={() => onStart(s)}>Empezar</button>
+
+          <label style={S.label}>Carta A (🟢 Verde)</label>
+          <select style={S.select} value={s.cardAId} onChange={(e) => upd({ cardAId: e.target.value })}>
+            {MOCK_CARDS.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} ({formatUsd(c.valueUsd)} · {c.gradeCompany}{c.grade})</option>
+            ))}
+          </select>
+          <CardPreview cardId={s.cardAId} playerKey="a" />
+
+          <label style={S.label}>Carta B (🔴 Rojo)</label>
+          <select style={S.select} value={s.cardBId} onChange={(e) => upd({ cardBId: e.target.value })}>
+            {MOCK_CARDS.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} ({formatUsd(c.valueUsd)} · {c.gradeCompany}{c.grade})</option>
+            ))}
+          </select>
+          <CardPreview cardId={s.cardBId} playerKey="b" />
+
+          <label style={S.label}>Modo</label>
+          <select style={S.select} value={s.mode} onChange={(e) => upd({ mode: e.target.value as Mode })}>
+            <option value="ranked">Ranked (cap 4x)</option>
+            <option value="challenge">Challenge (sin cap)</option>
+          </select>
+
+          {/* Edge toggle */}
+          <label
+            onClick={() => upd({ edgeEnabled: !s.edgeEnabled })}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              cursor: 'pointer',
+              marginBottom: '16px',
+              fontSize: '13px',
+              color: COLORS.text,
+            }}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '22px',
+                borderRadius: '11px',
+                background: s.edgeEnabled ? COLORS.green : COLORS.border,
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+                flexShrink: 0,
+                boxShadow: s.edgeEnabled ? '0 0 8px #34e29b66' : 'none',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '3px',
+                  left: s.edgeEnabled ? '21px' : '3px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: '#fff',
+                  transition: 'left 0.2s',
+                }}
+              />
+            </div>
+            <span>Edge de carta activado</span>
+            <span style={{ color: COLORS.muted, fontSize: '11px' }}>(ventaja por valor)</span>
+          </label>
+
+          {s.opponent === 'vs-bot' && (
+            <>
+              <label style={S.label}>Dificultad bot</label>
+              <select style={S.select} value={s.difficulty} onChange={(e) => upd({ difficulty: e.target.value as Difficulty })}>
+                <option value="easy">Fácil</option>
+                <option value="medium">Medio</option>
+                <option value="hard">Difícil</option>
+              </select>
+            </>
+          )}
+
+          {sameCard && (
+            <div style={{ color: COLORS.red, fontSize: '12px', marginBottom: '12px' }}>
+              Las dos cartas deben ser distintas.
+            </div>
+          )}
+
+          <button
+            disabled={sameCard}
+            onClick={() => onStart(s)}
+            style={{
+              width: '100%',
+              background: sameCard ? COLORS.border : COLORS.green,
+              color: sameCard ? COLORS.muted : '#04130c',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '14px',
+              fontSize: '15px',
+              fontWeight: 800,
+              cursor: sameCard ? 'not-allowed' : 'pointer',
+              letterSpacing: '.03em',
+              boxShadow: sameCard ? 'none' : '0 0 12px #34e29b55',
+              transition: 'box-shadow 0.2s',
+            }}
+          >
+            ⚡ EMPEZAR PARTIDA
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { exportJson } from '../../instrumentation/playtest'
+import { COLORS } from '../theme'
 
 export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: number, comment: string) => void; onPlayAgain: () => void }) {
   const [rating, setRating] = useState(3)
   const [comment, setComment] = useState('')
   const [done, setDone] = useState(false)
+
   const download = () => {
     if (!done) {
       onSubmit(rating, comment)
@@ -15,23 +17,148 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
     const a = document.createElement('a'); a.href = url; a.download = 'playtest.json'; a.click()
     URL.revokeObjectURL(url)
   }
+
   return (
-    <div className="max-w-md mx-auto p-6 text-center">
-      <h2 className="text-xl font-bold mb-4">¿Fue divertida?</h2>
-      <div className="flex justify-center gap-2 mb-4">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} className={`w-10 h-10 rounded-full ${rating >= n ? 'bg-yellow-400' : 'bg-slate-200'}`} onClick={() => setRating(n)}>{n}</button>
-        ))}
-      </div>
-      <textarea className="border rounded w-full p-2 mb-3" placeholder="Comentario (opcional)" value={comment} onChange={(e) => setComment(e.target.value)} />
-      {!done ? (
-        <button className="w-full bg-blue-600 text-white rounded p-3 font-semibold mb-2" onClick={() => { onSubmit(rating, comment); setDone(true) }}>Enviar</button>
-      ) : (
-        <p className="text-green-700 mb-2">¡Gracias! Registrado.</p>
-      )}
-      <div className="flex gap-2">
-        <button className="flex-1 bg-slate-200 rounded p-2" onClick={download}>Exportar JSON</button>
-        <button className="flex-1 bg-slate-200 rounded p-2" onClick={onPlayAgain}>Jugar otra</button>
+    <div
+      style={{
+        minHeight: '100dvh',
+        background: COLORS.bg,
+        color: COLORS.text,
+        fontFamily: 'Inter, system-ui, sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 16px',
+      }}
+    >
+      <div
+        style={{
+          background: COLORS.panel,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: '12px',
+          padding: '28px 24px',
+          maxWidth: '380px',
+          width: '100%',
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '20px', color: COLORS.text }}>
+          ¿Fue divertida?
+        </div>
+
+        {/* Star rating */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '20px' }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              onClick={() => setRating(n)}
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: rating >= n ? '#f59e0b' : COLORS.border,
+                border: 'none',
+                color: rating >= n ? '#0a0e1a' : COLORS.muted,
+                fontWeight: 800,
+                fontSize: '16px',
+                cursor: 'pointer',
+                boxShadow: rating >= n ? '0 0 8px #f59e0b66' : 'none',
+                transition: 'background 0.15s, box-shadow 0.15s',
+              }}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+
+        {/* Comment */}
+        <textarea
+          style={{
+            background: COLORS.bg,
+            color: COLORS.text,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: '6px',
+            width: '100%',
+            padding: '10px',
+            fontSize: '13px',
+            marginBottom: '16px',
+            resize: 'vertical',
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+          rows={3}
+          placeholder="Comentario (opcional)"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+
+        {!done ? (
+          <button
+            onClick={() => { onSubmit(rating, comment); setDone(true) }}
+            style={{
+              width: '100%',
+              background: COLORS.green,
+              color: '#04130c',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '13px',
+              fontSize: '15px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 0 12px #34e29b55',
+              marginBottom: '12px',
+            }}
+          >
+            Enviar
+          </button>
+        ) : (
+          <div
+            style={{
+              color: COLORS.green,
+              fontSize: '14px',
+              marginBottom: '12px',
+              fontWeight: 600,
+            }}
+          >
+            ✓ ¡Gracias! Registrado.
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={download}
+            style={{
+              flex: 1,
+              background: COLORS.border,
+              color: COLORS.text,
+              border: 'none',
+              borderRadius: '6px',
+              padding: '11px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Exportar JSON
+          </button>
+          <button
+            onClick={onPlayAgain}
+            style={{
+              flex: 1,
+              background: COLORS.border,
+              color: COLORS.text,
+              border: 'none',
+              borderRadius: '6px',
+              padding: '11px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Jugar otra
+          </button>
+        </div>
       </div>
     </div>
   )
