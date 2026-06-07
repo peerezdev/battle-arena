@@ -1,0 +1,16 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    database_url: str = "sqlite:///battlearena.db"
+    chain_source: str = "mock"
+    solana_rpc_url: str = "https://api.devnet.solana.com"
+    program_id: str = ""
+    elo_start: int = 1200
+    elo_k: int = 32
+    session_ttl: int = 3600
+
+
+def get_settings() -> Settings:
+    return Settings()
