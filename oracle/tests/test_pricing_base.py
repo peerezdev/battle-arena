@@ -6,6 +6,7 @@ def test_parse_insured_value_rounds_half_up():
     assert parse_insured_value("125") == 125
     assert parse_insured_value("124.50") == 125
     assert parse_insured_value("124.49") == 124
+    assert parse_insured_value("0.5") == 1  # half-up, positivo -> aceptado
 
 
 def test_parse_insured_value_rejects_bad():
@@ -16,6 +17,7 @@ def test_parse_insured_value_rejects_bad():
 
 def test_parse_grade_ok_and_bad():
     assert parse_grade(9) == 9
-    for bad in [None, 0, 11, -1]:
+    # bool es subclase de int en Python (True == 1): el guard debe rechazarlos
+    for bad in [None, 0, 11, -1, True, False]:
         with pytest.raises(ValueUnavailable):
             parse_grade(bad)
