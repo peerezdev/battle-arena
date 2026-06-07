@@ -46,3 +46,21 @@ async def test_get_value_calls_api():
     assert v["value_usd"] == 1200 and v["grade"] == 9
     assert route.called
     assert route.calls.last.request.url.params["search"] == MINT_OK
+
+
+def test_extract_no_fallback_to_listing_price():
+    items = _items_from_payload(_payload())
+    with pytest.raises(ValueUnavailable):
+        _extract_card(items, "3LISTINGonlyMINTxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+
+
+@respx.mock
+async def test_get_value_caches_within_ttl():
+    route = respx.get("https://api.collectorcrypt.com/marketplace").mock(
+        return_value=httpx.Response(200, json=_payload())
+    )
+    src = CollectorCryptSource(base_url="https://api.collectorcrypt.com", cache_ttl=300)
+    a = await src.get_value(MINT_OK)
+    b = await src.get_value(MINT_OK)
+    assert a == b
+    assert route.call_count == 1  # segunda llamada servida desde caché

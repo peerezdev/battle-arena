@@ -43,9 +43,9 @@ class CollectorCryptSource(PricingSource):
                 resp = await client.get(url, params={"search": mint},
                                         headers={"accept": "application/json"})
                 resp.raise_for_status()
-            except httpx.HTTPError as e:
+                payload = resp.json()
+            except (httpx.HTTPError, ValueError) as e:
                 raise ValueUnavailable(f"error CC API: {e}")
-            payload = resp.json()
         card = _extract_card(_items_from_payload(payload), mint)
         if self._ttl > 0:
             self._cache[mint] = (now, card)

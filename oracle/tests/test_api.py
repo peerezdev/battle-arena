@@ -29,3 +29,9 @@ def test_attest_unavailable(client):
     c, _ = client
     r = c.get("/attest", params={"mint": MINT_NOVALUE})
     assert r.status_code == 409
+
+
+def test_attest_invalid_mint(client):
+    c, _ = client
+    r = c.get("/attest", params={"mint": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"})  # 32 chars but decodes to <32 bytes
+    assert r.status_code in (409, 422)  # nunca 500

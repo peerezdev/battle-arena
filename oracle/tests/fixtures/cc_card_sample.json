@@ -19,6 +19,16 @@
       "gradingID": "555",
       "insuredValue": null,
       "listing": null
+    },
+    {
+      "id": "card-3",
+      "nftAddress": "3LISTINGonlyMINTxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "itemName": "Carta solo con precio de listado (sin insuredValue)",
+      "gradeNum": 8,
+      "gradingCompany": "PSA",
+      "gradingID": "777",
+      "insuredValue": null,
+      "listing": { "price": 950, "currency": "USDC", "marketplace": "CC" }
     }
   ]
 }
