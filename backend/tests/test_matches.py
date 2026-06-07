@@ -79,6 +79,32 @@ async def test_list_open_enriches_with_gap_and_joinable(Session):
         assert r2["joinable"] is False
 
 
+async def test_sync_chain_missing_raises_matcherror(Session):
+    chain = MockChainSource(); chain.set_battle("B1", player_a="A", stake=100)
+    with Session() as s:
+        await register_match(s, chain, creator="A", battle_pubkey="B1", min_elo=None, max_elo=None, elo_start=1200)
+        s.commit()
+    chain._battles.pop("B1")  # la cuenta on-chain desaparece
+    with Session() as s:
+        with pytest.raises(MatchError):
+            await sync_match(s, chain, "B1", elo_start=1200, k=32)
+
+
+async def test_sync_settled_winner_none_with_opponent_is_draw(Session):
+    chain = MockChainSource(); chain.set_battle("B1", player_a="A", stake=100)
+    with Session() as s:
+        await register_match(s, chain, creator="A", battle_pubkey="B1", min_elo=None, max_elo=None, elo_start=1200)
+        s.commit()
+    chain.join("B1", player_b="B")
+    chain.settle("B1", winner=None, is_draw=False)  # estado ambiguo: defensivo -> empate
+    with Session() as s:
+        m = await sync_match(s, chain, "B1", elo_start=1200, k=32)
+        s.commit()
+        a = get_or_create_user(s, "A", 1200); b = get_or_create_user(s, "B", 1200)
+        assert a.elo == 1200 and b.elo == 1200  # empate entre iguales -> sin cambio
+        assert m.is_draw is False  # se refleja el estado on-chain real, pero el rating fue de empate
+
+
 async def test_sync_joined_then_settled_applies_elo_once(Session):
     chain = MockChainSource()
     chain.set_battle("B1", player_a="A", stake=100)

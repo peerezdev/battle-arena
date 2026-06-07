@@ -64,6 +64,12 @@ def test_get_unknown_user_is_readonly():
     assert lb == []  # la lectura no creó ningún usuario
 
 
+def test_sync_unknown_match_404():
+    c, chain, _ = _client()
+    r = c.post("/matches/UNREGISTERED/sync")
+    assert r.status_code == 404
+
+
 def test_sync_applies_elo_and_compare():
     c, chain, _ = _client()
     ka, kb = SigningKey.generate(), SigningKey.generate()

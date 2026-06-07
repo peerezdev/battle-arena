@@ -95,7 +95,6 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
     @app.get("/matches/open")
     async def get_open(viewer: Optional[str] = None, s: Session = Depends(db)):
         rows = list_open(s, viewer=viewer)
-        s.commit()
         return rows
 
     @app.post("/matches/{battle_pubkey}/sync")

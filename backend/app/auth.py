@@ -28,6 +28,9 @@ class AuthService:
         self._tokens: dict[str, tuple[str, float]] = {}  # token -> (wallet, expiry)
 
     def issue_nonce(self, wallet: str) -> str:
+        existing = self._nonces.get(wallet)
+        if existing is not None:
+            return existing
         nonce = self._nonce_fn()
         self._nonces[wallet] = nonce
         return nonce
