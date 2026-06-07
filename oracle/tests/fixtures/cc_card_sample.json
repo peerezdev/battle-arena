@@ -1,0 +1,34 @@
+{
+  "nfts": [
+    {
+      "id": "card-1",
+      "nftAddress": "4zckiFu3N1kbJyZpqks8Qw1TW8bQ69eDDcyi1Qx9pJW",
+      "itemName": "Charizard Base Set",
+      "gradeNum": 9,
+      "gradingCompany": "PSA",
+      "gradingID": "119934391",
+      "insuredValue": "1200",
+      "listing": { "price": 950, "currency": "USDC", "marketplace": "CC" }
+    },
+    {
+      "id": "card-2",
+      "nftAddress": "9xxOTHERmintADDRESSxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "itemName": "Otra carta (ruido por subcadena)",
+      "gradeNum": 7,
+      "gradingCompany": "CGC",
+      "gradingID": "555",
+      "insuredValue": null,
+      "listing": null
+    },
+    {
+      "id": "card-3",
+      "nftAddress": "3LISTINGonlyMINTxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "itemName": "Carta solo con precio de listado (sin insuredValue)",
+      "gradeNum": 8,
+      "gradingCompany": "PSA",
+      "gradingID": "777",
+      "insuredValue": null,
+      "listing": { "price": 950, "currency": "USDC", "marketplace": "CC" }
+    }
+  ]
+}

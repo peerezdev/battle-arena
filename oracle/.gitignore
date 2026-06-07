@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+oracle_key.json
+.pytest_cache/

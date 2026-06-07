@@ -217,6 +217,35 @@ mod tests {
     }
 
     #[test]
+    fn shared_attestation_vector_matches() {
+        // Fixture compartido con el oráculo Python.
+        // La ruta es relativa a este archivo fuente (src/oracle.rs).
+        let fixture = include_str!("../tests/fixtures/attestation_vectors.json");
+
+        // Extracción mínima del primer "message_hex" sin dependencia externa.
+        let key = "\"message_hex\"";
+        let key_pos = fixture
+            .find(key)
+            .expect("fixture debe contener message_hex");
+        let after_key = &fixture[key_pos + key.len()..];
+        // Avanzar hasta la primera comilla de apertura del valor.
+        let open = after_key.find('"').expect("comilla de apertura del valor");
+        let value_start = &after_key[open + 1..];
+        let close = value_start.find('"').expect("comilla de cierre del valor");
+        let expected_hex = &value_start[..close];
+
+        // Construir el mensaje con los parámetros del primer vector.
+        let msg = attestation_msg(&Pubkey::new_from_array([0u8; 32]), 1200, 9, 1700000000);
+        let built_hex: String = msg.iter().map(|b| format!("{:02x}", b)).collect();
+
+        assert_eq!(
+            built_hex, expected_hex,
+            "El formato del mensaje del contrato difiere del fixture del oráculo.\n  contrato: {}\n  fixture:  {}",
+            built_hex, expected_hex
+        );
+    }
+
+    #[test]
     fn attestation_msg_layout() {
         let mint = Pubkey::new_unique();
         let value_usd: u64 = 1_234_567;
