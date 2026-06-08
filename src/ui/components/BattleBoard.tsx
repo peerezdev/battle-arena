@@ -719,32 +719,57 @@ function FrontColumn(props: FrontColumnProps) {
           </motion.span>
         </button>
 
-        {/* Minus control */}
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={disabledRemove}
-          aria-disabled={disabledRemove || undefined}
-          aria-label={`Quitar 1 energía de ${label}`}
-          style={{
-            width: '100%',
-            background: COLORS.bg,
-            border: `1px solid ${COLORS.border}`,
-            color: disabledRemove ? COLORS.border : COLORS.text,
-            borderRadius: '6px',
-            fontSize: s(16, 24),
-            fontWeight: 700,
-            cursor: disabledRemove ? 'default' : 'pointer',
-            padding: '3px',
-            minHeight: s(32, 44),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: s(3, 6),
-          }}
-        >
-          −
-        </button>
+        {/* −/+ controls (explicit) */}
+        <div style={{ display: 'flex', gap: s(4, 8), marginTop: s(3, 6) }}>
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={disabledRemove}
+            aria-disabled={disabledRemove || undefined}
+            aria-label={`Quitar 1 energía de ${label}`}
+            style={{
+              flex: 1,
+              background: COLORS.bg,
+              border: `1px solid ${COLORS.border}`,
+              color: disabledRemove ? COLORS.border : COLORS.text,
+              borderRadius: '6px',
+              fontSize: s(16, 24),
+              fontWeight: 700,
+              cursor: disabledRemove ? 'default' : 'pointer',
+              padding: '3px',
+              minHeight: s(36, 44),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={disabledAdd}
+            aria-disabled={disabledAdd || undefined}
+            aria-label={`Añadir 1 energía a ${label}`}
+            style={{
+              flex: 1,
+              background: disabledAdd ? COLORS.bg : `${accentColor}1a`,
+              border: `1px solid ${disabledAdd ? COLORS.border : `${accentColor}66`}`,
+              color: disabledAdd ? COLORS.border : accentColor,
+              borderRadius: '6px',
+              fontSize: s(16, 24),
+              fontWeight: 700,
+              cursor: disabledAdd ? 'default' : 'pointer',
+              padding: '3px',
+              minHeight: s(36, 44),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            +
+          </button>
+        </div>
       </div>
     </div>
   )
