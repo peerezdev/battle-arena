@@ -81,8 +81,8 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
 
           {/* Player cards row */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <PlayerCard card={state.cardA} playerKey="a" />
-            <PlayerCard card={state.cardB} playerKey="b" />
+            <PlayerCard card={state.cardA} playerKey="a" sheen={!reduced} />
+            <PlayerCard card={state.cardB} playerKey="b" sheen={!reduced} />
           </div>
 
           {/* Advantage banner */}
@@ -137,7 +137,26 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
               pointerEvents: committing ? 'none' : undefined,
             }}
           >
-            🔒 COMMIT · {total} asignada{remaining > 0 ? ` · ${remaining} se banca` : ''}
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '6px', marginBottom: '2px' }}
+            >
+              {/* Shackle arc */}
+              <path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" />
+              {/* Lock body */}
+              <rect x="2.5" y="7" width="11" height="8" rx="2" />
+              {/* Keyhole dot */}
+              <circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none" />
+            </svg>
+            COMMIT · {total} asignada{remaining > 0 ? ` · ${remaining} se banca` : ''}
           </motion.button>
         </div>
       </div>

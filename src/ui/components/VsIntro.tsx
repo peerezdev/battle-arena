@@ -4,7 +4,7 @@
 // Includes a skip button and tap-anywhere dismiss.
 // Reduced-motion: shows a static VS frame briefly (400ms), then dismisses.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Card } from '../../engine'
 import { CardSlab } from './CardSlab'
@@ -23,8 +23,17 @@ const REDUCED_DISMISS_MS = 400
 export function VsIntro({ cardA, cardB, reducedMotion, onDone }: Props) {
   const [visible, setVisible] = useState(true)
   const [flash, setFlash] = useState(false)
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const doneCalledRef = useRef(false)
 
   function dismiss() {
+    // Clear the auto-dismiss timer so it can't fire after a manual tap
+    if (dismissTimerRef.current !== null) {
+      clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
+    if (doneCalledRef.current) return
+    doneCalledRef.current = true
     setVisible(false)
     // Give AnimatePresence exit a tiny window, then fire onDone
     setTimeout(onDone, reducedMotion ? 0 : 300)
@@ -33,10 +42,13 @@ export function VsIntro({ cardA, cardB, reducedMotion, onDone }: Props) {
   useEffect(() => {
     // Flash appears at ~600ms for full animation; instant for reduced.
     const flashTimer = reducedMotion ? null : setTimeout(() => setFlash(true), 600)
-    const dismissTimer = setTimeout(dismiss, reducedMotion ? REDUCED_DISMISS_MS : AUTO_DISMISS_MS)
+    dismissTimerRef.current = setTimeout(dismiss, reducedMotion ? REDUCED_DISMISS_MS : AUTO_DISMISS_MS)
     return () => {
       if (flashTimer) clearTimeout(flashTimer)
-      clearTimeout(dismissTimer)
+      if (dismissTimerRef.current !== null) {
+        clearTimeout(dismissTimerRef.current)
+        dismissTimerRef.current = null
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -153,7 +165,7 @@ export function VsIntro({ cardA, cardB, reducedMotion, onDone }: Props) {
 
           {/* Skip hint */}
           <motion.div
-            initial={{ opacity: 0 }}
+            initial={{ opacity: reducedMotion ? 0.55 : 0 }}
             animate={{ opacity: 0.55 }}
             transition={{ delay: reducedMotion ? 0 : 0.6, duration: 0.3 }}
             style={{
@@ -172,7 +184,7 @@ export function VsIntro({ cardA, cardB, reducedMotion, onDone }: Props) {
           {/* Explicit skip button (also accessible via tap-anywhere above) */}
           <motion.button
             onClick={(e) => { e.stopPropagation(); dismiss() }}
-            initial={{ opacity: 0 }}
+            initial={{ opacity: reducedMotion ? 0.7 : 0 }}
             animate={{ opacity: 0.7 }}
             transition={{ delay: reducedMotion ? 0 : 0.5, duration: 0.3 }}
             style={{

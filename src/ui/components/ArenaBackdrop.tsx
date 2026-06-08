@@ -36,26 +36,35 @@ export function ArenaBackdrop({ children, reducedMotion, accentA = '#34e29b', ac
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
 
+    const COUNT = 40
+    const particles: Particle[] = []
+
+    function initParticles() {
+      if (!canvas) return
+      particles.length = 0
+      for (let i = 0; i < COUNT; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 0.4 * dpr,
+          vy: (Math.random() - 0.5) * 0.4 * dpr,
+          r: (Math.random() * 1.5 + 0.5) * dpr,
+          alpha: Math.random() * 0.25 + 0.05,
+          color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
+        })
+      }
+    }
+
     function resize() {
       if (!canvas) return
       canvas.width = window.innerWidth * dpr
       canvas.height = window.innerHeight * dpr
       canvas.style.width = '100%'
       canvas.style.height = '100%'
+      initParticles()
     }
     resize()
     window.addEventListener('resize', resize)
-
-    const COUNT = 40
-    const particles: Particle[] = Array.from({ length: COUNT }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 0.4 * dpr,
-      vy: (Math.random() - 0.5) * 0.4 * dpr,
-      r: (Math.random() * 1.5 + 0.5) * dpr,
-      alpha: Math.random() * 0.25 + 0.05,
-      color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
-    }))
 
     let raf = 0
     function frame() {
