@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   createMatch, availableEnergy, commit, reveal, resolveRound, resolveBattle, nextRound,
@@ -16,11 +16,25 @@ import { FeedbackScreen } from './ui/screens/FeedbackScreen'
 import { MuteButton } from './ui/components/MuteButton'
 import { useReducedMotion } from './ui/useReducedMotion'
 import { ModeSelect, type AppMode } from './mode/ModeSelect'
-import { AppKitProvider } from './wallet/AppKitProvider'
-import { ConnectScreen } from './ui/screens/onchain/ConnectScreen'
-import { CollectionScreen, type SelectedCard } from './ui/screens/onchain/CollectionScreen'
-import { LobbyScreen, type BattleInfo } from './ui/screens/onchain/LobbyScreen'
-import { OnchainBattleScreen } from './ui/screens/onchain/OnchainBattleScreen'
+import type { SelectedCard } from './ui/screens/onchain/CollectionScreen'
+import type { BattleInfo } from './ui/screens/onchain/LobbyScreen'
+
+// ── Lazy-loaded on-chain bundle (never imported for offline users) ──────────
+const AppKitProvider = lazy(() =>
+  import('./wallet/AppKitProvider').then((m) => ({ default: m.AppKitProvider }))
+)
+const ConnectScreen = lazy(() =>
+  import('./ui/screens/onchain/ConnectScreen').then((m) => ({ default: m.ConnectScreen }))
+)
+const CollectionScreen = lazy(() =>
+  import('./ui/screens/onchain/CollectionScreen').then((m) => ({ default: m.CollectionScreen }))
+)
+const LobbyScreen = lazy(() =>
+  import('./ui/screens/onchain/LobbyScreen').then((m) => ({ default: m.LobbyScreen }))
+)
+const OnchainBattleScreen = lazy(() =>
+  import('./ui/screens/onchain/OnchainBattleScreen').then((m) => ({ default: m.OnchainBattleScreen }))
+)
 
 // ── Offline screen names ────────────────────────────────────────────────────
 type OfflineScreen = 'setup' | 'allocateA' | 'passToB' | 'allocateB' | 'reveal' | 'result' | 'feedback'
@@ -284,21 +298,23 @@ export default function App() {
     )
   }
 
-  // ── On-chain flow (wrapped in AppKitProvider) ──────────────────────────
+  // ── On-chain flow (wrapped in AppKitProvider, lazy-loaded) ────────────────
   return (
-    <AppKitProvider>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={onchainScreen}
-          variants={variants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
-        >
-          {renderOnchainScreen()}
-        </motion.div>
-      </AnimatePresence>
-    </AppKitProvider>
+    <Suspense fallback={<div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Cargando...</div>}>
+      <AppKitProvider>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={onchainScreen}
+            variants={variants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
+          >
+            {renderOnchainScreen()}
+          </motion.div>
+        </AnimatePresence>
+      </AppKitProvider>
+    </Suspense>
   )
 }

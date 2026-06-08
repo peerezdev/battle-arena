@@ -4,7 +4,7 @@
  *   getNonce → build message → signMessage → verify → token
  * Once authenticated, calls onAuthenticated(token) to proceed to the Collection.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../../../wallet/useWallet'
 import { getNonce, verify } from '../../../onchain/backendClient'
@@ -24,17 +24,19 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
 
   const [step, setStep] = useState<AuthStep>('idle')
   const [error, setError] = useState<string | null>(null)
+  const authingRef = useRef(false)
 
   // Once the wallet is connected, trigger authentication automatically.
+  // authingRef prevents concurrent invocations if wallet state toggles.
   useEffect(() => {
-    if (isConnected && publicKey && step === 'connecting') {
+    if (isConnected && publicKey && step === 'connecting' && !authingRef.current) {
       void authenticate()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, publicKey])
+  }, [isConnected, publicKey, step])
 
   async function authenticate() {
-    if (!publicKey) return
+    if (!publicKey || authingRef.current) return
+    authingRef.current = true
     setStep('authenticating')
     setError(null)
     try {
@@ -51,6 +53,8 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
     } catch (e) {
       setError((e as Error).message)
       setStep('error')
+    } finally {
+      authingRef.current = false
     }
   }
 

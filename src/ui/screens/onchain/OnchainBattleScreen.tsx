@@ -37,6 +37,7 @@ import {
 import { vaultPda } from '../../../onchain/pdas'
 import { syncMatch } from '../../../onchain/backendClient'
 import { config } from '../../../onchain/config'
+import { DEFAULT_MATCH_CONFIG } from '../../../onchain/types'
 import idl from '../../../onchain/idl/battle_arena.json'
 import { COLORS, player as playerTheme } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
@@ -189,7 +190,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
         }
         if (phase === 'RoundResolved') {
           // Check if battle should end (one player reached roundsToWin)
-          const roundsToWin = 2
+          const roundsToWin = decoded.cfg?.rounds_to_win ?? DEFAULT_MATCH_CONFIG.roundsToWin
           if (decoded.wins_a >= roundsToWin || decoded.wins_b >= roundsToWin) {
             setStep('settling')
             await handleSettle(decoded)
