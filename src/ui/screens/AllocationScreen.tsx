@@ -4,8 +4,9 @@ import { EnergyHeader } from '../components/EnergyHeader'
 import { PlayerCard } from '../components/PlayerCard'
 import { AdvantageBanner } from '../components/AdvantageBanner'
 import { EnergyAllocator } from '../components/EnergyAllocator'
+import { ArenaBackdrop } from '../components/ArenaBackdrop'
 import type { Allocation, MatchState } from '../../engine'
-import { COLORS, player as playerTheme } from '../theme'
+import { COLORS, player as playerTheme, FONTS } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
 import { playSfx, haptic } from '../sound'
 
@@ -55,86 +56,91 @@ export function AllocationScreen({ available, winsA, winsB, round, playerLabel, 
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        background: COLORS.bg,
-        color: COLORS.text,
-        fontFamily: 'Inter, system-ui, sans-serif',
-        padding: '0 16px 32px',
-      }}
+    <ArenaBackdrop
+      reducedMotion={reduced}
+      accentA={playerKey === 'a' ? COLORS.green : COLORS.red}
+      accentB={playerKey === 'a' ? COLORS.red : COLORS.green}
     >
-      <div style={{ maxWidth: '420px', margin: '0 auto', paddingTop: '24px' }}>
-        {/* Round / player header */}
-        <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px' }}>
-            RONDA {round + 1}
+      <div
+        style={{
+          color: COLORS.text,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          padding: '0 16px 32px',
+        }}
+      >
+        <div style={{ maxWidth: '420px', margin: '0 auto', paddingTop: '24px' }}>
+          {/* Round / player header */}
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px', fontFamily: FONTS.mono }}>
+              RONDA {round + 1}
+            </div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: t.color, fontFamily: FONTS.orbitron }}>
+              {playerLabel}
+            </div>
           </div>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: t.color }}>
-            {playerLabel}
+
+          {/* Player cards row */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+            <PlayerCard card={state.cardA} playerKey="a" />
+            <PlayerCard card={state.cardB} playerKey="b" />
           </div>
+
+          {/* Advantage banner */}
+          <AdvantageBanner state={state} currentPlayer={playerKey} />
+
+          {/* Energy header with breakdown (base + edge + banked) */}
+          <EnergyHeader
+            available={available}
+            unassigned={remaining}
+            winsA={winsA}
+            winsB={winsB}
+            base={base}
+            edge={edge}
+            banked={banked}
+            playerColor={t.color}
+          />
+
+          {/* Tap-to-allocate energy tokens */}
+          <EnergyAllocator
+            alloc={a}
+            available={available}
+            onChange={(key, delta) => setA(prev => clampApply(prev, key, delta, available))}
+            accentColor={t.color}
+            reducedMotion={reduced}
+            disabled={committing}
+          />
+
+          {/* Commit button — disabled once committing to prevent double-submit. */}
+          <motion.button
+            onClick={handleCommit}
+            disabled={committing}
+            aria-disabled={committing}
+            whileTap={reduced ? undefined : { scale: 0.96 }}
+            animate={committing && !reduced ? { scale: [1, 1.04, 1] } : undefined}
+            transition={{ duration: 0.26 }}
+            aria-label="Confirmar asignación de energía"
+            style={{
+              width: '100%',
+              background: t.color,
+              color: playerKey === 'a' ? '#04130c' : '#1a040a',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '16px',
+              fontSize: '16px',
+              fontWeight: 800,
+              fontFamily: FONTS.orbitron,
+              cursor: committing ? 'default' : 'pointer',
+              letterSpacing: '.03em',
+              boxShadow: `0 0 14px ${t.color}66`,
+              minHeight: '52px',
+              opacity: committing ? 0.7 : 1,
+              pointerEvents: committing ? 'none' : undefined,
+            }}
+          >
+            🔒 COMMIT · {total} asignada{remaining > 0 ? ` · ${remaining} se banca` : ''}
+          </motion.button>
         </div>
-
-        {/* Player cards row */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-          <PlayerCard card={state.cardA} playerKey="a" />
-          <PlayerCard card={state.cardB} playerKey="b" />
-        </div>
-
-        {/* Advantage banner */}
-        <AdvantageBanner state={state} currentPlayer={playerKey} />
-
-        {/* Energy header with breakdown (base + edge + banked) */}
-        <EnergyHeader
-          available={available}
-          unassigned={remaining}
-          winsA={winsA}
-          winsB={winsB}
-          base={base}
-          edge={edge}
-          banked={banked}
-          playerColor={t.color}
-        />
-
-        {/* Tap-to-allocate energy tokens */}
-        <EnergyAllocator
-          alloc={a}
-          available={available}
-          onChange={(key, delta) => setA(prev => clampApply(prev, key, delta, available))}
-          accentColor={t.color}
-          reducedMotion={reduced}
-          disabled={committing}
-        />
-
-        {/* Commit button — disabled once committing to prevent double-submit. */}
-        <motion.button
-          onClick={handleCommit}
-          disabled={committing}
-          aria-disabled={committing}
-          whileTap={reduced ? undefined : { scale: 0.96 }}
-          animate={committing && !reduced ? { scale: [1, 1.04, 1] } : undefined}
-          transition={{ duration: 0.26 }}
-          aria-label="Confirmar asignación de energía"
-          style={{
-            width: '100%',
-            background: t.color,
-            color: playerKey === 'a' ? '#04130c' : '#1a040a',
-            border: 'none',
-            borderRadius: '10px',
-            padding: '16px',
-            fontSize: '16px',
-            fontWeight: 800,
-            cursor: committing ? 'default' : 'pointer',
-            letterSpacing: '.03em',
-            boxShadow: `0 0 14px ${t.color}66`,
-            minHeight: '52px',
-            opacity: committing ? 0.7 : 1,
-            pointerEvents: committing ? 'none' : undefined,
-          }}
-        >
-          🔒 COMMIT · {total} asignada{remaining > 0 ? ` · ${remaining} se banca` : ''}
-        </motion.button>
       </div>
-    </div>
+    </ArenaBackdrop>
   )
 }
