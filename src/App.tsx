@@ -1,17 +1,16 @@
 import { useState, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  createMatch, availableEnergy, commit, reveal, resolveRound, resolveBattle, nextRound,
+  createMatch, commit, reveal, resolveRound, resolveBattle, nextRound,
   hashAllocation, DEFAULT_CONFIG, type MatchState, type Allocation,
 } from './engine'
 import { decide } from './bot/bot'
 import { MOCK_CARDS } from './data/cards'
 import { recordMatch } from './instrumentation/playtest'
 import { SetupScreen, type Setup } from './ui/screens/SetupScreen'
-import { AllocationScreen } from './ui/screens/AllocationScreen'
 import { PassDeviceScreen } from './ui/screens/PassDeviceScreen'
-import { RevealScreen } from './ui/screens/RevealScreen'
 import { ResultScreen } from './ui/screens/ResultScreen'
+import { BattleBoard } from './ui/components/BattleBoard'
 import { FeedbackScreen } from './ui/screens/FeedbackScreen'
 import { MuteButton } from './ui/components/MuteButton'
 import { VsIntro } from './ui/components/VsIntro'
@@ -126,15 +125,12 @@ export default function App() {
 
     if (offlineScreen === 'allocateA')
       return (
-        <AllocationScreen
-          available={availableEnergy(state, 'a')}
-          winsA={state.roundWins.a}
-          winsB={state.roundWins.b}
-          round={state.round}
+        <BattleBoard
+          phase="allocate"
+          playerKey="a"
           playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Jugador A)` : `Tu — ${nameA}`}
           onCommit={commitA}
           state={state}
-          playerKey="a"
         />
       )
 
@@ -143,27 +139,23 @@ export default function App() {
 
     if (offlineScreen === 'allocateB')
       return (
-        <AllocationScreen
-          available={availableEnergy(state, 'b')}
-          winsA={state.roundWins.a}
-          winsB={state.roundWins.b}
-          round={state.round}
+        <BattleBoard
+          phase="allocate"
+          playerKey="b"
           playerLabel={`${nameB} (Jugador B)`}
           onCommit={commitB}
           state={state}
-          playerKey="b"
         />
       )
 
     if (offlineScreen === 'reveal')
       return (
-        <RevealScreen
+        <BattleBoard
+          phase="reveal"
           allocA={cur.revealA!}
           allocB={cur.revealB!}
           frontWinners={cur.frontWinners!}
           roundWinner={cur.roundWinner!}
-          nameA={nameA}
-          nameB={nameB}
           onContinue={continueAfterReveal}
           state={state}
         />
