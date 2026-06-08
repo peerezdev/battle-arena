@@ -1,4 +1,4 @@
-import { COLORS } from '../theme'
+import { COLORS, FONTS } from '../theme'
 
 interface Props {
   available: number
@@ -31,17 +31,17 @@ export function EnergyHeader({ available, unassigned, winsA, winsB, base, edge, 
   return (
     <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
       <div style={{ ...box, flex: 1 }}>
-        <div style={{ fontSize: '9px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px' }}>DISPONIBLE</div>
-        <div style={{ fontSize: '22px', fontWeight: 800, color: playerColor, lineHeight: 1 }}>{available}</div>
-        <div style={{ fontSize: '9px', color: COLORS.muted, marginTop: '2px' }}>{breakdown}</div>
+        <div style={{ fontSize: '9px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px', fontFamily: FONTS.mono }}>DISPONIBLE</div>
+        <div style={{ fontSize: '22px', fontWeight: 800, color: playerColor, lineHeight: 1, fontFamily: FONTS.orbitron }}>{available}</div>
+        <div style={{ fontSize: '9px', color: COLORS.muted, marginTop: '2px', fontFamily: FONTS.mono }}>{breakdown}</div>
       </div>
       <div style={{ ...box, flex: 1 }}>
-        <div style={{ fontSize: '9px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px' }}>SIN ASIGNAR</div>
-        <div style={{ fontSize: '22px', fontWeight: 800, color: COLORS.text, lineHeight: 1 }}>{unassigned}</div>
+        <div style={{ fontSize: '9px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px', fontFamily: FONTS.mono }}>SIN ASIGNAR</div>
+        <div style={{ fontSize: '22px', fontWeight: 800, color: COLORS.text, lineHeight: 1, fontFamily: FONTS.orbitron }}>{unassigned}</div>
       </div>
       <div style={{ ...box, flex: 1 }}>
-        <div style={{ fontSize: '9px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px' }}>RONDAS</div>
-        <div style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, lineHeight: 1 }}>
+        <div style={{ fontSize: '9px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px', fontFamily: FONTS.mono }}>RONDAS</div>
+        <div style={{ fontSize: '20px', fontWeight: 800, color: COLORS.text, lineHeight: 1, fontFamily: FONTS.orbitron }}>
           <span style={{ color: COLORS.green }}>{winsA}</span>
           <span style={{ color: COLORS.muted }}> – </span>
           <span style={{ color: COLORS.red }}>{winsB}</span>

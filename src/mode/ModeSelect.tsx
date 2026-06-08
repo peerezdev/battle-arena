@@ -5,7 +5,7 @@
  *   - On-chain (devnet): the full on-chain flow wrapped in AppKitProvider.
  */
 import { motion } from 'framer-motion'
-import { COLORS } from '../ui/theme'
+import { COLORS, FONTS } from '../ui/theme'
 import { useReducedMotion } from '../ui/useReducedMotion'
 
 export type AppMode = 'offline' | 'onchain'
@@ -72,11 +72,12 @@ export function ModeSelect({ onSelect }: Props) {
               letterSpacing: '-0.5px',
               color: COLORS.green,
               marginBottom: '8px',
+              fontFamily: FONTS.orbitron,
             }}
           >
             ⚡ TCG Battle Arena
           </div>
-          <div style={{ fontSize: '13px', color: COLORS.muted }}>
+          <div style={{ fontSize: '13px', color: COLORS.muted, fontFamily: FONTS.mono }}>
             Elige el modo de juego
           </div>
         </div>

@@ -14,6 +14,7 @@ import { RevealScreen } from './ui/screens/RevealScreen'
 import { ResultScreen } from './ui/screens/ResultScreen'
 import { FeedbackScreen } from './ui/screens/FeedbackScreen'
 import { MuteButton } from './ui/components/MuteButton'
+import { VsIntro } from './ui/components/VsIntro'
 import { useReducedMotion } from './ui/useReducedMotion'
 import { ModeSelect, type AppMode } from './mode/ModeSelect'
 import type { SelectedCard } from './ui/screens/onchain/CollectionScreen'
@@ -54,6 +55,7 @@ export default function App() {
   const [state, setState] = useState<MatchState | null>(null)
   const [error, setError] = useState<string | undefined>()
   const [allocA, setAllocA] = useState<Allocation | null>(null)
+  const [showVsIntro, setShowVsIntro] = useState(false)
 
   // ── On-chain state ──────────────────────────────────────────────────────
   const [onchainScreen, setOnchainScreen] = useState<OnchainScreen>('connect')
@@ -70,7 +72,9 @@ export default function App() {
       const cardA = MOCK_CARDS.find((c) => c.id === s.cardAId)!
       const cardB = MOCK_CARDS.find((c) => c.id === s.cardBId)!
       const st = createMatch(cardA, cardB, { ...DEFAULT_CONFIG, mode: s.mode, edgeEnabled: s.edgeEnabled })
-      setSetup(s); setState(st); setError(undefined); setOfflineScreen('allocateA')
+      setSetup(s); setState(st); setError(undefined)
+      setShowVsIntro(true)
+      setOfflineScreen('allocateA')
     } catch (e) {
       setError((e as Error).message)
     }
@@ -282,6 +286,14 @@ export default function App() {
     return (
       <>
         <MuteButton />
+        {showVsIntro && state && (
+          <VsIntro
+            cardA={state.cardA}
+            cardB={state.cardB}
+            reducedMotion={reduced}
+            onDone={() => setShowVsIntro(false)}
+          />
+        )}
         <AnimatePresence mode="wait">
           <motion.div
             key={offlineScreen}

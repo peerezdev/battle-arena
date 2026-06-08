@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { MOCK_CARDS } from '../../data/cards'
 import type { Mode } from '../../engine'
 import type { Difficulty } from '../../bot/bot'
-import { COLORS, formatUsd } from '../theme'
+import { COLORS, formatUsd, FONTS } from '../theme'
 import { solidez } from '../../engine'
 
 export interface Setup {
@@ -84,10 +84,10 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
       <div style={{ maxWidth: '420px', margin: '0 auto', paddingTop: '32px' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px', color: COLORS.green }}>
+          <div style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px', color: COLORS.green, fontFamily: FONTS.orbitron }}>
             ⚡ TCG Battle Arena
           </div>
-          <div style={{ fontSize: '12px', color: COLORS.muted, marginTop: '4px' }}>Fase 0 · Arena Oscura</div>
+          <div style={{ fontSize: '12px', color: COLORS.muted, marginTop: '4px', fontFamily: FONTS.mono }}>Fase 0 · Arena Oscura</div>
         </div>
 
         {/* Error */}
