@@ -5,19 +5,25 @@
  * The coder prepends the 8-byte discriminator from the IDL automatically.
  * u64/i64 → BN; u32 → number; u8/bool → number/boolean; pubkey → PublicKey.
  */
-import { PublicKey, TransactionInstruction, SYSVAR_INSTRUCTIONS_PUBKEY } from '@solana/web3.js'
+import {
+  PublicKey,
+  TransactionInstruction,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  SystemProgram,
+} from '@solana/web3.js'
 import { BorshCoder, BN } from '@coral-xyz/anchor'
 import idl from './idl/battle_arena.json'
 import { PROGRAM_ID } from './types'
 import { buildEd25519Ix } from './attestation'
+import { battlePda, vaultPda } from './pdas'
 import type { MatchConfig, Allocation } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const coder = new BorshCoder(idl as any)
 
+// TOKEN_PROGRAM_ID is not yet a named export in @solana/web3.js v1; keep the known constant.
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')
-const SYSTEM_PROGRAM_ID = new PublicKey('11111111111111111111111111111111')
-const RENT_SYSVAR_ID = new PublicKey('SysvarRent111111111111111111111111111111111')
 
 // ──────────────────────────────────────────────────────────
 // Helpers
@@ -143,7 +149,6 @@ export function buildClaimTimeoutIx(a: { battle: PublicKey }): TransactionInstru
 export function buildInitializeBattleIxs(a: {
   playerA: PublicKey
   stakeMint: PublicKey
-  escrowVault: PublicKey
   playerAToken: PublicKey
   nftTokenA: PublicKey
   nonce: bigint
@@ -158,6 +163,10 @@ export function buildInitializeBattleIxs(a: {
   messageHex: string
   signatureHex: string
 }): [TransactionInstruction, TransactionInstruction] {
+  // Derive PDAs internally — callers must NOT pass these; they are always deterministic.
+  const [battle] = battlePda(a.playerA, a.nonce)
+  const [escrowVault] = vaultPda(battle)
+
   const ed25519Ix = buildEd25519Ix(a.messageHex, a.signatureHex, a.oracle.toBase58())
   const data = encodedData('initialize_battle', {
     nonce: new BN(a.nonce.toString()),
@@ -171,19 +180,30 @@ export function buildInitializeBattleIxs(a: {
     ts_a: new BN(a.tsA.toString()),
     ed25519_ix_index: 0,
   })
+  // Account order MUST match InitializeBattle<'info> in initialize.rs:
+  // [0] player_a (signer, writable)
+  // [1] battle   (writable, PDA init)
+  // [2] stake_mint
+  // [3] escrow_vault (writable, PDA init)
+  // [4] player_a_token (writable)
+  // [5] nft_token_a
+  // [6] instructions_sysvar
+  // [7] token_program
+  // [8] system_program
+  // [9] rent
   const programIx = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: a.playerA, isSigner: true, isWritable: true },
-      { pubkey: a.escrowVault, isSigner: false, isWritable: true },
-      { pubkey: a.stakeMint, isSigner: false, isWritable: false },
-      { pubkey: a.escrowVault, isSigner: false, isWritable: true },
-      { pubkey: a.playerAToken, isSigner: false, isWritable: true },
-      { pubkey: a.nftTokenA, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: RENT_SYSVAR_ID, isSigner: false, isWritable: false },
+      { pubkey: a.playerA,                  isSigner: true,  isWritable: true  },
+      { pubkey: battle,                      isSigner: false, isWritable: true  },
+      { pubkey: a.stakeMint,                 isSigner: false, isWritable: false },
+      { pubkey: escrowVault,                 isSigner: false, isWritable: true  },
+      { pubkey: a.playerAToken,              isSigner: false, isWritable: true  },
+      { pubkey: a.nftTokenA,                 isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY,  isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID,            isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId,     isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY,          isSigner: false, isWritable: false },
     ],
     data,
   })
@@ -197,9 +217,9 @@ export function buildInitializeBattleIxs(a: {
 export function buildJoinBattleIxs(a: {
   playerB: PublicKey
   battle: PublicKey
-  escrowVault: PublicKey
   playerBToken: PublicKey
   nftTokenB: PublicKey
+  oracle: PublicKey
   nftMintB: PublicKey
   valueUsdB: bigint
   gradeB: number
@@ -207,7 +227,12 @@ export function buildJoinBattleIxs(a: {
   messageHex: string
   signatureHex: string
 }): [TransactionInstruction, TransactionInstruction] {
-  const ed25519Ix = buildEd25519Ix(a.messageHex, a.signatureHex, a.playerB.toBase58())
+  // Derive vault PDA from the battle pubkey (known from the lobby).
+  const [escrowVault] = vaultPda(a.battle)
+
+  // The ed25519 instruction must embed the ORACLE pubkey, not playerB.
+  // join.rs verifies the signature against battle.oracle via verify_oracle_ed25519.
+  const ed25519Ix = buildEd25519Ix(a.messageHex, a.signatureHex, a.oracle.toBase58())
   const data = encodedData('join_battle', {
     nft_mint_b: a.nftMintB,
     value_usd_b: new BN(a.valueUsdB.toString()),
@@ -215,16 +240,24 @@ export function buildJoinBattleIxs(a: {
     ts_b: new BN(a.tsB.toString()),
     ed25519_ix_index: 0,
   })
+  // Account order MUST match JoinBattle<'info> in join.rs:
+  // [0] player_b (signer, writable)
+  // [1] battle   (writable)
+  // [2] escrow_vault (writable)
+  // [3] player_b_token (writable)
+  // [4] nft_token_b
+  // [5] instructions_sysvar
+  // [6] token_program
   const programIx = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: a.playerB, isSigner: true, isWritable: true },
-      { pubkey: a.battle, isSigner: false, isWritable: true },
-      { pubkey: a.escrowVault, isSigner: false, isWritable: true },
-      { pubkey: a.playerBToken, isSigner: false, isWritable: true },
-      { pubkey: a.nftTokenB, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY, isSigner: false, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: a.playerB,                  isSigner: true,  isWritable: true  },
+      { pubkey: a.battle,                    isSigner: false, isWritable: true  },
+      { pubkey: escrowVault,                 isSigner: false, isWritable: true  },
+      { pubkey: a.playerBToken,              isSigner: false, isWritable: true  },
+      { pubkey: a.nftTokenB,                 isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_INSTRUCTIONS_PUBKEY,  isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID,            isSigner: false, isWritable: false },
     ],
     data,
   })
