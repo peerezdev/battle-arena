@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Allocation, FrontKey } from '../../engine'
-import { COLORS } from '../theme'
+import { COLORS, FONTS } from '../theme'
 import { playSfx, haptic } from '../sound'
+import { FrontSigil } from './FrontSigil'
 
 interface Props {
   alloc: Allocation
@@ -15,18 +16,17 @@ interface Props {
   disabled?: boolean
 }
 
-const FRONTS: { key: FrontKey; label: string; icon: string }[] = [
-  { key: 'apertura', label: 'Apertura', icon: '⚔️' },
-  { key: 'choque', label: 'Choque', icon: '💥' },
-  { key: 'remate', label: 'Remate', icon: '🎯' },
+const FRONTS: { key: FrontKey; label: string }[] = [
+  { key: 'apertura', label: 'Apertura' },
+  { key: 'choque',   label: 'Choque'   },
+  { key: 'remate',   label: 'Remate'   },
 ]
 
 /**
- * A glowing energy pip. Identity is stable per container (pool / each front),
- * so changing one front never reshuffles another's pips. Pips pop in/out in place
- * rather than flying between containers (which caused phantom "sum" animations).
+ * Glowing energy orb — replaces the old Pip.
+ * Uses a CSS custom-property for the pulse animation color.
  */
-function Pip({ color, reduced }: { color: string; reduced: boolean }) {
+function EnergyOrb({ color, reduced }: { color: string; reduced: boolean }) {
   return (
     <motion.span
       layout={!reduced}
@@ -35,14 +35,16 @@ function Pip({ color, reduced }: { color: string; reduced: boolean }) {
       exit={reduced ? undefined : { scale: 0, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 600, damping: 34 }}
       style={{
-        width: 14,
-        height: 14,
+        '--orb-color': color,
+        width: 16,
+        height: 16,
         borderRadius: '50%',
-        background: color,
-        boxShadow: `0 0 6px ${color}`,
+        background: `radial-gradient(circle at 38% 36%, ${color}ee 0%, ${color}88 55%, ${color}44 100%)`,
+        boxShadow: `0 0 6px ${color}, 0 0 12px ${color}44`,
         display: 'inline-block',
         flex: '0 0 auto',
-      }}
+        animation: reduced ? 'none' : 'orb-pulse 2.2s ease-in-out infinite',
+      } as React.CSSProperties}
     />
   )
 }
@@ -67,7 +69,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
 
   return (
     <div>
-      {/* Energy pool — labeled "se banca" (unspent carries over). */}
+      {/* Energy pool */}
       <div
         style={{
           background: COLORS.panel,
@@ -85,11 +87,11 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
             marginBottom: '8px',
           }}
         >
-          <span style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em' }}>
+          <span style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', fontFamily: FONTS.mono }}>
             ENERGÍA DISPONIBLE
           </span>
-          <span style={{ fontSize: '11px', color: COLORS.muted }}>
-            sin asignar <strong style={{ color: accentColor, fontSize: '13px' }}>{pool}</strong> · se banca
+          <span style={{ fontSize: '11px', color: COLORS.muted, fontFamily: FONTS.mono }}>
+            sin asignar <strong style={{ color: accentColor, fontSize: '13px', fontFamily: FONTS.orbitron }}>{pool}</strong> · se banca
           </span>
         </div>
         <motion.div
@@ -98,17 +100,17 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
             display: 'flex',
             flexWrap: 'wrap',
             gap: '7px',
-            minHeight: '14px',
+            minHeight: '16px',
             alignItems: 'center',
           }}
         >
           <AnimatePresence>
             {Array.from({ length: pool }, (_, i) => (
-              <Pip key={`pool-${i}`} color={accentColor} reduced={reducedMotion} />
+              <EnergyOrb key={`pool-${i}`} color={accentColor} reduced={reducedMotion} />
             ))}
           </AnimatePresence>
           {pool === 0 && (
-            <span style={{ fontSize: '11px', color: COLORS.muted, fontStyle: 'italic' }}>
+            <span style={{ fontSize: '11px', color: COLORS.muted, fontStyle: 'italic', fontFamily: FONTS.mono }}>
               Sin energía en reserva
             </span>
           )}
@@ -167,10 +169,15 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                     minHeight: '44px',
                   }}
                 >
-                  <span style={{ fontSize: '22px' }}>{f.icon}</span>
+                  <FrontSigil
+                    front={f.key}
+                    color={value > 0 ? accentColor : COLORS.muted}
+                    size={22}
+                    glow={value > 0 && !reducedMotion}
+                  />
                   <span style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '15px', fontWeight: 700 }}>{f.label}</span>
-                    <span style={{ fontSize: '10px', color: COLORS.muted }}>
+                    <span style={{ fontSize: '10px', color: COLORS.muted, fontFamily: FONTS.mono }}>
                       {disabledAdd ? 'pulsa − para quitar' : 'pulsa para sumar'}
                     </span>
                   </span>
@@ -186,6 +193,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                   style={{
                     fontSize: '30px',
                     fontWeight: 800,
+                    fontFamily: FONTS.orbitron,
                     color: value > 0 ? accentColor : COLORS.muted,
                     minWidth: '34px',
                     textAlign: 'center',
@@ -222,7 +230,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                 </button>
               </div>
 
-              {/* Pips currently allocated to this front. */}
+              {/* Orbs currently allocated to this front. */}
               {value > 0 && (
                 <motion.div
                   layout={!reducedMotion}
@@ -230,7 +238,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                 >
                   <AnimatePresence>
                     {Array.from({ length: value }, (_, i) => (
-                      <Pip key={`${f.key}-${i}`} color={accentColor} reduced={reducedMotion} />
+                      <EnergyOrb key={`${f.key}-${i}`} color={accentColor} reduced={reducedMotion} />
                     ))}
                   </AnimatePresence>
                 </motion.div>
