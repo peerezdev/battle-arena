@@ -16,6 +16,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        orbitron: ['Orbitron', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Courier New', 'monospace'],
       },
       boxShadow: {
         'neon-green': '0 0 8px #34e29b',

@@ -35,3 +35,8 @@ export function formatUsd(v: number): string {
   if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`
   return `$${v}`
 }
+
+export const FONTS = {
+  orbitron: "'Orbitron', system-ui, sans-serif",
+  mono: "'JetBrains Mono', 'Courier New', monospace",
+} as const

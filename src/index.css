@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,6 +9,21 @@ body {
   color: #e7ecf5;
   font-family: 'Inter', system-ui, sans-serif;
   min-height: 100dvh;
+}
+
+:root {
+  --font-orbitron: 'Orbitron', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+@keyframes holographic-sheen {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes orb-pulse {
+  0%, 100% { box-shadow: 0 0 6px var(--orb-color, #34e29b), 0 0 12px var(--orb-color, #34e29b44); }
+  50%       { box-shadow: 0 0 10px var(--orb-color, #34e29b), 0 0 22px var(--orb-color, #34e29b66); }
 }
 
 /* Custom range slider — accent changes per player via CSS var */
