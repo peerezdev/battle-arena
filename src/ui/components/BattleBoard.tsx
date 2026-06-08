@@ -464,7 +464,7 @@ function FrontColumn(props: FrontColumnProps) {
         >
           <span
             style={{
-              fontSize: s(20, 46),
+              fontSize: s(20, 40),
               fontWeight: isRevealed && winner === 'b' ? 800 : 400,
               fontFamily: FONTS.orbitron,
               color: isRevealed && winner === 'b' ? COLORS.red : COLORS.text,
@@ -546,7 +546,7 @@ function FrontColumn(props: FrontColumnProps) {
         >
           <span
             style={{
-              fontSize: s(20, 46),
+              fontSize: s(20, 40),
               fontWeight: isRevealed && winner === 'a' ? 800 : 400,
               fontFamily: FONTS.orbitron,
               color: isRevealed && winner === 'a' ? COLORS.green : COLORS.text,
@@ -590,9 +590,9 @@ function FrontColumn(props: FrontColumnProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: s(46, 86),
+          minHeight: s(46, 56),
           color: COLORS.muted,
-          fontSize: s(13, 22),
+          fontSize: s(13, 20),
           letterSpacing: '.3em',
         }}
         aria-label="Zona del rival — oculta"
@@ -708,7 +708,7 @@ function FrontColumn(props: FrontColumnProps) {
             transition={{ type: 'spring', stiffness: 500, damping: 18 }}
             aria-live="polite"
             style={{
-              fontSize: s(24, 52),
+              fontSize: s(24, 42),
               fontWeight: 800,
               fontFamily: FONTS.orbitron,
               color: hasAlloc ? accentColor : COLORS.muted,
@@ -1298,34 +1298,51 @@ export function BattleBoard(props: BattleBoardProps) {
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
     <ArenaBackdrop reducedMotion={reduced} accentA={accentColor} accentB={opponentAccent}>
+      {/* Fixed-height viewport: action button (COMMIT / Continuar) stays pinned at
+          the bottom and is ALWAYS visible — only the upper area scrolls if needed. */}
       <div
         style={{
           color: COLORS.text,
           fontFamily: 'Inter, system-ui, sans-serif',
-          minHeight: wide ? '100dvh' : undefined,
+          height: '100dvh',
           display: 'flex',
           flexDirection: 'column',
-          padding: wide ? '24px 24px 28px' : '10px 10px 24px',
+          overflow: 'hidden',
           boxSizing: 'border-box',
         }}
       >
-        {/* Inner wrapper: on desktop fills height and distributes zones
-            (opponent top, board middle, your zone+commit bottom). */}
         <div
           style={{
             width: '100%',
-            maxWidth: wide ? '1120px' : '900px',
+            maxWidth: wide ? 'min(1500px, 95vw)' : '900px',
             margin: '0 auto',
-            flex: wide ? 1 : undefined,
+            flex: 1,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: wide ? 'space-between' : 'flex-start',
-            gap: wide ? '8px' : undefined,
+            padding: wide ? '16px 24px 14px' : '8px 10px 12px',
+            boxSizing: 'border-box',
           }}
         >
-          {topGroup}
-          {board}
-          {bottomGroup}
+          {/* Scrollable upper region: opponent + the 3-front board */}
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              gap: wide ? '12px' : '6px',
+            }}
+          >
+            {topGroup}
+            {board}
+          </div>
+          {/* Pinned bottom: your zone + reveal banner + action button */}
+          <div style={{ flexShrink: 0, paddingTop: wide ? '12px' : '8px' }}>
+            {bottomGroup}
+          </div>
         </div>
       </div>
     </ArenaBackdrop>
