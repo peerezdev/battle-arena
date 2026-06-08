@@ -8,9 +8,11 @@
  *    a stagger animation (skipped when reduced-motion).
  *
  * Responsive layout:
- *  Mobile (<768 / default): compact — 3 front columns, opponent above,
- *    your zone below. No horizontal overflow at 375px.
- *  Desktop (≥768 md:): same structure, generous gaps, max-width 900px.
+ *  Mobile (<768): compact — natural top-down stack, 3 front columns,
+ *    opponent above, your zone below. No horizontal overflow at 375px.
+ *  Desktop (≥768): FULL-HEIGHT board — opponent pinned to the top, your
+ *    zone + commit pinned to the BOTTOM, the 3 fronts expand in the middle.
+ *    Larger typography / elements, wider max-width, generous gaps.
  *
  * Privacy invariant: opponent banked/reserve is NEVER shown as a number.
  *  A lock icon + "oculto" is shown instead.
@@ -25,6 +27,30 @@ import { useReducedMotion } from '../useReducedMotion'
 import { FrontSigil } from './FrontSigil'
 import { ArenaBackdrop } from './ArenaBackdrop'
 import { playSfx, haptic } from '../sound'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Responsive helper: true on desktop-width viewports (≥768px).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function useIsWide(query = '(min-width: 768px)'): boolean {
+  const get = () =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(query).matches
+      : false
+  const [wide, setWide] = useState<boolean>(get)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const mql = window.matchMedia(query)
+    const handler = () => setWide(mql.matches)
+    handler()
+    mql.addEventListener?.('change', handler)
+    return () => mql.removeEventListener?.('change', handler)
+  }, [query])
+  return wide
+}
+
+/** size picker: mobile value on phones, desktop value on ≥768px. */
+const pick = (wide: boolean) => (m: number, d: number) => (wide ? d : m)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -117,19 +143,23 @@ function HeroPortrait({
   winsCount,
   winsNeeded,
   reduced,
+  wide,
 }: {
   name: string
   accentColor: string
   winsCount: number
   winsNeeded: number
   reduced: boolean
+  wide: boolean
 }) {
+  const s = pick(wide)
   const initials = name
     .split(' ')
     .map((w) => w[0])
     .join('')
     .slice(0, 2)
     .toUpperCase()
+  const circle = s(48, 82)
 
   return (
     <div
@@ -137,39 +167,37 @@ function HeroPortrait({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '3px',
+        gap: s(3, 6),
         flexShrink: 0,
       }}
     >
-      {/* Circle */}
       <div
         style={{
-          width: 48,
-          height: 48,
+          width: circle,
+          height: circle,
           borderRadius: '50%',
           background: `radial-gradient(circle at 40% 38%, ${accentColor}33, #0a0e1a 80%)`,
           border: `2px solid ${accentColor}88`,
-          boxShadow: reduced ? 'none' : `0 0 10px ${accentColor}44`,
+          boxShadow: reduced ? 'none' : `0 0 ${s(10, 18)}px ${accentColor}44`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontFamily: FONTS.orbitron,
           fontWeight: 800,
-          fontSize: '14px',
+          fontSize: s(14, 26),
           color: accentColor,
           flexShrink: 0,
         }}
       >
         {initials}
       </div>
-      {/* Name */}
       <span
         style={{
-          fontSize: '8px',
+          fontSize: s(8, 12),
           color: COLORS.muted,
           fontFamily: FONTS.mono,
           letterSpacing: '.03em',
-          maxWidth: 54,
+          maxWidth: s(54, 110),
           textAlign: 'center',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -178,14 +206,13 @@ function HeroPortrait({
       >
         {name}
       </span>
-      {/* Win pips */}
-      <div style={{ display: 'flex', gap: '3px' }}>
+      <div style={{ display: 'flex', gap: s(3, 5) }}>
         {Array.from({ length: winsNeeded }, (_, i) => (
           <span
             key={i}
             style={{
-              width: 7,
-              height: 7,
+              width: s(7, 11),
+              height: s(7, 11),
               borderRadius: '50%',
               background: i < winsCount ? accentColor : COLORS.border,
               boxShadow: i < winsCount && !reduced ? `0 0 4px ${accentColor}` : 'none',
@@ -206,6 +233,7 @@ function ManaCrystals({
   banked,
   accentColor,
   reduced,
+  wide,
 }: {
   available: number
   base: number
@@ -213,11 +241,14 @@ function ManaCrystals({
   banked: number
   accentColor: string
   reduced: boolean
+  wide: boolean
 }) {
+  const s = pick(wide)
   const parts: string[] = []
   if (base > 0) parts.push(`${base}b`)
   if (edge > 0) parts.push(`+${edge}e`)
   if (banked > 0) parts.push(`+${banked}bk`)
+  const cap = s(12, 18)
 
   return (
     <div
@@ -225,16 +256,16 @@ function ManaCrystals({
         background: COLORS.panel,
         border: `1px solid ${COLORS.border}`,
         borderRadius: '8px',
-        padding: '5px 8px',
+        padding: s(6, 10),
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: s(8, 14),
       }}
     >
       <div>
         <div
           style={{
-            fontSize: '8px',
+            fontSize: s(8, 12),
             color: COLORS.muted,
             fontFamily: FONTS.mono,
             letterSpacing: '.05em',
@@ -245,7 +276,7 @@ function ManaCrystals({
         </div>
         <div
           style={{
-            fontSize: '20px',
+            fontSize: s(20, 40),
             fontWeight: 800,
             fontFamily: FONTS.orbitron,
             color: accentColor,
@@ -257,7 +288,7 @@ function ManaCrystals({
         {parts.length > 0 && (
           <div
             style={{
-              fontSize: '8px',
+              fontSize: s(8, 12),
               color: COLORS.muted,
               fontFamily: FONTS.mono,
               marginTop: '1px',
@@ -271,23 +302,23 @@ function ManaCrystals({
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '3px',
-          maxWidth: 88,
+          gap: s(3, 5),
+          maxWidth: s(88, 260),
         }}
       >
-        {Array.from({ length: Math.min(available, 12) }, (_, i) => (
-          <EnergyOrb key={i} color={accentColor} reduced={reduced} size={11} />
+        {Array.from({ length: Math.min(available, cap) }, (_, i) => (
+          <EnergyOrb key={i} color={accentColor} reduced={reduced} size={s(11, 16)} />
         ))}
-        {available > 12 && (
+        {available > cap && (
           <span
             style={{
-              fontSize: '9px',
+              fontSize: s(9, 13),
               color: COLORS.muted,
               fontFamily: FONTS.mono,
               alignSelf: 'center',
             }}
           >
-            +{available - 12}
+            +{available - cap}
           </span>
         )}
       </div>
@@ -299,24 +330,25 @@ function ManaCrystals({
  * Opponent reserve — always hidden (hard privacy requirement).
  * Shows a lock icon + "oculto", never a number.
  */
-function OpponentReserve() {
+function OpponentReserve({ wide }: { wide: boolean }) {
+  const s = pick(wide)
+  const ico = s(12, 18)
   return (
     <div
       style={{
         background: COLORS.panel,
         border: `1px solid ${COLORS.border}`,
         borderRadius: '8px',
-        padding: '5px 8px',
+        padding: s(6, 10),
         display: 'flex',
         alignItems: 'center',
-        gap: '5px',
+        gap: s(5, 8),
       }}
       aria-label="Reserva del rival: oculta"
     >
-      {/* Lock SVG */}
       <svg
-        width="12"
-        height="12"
+        width={ico}
+        height={ico}
         viewBox="0 0 16 16"
         fill="none"
         stroke={COLORS.muted}
@@ -332,7 +364,7 @@ function OpponentReserve() {
       <div>
         <div
           style={{
-            fontSize: '8px',
+            fontSize: s(8, 12),
             color: COLORS.muted,
             fontFamily: FONTS.mono,
             letterSpacing: '.04em',
@@ -342,7 +374,7 @@ function OpponentReserve() {
         </div>
         <div
           style={{
-            fontSize: '10px',
+            fontSize: s(10, 15),
             color: COLORS.muted,
             fontFamily: FONTS.mono,
             fontStyle: 'italic',
@@ -369,6 +401,7 @@ interface FrontColumnAllocateProps {
   onRemove: () => void
   accentColor: string
   reduced: boolean
+  wide: boolean
 }
 
 interface FrontColumnRevealProps {
@@ -382,11 +415,13 @@ interface FrontColumnRevealProps {
   aguanteNote: string | null
   isRevealed: boolean
   reduced: boolean
+  wide: boolean
 }
 
 type FrontColumnProps = FrontColumnAllocateProps | FrontColumnRevealProps
 
 function FrontColumn(props: FrontColumnProps) {
+  const s = pick(props.wide)
   const label = FRONT_LABELS[props.frontKey]
 
   if (props.mode === 'reveal') {
@@ -407,7 +442,7 @@ function FrontColumn(props: FrontColumnProps) {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '3px',
+          gap: s(3, 6),
           flex: 1,
           minWidth: 0,
         }}
@@ -421,7 +456,7 @@ function FrontColumn(props: FrontColumnProps) {
                 : COLORS.panel,
             border: `1px solid ${isRevealed && winner === 'b' ? `${COLORS.red}55` : COLORS.border}`,
             borderRadius: '8px',
-            padding: '6px 4px',
+            padding: s(6, 14),
             width: '100%',
             textAlign: 'center',
             transition: 'border-color .2s, background .2s',
@@ -429,7 +464,7 @@ function FrontColumn(props: FrontColumnProps) {
         >
           <span
             style={{
-              fontSize: '20px',
+              fontSize: s(20, 46),
               fontWeight: isRevealed && winner === 'b' ? 800 : 400,
               fontFamily: FONTS.orbitron,
               color: isRevealed && winner === 'b' ? COLORS.red : COLORS.text,
@@ -446,18 +481,18 @@ function FrontColumn(props: FrontColumnProps) {
             flexDirection: 'column',
             alignItems: 'center',
             gap: '1px',
-            padding: '3px 0',
+            padding: s(3, 6) + 'px 0',
           }}
         >
           <FrontSigil
             front={props.frontKey}
             color={winColor}
-            size={18}
+            size={s(18, 34)}
             glow={isRevealed && winner !== 'disputed' && !reduced}
           />
           <span
             style={{
-              fontSize: '8px',
+              fontSize: s(8, 13),
               color: COLORS.muted,
               fontFamily: FONTS.mono,
               letterSpacing: '.04em',
@@ -468,7 +503,7 @@ function FrontColumn(props: FrontColumnProps) {
           {isRevealed && (
             <span
               style={{
-                fontSize: '8px',
+                fontSize: s(8, 13),
                 fontWeight: 700,
                 color: winColor,
                 fontFamily: FONTS.mono,
@@ -480,12 +515,12 @@ function FrontColumn(props: FrontColumnProps) {
           {aguanteNote && isRevealed && (
             <span
               style={{
-                fontSize: '7px',
+                fontSize: s(7, 11),
                 color: COLORS.muted,
                 fontFamily: FONTS.mono,
                 fontStyle: 'italic',
                 textAlign: 'center',
-                maxWidth: 72,
+                maxWidth: s(72, 140),
                 lineHeight: 1.2,
               }}
             >
@@ -503,7 +538,7 @@ function FrontColumn(props: FrontColumnProps) {
                 : COLORS.panel,
             border: `1px solid ${isRevealed && winner === 'a' ? `${COLORS.green}55` : COLORS.border}`,
             borderRadius: '8px',
-            padding: '6px 4px',
+            padding: s(6, 14),
             width: '100%',
             textAlign: 'center',
             transition: 'border-color .2s, background .2s',
@@ -511,7 +546,7 @@ function FrontColumn(props: FrontColumnProps) {
         >
           <span
             style={{
-              fontSize: '20px',
+              fontSize: s(20, 46),
               fontWeight: isRevealed && winner === 'a' ? 800 : 400,
               fontFamily: FONTS.orbitron,
               color: isRevealed && winner === 'a' ? COLORS.green : COLORS.text,
@@ -530,6 +565,7 @@ function FrontColumn(props: FrontColumnProps) {
   const disabledAdd = disabled || availablePool <= 0
   const disabledRemove = disabled || allocValue <= 0
   const frontAccent = hasAlloc ? accentColor : COLORS.muted
+  const orbCap = s(6, 10)
 
   return (
     <div
@@ -537,7 +573,7 @@ function FrontColumn(props: FrontColumnProps) {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '3px',
+        gap: s(3, 6),
         flex: 1,
         minWidth: 0,
       }}
@@ -548,15 +584,15 @@ function FrontColumn(props: FrontColumnProps) {
           background: 'linear-gradient(135deg,#16213d,#0d1326)',
           border: `1px solid ${COLORS.border}`,
           borderRadius: '8px',
-          padding: '8px 4px',
+          padding: s(8, 14) + 'px 4px',
           width: '100%',
           textAlign: 'center',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: '46px',
+          minHeight: s(46, 86),
           color: COLORS.muted,
-          fontSize: '13px',
+          fontSize: s(13, 22),
           letterSpacing: '.3em',
         }}
         aria-label="Zona del rival — oculta"
@@ -571,18 +607,18 @@ function FrontColumn(props: FrontColumnProps) {
           flexDirection: 'column',
           alignItems: 'center',
           gap: '1px',
-          padding: '2px 0',
+          padding: s(2, 4) + 'px 0',
         }}
       >
         <FrontSigil
           front={props.frontKey}
           color={frontAccent}
-          size={16}
+          size={s(16, 30)}
           glow={hasAlloc && !reduced}
         />
         <span
           style={{
-            fontSize: '8px',
+            fontSize: s(8, 13),
             color: COLORS.muted,
             fontFamily: FONTS.mono,
             letterSpacing: '.04em',
@@ -598,7 +634,7 @@ function FrontColumn(props: FrontColumnProps) {
           background: COLORS.panel,
           border: `1px solid ${hasAlloc ? `${accentColor}66` : COLORS.border}`,
           borderRadius: '8px',
-          padding: '6px 4px',
+          padding: s(6, 10) + 'px 4px',
           width: '100%',
           transition: 'border-color .15s, box-shadow .15s',
           boxShadow: hasAlloc ? `0 0 10px ${accentColor}22` : 'none',
@@ -621,8 +657,8 @@ function FrontColumn(props: FrontColumnProps) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '3px',
-            minHeight: '44px',
+            gap: s(3, 6),
+            minHeight: s(44, 64),
           }}
         >
           {/* Orbs stacked in troop zone */}
@@ -630,14 +666,14 @@ function FrontColumn(props: FrontColumnProps) {
             style={{
               display: 'flex',
               flexWrap: 'wrap',
-              gap: '2px',
+              gap: s(2, 4),
               justifyContent: 'center',
-              minHeight: '13px',
+              minHeight: s(13, 18),
             }}
           >
             <AnimatePresence>
               {allocValue > 0 &&
-                Array.from({ length: Math.min(allocValue, 6) }, (_, i) => (
+                Array.from({ length: Math.min(allocValue, orbCap) }, (_, i) => (
                   <motion.span
                     key={`${props.frontKey}-orb-${i}`}
                     initial={reduced ? false : { scale: 0, opacity: 0 }}
@@ -646,19 +682,19 @@ function FrontColumn(props: FrontColumnProps) {
                     transition={{ type: 'spring', stiffness: 600, damping: 34 }}
                     style={{ display: 'inline-flex' }}
                   >
-                    <EnergyOrb color={accentColor} reduced={reduced} size={11} />
+                    <EnergyOrb color={accentColor} reduced={reduced} size={s(11, 16)} />
                   </motion.span>
                 ))}
-              {allocValue > 6 && (
+              {allocValue > orbCap && (
                 <span
                   style={{
-                    fontSize: '8px',
+                    fontSize: s(8, 12),
                     color: accentColor,
                     fontFamily: FONTS.mono,
                     alignSelf: 'center',
                   }}
                 >
-                  +{allocValue - 6}
+                  +{allocValue - orbCap}
                 </span>
               )}
             </AnimatePresence>
@@ -672,7 +708,7 @@ function FrontColumn(props: FrontColumnProps) {
             transition={{ type: 'spring', stiffness: 500, damping: 18 }}
             aria-live="polite"
             style={{
-              fontSize: '24px',
+              fontSize: s(24, 52),
               fontWeight: 800,
               fontFamily: FONTS.orbitron,
               color: hasAlloc ? accentColor : COLORS.muted,
@@ -696,15 +732,15 @@ function FrontColumn(props: FrontColumnProps) {
             border: `1px solid ${COLORS.border}`,
             color: disabledRemove ? COLORS.border : COLORS.text,
             borderRadius: '6px',
-            fontSize: '16px',
+            fontSize: s(16, 24),
             fontWeight: 700,
             cursor: disabledRemove ? 'default' : 'pointer',
             padding: '3px',
-            minHeight: '32px',
+            minHeight: s(32, 44),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginTop: '3px',
+            marginTop: s(3, 6),
           }}
         >
           −
@@ -721,23 +757,20 @@ function FrontColumn(props: FrontColumnProps) {
 export function BattleBoard(props: BattleBoardProps) {
   const { state } = props
   const reduced = useReducedMotion()
+  const wide = useIsWide()
+  const s = pick(wide)
 
   // ── Allocation state (only used in allocate phase) ─────────────────────────
   const [alloc, setAlloc] = useState<Allocation>({ apertura: 0, choque: 0, remate: 0 })
   const [committing, setCommitting] = useState(false)
 
   // ── Reveal stagger state ───────────────────────────────────────────────────
-  // Initialise to fully-revealed instantly under reduced-motion or in allocate
-  // phase (where it's not used); this avoids a flash on first render.
   const isReveal = props.phase === 'reveal'
   const [revealedFronts, setRevealedFronts] = useState<number>(
     isReveal && reduced ? FRONT_KEYS.length : 0,
   )
-  const [showRoundBanner, setShowRoundBanner] = useState<boolean>(
-    isReveal && reduced,
-  )
+  const [showRoundBanner, setShowRoundBanner] = useState<boolean>(isReveal && reduced)
 
-  // Fire reveal stagger on mount (only when phase === 'reveal' with motion).
   useEffect(() => {
     if (!isReveal) return
     if (reduced) {
@@ -818,7 +851,6 @@ export function BattleBoard(props: BattleBoardProps) {
     return null
   }
 
-  // Round winner display values (reveal only)
   const roundWinColor =
     props.phase === 'reveal'
       ? props.roundWinner === 'a'
@@ -837,464 +869,439 @@ export function BattleBoard(props: BattleBoardProps) {
         : `Gana la ronda: ${nameB}`
       : ''
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
-  return (
-    <ArenaBackdrop
-      reducedMotion={reduced}
-      accentA={accentColor}
-      accentB={opponentAccent}
-    >
+  // ── Top group: header + opponent zone ──────────────────────────────────────
+  const topGroup = (
+    <div>
+      {/* Header: round label + score */}
       <div
         style={{
-          color: COLORS.text,
-          fontFamily: 'Inter, system-ui, sans-serif',
-          padding: '10px 10px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: s(10, 16),
         }}
       >
-        {/* ── Outer max-width wrapper ── */}
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div>
+          <div
+            style={{
+              fontSize: s(9, 13),
+              color: COLORS.muted,
+              letterSpacing: '.07em',
+              fontFamily: FONTS.mono,
+              marginBottom: '1px',
+            }}
+          >
+            RONDA {state.round + 1}
+          </div>
+          <div
+            style={{
+              fontSize: s(15, 26),
+              fontWeight: 800,
+              color: accentColor,
+              fontFamily: FONTS.orbitron,
+            }}
+          >
+            {props.phase === 'allocate' ? props.playerLabel : 'Resultados'}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: s(5, 8), alignItems: 'center' }}>
+          <span style={{ fontWeight: 700, fontFamily: FONTS.orbitron, fontSize: s(16, 30), color: COLORS.green }}>
+            {state.roundWins.a}
+          </span>
+          <span style={{ fontSize: s(12, 20), color: COLORS.muted, fontFamily: FONTS.mono }}>–</span>
+          <span style={{ fontWeight: 700, fontFamily: FONTS.orbitron, fontSize: s(16, 30), color: COLORS.red }}>
+            {state.roundWins.b}
+          </span>
+        </div>
+      </div>
 
-          {/* ── Header: round label + score ── */}
+      {/* Opponent zone */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: s(10, 18),
+          padding: s(8, 14),
+          background: `linear-gradient(180deg, ${opponentAccent}0c, transparent 100%)`,
+          borderRadius: '10px 10px 0 0',
+          border: `1px solid ${opponentAccent}22`,
+          borderBottom: 'none',
+        }}
+      >
+        <HeroPortrait
+          name={oppCard.name}
+          accentColor={opponentAccent}
+          winsCount={oppWins}
+          winsNeeded={roundsToWin}
+          reduced={reduced}
+          wide={wide}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: s(10, 15),
+              fontFamily: FONTS.mono,
+              color: opponentAccent,
+              letterSpacing: '.04em',
+              marginBottom: s(4, 7),
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {oppCard.gradeCompany} {oppCard.grade} — {oppCard.name}
+          </div>
+          <OpponentReserve wide={wide} />
+        </div>
+      </div>
+    </div>
+  )
+
+  // ── Middle: the 3-front board grid ─────────────────────────────────────────
+  const board = (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gap: s(6, 22),
+        padding: s(8, 18) + 'px ' + s(6, 18) + 'px',
+        background: COLORS.panel,
+        border: `1px solid ${COLORS.border}`,
+        borderTop: `1px solid ${opponentAccent}22`,
+        borderBottom: `1px solid ${accentColor}22`,
+      }}
+    >
+      {FRONT_KEYS.map((fk, idx) => {
+        if (props.phase === 'reveal') {
+          const isRevealed = revealedFronts > idx
+          const winner = props.frontWinners[fk]
+          const note = aguanteNote(fk)
+          return (
+            <div key={fk} style={{ position: 'relative' }}>
+              <FrontColumn
+                mode="reveal"
+                frontKey={fk}
+                allocA={props.allocA[fk]}
+                allocB={props.allocB[fk]}
+                winner={winner}
+                nameA={nameA}
+                nameB={nameB}
+                aguanteNote={note}
+                isRevealed={isRevealed}
+                reduced={reduced}
+                wide={wide}
+              />
+              {isRevealed && winner !== 'disputed' && !reduced && (
+                <motion.div
+                  initial={{ opacity: 0.5 }}
+                  animate={{ opacity: 0 }}
+                  transition={{ duration: 0.9 }}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '8px',
+                    background: `radial-gradient(ellipse at center, ${
+                      winner === 'a' ? COLORS.green : COLORS.red
+                    }33 0%, transparent 70%)`,
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+            </div>
+          )
+        }
+
+        return (
+          <FrontColumn
+            key={fk}
+            mode="allocate"
+            frontKey={fk}
+            allocValue={alloc[fk]}
+            availablePool={pool}
+            disabled={committing}
+            onAdd={() => {
+              if (committing || pool <= 0) return
+              setAlloc((prev) => clampApply(prev, fk, +1, available))
+              playSfx('tick')
+              haptic(8)
+            }}
+            onRemove={() => {
+              if (committing || alloc[fk] <= 0) return
+              setAlloc((prev) => clampApply(prev, fk, -1, available))
+              playSfx('tick')
+              haptic(8)
+            }}
+            accentColor={accentColor}
+            reduced={reduced}
+            wide={wide}
+          />
+        )
+      })}
+    </div>
+  )
+
+  // ── Bottom group: your zone + reveal notes/banner + action button ──────────
+  const bottomGroup = (
+    <div>
+      {/* Your zone */}
+      <div
+        style={{
+          padding: s(8, 14),
+          background: `linear-gradient(0deg, ${accentColor}0c, transparent 100%)`,
+          borderRadius: '0 0 10px 10px',
+          border: `1px solid ${accentColor}22`,
+          borderTop: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: s(10, 18) }}>
+          <HeroPortrait
+            name={myCard.name}
+            accentColor={accentColor}
+            winsCount={myWins}
+            winsNeeded={roundsToWin}
+            reduced={reduced}
+            wide={wide}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: s(10, 15),
+                fontFamily: FONTS.mono,
+                color: accentColor,
+                letterSpacing: '.04em',
+                marginBottom: s(4, 7),
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {myCard.gradeCompany} {myCard.grade} — {myCard.name}
+            </div>
+            {props.phase === 'allocate' && (
+              <ManaCrystals
+                available={available}
+                base={base}
+                edge={edge}
+                banked={banked}
+                accentColor={accentColor}
+                reduced={reduced}
+                wide={wide}
+              />
+            )}
+          </div>
+        </div>
+
+        {props.phase === 'allocate' && (
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '10px',
+              marginTop: s(6, 10),
+              fontSize: s(10, 14),
+              color: COLORS.muted,
+              fontFamily: FONTS.mono,
+              padding: '0 2px',
             }}
           >
-            <div>
+            <span>
+              Sin asignar:{' '}
+              <strong style={{ color: accentColor, fontFamily: FONTS.orbitron }}>{pool}</strong>
+            </span>
+            <span>
+              Asignada:{' '}
+              <strong style={{ color: accentColor, fontFamily: FONTS.orbitron }}>{spent}</strong>
+              {pool > 0 ? ` · ${pool} se banca` : ''}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Reveal: aguante notes + round winner banner */}
+      {props.phase === 'reveal' && (
+        <>
+          {FRONT_KEYS.map((fk, idx) => {
+            const note = aguanteNote(fk)
+            if (!note || revealedFronts <= idx) return null
+            return (
               <div
+                key={fk}
                 style={{
-                  fontSize: '9px',
+                  fontSize: s(10, 14),
                   color: COLORS.muted,
-                  letterSpacing: '.07em',
                   fontFamily: FONTS.mono,
-                  marginBottom: '1px',
+                  fontStyle: 'italic',
+                  padding: s(3, 6) + 'px 8px',
+                  borderLeft: `2px solid ${COLORS.border}`,
+                  marginTop: '4px',
                 }}
               >
-                RONDA {state.round + 1}
+                {FRONT_LABELS[fk]}: {note}
               </div>
-              <div
+            )
+          })}
+
+          <AnimatePresence>
+            {showRoundBanner && (
+              <motion.div
+                initial={reduced ? false : { opacity: 0, scale: 0.92, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 22 }}
                 style={{
-                  fontSize: '15px',
-                  fontWeight: 800,
-                  color: accentColor,
-                  fontFamily: FONTS.orbitron,
+                  background:
+                    props.roundWinner === 'disputed'
+                      ? COLORS.panel
+                      : playerTheme[props.roundWinner as 'a' | 'b']?.gradient ?? COLORS.panel,
+                  border: `1px solid ${roundWinColor}55`,
+                  borderRadius: '10px',
+                  padding: s(12, 18) + 'px ' + s(14, 18) + 'px',
+                  textAlign: 'center',
+                  marginTop: s(10, 16),
+                  boxShadow: `0 0 16px ${roundWinColor}44`,
                 }}
               >
-                {props.phase === 'allocate' ? props.playerLabel : 'Resultados'}
-              </div>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: '5px',
-                alignItems: 'center',
-              }}
-            >
-              <span
-                style={{
-                  fontWeight: 700,
-                  fontFamily: FONTS.orbitron,
-                  fontSize: '16px',
-                  color: COLORS.green,
-                }}
-              >
-                {state.roundWins.a}
-              </span>
-              <span style={{ fontSize: '12px', color: COLORS.muted, fontFamily: FONTS.mono }}>
-                –
-              </span>
-              <span
-                style={{
-                  fontWeight: 700,
-                  fontFamily: FONTS.orbitron,
-                  fontSize: '16px',
-                  color: COLORS.red,
-                }}
-              >
-                {state.roundWins.b}
-              </span>
-            </div>
-          </div>
-
-          {/* ═══════════════════════════════════════════════
-           *  OPPONENT ZONE (top)
-           * ═══════════════════════════════════════════════ */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '8px 8px',
-              background: `linear-gradient(180deg, ${opponentAccent}0c, transparent 100%)`,
-              borderRadius: '10px 10px 0 0',
-              border: `1px solid ${opponentAccent}22`,
-              borderBottom: 'none',
-            }}
-          >
-            <HeroPortrait
-              name={oppCard.name}
-              accentColor={opponentAccent}
-              winsCount={oppWins}
-              winsNeeded={roundsToWin}
-              reduced={reduced}
-            />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontFamily: FONTS.mono,
-                  color: opponentAccent,
-                  letterSpacing: '.04em',
-                  marginBottom: '4px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {oppCard.gradeCompany} {oppCard.grade} — {oppCard.name}
-              </div>
-              {/* Opponent reserve: always hidden */}
-              <OpponentReserve />
-            </div>
-          </div>
-
-          {/* ═══════════════════════════════════════════════
-           *  3 FRONT COLUMNS (the board)
-           * ═══════════════════════════════════════════════ */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: '6px',
-              padding: '8px 6px',
-              background: COLORS.panel,
-              border: `1px solid ${COLORS.border}`,
-              borderTop: `1px solid ${opponentAccent}22`,
-              borderBottom: `1px solid ${accentColor}22`,
-            }}
-          >
-            {FRONT_KEYS.map((fk, idx) => {
-              if (props.phase === 'reveal') {
-                const isRevealed = revealedFronts > idx
-                const winner = props.frontWinners[fk]
-                const note = aguanteNote(fk)
-                return (
-                  <div key={fk} style={{ position: 'relative' }}>
-                    <FrontColumn
-                      mode="reveal"
-                      frontKey={fk}
-                      allocA={props.allocA[fk]}
-                      allocB={props.allocB[fk]}
-                      winner={winner}
-                      nameA={nameA}
-                      nameB={nameB}
-                      aguanteNote={note}
-                      isRevealed={isRevealed}
-                      reduced={reduced}
-                    />
-                    {/* Spotlight pulse on reveal */}
-                    {isRevealed && winner !== 'disputed' && !reduced && (
-                      <motion.div
-                        initial={{ opacity: 0.5 }}
-                        animate={{ opacity: 0 }}
-                        transition={{ duration: 0.9 }}
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          borderRadius: '8px',
-                          background: `radial-gradient(ellipse at center, ${
-                            winner === 'a' ? COLORS.green : COLORS.red
-                          }33 0%, transparent 70%)`,
-                          pointerEvents: 'none',
-                        }}
-                      />
-                    )}
-                  </div>
-                )
-              }
-
-              // allocate phase
-              return (
-                <FrontColumn
-                  key={fk}
-                  mode="allocate"
-                  frontKey={fk}
-                  allocValue={alloc[fk]}
-                  availablePool={pool}
-                  disabled={committing}
-                  onAdd={() => {
-                    if (committing || pool <= 0) return
-                    setAlloc((prev) => clampApply(prev, fk, +1, available))
-                    playSfx('tick')
-                    haptic(8)
-                  }}
-                  onRemove={() => {
-                    if (committing || alloc[fk] <= 0) return
-                    setAlloc((prev) => clampApply(prev, fk, -1, available))
-                    playSfx('tick')
-                    haptic(8)
-                  }}
-                  accentColor={accentColor}
-                  reduced={reduced}
-                />
-              )
-            })}
-          </div>
-
-          {/* ═══════════════════════════════════════════════
-           *  YOUR ZONE (bottom)
-           * ═══════════════════════════════════════════════ */}
-          <div
-            style={{
-              padding: '8px 8px',
-              background: `linear-gradient(0deg, ${accentColor}0c, transparent 100%)`,
-              borderRadius: '0 0 10px 10px',
-              border: `1px solid ${accentColor}22`,
-              borderTop: 'none',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <HeroPortrait
-                name={myCard.name}
-                accentColor={accentColor}
-                winsCount={myWins}
-                winsNeeded={roundsToWin}
-                reduced={reduced}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
-                    fontSize: '10px',
-                    fontFamily: FONTS.mono,
-                    color: accentColor,
-                    letterSpacing: '.04em',
+                    fontSize: s(9, 13),
+                    color: COLORS.muted,
+                    letterSpacing: '.07em',
                     marginBottom: '4px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    fontFamily: FONTS.mono,
                   }}
                 >
-                  {myCard.gradeCompany} {myCard.grade} — {myCard.name}
+                  RESULTADO DE LA RONDA
                 </div>
-                {/* Mana crystals only during allocation */}
-                {props.phase === 'allocate' && (
-                  <ManaCrystals
-                    available={available}
-                    base={base}
-                    edge={edge}
-                    banked={banked}
-                    accentColor={accentColor}
-                    reduced={reduced}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Pool info row (allocate only) */}
-            {props.phase === 'allocate' && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginTop: '6px',
-                  fontSize: '10px',
-                  color: COLORS.muted,
-                  fontFamily: FONTS.mono,
-                  padding: '0 2px',
-                }}
-              >
-                <span>
-                  Sin asignar:{' '}
-                  <strong
-                    style={{ color: accentColor, fontFamily: FONTS.orbitron }}
-                  >
-                    {pool}
-                  </strong>
-                </span>
-                <span>
-                  Asignada:{' '}
-                  <strong
-                    style={{ color: accentColor, fontFamily: FONTS.orbitron }}
-                  >
-                    {spent}
-                  </strong>
-                  {pool > 0 ? ` · ${pool} se banca` : ''}
-                </span>
-              </div>
+                <div
+                  style={{
+                    fontSize: s(17, 30),
+                    fontWeight: 800,
+                    color: roundWinColor,
+                    fontFamily: FONTS.orbitron,
+                  }}
+                >
+                  {roundWinLabel}
+                </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
+        </>
+      )}
 
-          {/* ═══════════════════════════════════════════════
-           *  REVEAL: aguante notes + round winner banner
-           * ═══════════════════════════════════════════════ */}
-          {props.phase === 'reveal' && (
-            <>
-              {/* Aguante notes for each front */}
-              {FRONT_KEYS.map((fk, idx) => {
-                const note = aguanteNote(fk)
-                if (!note || revealedFronts <= idx) return null
-                return (
-                  <div
-                    key={fk}
-                    style={{
-                      fontSize: '10px',
-                      color: COLORS.muted,
-                      fontFamily: FONTS.mono,
-                      fontStyle: 'italic',
-                      padding: '3px 8px',
-                      borderLeft: `2px solid ${COLORS.border}`,
-                      marginTop: '4px',
-                    }}
-                  >
-                    {FRONT_LABELS[fk]}: {note}
-                  </div>
-                )
-              })}
+      {/* COMMIT button (allocate) */}
+      {props.phase === 'allocate' && (
+        <motion.button
+          onClick={handleCommit}
+          disabled={committing}
+          aria-disabled={committing}
+          whileTap={reduced ? undefined : { scale: 0.96 }}
+          animate={committing && !reduced ? { scale: [1, 1.04, 1] } : undefined}
+          transition={{ duration: 0.26 }}
+          aria-label="Confirmar asignación de energía"
+          style={{
+            width: '100%',
+            background: accentColor,
+            color: playerKey === 'a' ? '#04130c' : '#1a040a',
+            border: 'none',
+            borderRadius: '10px',
+            padding: s(15, 20),
+            fontSize: s(15, 22),
+            fontWeight: 800,
+            fontFamily: FONTS.orbitron,
+            cursor: committing ? 'default' : 'pointer',
+            letterSpacing: '.03em',
+            boxShadow: `0 0 14px ${accentColor}66`,
+            minHeight: s(52, 64),
+            opacity: committing ? 0.7 : 1,
+            pointerEvents: committing ? 'none' : undefined,
+            marginTop: s(12, 16),
+          }}
+        >
+          <svg
+            aria-hidden="true"
+            width={s(14, 18)}
+            height={s(14, 18)}
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '6px', marginBottom: '2px' }}
+          >
+            <path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" />
+            <rect x="2.5" y="7" width="11" height="8" rx="2" />
+            <circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          COMMIT · {spent} asignada{pool > 0 ? ` · ${pool} se banca` : ''}
+        </motion.button>
+      )}
 
-              {/* Round winner banner */}
-              <AnimatePresence>
-                {showRoundBanner && (
-                  <motion.div
-                    initial={reduced ? false : { opacity: 0, scale: 0.92, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-                    style={{
-                      background:
-                        props.roundWinner === 'disputed'
-                          ? COLORS.panel
-                          : playerTheme[props.roundWinner as 'a' | 'b']?.gradient ??
-                            COLORS.panel,
-                      border: `1px solid ${roundWinColor}55`,
-                      borderRadius: '10px',
-                      padding: '12px 14px',
-                      textAlign: 'center',
-                      marginTop: '10px',
-                      boxShadow: `0 0 16px ${roundWinColor}44`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: '9px',
-                        color: COLORS.muted,
-                        letterSpacing: '.07em',
-                        marginBottom: '4px',
-                        fontFamily: FONTS.mono,
-                      }}
-                    >
-                      RESULTADO DE LA RONDA
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '17px',
-                        fontWeight: 800,
-                        color: roundWinColor,
-                        fontFamily: FONTS.orbitron,
-                      }}
-                    >
-                      {roundWinLabel}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </>
-          )}
-
-          {/* ═══════════════════════════════════════════════
-           *  COMMIT button (allocate phase)
-           * ═══════════════════════════════════════════════ */}
-          {props.phase === 'allocate' && (
+      {/* CONTINUE button (reveal) */}
+      {props.phase === 'reveal' && (
+        <AnimatePresence>
+          {showRoundBanner && (
             <motion.button
-              onClick={handleCommit}
-              disabled={committing}
-              aria-disabled={committing}
-              whileTap={reduced ? undefined : { scale: 0.96 }}
-              animate={committing && !reduced ? { scale: [1, 1.04, 1] } : undefined}
-              transition={{ duration: 0.26 }}
-              aria-label="Confirmar asignación de energía"
+              initial={reduced ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={props.onContinue}
+              whileTap={reduced ? undefined : { scale: 0.97 }}
               style={{
                 width: '100%',
-                background: accentColor,
-                color: playerKey === 'a' ? '#04130c' : '#1a040a',
+                background: COLORS.green,
+                color: '#04130c',
                 border: 'none',
                 borderRadius: '10px',
-                padding: '15px',
-                fontSize: '15px',
+                padding: s(15, 20),
+                fontSize: s(15, 22),
                 fontWeight: 800,
                 fontFamily: FONTS.orbitron,
-                cursor: committing ? 'default' : 'pointer',
+                cursor: 'pointer',
                 letterSpacing: '.03em',
-                boxShadow: `0 0 14px ${accentColor}66`,
-                minHeight: '52px',
-                opacity: committing ? 0.7 : 1,
-                pointerEvents: committing ? 'none' : undefined,
-                marginTop: '12px',
+                boxShadow: '0 0 12px #34e29b55',
+                minHeight: s(52, 64),
+                marginTop: s(10, 16),
               }}
             >
-              <svg
-                aria-hidden="true"
-                width="14"
-                height="14"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  display: 'inline-block',
-                  verticalAlign: 'middle',
-                  marginRight: '6px',
-                  marginBottom: '2px',
-                }}
-              >
-                <path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" />
-                <rect x="2.5" y="7" width="11" height="8" rx="2" />
-                <circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none" />
-              </svg>
-              COMMIT · {spent} asignada
-              {pool > 0 ? ` · ${pool} se banca` : ''}
+              Continuar →
             </motion.button>
           )}
+        </AnimatePresence>
+      )}
+    </div>
+  )
 
-          {/* ═══════════════════════════════════════════════
-           *  CONTINUE button (reveal phase)
-           * ═══════════════════════════════════════════════ */}
-          {props.phase === 'reveal' && (
-            <AnimatePresence>
-              {showRoundBanner && (
-                <motion.button
-                  initial={reduced ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  onClick={props.onContinue}
-                  whileTap={reduced ? undefined : { scale: 0.97 }}
-                  style={{
-                    width: '100%',
-                    background: COLORS.green,
-                    color: '#04130c',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '15px',
-                    fontSize: '15px',
-                    fontWeight: 800,
-                    fontFamily: FONTS.orbitron,
-                    cursor: 'pointer',
-                    letterSpacing: '.03em',
-                    boxShadow: '0 0 12px #34e29b55',
-                    minHeight: '52px',
-                    marginTop: '10px',
-                  }}
-                >
-                  Continuar →
-                </motion.button>
-              )}
-            </AnimatePresence>
-          )}
-
-        </div>{/* /max-width wrapper */}
+  // ── RENDER ─────────────────────────────────────────────────────────────────
+  return (
+    <ArenaBackdrop reducedMotion={reduced} accentA={accentColor} accentB={opponentAccent}>
+      <div
+        style={{
+          color: COLORS.text,
+          fontFamily: 'Inter, system-ui, sans-serif',
+          minHeight: wide ? '100dvh' : undefined,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: wide ? '24px 24px 28px' : '10px 10px 24px',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Inner wrapper: on desktop fills height and distributes zones
+            (opponent top, board middle, your zone+commit bottom). */}
+        <div
+          style={{
+            width: '100%',
+            maxWidth: wide ? '1120px' : '900px',
+            margin: '0 auto',
+            flex: wide ? 1 : undefined,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: wide ? 'space-between' : 'flex-start',
+            gap: wide ? '8px' : undefined,
+          }}
+        >
+          {topGroup}
+          {board}
+          {bottomGroup}
+        </div>
       </div>
     </ArenaBackdrop>
   )
