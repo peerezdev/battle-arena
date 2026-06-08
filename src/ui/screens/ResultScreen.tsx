@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { COLORS } from '../theme'
+import { COLORS, FONTS } from '../theme'
 import { Confetti } from '../components/Confetti'
 import { useReducedMotion } from '../useReducedMotion'
 import { useEffect } from 'react'
@@ -10,6 +10,30 @@ interface Props {
   onFeedback: () => void
   /** Celebrate (you/a player won) vs subdued (you lost). */
   celebrate?: boolean
+}
+
+function TrophySvg() {
+  return (
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none"
+      stroke="#f59e0b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden="true">
+      <path d="M8 21h8M12 17v4M17 3h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4h-.18" />
+      <path d="M7 3H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4H7" />
+      <path d="M12 17a5 5 0 0 0 5-5V3H7v9a5 5 0 0 0 5 5Z" />
+    </svg>
+  )
+}
+
+function MedalSvg() {
+  return (
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none"
+      stroke="#7c89a8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden="true">
+      <circle cx="12" cy="14" r="6" />
+      <path d="M8 2h8l-2 6H10L8 2Z" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+    </svg>
+  )
 }
 
 export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Props) {
@@ -47,8 +71,23 @@ export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Prop
 
       <motion.div
         initial={reduced ? false : { opacity: 0, scale: 0.92, y: 14 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+        animate={
+          celebrate && !reduced
+            ? {
+                opacity: 1, scale: 1, y: 0,
+                boxShadow: [
+                  `0 0 32px ${COLORS.green}33`,
+                  `0 0 48px ${COLORS.green}66`,
+                  `0 0 32px ${COLORS.green}33`,
+                ],
+              }
+            : { opacity: 1, scale: 1, y: 0, boxShadow: 'none' }
+        }
+        transition={
+          celebrate && !reduced
+            ? { opacity: { duration: 0.5 }, scale: { type: 'spring', stiffness: 280, damping: 20 }, y: { type: 'spring', stiffness: 280, damping: 20 }, boxShadow: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' } }
+            : { type: 'spring', stiffness: 280, damping: 20 }
+        }
         style={{
           background: COLORS.panel,
           border: `1px solid ${accent}55`,
@@ -56,7 +95,6 @@ export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Prop
           padding: '40px 28px',
           maxWidth: '360px',
           width: '100%',
-          boxShadow: celebrate ? `0 0 32px ${COLORS.green}33` : 'none',
           position: 'relative',
           zIndex: 41,
         }}
@@ -65,14 +103,14 @@ export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Prop
           initial={reduced ? false : { scale: 0, rotate: -25 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 240, damping: 12, delay: reduced ? 0 : 0.15 }}
-          style={{ fontSize: '52px', marginBottom: '12px' }}
+          style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}
         >
-          {celebrate ? '🏆' : '🥈'}
+          {celebrate ? <TrophySvg /> : <MedalSvg />}
         </motion.div>
-        <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.08em', marginBottom: '8px' }}>
+        <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.08em', marginBottom: '8px', fontFamily: FONTS.mono }}>
           RESULTADO FINAL
         </div>
-        <div style={{ fontSize: '26px', fontWeight: 800, color: accent, marginBottom: '32px', lineHeight: 1.2 }}>
+        <div style={{ fontSize: '26px', fontWeight: 800, color: accent, marginBottom: '32px', lineHeight: 1.2, fontFamily: FONTS.orbitron }}>
           {winnerLabel}
         </div>
         <motion.button
