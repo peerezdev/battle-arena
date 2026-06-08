@@ -12,7 +12,7 @@ interface Props {
   minHeight?: number | string
 }
 
-/** 3D card flip via CSS rotateY + perspective. No assets. */
+/** 3D card flip via CSS rotateY + perspective. No assets. Spring slam-down on reveal. */
 export function FlipCard({ flipped, back, front, reducedMotion = false, delay = 0, minHeight = 56 }: Props) {
   if (reducedMotion) {
     // Instant — just render the eventual face.
@@ -24,7 +24,11 @@ export function FlipCard({ flipped, back, front, reducedMotion = false, delay = 
       <motion.div
         initial={false}
         animate={{ rotateY: flipped ? 0 : 180 }}
-        transition={{ duration: 0.5, delay, ease: 'easeOut' }}
+        transition={
+          flipped
+            ? { type: 'spring', stiffness: 420, damping: 30, delay }
+            : { duration: 0.2, delay, ease: 'easeIn' }
+        }
         style={{
           position: 'relative',
           width: '100%',
