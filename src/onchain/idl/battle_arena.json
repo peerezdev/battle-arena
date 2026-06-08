@@ -1,0 +1,913 @@
+{
+  "address": "89qGDjXGcV9zi3968DtRLNzBn5KXhYmSGJkjKntksCdk",
+  "metadata": {
+    "name": "battle_arena",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "claim_timeout",
+      "discriminator": [
+        130,
+        234,
+        45,
+        53,
+        120,
+        90,
+        86,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle.player_a",
+                "account": "Battle"
+              },
+              {
+                "kind": "account",
+                "path": "battle.nonce",
+                "account": "Battle"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "commit",
+      "discriminator": [
+        223,
+        140,
+        142,
+        165,
+        229,
+        208,
+        156,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "signer": true
+        },
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle.player_a",
+                "account": "Battle"
+              },
+              {
+                "kind": "account",
+                "path": "battle.nonce",
+                "account": "Battle"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "commit",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_battle",
+      "discriminator": [
+        117,
+        108,
+        166,
+        159,
+        146,
+        82,
+        246,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "player_a",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_a"
+              },
+              {
+                "kind": "arg",
+                "path": "nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_mint"
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_a_token",
+          "writable": true
+        },
+        {
+          "name": "nft_token_a",
+          "docs": [
+            "NFT del jugador A: token account con amount >= 1 del mint nft_mint_a."
+          ]
+        },
+        {
+          "name": "instructions_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "stake",
+          "type": "u64"
+        },
+        {
+          "name": "cfg",
+          "type": {
+            "defined": {
+              "name": "MatchConfig"
+            }
+          }
+        },
+        {
+          "name": "oracle",
+          "type": "pubkey"
+        },
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        },
+        {
+          "name": "nft_mint_a",
+          "type": "pubkey"
+        },
+        {
+          "name": "value_usd_a",
+          "type": "u64"
+        },
+        {
+          "name": "grade_a",
+          "type": "u8"
+        },
+        {
+          "name": "ts_a",
+          "type": "i64"
+        },
+        {
+          "name": "ed25519_ix_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "join_battle",
+      "discriminator": [
+        126,
+        0,
+        69,
+        130,
+        127,
+        145,
+        54,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "player_b",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle.player_a",
+                "account": "Battle"
+              },
+              {
+                "kind": "account",
+                "path": "battle.nonce",
+                "account": "Battle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_b_token",
+          "writable": true
+        },
+        {
+          "name": "nft_token_b",
+          "docs": [
+            "NFT del jugador B: token account con amount >= 1 del mint nft_mint_b."
+          ]
+        },
+        {
+          "name": "instructions_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "nft_mint_b",
+          "type": "pubkey"
+        },
+        {
+          "name": "value_usd_b",
+          "type": "u64"
+        },
+        {
+          "name": "grade_b",
+          "type": "u8"
+        },
+        {
+          "name": "ts_b",
+          "type": "i64"
+        },
+        {
+          "name": "ed25519_ix_index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "resolve_round",
+      "discriminator": [
+        165,
+        114,
+        237,
+        158,
+        1,
+        36,
+        70,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle.player_a",
+                "account": "Battle"
+              },
+              {
+                "kind": "account",
+                "path": "battle.nonce",
+                "account": "Battle"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reveal",
+      "discriminator": [
+        9,
+        35,
+        59,
+        190,
+        167,
+        249,
+        76,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "signer": true
+        },
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle.player_a",
+                "account": "Battle"
+              },
+              {
+                "kind": "account",
+                "path": "battle.nonce",
+                "account": "Battle"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "alloc",
+          "type": {
+            "defined": {
+              "name": "Allocation"
+            }
+          }
+        },
+        {
+          "name": "salt",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "settle",
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "battle",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle.player_a",
+                "account": "Battle"
+              },
+              {
+                "kind": "account",
+                "path": "battle.nonce",
+                "account": "Battle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "battle"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_a_token",
+          "writable": true
+        },
+        {
+          "name": "player_b_token",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Battle",
+      "discriminator": [
+        81,
+        148,
+        121,
+        71,
+        63,
+        166,
+        116,
+        24
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "WrongPhase",
+      "msg": "Operacion no permitida en la fase actual"
+    },
+    {
+      "code": 6001,
+      "name": "StaleAttestation",
+      "msg": "Atestacion del oraculo obsoleta"
+    },
+    {
+      "code": 6002,
+      "name": "BadOracleSig",
+      "msg": "Firma del oraculo invalida"
+    },
+    {
+      "code": 6003,
+      "name": "NftNotOwned",
+      "msg": "El NFT no pertenece al jugador"
+    },
+    {
+      "code": 6004,
+      "name": "RatioCapExceeded",
+      "msg": "Se excedio el limite de ratio de valor"
+    },
+    {
+      "code": 6005,
+      "name": "NonPositiveValue",
+      "msg": "El valor debe ser positivo"
+    },
+    {
+      "code": 6006,
+      "name": "CommitMismatch",
+      "msg": "El reveal no coincide con el commit"
+    },
+    {
+      "code": 6007,
+      "name": "OverAllocated",
+      "msg": "Se asigno mas energia de la disponible"
+    },
+    {
+      "code": 6008,
+      "name": "AlreadyCommitted",
+      "msg": "El jugador ya hizo commit"
+    },
+    {
+      "code": 6009,
+      "name": "MissingReveals",
+      "msg": "Faltan reveals para resolver la ronda"
+    },
+    {
+      "code": 6010,
+      "name": "DeadlineNotReached",
+      "msg": "Aun no se alcanzo el deadline"
+    },
+    {
+      "code": 6011,
+      "name": "MathOverflow",
+      "msg": "Overflow aritmetico"
+    },
+    {
+      "code": 6012,
+      "name": "RakeTooHigh",
+      "msg": "rake_bps excede el máximo permitido"
+    }
+  ],
+  "types": [
+    {
+      "name": "Allocation",
+      "docs": [
+        "Reparto de energía entre los tres frentes de una ronda."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "apertura",
+            "type": "u32"
+          },
+          {
+            "name": "choque",
+            "type": "u32"
+          },
+          {
+            "name": "remate",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Battle",
+      "docs": [
+        "Cuenta principal de una batalla."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "player_a",
+            "type": "pubkey"
+          },
+          {
+            "name": "player_b",
+            "type": "pubkey"
+          },
+          {
+            "name": "nft_mint_a",
+            "type": "pubkey"
+          },
+          {
+            "name": "nft_mint_b",
+            "type": "pubkey"
+          },
+          {
+            "name": "value_usd_a",
+            "type": "u64"
+          },
+          {
+            "name": "value_usd_b",
+            "type": "u64"
+          },
+          {
+            "name": "grade_a",
+            "type": "u8"
+          },
+          {
+            "name": "grade_b",
+            "type": "u8"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake",
+            "type": "u64"
+          },
+          {
+            "name": "cfg",
+            "type": {
+              "defined": {
+                "name": "MatchConfig"
+              }
+            }
+          },
+          {
+            "name": "edge_a",
+            "type": "u8"
+          },
+          {
+            "name": "edge_b",
+            "type": "u8"
+          },
+          {
+            "name": "banked_a",
+            "type": "u32"
+          },
+          {
+            "name": "banked_b",
+            "type": "u32"
+          },
+          {
+            "name": "wins_a",
+            "type": "u8"
+          },
+          {
+            "name": "wins_b",
+            "type": "u8"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "phase",
+            "type": {
+              "defined": {
+                "name": "Phase"
+              }
+            }
+          },
+          {
+            "name": "commit_a",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "commit_b",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "reveal_a",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Allocation"
+                }
+              }
+            }
+          },
+          {
+            "name": "reveal_b",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Allocation"
+                }
+              }
+            }
+          },
+          {
+            "name": "deadline_commit",
+            "type": "i64"
+          },
+          {
+            "name": "deadline_reveal",
+            "type": "i64"
+          },
+          {
+            "name": "winner",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "is_draw",
+            "type": "bool"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MatchConfig",
+      "docs": [
+        "Parámetros de configuración del match."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rounds_to_win",
+            "type": "u8"
+          },
+          {
+            "name": "base_energy",
+            "type": "u32"
+          },
+          {
+            "name": "max_edge",
+            "type": "u8"
+          },
+          {
+            "name": "value_ratio_cap",
+            "type": "u8"
+          },
+          {
+            "name": "max_rounds",
+            "type": "u8"
+          },
+          {
+            "name": "rake_bps",
+            "type": "u16"
+          },
+          {
+            "name": "edge_enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Phase",
+      "docs": [
+        "Fase actual de la batalla."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Created"
+          },
+          {
+            "name": "Committing"
+          },
+          {
+            "name": "Revealing"
+          },
+          {
+            "name": "RoundResolved"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Closed"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "SEED",
+      "type": "string",
+      "value": "\"anchor\""
+    }
+  ]
+}

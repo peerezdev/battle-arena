@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   createMatch, availableEnergy, commit, reveal, resolveRound, resolveBattle, nextRound,
@@ -15,26 +15,62 @@ import { ResultScreen } from './ui/screens/ResultScreen'
 import { FeedbackScreen } from './ui/screens/FeedbackScreen'
 import { MuteButton } from './ui/components/MuteButton'
 import { useReducedMotion } from './ui/useReducedMotion'
+import { ModeSelect, type AppMode } from './mode/ModeSelect'
+import type { SelectedCard } from './ui/screens/onchain/CollectionScreen'
+import type { BattleInfo } from './ui/screens/onchain/LobbyScreen'
 
-type Screen = 'setup' | 'allocateA' | 'passToB' | 'allocateB' | 'reveal' | 'result' | 'feedback'
+// ── Lazy-loaded on-chain bundle (never imported for offline users) ──────────
+const AppKitProvider = lazy(() =>
+  import('./wallet/AppKitProvider').then((m) => ({ default: m.AppKitProvider }))
+)
+const ConnectScreen = lazy(() =>
+  import('./ui/screens/onchain/ConnectScreen').then((m) => ({ default: m.ConnectScreen }))
+)
+const CollectionScreen = lazy(() =>
+  import('./ui/screens/onchain/CollectionScreen').then((m) => ({ default: m.CollectionScreen }))
+)
+const LobbyScreen = lazy(() =>
+  import('./ui/screens/onchain/LobbyScreen').then((m) => ({ default: m.LobbyScreen }))
+)
+const OnchainBattleScreen = lazy(() =>
+  import('./ui/screens/onchain/OnchainBattleScreen').then((m) => ({ default: m.OnchainBattleScreen }))
+)
+
+// ── Offline screen names ────────────────────────────────────────────────────
+type OfflineScreen = 'setup' | 'allocateA' | 'passToB' | 'allocateB' | 'reveal' | 'result' | 'feedback'
+
+// ── On-chain screen names ───────────────────────────────────────────────────
+type OnchainScreen = 'connect' | 'collection' | 'lobby' | 'battle'
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('setup')
+  const reduced = useReducedMotion()
+
+  // ── Mode selection ──────────────────────────────────────────────────────
+  const [appMode, setAppMode] = useState<AppMode | null>(null)
+
+  // ── Offline state ───────────────────────────────────────────────────────
+  const [offlineScreen, setOfflineScreen] = useState<OfflineScreen>('setup')
   const [setup, setSetup] = useState<Setup | null>(null)
   const [state, setState] = useState<MatchState | null>(null)
   const [error, setError] = useState<string | undefined>()
   const [allocA, setAllocA] = useState<Allocation | null>(null)
-  const reduced = useReducedMotion()
+
+  // ── On-chain state ──────────────────────────────────────────────────────
+  const [onchainScreen, setOnchainScreen] = useState<OnchainScreen>('connect')
+  const [authToken, setAuthToken] = useState<string>('')
+  const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null)
+  const [currentBattle, setCurrentBattle] = useState<BattleInfo | null>(null)
 
   const nameA = state ? state.cardA.name : 'A'
   const nameB = state ? state.cardB.name : 'B'
 
+  // ── Offline handlers ────────────────────────────────────────────────────
   function start(s: Setup) {
     try {
       const cardA = MOCK_CARDS.find((c) => c.id === s.cardAId)!
       const cardB = MOCK_CARDS.find((c) => c.id === s.cardBId)!
       const st = createMatch(cardA, cardB, { ...DEFAULT_CONFIG, mode: s.mode, edgeEnabled: s.edgeEnabled })
-      setSetup(s); setState(st); setError(undefined); setScreen('allocateA')
+      setSetup(s); setState(st); setError(undefined); setOfflineScreen('allocateA')
     } catch (e) {
       setError((e as Error).message)
     }
@@ -42,7 +78,7 @@ export default function App() {
 
   async function commitA(a: Allocation) {
     setAllocA(a)
-    if (setup!.opponent === 'hotseat') setScreen('passToB')
+    if (setup!.opponent === 'hotseat') setOfflineScreen('passToB')
     else await resolveBoth(a, decide(state!, 'b', [], setup!.difficulty))
   }
 
@@ -61,47 +97,47 @@ export default function App() {
       st = resolveRound(st)
       st = resolveBattle(st)
       setState(st)
-      setScreen('reveal')
+      setOfflineScreen('reveal')
     } catch (e) {
       setError((e as Error).message)
-      setScreen('setup')
+      setOfflineScreen('setup')
     }
   }
 
   function continueAfterReveal() {
     let st = state!
     if (st.winner) {
-      // Do NOT record here — we record once in feedback.onSubmit with the real funRating
-      setScreen('result')
+      setOfflineScreen('result')
       return
     }
     st = nextRound(st)
-    setState(st); setAllocA(null); setScreen('allocateA')
+    setState(st); setAllocA(null); setOfflineScreen('allocateA')
   }
 
-  function renderScreen() {
-    if (screen === 'setup' || !state) return <SetupScreen onStart={start} error={error} />
+  // ── Offline render ──────────────────────────────────────────────────────
+  function renderOfflineScreen() {
+    if (offlineScreen === 'setup' || !state) return <SetupScreen onStart={start} error={error} />
 
     const cur = state.rounds[state.round]
 
-    if (screen === 'allocateA')
+    if (offlineScreen === 'allocateA')
       return (
         <AllocationScreen
           available={availableEnergy(state, 'a')}
           winsA={state.roundWins.a}
           winsB={state.roundWins.b}
           round={state.round}
-          playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Jugador A)` : `Tú — ${nameA}`}
+          playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Jugador A)` : `Tu — ${nameA}`}
           onCommit={commitA}
           state={state}
           playerKey="a"
         />
       )
 
-    if (screen === 'passToB')
-      return <PassDeviceScreen nextPlayer={`${nameB} (Jugador B)`} onReady={() => setScreen('allocateB')} />
+    if (offlineScreen === 'passToB')
+      return <PassDeviceScreen nextPlayer={`${nameB} (Jugador B)`} onReady={() => setOfflineScreen('allocateB')} />
 
-    if (screen === 'allocateB')
+    if (offlineScreen === 'allocateB')
       return (
         <AllocationScreen
           available={availableEnergy(state, 'b')}
@@ -115,7 +151,7 @@ export default function App() {
         />
       )
 
-    if (screen === 'reveal')
+    if (offlineScreen === 'reveal')
       return (
         <RevealScreen
           allocA={cur.revealA!}
@@ -129,17 +165,15 @@ export default function App() {
         />
       )
 
-    if (screen === 'result') {
+    if (offlineScreen === 'result') {
       const wl = state.winner === 'a' ? `Gana ${nameA}` : `Gana ${nameB}`
-      // In vs-bot, the local player is 'a'; subdued variant when the bot ('b') wins.
       const celebrate = setup!.opponent === 'hotseat' || state.winner === 'a'
-      return <ResultScreen winnerLabel={wl} celebrate={celebrate} onFeedback={() => setScreen('feedback')} />
+      return <ResultScreen winnerLabel={wl} celebrate={celebrate} onFeedback={() => setOfflineScreen('feedback')} />
     }
 
-    if (screen === 'feedback')
+    if (offlineScreen === 'feedback')
       return <FeedbackScreen
         onSubmit={(rating, comment) => {
-          // Single record per finished match — recorded here with the real funRating
           const ratio = Math.max(state.cardA.valueUsd, state.cardB.valueUsd) / Math.min(state.cardA.valueUsd, state.cardB.valueUsd)
           recordMatch({
             ts: Date.now(), winner: state.winner, rounds: state.roundWins.a + state.roundWins.b,
@@ -147,12 +181,76 @@ export default function App() {
             mode: state.config.mode, difficulty: setup!.opponent === 'hotseat' ? 'n/a' : setup!.difficulty, funRating: rating, comment,
           })
         }}
-        onPlayAgain={() => { setState(null); setSetup(null); setScreen('setup') }}
+        onPlayAgain={() => { setState(null); setSetup(null); setOfflineScreen('setup') }}
       />
 
     return null
   }
 
+  // ── On-chain render (always inside AppKitProvider) ──────────────────────
+  function renderOnchainScreen() {
+    if (onchainScreen === 'connect') {
+      return (
+        <ConnectScreen
+          onAuthenticated={(token) => {
+            setAuthToken(token)
+            setOnchainScreen('collection')
+          }}
+          onBack={() => setAppMode(null)}
+        />
+      )
+    }
+
+    if (onchainScreen === 'collection') {
+      return (
+        <CollectionScreen
+          token={authToken}
+          onSelectCard={(card) => {
+            setSelectedCard(card)
+            setOnchainScreen('lobby')
+          }}
+          onBack={() => setOnchainScreen('connect')}
+        />
+      )
+    }
+
+    if (onchainScreen === 'lobby' && selectedCard) {
+      return (
+        <LobbyScreen
+          token={authToken}
+          selectedCard={selectedCard}
+          onBattleJoined={(battleInfo) => {
+            setCurrentBattle(battleInfo)
+            setOnchainScreen('battle')
+          }}
+          onBack={() => setOnchainScreen('collection')}
+        />
+      )
+    }
+
+    if (onchainScreen === 'battle' && currentBattle) {
+      return (
+        <OnchainBattleScreen
+          token={authToken}
+          battle={currentBattle}
+          onFinished={() => {
+            setCurrentBattle(null)
+            setOnchainScreen('lobby')
+          }}
+        />
+      )
+    }
+
+    // Fallback: back to connect
+    return (
+      <ConnectScreen
+        onAuthenticated={(token) => { setAuthToken(token); setOnchainScreen('collection') }}
+        onBack={() => setAppMode(null)}
+      />
+    )
+  }
+
+  // ── Animation variants ──────────────────────────────────────────────────
   const variants = reduced
     ? { initial: {}, animate: {}, exit: {} }
     : {
@@ -161,21 +259,62 @@ export default function App() {
         exit: { opacity: 0, x: -24 },
       }
 
-  return (
-    <>
-      <MuteButton />
+  // ── Mode select ──────────────────────────────────────────────────────────
+  if (appMode === null) {
+    return (
       <AnimatePresence mode="wait">
         <motion.div
-          key={screen}
+          key="mode-select"
           variants={variants}
           initial="initial"
           animate="animate"
           exit="exit"
           transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
         >
-          {renderScreen()}
+          <ModeSelect onSelect={setAppMode} />
         </motion.div>
       </AnimatePresence>
-    </>
+    )
+  }
+
+  // ── Offline flow ──────────────────────────────────────────────────────────
+  if (appMode === 'offline') {
+    return (
+      <>
+        <MuteButton />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={offlineScreen}
+            variants={variants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
+          >
+            {renderOfflineScreen()}
+          </motion.div>
+        </AnimatePresence>
+      </>
+    )
+  }
+
+  // ── On-chain flow (wrapped in AppKitProvider, lazy-loaded) ────────────────
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Cargando...</div>}>
+      <AppKitProvider>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={onchainScreen}
+            variants={variants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
+          >
+            {renderOnchainScreen()}
+          </motion.div>
+        </AnimatePresence>
+      </AppKitProvider>
+    </Suspense>
   )
 }
