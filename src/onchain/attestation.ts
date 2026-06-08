@@ -1,4 +1,4 @@
-import { PublicKey, TransactionInstruction } from '@solana/web3.js'
+import { TransactionInstruction } from '@solana/web3.js'
 import bs58 from 'bs58'
 import { ED25519_PROGRAM_ID } from './types'
 
