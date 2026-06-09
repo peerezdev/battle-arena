@@ -18,8 +18,8 @@
  *  A lock icon + "oculto" is shown instead.
  */
 
-import { useState, useEffect } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { AnimatePresence, motion, type Transition } from 'framer-motion'
 import type { Allocation, FrontKey, FrontWinner, MatchState } from '../../engine'
 import { solidez, availableEnergy } from '../../engine'
 import { COLORS, player as playerTheme, FONTS } from '../theme'
@@ -63,6 +63,8 @@ interface AllocateProps {
   playerKey: 'a' | 'b'
   playerLabel: string
   onCommit: (a: Allocation) => void
+  /** Seconds for round timer. 0 or undefined = no timer. */
+  timerSeconds?: number
 }
 
 interface RevealProps {
@@ -459,6 +461,86 @@ function FrontColumn(props: FrontColumnProps) {
     const winLabel =
       displayWinner === 'a' ? nameA : displayWinner === 'b' ? nameB : '—'
 
+    // ── Cinematic charge/clash states (3 phases after isRevealed fires) ──────
+    // Phase: 'hidden' → 'charge' → 'impact' → 'settle'
+    const [clashPhase, setClashPhase] = useState<'hidden' | 'charge' | 'impact' | 'settle'>('hidden')
+    useEffect(() => {
+      if (!isRevealed) return
+      if (reduced) {
+        setClashPhase('settle')
+        return
+      }
+      // charge: 0ms, impact: 300ms, settle: 450ms
+      setClashPhase('charge')
+      const t1 = setTimeout(() => setClashPhase('impact'), 300)
+      const t2 = setTimeout(() => setClashPhase('settle'), 450)
+      return () => { clearTimeout(t1); clearTimeout(t2) }
+    }, [isRevealed, reduced])
+
+    // Derived per-side state for settle phase
+    const winnerA = winner === 'a'
+    const winnerB = winner === 'b'
+    const disputed = winner === 'disputed'
+
+    // Opponent block (B) — charges DOWN
+    const opponentChargeY = s(24, 44)   // px to slide down toward center
+    const playerChargeY = s(24, 44)     // px to slide up toward center
+
+    // animate values for each block
+    const opponentMotion = !reduced
+      ? clashPhase === 'hidden'
+        ? { y: 0, scale: 1, opacity: 0.6 }
+        : clashPhase === 'charge'
+        ? { y: opponentChargeY, scale: 1.06, opacity: 1 }
+        : clashPhase === 'impact'
+        ? { y: opponentChargeY * 0.5, scale: 1.12, opacity: 1 }
+        : // settle
+          {
+            y: 0,
+            scale: winnerB ? 1.08 : disputed ? 1 : 0.92,
+            opacity: winnerB ? 1 : disputed ? 0.85 : 0.45,
+          }
+      : {}
+
+    const playerMotion = !reduced
+      ? clashPhase === 'hidden'
+        ? { y: 0, scale: 1, opacity: 0.6 }
+        : clashPhase === 'charge'
+        ? { y: -playerChargeY, scale: 1.06, opacity: 1 }
+        : clashPhase === 'impact'
+        ? { y: -playerChargeY * 0.5, scale: 1.12, opacity: 1 }
+        : // settle
+          {
+            y: 0,
+            scale: winnerA ? 1.08 : disputed ? 1 : 0.92,
+            opacity: winnerA ? 1 : disputed ? 0.85 : 0.45,
+          }
+      : {}
+
+    // Sigil shake on impact
+    const sigilMotion = !reduced
+      ? clashPhase === 'impact'
+        ? { x: [0, -5, 5, -4, 4, -2, 2, 0], scale: [1, 1.18, 1.18, 1.12, 1.12, 1.06, 1.06, 1] }
+        : clashPhase === 'settle'
+        ? { x: 0, scale: disputed ? [1, 1.04, 1] : 1 }
+        : { x: 0, scale: 1 }
+      : {}
+
+    // Impact flash overlay
+    const showFlash = !reduced && clashPhase === 'impact'
+
+    const chargeTransition: Transition = { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+    const impactTransition: Transition = { duration: 0.14, ease: 'easeOut' }
+    const settleTransition: Transition = { duration: 0.22, ease: 'easeOut' }
+    const sigilImpactTransition: Transition = { duration: 0.22, ease: 'easeOut' }
+
+    const activeTransition =
+      clashPhase === 'charge'
+        ? chargeTransition
+        : clashPhase === 'impact'
+        ? impactTransition
+        : settleTransition
+
     return (
       <div
         style={{
@@ -468,11 +550,15 @@ function FrontColumn(props: FrontColumnProps) {
           gap: s(3, 6),
           flex: 1,
           minWidth: 0,
+          position: 'relative',
         }}
       >
-        {/* Opponent value (top) */}
-        <div
+        {/* Opponent value (top) — charges DOWN */}
+        <motion.div
+          animate={opponentMotion}
+          transition={activeTransition}
           style={{
+            width: '100%',
             background:
               isRevealed && winner === 'b'
                 ? `linear-gradient(180deg, ${COLORS.red}22, ${COLORS.panel})`
@@ -480,9 +566,12 @@ function FrontColumn(props: FrontColumnProps) {
             border: `1px solid ${isRevealed && winner === 'b' ? `${COLORS.red}55` : COLORS.border}`,
             borderRadius: '8px',
             padding: s(6, 14),
-            width: '100%',
             textAlign: 'center',
-            transition: 'border-color .2s, background .2s',
+            boxShadow:
+              clashPhase === 'settle' && winnerB && !reduced
+                ? `0 0 ${s(10, 18)}px ${COLORS.red}88`
+                : 'none',
+            transition: 'border-color .2s, background .2s, box-shadow .3s',
           }}
         >
           <span
@@ -495,10 +584,12 @@ function FrontColumn(props: FrontColumnProps) {
           >
             {isRevealed ? allocB : '?'}
           </span>
-        </div>
+        </motion.div>
 
         {/* Front sigil + winner label divider */}
-        <div
+        <motion.div
+          animate={sigilMotion}
+          transition={sigilImpactTransition}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -550,11 +641,14 @@ function FrontColumn(props: FrontColumnProps) {
               Sol.
             </span>
           )}
-        </div>
+        </motion.div>
 
-        {/* Your (A) value (bottom) */}
-        <div
+        {/* Your (A) value (bottom) — charges UP */}
+        <motion.div
+          animate={playerMotion}
+          transition={activeTransition}
           style={{
+            width: '100%',
             background:
               isRevealed && winner === 'a'
                 ? `linear-gradient(0deg, ${COLORS.green}22, ${COLORS.panel})`
@@ -562,9 +656,12 @@ function FrontColumn(props: FrontColumnProps) {
             border: `1px solid ${isRevealed && winner === 'a' ? `${COLORS.green}55` : COLORS.border}`,
             borderRadius: '8px',
             padding: s(6, 14),
-            width: '100%',
             textAlign: 'center',
-            transition: 'border-color .2s, background .2s',
+            boxShadow:
+              clashPhase === 'settle' && winnerA && !reduced
+                ? `0 0 ${s(10, 18)}px ${COLORS.green}88`
+                : 'none',
+            transition: 'border-color .2s, background .2s, box-shadow .3s',
           }}
         >
           <span
@@ -577,7 +674,27 @@ function FrontColumn(props: FrontColumnProps) {
           >
             {allocA}
           </span>
-        </div>
+        </motion.div>
+
+        {/* Impact flash overlay — brief white/gold burst on the sigil area */}
+        <AnimatePresence>
+          {showFlash && (
+            <motion.div
+              key="impact-flash"
+              initial={{ opacity: 0.85 }}
+              animate={{ opacity: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '8px',
+                background: `radial-gradient(ellipse at center 50%, #fff9 0%, #fff0 70%)`,
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+        </AnimatePresence>
       </div>
     )
   }
@@ -811,6 +928,11 @@ export function BattleBoard(props: BattleBoardProps) {
   // ── Allocation state (only used in allocate phase) ─────────────────────────
   const [alloc, setAlloc] = useState<Allocation>({ apertura: 0, choque: 0, remate: 0 })
   const [committing, setCommitting] = useState(false)
+  const committingRef = useRef(false)   // sync ref for timer callback (avoids stale closure)
+  const allocRef = useRef(alloc)        // keep current alloc accessible from timer
+  // keep refs in sync
+  useEffect(() => { allocRef.current = alloc }, [alloc])
+  useEffect(() => { committingRef.current = committing }, [committing])
 
   // ── Reveal stagger state ───────────────────────────────────────────────────
   const isReveal = props.phase === 'reveal'
@@ -849,6 +971,42 @@ export function BattleBoard(props: BattleBoardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Round timer (allocate phase only) ─────────────────────────────────────
+  const timerSecondsConfig =
+    props.phase === 'allocate' && props.timerSeconds && props.timerSeconds > 0
+      ? props.timerSeconds
+      : 0
+  const [timeLeft, setTimeLeft] = useState<number>(timerSecondsConfig)
+
+  useEffect(() => {
+    if (!timerSecondsConfig) return
+    setTimeLeft(timerSecondsConfig)
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          // Auto-commit once — guard with ref to avoid double-fire
+          if (!committingRef.current) {
+            committingRef.current = true
+            setCommitting(true)
+            playSfx('commit')
+            haptic([12, 30, 12])
+            const snap = allocRef.current
+            const delay = reduced ? 0 : 260
+            setTimeout(() => {
+              onCommitRef.current?.(snap)
+            }, delay)
+          }
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+    // Mount-only: timerSecondsConfig is fixed per mount (BattleBoard remounts per screen)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── Derived values ─────────────────────────────────────────────────────────
   const playerKey: 'a' | 'b' = props.phase === 'allocate' ? props.playerKey : 'a'
   const opponentKey: 'a' | 'b' = playerKey === 'a' ? 'b' : 'a'
@@ -872,14 +1030,23 @@ export function BattleBoard(props: BattleBoardProps) {
   const nameB = state.cardB.name
 
   // ── Commit handler ─────────────────────────────────────────────────────────
-  function handleCommit() {
-    if (committing || props.phase !== 'allocate') return
+  // Stable ref to onCommit so the timer closure can call the latest version
+  const onCommitRef = useRef<((a: Allocation) => void) | null>(null)
+  if (props.phase === 'allocate') onCommitRef.current = props.onCommit
+
+  const handleCommit = useCallback(() => {
+    if (committingRef.current || props.phase !== 'allocate') return
+    committingRef.current = true
     setCommitting(true)
     playSfx('commit')
     haptic([12, 30, 12])
     const delay = reduced ? 0 : 260
-    setTimeout(() => props.onCommit(alloc), delay)
-  }
+    const snap = allocRef.current
+    setTimeout(() => {
+      onCommitRef.current?.(snap)
+    }, delay)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduced])
 
   // ── Reveal helpers ─────────────────────────────────────────────────────────
   function aguanteNote(frontKey: FrontKey): string | null {
@@ -916,10 +1083,99 @@ export function BattleBoard(props: BattleBoardProps) {
         : `Gana la ronda: ${nameB}`
       : ''
 
+  // ── Timer display ─────────────────────────────────────────────────────────
+  const isUrgent = timerSecondsConfig > 0 && timeLeft <= 10 && timeLeft > 0
+  const timerWidget =
+    props.phase === 'allocate' && timerSecondsConfig > 0 ? (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '2px',
+          flexShrink: 0,
+        }}
+        aria-label={`Tiempo restante: ${timeLeft} segundos`}
+        aria-live="polite"
+      >
+        {/* Ring + number */}
+        <div
+          style={{
+            position: 'relative',
+            width: s(36, 48),
+            height: s(36, 48),
+            flexShrink: 0,
+          }}
+        >
+          <svg
+            viewBox="0 0 40 40"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              transform: 'rotate(-90deg)',
+            }}
+            aria-hidden="true"
+          >
+            <circle cx="20" cy="20" r="16" fill="none" stroke={COLORS.border} strokeWidth="3" />
+            <circle
+              cx="20"
+              cy="20"
+              r="16"
+              fill="none"
+              stroke={isUrgent ? COLORS.red : accentColor}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={`${2 * Math.PI * 16}`}
+              strokeDashoffset={`${2 * Math.PI * 16 * (1 - timeLeft / timerSecondsConfig)}`}
+              style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s' }}
+            />
+          </svg>
+          <motion.span
+            key={timeLeft}
+            animate={
+              isUrgent && !reduced
+                ? { scale: [1, 1.18, 1] }
+                : { scale: 1 }
+            }
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: s(11, 15),
+              fontWeight: 800,
+              fontFamily: FONTS.mono,
+              fontVariantNumeric: 'tabular-nums',
+              color: isUrgent ? COLORS.red : accentColor,
+              lineHeight: 1,
+            }}
+          >
+            {timeLeft}
+          </motion.span>
+        </div>
+        <span
+          style={{
+            fontSize: s(7, 9),
+            color: isUrgent ? COLORS.red : COLORS.muted,
+            fontFamily: FONTS.mono,
+            letterSpacing: '.02em',
+            whiteSpace: 'nowrap',
+            transition: 'color 0.3s',
+          }}
+        >
+          se auto-confirma al llegar a 0
+        </span>
+      </div>
+    ) : null
+
   // ── Top group: header + opponent zone ──────────────────────────────────────
   const topGroup = (
     <div>
-      {/* Header: round label + score */}
+      {/* Header: round label + score + optional timer */}
       <div
         style={{
           display: 'flex',
@@ -947,6 +1203,7 @@ export function BattleBoard(props: BattleBoardProps) {
             {state.roundWins.b}
           </span>
         </div>
+        {timerWidget}
       </div>
 
       {/* Opponent zone */}
