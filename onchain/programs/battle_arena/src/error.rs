@@ -28,4 +28,12 @@ pub enum ErrorCode {
     MathOverflow,
     #[msg("rake_bps excede el máximo permitido")]
     RakeTooHigh,
+    #[msg("Configuracion de match invalida (rounds_to_win, base_energy o max_rounds)")]
+    InvalidConfig,
+    #[msg("Estado de settle invalido: la batalla debe tener ganador o empate")]
+    InvalidSettleState,
+    #[msg("El commit no puede ser todo ceros")]
+    InvalidCommit,
+    #[msg("La cuenta de tokens de stake no pertenece al jugador")]
+    UnauthorizedTokenAccount,
 }

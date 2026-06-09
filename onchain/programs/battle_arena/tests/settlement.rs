@@ -114,11 +114,11 @@ fn settle_draw_refund() {
     let funded: u64 = 1000;
     let m = Match::setup(&mut h, stake, funded);
 
-    // max_rounds = 1: tras una sola ronda se alcanza el cap. La hacemos DISPUTED
-    // y simétrica (mismos totales, misma solidez) -> wins 0-0 -> is_draw.
+    // max_rounds = 1, rounds_to_win = 1: tras una sola ronda DISPUTED se alcanza
+    // el cap con wins 0-0 -> is_draw. Config válida (max_rounds >= rounds_to_win).
     let mut cfg = default_cfg();
     cfg.max_rounds = 1;
-    cfg.rounds_to_win = 2; // no se decide por victorias en 1 ronda
+    cfg.rounds_to_win = 1; // cap en 1 ronda; si es Disputed no hay ganador -> empate
     // Valores iguales y MISMO grade => solidez igual => desempates fallan => Disputed.
     m.init(&mut h, cfg, 1000, 5);
     m.join(&mut h, 1000, 5);

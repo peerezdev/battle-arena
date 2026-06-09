@@ -31,8 +31,8 @@ pub struct InitializeBattle<'info> {
     pub escrow_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        constraint = player_a_token.owner == player_a.key() @ ErrorCode::NftNotOwned,
-        constraint = player_a_token.mint == stake_mint.key()
+        constraint = player_a_token.owner == player_a.key() @ ErrorCode::UnauthorizedTokenAccount,
+        constraint = player_a_token.mint == stake_mint.key() @ ErrorCode::UnauthorizedTokenAccount
     )]
     pub player_a_token: Box<Account<'info, TokenAccount>>,
     /// NFT del jugador A: token account con amount >= 1 del mint nft_mint_a.
@@ -86,6 +86,9 @@ pub fn handler(
     require!(stake > 0, ErrorCode::NonPositiveValue);
     require!(value_usd_a > 0, ErrorCode::NonPositiveValue);
     require!(cfg.rake_bps <= MAX_RAKE_BPS, ErrorCode::RakeTooHigh);
+    require!(cfg.rounds_to_win > 0, ErrorCode::InvalidConfig);
+    require!(cfg.base_energy > 0, ErrorCode::InvalidConfig);
+    require!(cfg.max_rounds >= cfg.rounds_to_win, ErrorCode::InvalidConfig);
 
     // Depósito de A en el vault de escrow.
     token::transfer(

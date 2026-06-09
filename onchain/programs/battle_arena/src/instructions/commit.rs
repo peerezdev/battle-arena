@@ -15,6 +15,7 @@ pub struct CommitMove<'info> {
 }
 
 pub fn handler(ctx: Context<CommitMove>, commit: [u8; 32]) -> Result<()> {
+    require!(commit != [0u8; 32], ErrorCode::InvalidCommit);
     let b = &mut ctx.accounts.battle;
     require!(b.phase == Phase::Committing, ErrorCode::WrongPhase);
     let now = Clock::get()?.unix_timestamp;

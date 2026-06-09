@@ -42,6 +42,7 @@ pub struct Settle<'info> {
 pub fn handler(ctx: Context<Settle>) -> Result<()> {
     let b = &ctx.accounts.battle;
     require!(b.phase == Phase::Settled, ErrorCode::WrongPhase);
+    require!(b.is_draw || b.winner.is_some(), ErrorCode::InvalidSettleState);
     let pot = b.stake.checked_mul(2).ok_or(error!(ErrorCode::MathOverflow))?;
 
     // La autoridad del vault es la PDA `battle`. Firmamos las salidas con sus seeds.

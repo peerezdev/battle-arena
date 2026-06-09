@@ -25,8 +25,8 @@ pub struct JoinBattle<'info> {
     pub escrow_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
-        constraint = player_b_token.owner == player_b.key() @ ErrorCode::NftNotOwned,
-        constraint = player_b_token.mint == battle.stake_mint
+        constraint = player_b_token.owner == player_b.key() @ ErrorCode::UnauthorizedTokenAccount,
+        constraint = player_b_token.mint == battle.stake_mint @ ErrorCode::UnauthorizedTokenAccount
     )]
     pub player_b_token: Box<Account<'info, TokenAccount>>,
     /// NFT del jugador B: token account con amount >= 1 del mint nft_mint_b.

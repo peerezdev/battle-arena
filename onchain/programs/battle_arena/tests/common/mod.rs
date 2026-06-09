@@ -280,6 +280,12 @@ pub mod err {
     pub const ALREADY_COMMITTED: u32 = 6008;
     pub const MISSING_REVEALS: u32 = 6009;
     pub const DEADLINE_NOT_REACHED: u32 = 6010;
+    pub const MATH_OVERFLOW: u32 = 6011;
+    pub const RAKE_TOO_HIGH: u32 = 6012;
+    pub const INVALID_CONFIG: u32 = 6013;
+    pub const INVALID_SETTLE_STATE: u32 = 6014;
+    pub const INVALID_COMMIT: u32 = 6015;
+    pub const UNAUTHORIZED_TOKEN_ACCOUNT: u32 = 6016;
 }
 
 /// Afirma que los logs de una tx fallida contienen el error Anchor esperado,

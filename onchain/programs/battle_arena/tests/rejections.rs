@@ -284,6 +284,78 @@ fn missing_reveals_rejected() {
     assert_error(&logs, "MissingReveals", err::MISSING_REVEALS);
 }
 
+// ---- FIX A (F-1): MatchConfig inválida en initialize_battle ----------------
+
+#[test]
+fn invalid_config_rounds_to_win_zero_rejected() {
+    let mut h = Harness::new();
+    let m = Match::setup(&mut h, 100, 1000);
+
+    let mut bad_cfg = default_cfg();
+    bad_cfg.rounds_to_win = 0;
+
+    let oracle = h.oracle.clone();
+    let ixs = m.init_ixs(&h, bad_cfg, 1000, 7, FIXED_NOW, &oracle);
+    let logs = h
+        .try_send(&ixs, &m.pa.kp, &[&m.pa.kp])
+        .expect_err("rounds_to_win=0 debe fallar");
+    assert_error(&logs, "InvalidConfig", err::INVALID_CONFIG);
+}
+
+#[test]
+fn invalid_config_base_energy_zero_rejected() {
+    let mut h = Harness::new();
+    let m = Match::setup(&mut h, 100, 1000);
+
+    let mut bad_cfg = default_cfg();
+    bad_cfg.base_energy = 0;
+
+    let oracle = h.oracle.clone();
+    let ixs = m.init_ixs(&h, bad_cfg, 1000, 7, FIXED_NOW, &oracle);
+    let logs = h
+        .try_send(&ixs, &m.pa.kp, &[&m.pa.kp])
+        .expect_err("base_energy=0 debe fallar");
+    assert_error(&logs, "InvalidConfig", err::INVALID_CONFIG);
+}
+
+#[test]
+fn invalid_config_max_rounds_less_than_rounds_to_win_rejected() {
+    let mut h = Harness::new();
+    let m = Match::setup(&mut h, 100, 1000);
+
+    // rounds_to_win=3, max_rounds=2 -> inválido
+    let mut bad_cfg = default_cfg();
+    bad_cfg.rounds_to_win = 3;
+    bad_cfg.max_rounds = 2;
+
+    let oracle = h.oracle.clone();
+    let ixs = m.init_ixs(&h, bad_cfg, 1000, 7, FIXED_NOW, &oracle);
+    let logs = h
+        .try_send(&ixs, &m.pa.kp, &[&m.pa.kp])
+        .expect_err("max_rounds < rounds_to_win debe fallar");
+    assert_error(&logs, "InvalidConfig", err::INVALID_CONFIG);
+}
+
+// ---- FIX C (F-3): commit de todo-ceros rechazado ---------------------------
+
+#[test]
+fn commit_zero_rejected() {
+    let mut h = Harness::new();
+    let m = Match::setup(&mut h, 100, 1000);
+    m.init(&mut h, default_cfg(), 1000, 7);
+    m.join(&mut h, 1000, 7);
+
+    // Intentar commit con [0u8; 32] -> InvalidCommit.
+    let logs = h
+        .try_send(
+            &[commit_ix(&h, m.battle_pda, &m.pa.kp, [0u8; 32])],
+            &m.pa.kp,
+            &[&m.pa.kp],
+        )
+        .expect_err("commit todo-ceros debe fallar");
+    assert_error(&logs, "InvalidCommit", err::INVALID_COMMIT);
+}
+
 // ---- Timeout: deadline no alcanzado ----------------------------------------
 
 #[test]
