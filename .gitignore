@@ -7,3 +7,6 @@ onchain/target/
 onchain/.anchor/
 onchain/node_modules/
 onchain/test-ledger/
+.env
+.env.*
+!.env.example
