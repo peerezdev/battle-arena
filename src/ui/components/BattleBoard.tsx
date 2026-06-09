@@ -906,28 +906,15 @@ export function BattleBoard(props: BattleBoardProps) {
           marginBottom: s(10, 16),
         }}
       >
-        <div>
-          <div
-            style={{
-              fontSize: s(9, 13),
-              color: COLORS.muted,
-              letterSpacing: '.07em',
-              fontFamily: FONTS.mono,
-              marginBottom: '1px',
-            }}
-          >
-            RONDA {state.round + 1}
-          </div>
-          <div
-            style={{
-              fontSize: s(15, 26),
-              fontWeight: 800,
-              color: accentColor,
-              fontFamily: FONTS.orbitron,
-            }}
-          >
-            {props.phase === 'allocate' ? props.playerLabel : 'Resultados'}
-          </div>
+        <div
+          style={{
+            fontSize: s(10, 14),
+            color: COLORS.muted,
+            letterSpacing: '.1em',
+            fontFamily: FONTS.mono,
+          }}
+        >
+          RONDA {state.round + 1}
         </div>
         <div style={{ display: 'flex', gap: s(5, 8), alignItems: 'center' }}>
           <span style={{ fontWeight: 700, fontFamily: FONTS.orbitron, fontSize: s(16, 30), color: COLORS.green }}>
@@ -947,10 +934,9 @@ export function BattleBoard(props: BattleBoardProps) {
           alignItems: 'center',
           gap: s(10, 18),
           padding: s(8, 14),
-          background: `linear-gradient(180deg, ${opponentAccent}0c, transparent 100%)`,
-          borderRadius: '10px 10px 0 0',
-          border: `1px solid ${opponentAccent}22`,
-          borderBottom: 'none',
+          background: `linear-gradient(180deg, ${opponentAccent}14, ${COLORS.panel} 100%)`,
+          borderRadius: '12px',
+          border: `1px solid ${opponentAccent}33`,
         }}
       >
         <HeroPortrait
@@ -992,8 +978,9 @@ export function BattleBoard(props: BattleBoardProps) {
         padding: s(8, 18) + 'px ' + s(6, 18) + 'px',
         background: COLORS.panel,
         border: `1px solid ${COLORS.border}`,
-        borderTop: `1px solid ${opponentAccent}22`,
-        borderBottom: `1px solid ${accentColor}22`,
+        borderRadius: '12px',
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
       {FRONT_KEYS.map((fk, idx) => {
@@ -1068,14 +1055,28 @@ export function BattleBoard(props: BattleBoardProps) {
   // ── Bottom group: your zone + reveal notes/banner + action button ──────────
   const bottomGroup = (
     <div>
+      {/* Turn / identity label — relocated here, with YOUR side */}
+      {props.phase === 'allocate' && (
+        <div
+          style={{
+            fontSize: s(13, 20),
+            fontWeight: 800,
+            color: accentColor,
+            fontFamily: FONTS.orbitron,
+            marginBottom: s(5, 8),
+            paddingLeft: '2px',
+          }}
+        >
+          {props.playerLabel}
+        </div>
+      )}
       {/* Your zone */}
       <div
         style={{
           padding: s(8, 14),
-          background: `linear-gradient(0deg, ${accentColor}0c, transparent 100%)`,
-          borderRadius: '0 0 10px 10px',
-          border: `1px solid ${accentColor}22`,
-          borderTop: 'none',
+          background: `linear-gradient(0deg, ${accentColor}14, ${COLORS.panel} 100%)`,
+          borderRadius: '12px',
+          border: `1px solid ${accentColor}33`,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: s(10, 18) }}>
@@ -1324,7 +1325,9 @@ export function BattleBoard(props: BattleBoardProps) {
             boxSizing: 'border-box',
           }}
         >
-          {/* Scrollable upper region: opponent + the 3-front board */}
+          {/* TOP: round bar + opponent — pinned at the top */}
+          <div style={{ flexShrink: 0 }}>{topGroup}</div>
+          {/* MIDDLE: the 3 fronts — centered, scrolls only if it can't fit */}
           <div
             style={{
               flex: 1,
@@ -1333,16 +1336,13 @@ export function BattleBoard(props: BattleBoardProps) {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
-              gap: wide ? '12px' : '6px',
+              padding: wide ? '14px 0' : '8px 0',
             }}
           >
-            {topGroup}
             {board}
           </div>
-          {/* Pinned bottom: your zone + reveal banner + action button */}
-          <div style={{ flexShrink: 0, paddingTop: wide ? '12px' : '8px' }}>
-            {bottomGroup}
-          </div>
+          {/* BOTTOM: your zone + reveal banner + action — pinned at the bottom */}
+          <div style={{ flexShrink: 0 }}>{bottomGroup}</div>
         </div>
       </div>
     </ArenaBackdrop>
