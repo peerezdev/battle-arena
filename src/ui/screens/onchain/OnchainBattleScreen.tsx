@@ -58,6 +58,14 @@ interface DecodedBattle {
   round: number
   player_a: PublicKey
   player_b: PublicKey
+  /** on-chain banked energy for each player */
+  banked_a: number
+  banked_b: number
+  /** edge bonus per round for each player */
+  edge_a: number
+  edge_b: number
+  /** match config (decoded camelCase by Anchor coder) */
+  cfg?: { base_energy?: number; baseEnergy?: number; rounds_to_win?: number; roundsToWin?: number }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any
 }
@@ -100,7 +108,8 @@ function clampApply(prev: Allocation, key: keyof Allocation, delta: number, avai
   return { ...prev, [key]: clamped }
 }
 
-const BASE_ENERGY = 10
+/** FIX A: Default base energy (fallback when battle account not yet read). */
+const DEFAULT_BASE_ENERGY = 10
 
 export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
   const { publicKey, signAndSendTransaction } = useWallet()
@@ -114,6 +123,8 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
   const [winsA, setWinsA] = useState(0)
   const [winsB, setWinsB] = useState(0)
   const [finalWinner, setFinalWinner] = useState<'a' | 'b' | 'draw' | null>(null)
+  // FIX A: Track available energy computed from on-chain state (base + banked + edge).
+  const [availableEnergy, setAvailableEnergy] = useState<number>(DEFAULT_BASE_ENERGY)
 
   // Current salt (generated per round commit)
   const [currentSalt, setCurrentSalt] = useState<string>('')
@@ -123,6 +134,20 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
 
   function logTx(label: string, sig: string) {
     setTxLog((prev) => [...prev, `${label}: ${sig.slice(0, 8)}...`])
+  }
+
+  /**
+   * FIX A: Compute available energy for the local player from the decoded on-chain Battle.
+   * Formula mirrors the engine's availableEnergy():
+   *   available = base_energy + banked_<me> + edge_<me>
+   */
+  function computeAvailableFromDecoded(decoded: DecodedBattle): number {
+    const isA = publicKey != null && decoded.player_a.toBase58() === publicKey.toBase58()
+    const baseEnergy =
+      (decoded.cfg?.base_energy ?? decoded.cfg?.baseEnergy ?? DEFAULT_BASE_ENERGY)
+    const banked = isA ? (decoded.banked_a ?? 0) : (decoded.banked_b ?? 0)
+    const edge   = isA ? (decoded.edge_a   ?? 0) : (decoded.edge_b   ?? 0)
+    return baseEnergy + banked + edge
   }
 
   // Read Battle account and decode
@@ -182,6 +207,8 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
         setWinsA(decoded.wins_a)
         setWinsB(decoded.wins_b)
         setRound(decoded.round)
+        // FIX A: update available energy for the next round from on-chain state
+        setAvailableEnergy(computeAvailableFromDecoded(decoded))
         const phase = getPhaseName(decoded)
         if (phase === 'Settled') {
           // Already settled on-chain (shouldn't happen right after resolve, but handle it)
@@ -190,7 +217,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
         }
         if (phase === 'RoundResolved') {
           // Check if battle should end (one player reached roundsToWin)
-          const roundsToWin = decoded.cfg?.rounds_to_win ?? DEFAULT_MATCH_CONFIG.roundsToWin
+          const roundsToWin = decoded.cfg?.rounds_to_win ?? decoded.cfg?.roundsToWin ?? DEFAULT_MATCH_CONFIG.roundsToWin
           if (decoded.wins_a >= roundsToWin || decoded.wins_b >= roundsToWin) {
             setStep('settling')
             await handleSettle(decoded)
@@ -253,7 +280,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
   const accentColor = isPlayerA ? COLORS.green : COLORS.red
   const roleLabel = isPlayerA ? 'Jugador A' : 'Jugador B'
   const total = alloc.apertura + alloc.choque + alloc.remate
-  const remaining = BASE_ENERGY - total
+  const remaining = availableEnergy - total
 
   const isLoading =
     step === 'committing' ||
@@ -433,7 +460,8 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
             }}
           >
             <span style={{ color: COLORS.muted }}>
-              Energía disponible: <strong style={{ color: accentColor }}>{BASE_ENERGY}</strong>
+              {/* FIX A: show computed available (base + banked + edge) */}
+              Energía disponible: <strong style={{ color: accentColor }}>{availableEnergy}</strong>
             </span>
             <span style={{ color: COLORS.muted }}>
               Asignada: <strong style={{ color: accentColor }}>{total}</strong>
@@ -446,9 +474,9 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
         {step === 'allocating' && (
           <EnergyAllocator
             alloc={alloc}
-            available={BASE_ENERGY}
+            available={availableEnergy}
             onChange={(key, delta) =>
-              setAlloc((prev) => clampApply(prev, key, delta, BASE_ENERGY))
+              setAlloc((prev) => clampApply(prev, key, delta, availableEnergy))
             }
             accentColor={accentColor}
             reducedMotion={reduced}
@@ -476,7 +504,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
               marginBottom: '12px',
             }}
           >
-            Confirmar y Commit — {total} energia
+            Confirmar y Commit — {total}/{availableEnergy} energía
             {remaining > 0 ? ` · ${remaining} se banca` : ''}
           </motion.button>
         )}
@@ -543,8 +571,8 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
           </div>
         )}
 
-        {/* Current salt display (debug info) */}
-        {currentSalt && step !== 'allocating' && (
+        {/* FIX E (MEDIUM-2): Salt display only in DEV builds — never expose in production. */}
+        {import.meta.env.DEV && currentSalt && step !== 'allocating' && (
           <div
             style={{
               marginTop: '8px',
@@ -554,7 +582,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
               wordBreak: 'break-all',
             }}
           >
-            Salt: {currentSalt}
+            [DEV] Salt: {currentSalt}
           </div>
         )}
       </div>

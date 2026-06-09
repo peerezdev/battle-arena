@@ -82,7 +82,7 @@ export async function registerMatch(token: string, body: RegisterMatchBody): Pro
 export async function syncMatch(battle: string, token?: string): Promise<SyncMatchResponse> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
-  return apiFetch<SyncMatchResponse>(`${config.backendUrl}/matches/${battle}/sync`, {
+  return apiFetch<SyncMatchResponse>(`${config.backendUrl}/matches/${encodeURIComponent(battle)}/sync`, {
     method: 'POST',
     headers,
   })

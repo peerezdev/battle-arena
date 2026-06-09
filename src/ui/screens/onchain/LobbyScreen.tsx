@@ -124,8 +124,23 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
     try {
       const att = await attest(selectedCard.mint)
 
-      // Use a client-chosen nonce (timestamp as bigint — unique enough for devnet)
-      const nonce = BigInt(Date.now())
+      // FIX B (HIGH-1): Assert oracle pubkey matches the pinned config value if set.
+      if (config.oraclePubkey && att.oracle_pubkey !== config.oraclePubkey) {
+        throw new Error(
+          `Oracle pubkey mismatch: expected ${config.oraclePubkey}, got ${att.oracle_pubkey}. ` +
+          'Rejecting attestation from untrusted oracle.'
+        )
+      }
+
+      // FIX D (MEDIUM-1): Guard BigInt() calls against floats/null from oracle.
+      if (!Number.isInteger(att.ts) || att.ts == null)
+        throw new Error(`Oracle ts is not an integer: ${att.ts}`)
+      if (!Number.isInteger(att.value_usd) || att.value_usd == null)
+        throw new Error(`Oracle value_usd is not an integer: ${att.value_usd}`)
+
+      // FIX F (MEDIUM-3): Stronger nonce with added random entropy (stays within u64 safely).
+      const nonce =
+        BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000))
 
       const stakeMintPk = new PublicKey(config.stakeMint)
       const treasuryPk = new PublicKey(config.treasury)
@@ -189,6 +204,20 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
     setJoinError(null)
     try {
       const att = await attest(selectedCard.mint)
+
+      // FIX B (HIGH-1): Assert oracle pubkey matches the pinned config value if set.
+      if (config.oraclePubkey && att.oracle_pubkey !== config.oraclePubkey) {
+        throw new Error(
+          `Oracle pubkey mismatch: expected ${config.oraclePubkey}, got ${att.oracle_pubkey}. ` +
+          'Rejecting attestation from untrusted oracle.'
+        )
+      }
+
+      // FIX D (MEDIUM-1): Guard BigInt() calls against floats/null from oracle.
+      if (!Number.isInteger(att.ts) || att.ts == null)
+        throw new Error(`Oracle ts is not an integer: ${att.ts}`)
+      if (!Number.isInteger(att.value_usd) || att.value_usd == null)
+        throw new Error(`Oracle value_usd is not an integer: ${att.value_usd}`)
 
       const playerBToken = getAta(publicKey, config.stakeMint)
       const nftTokenB = getAta(publicKey, selectedCard.mint)
