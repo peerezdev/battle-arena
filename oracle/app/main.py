@@ -1,6 +1,9 @@
 import time
+from collections import defaultdict
 from typing import Callable, Optional
-from fastapi import FastAPI, HTTPException, Query
+import based58
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from nacl.signing import SigningKey
 
 from .attestation import sign_attestation, build_message
@@ -11,10 +14,55 @@ from .pricing.collector_crypt import CollectorCryptSource
 from .config import get_settings
 
 
+def _validate_mint(mint: str) -> None:
+    """Raises HTTPException(422) if mint is not a valid 32-byte base58 pubkey."""
+    try:
+        decoded = based58.b58decode(mint.encode())
+    except Exception:
+        raise HTTPException(status_code=422, detail=f"mint inválido (no es base58): {mint}")
+    if len(decoded) != 32:
+        raise HTTPException(status_code=422, detail=f"mint debe decodificar a 32 bytes, got {len(decoded)}: {mint}")
+
+
+class _RateLimiter:
+    """Fixed-window rate limiter keyed by IP. No-op when limit <= 0."""
+
+    def __init__(self, max_per_min: int):
+        self._limit = max_per_min
+        self._windows: dict[str, tuple[float, int]] = {}
+
+    def check(self, ip: str) -> None:
+        if self._limit <= 0:
+            return
+        now = time.time()
+        window_start, count = self._windows.get(ip, (now, 0))
+        if now - window_start >= 60:
+            window_start, count = now, 0
+        count += 1
+        self._windows[ip] = (window_start, count)
+        # Prune old windows to avoid unbounded growth (keep only last 10k IPs)
+        if len(self._windows) > 10_000:
+            cutoff = now - 60
+            self._windows = {k: v for k, v in self._windows.items() if v[0] >= cutoff}
+        if count > self._limit:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
+
+
 def create_app(signing_key: SigningKey, pricing: PricingSource,
-               now_fn: Callable[[], int] = lambda: int(time.time())) -> FastAPI:
+               now_fn: Callable[[], int] = lambda: int(time.time()),
+               rate_limit_per_min: int = 30,
+               cors_origins: Optional[list] = None) -> FastAPI:
     app = FastAPI(title="Battle Arena — Oráculo de pricing")
     oracle_b58 = pubkey_base58(signing_key)
+    limiter = _RateLimiter(rate_limit_per_min)
+
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_methods=["GET"],
+            allow_headers=["*"],
+        )
 
     @app.get("/health")
     async def health():
@@ -25,7 +73,9 @@ def create_app(signing_key: SigningKey, pricing: PricingSource,
         return {"oracle_pubkey": oracle_b58}
 
     @app.get("/attest")
-    async def attest(mint: str = Query(..., min_length=1, max_length=44)):
+    async def attest(request: Request, mint: str = Query(..., min_length=1, max_length=44)):
+        limiter.check(request.client.host if request.client else "unknown")
+        _validate_mint(mint)
         try:
             card = await pricing.get_value(mint)
         except ValueUnavailable as e:
@@ -54,7 +104,9 @@ def build_default_app() -> FastAPI:
         if s.pricing_source == "collectorcrypt"
         else MockPricingSource()
     )
-    return create_app(key, pricing)
+    return create_app(key, pricing,
+                      rate_limit_per_min=s.rate_limit_per_min,
+                      cors_origins=s.cors_origins)
 
 
 app = build_default_app()

@@ -16,5 +16,6 @@ def client(tmp_path):
         overrides={MINT_HAPPY: {"value_usd": 1200, "grade": 9, "grading_company": "PSA"}},
         unavailable={MINT_NOVALUE},
     )
-    app = create_app(signing_key=key, pricing=src, now_fn=lambda: 1700000000)
+    app = create_app(signing_key=key, pricing=src, now_fn=lambda: 1700000000,
+                     rate_limit_per_min=0)  # 0 = disabled in tests
     return TestClient(app), key

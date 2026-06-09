@@ -43,6 +43,8 @@ class CollectorCryptSource(PricingSource):
                 resp = await client.get(url, params={"search": mint},
                                         headers={"accept": "application/json"})
                 resp.raise_for_status()
+                if len(resp.content) > 1_048_576:  # 1 MB cap
+                    raise ValueUnavailable("CC API response too large")
                 payload = resp.json()
             except (httpx.HTTPError, ValueError) as e:
                 raise ValueUnavailable(f"error CC API: {e}")
