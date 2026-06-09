@@ -591,8 +591,12 @@ function FrontColumn(props: FrontColumnProps) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '1px',
             padding: s(3, 6) + 'px 0',
+            // Fixed height so the optional winner-name + "Sol." lines never push
+            // the bottom value box down — keeps the 3 columns' rows aligned.
+            minHeight: s(60, 104),
           }}
         >
           <FrontSigil
