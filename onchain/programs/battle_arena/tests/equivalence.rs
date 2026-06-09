@@ -161,7 +161,7 @@ fn replay_vector(v: &Vector) {
 
     // ---- initialize_battle -------------------------------------------------
     let stake: u64 = 100;
-    let msg_a = attestation_msg(&pa.nft_mint, v.card_a.value_usd, v.card_a.grade, FIXED_NOW);
+    let msg_a = attestation_msg(&pa.nft_mint, v.card_a.value_usd, v.card_a.grade, FIXED_NOW, &battle_pda);
     let ed_a = ed25519_attest_ix(&h.oracle, &msg_a);
     let init_ix = Instruction {
         program_id: h.program_id,
@@ -195,7 +195,7 @@ fn replay_vector(v: &Vector) {
     h.send(&[ed_a, init_ix], &pa.kp, &[&pa.kp]);
 
     // ---- join_battle -------------------------------------------------------
-    let msg_b = attestation_msg(&pb.nft_mint, v.card_b.value_usd, v.card_b.grade, FIXED_NOW);
+    let msg_b = attestation_msg(&pb.nft_mint, v.card_b.value_usd, v.card_b.grade, FIXED_NOW, &battle_pda);
     let ed_b = ed25519_attest_ix(&h.oracle, &msg_b);
     let join_ix = Instruction {
         program_id: h.program_id,

@@ -75,7 +75,9 @@ pub fn handler(
     );
 
     // Verificación de la firma del oráculo por introspección.
-    let msg = attestation_msg(&nft_mint_a, value_usd_a, grade_a, ts_a);
+    // El battle PDA se incluye en el mensaje para ligar la atestación a esta batalla
+    // concreta y evitar el reuso de firmas en otras batallas (anti-replay).
+    let msg = attestation_msg(&nft_mint_a, value_usd_a, grade_a, ts_a, &ctx.accounts.battle.key());
     verify_oracle_ed25519(
         &ctx.accounts.instructions_sysvar.to_account_info(),
         ed25519_ix_index,

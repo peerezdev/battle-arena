@@ -115,7 +115,7 @@ fn nft_not_owned_rejected() {
     let empty_nft_token =
         h.create_token_account(&m.payer, &empty_nft_mint.pubkey(), &m.pa.kp.pubkey());
 
-    let msg_a = attestation_msg(&empty_nft_mint.pubkey(), 1000, 7, FIXED_NOW);
+    let msg_a = attestation_msg(&empty_nft_mint.pubkey(), 1000, 7, FIXED_NOW, &m.battle_pda);
     let ed_a = ed25519_attest_ix(&h.oracle, &msg_a);
     let init_ix = Instruction {
         program_id: h.program_id,

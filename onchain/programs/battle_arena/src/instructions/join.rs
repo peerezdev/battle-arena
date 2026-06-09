@@ -64,7 +64,9 @@ pub fn handler(
     );
 
     let oracle = ctx.accounts.battle.oracle;
-    let msg = attestation_msg(&nft_mint_b, value_usd_b, grade_b, ts_b);
+    // El battle PDA se incluye en el mensaje para ligar la atestación a esta batalla
+    // concreta y evitar el reuso de firmas en otras batallas (anti-replay).
+    let msg = attestation_msg(&nft_mint_b, value_usd_b, grade_b, ts_b, &ctx.accounts.battle.key());
     verify_oracle_ed25519(
         &ctx.accounts.instructions_sysvar.to_account_info(),
         ed25519_ix_index,

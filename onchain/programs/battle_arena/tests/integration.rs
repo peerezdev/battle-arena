@@ -90,7 +90,7 @@ fn happy_path_initialize_join_commit_reveal_resolve() {
     let stake: u64 = 100;
     let value_a: u64 = 1000;
     let grade_a: u8 = 9;
-    let msg_a = attestation_msg(&pa.nft_mint, value_a, grade_a, FIXED_NOW);
+    let msg_a = attestation_msg(&pa.nft_mint, value_a, grade_a, FIXED_NOW, &battle_pda);
     let ed_a = ed25519_attest_ix(&h.oracle, &msg_a);
 
     let init_ix = Instruction {
@@ -133,7 +133,7 @@ fn happy_path_initialize_join_commit_reveal_resolve() {
     // ---- join_battle -------------------------------------------------------
     let value_b: u64 = 950;
     let grade_b: u8 = 7;
-    let msg_b = attestation_msg(&pb.nft_mint, value_b, grade_b, FIXED_NOW);
+    let msg_b = attestation_msg(&pb.nft_mint, value_b, grade_b, FIXED_NOW, &battle_pda);
     let ed_b = ed25519_attest_ix(&h.oracle, &msg_b);
 
     let join_ix = Instruction {

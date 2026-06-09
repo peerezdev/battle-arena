@@ -6,13 +6,16 @@ use crate::error::ErrorCode;
 
 /// Construye el mensaje canonico de atestacion del oraculo.
 ///
-/// Layout: 32 (mint) + 8 (value_usd LE) + 1 (grade) + 8 (ts LE) = 49 bytes.
-pub fn attestation_msg(nft_mint: &Pubkey, value_usd: u64, grade: u8, ts: i64) -> Vec<u8> {
-    let mut v = Vec::with_capacity(49);
+/// Layout: 32 (mint) + 8 (value_usd LE) + 1 (grade) + 8 (ts LE) + 32 (battle) = 81 bytes.
+/// El campo `battle` liga la atestacion al PDA concreto de la batalla,
+/// evitando que una firma valida pueda reutilizarse en otra batalla (anti-replay).
+pub fn attestation_msg(nft_mint: &Pubkey, value_usd: u64, grade: u8, ts: i64, battle: &Pubkey) -> Vec<u8> {
+    let mut v = Vec::with_capacity(81);
     v.extend_from_slice(nft_mint.as_ref());
     v.extend_from_slice(&value_usd.to_le_bytes());
     v.push(grade);
     v.extend_from_slice(&ts.to_le_bytes());
+    v.extend_from_slice(battle.as_ref());
     v
 }
 
@@ -141,7 +144,8 @@ mod tests {
     #[test]
     fn accepts_valid_self_referential() {
         let pk = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
         let data = build_ed25519_ix_data(&pk, &msg);
         assert!(verify_ed25519_ix_data(&data, &pk, &msg).is_ok());
     }
@@ -150,7 +154,8 @@ mod tests {
     fn rejects_redirected_pubkey_index() {
         // ATAQUE CRITICO: public_key_instruction_index apunta a otra instruccion (0).
         let pk = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
         let mut data = build_ed25519_ix_data(&pk, &msg);
         data[8..10].copy_from_slice(&0u16.to_le_bytes());
         assert!(verify_ed25519_ix_data(&data, &pk, &msg).is_err());
@@ -160,7 +165,8 @@ mod tests {
     fn rejects_redirected_message_index() {
         // ATAQUE CRITICO: message_instruction_index apunta a otra instruccion (0).
         let pk = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
         let mut data = build_ed25519_ix_data(&pk, &msg);
         data[14..16].copy_from_slice(&0u16.to_le_bytes());
         assert!(verify_ed25519_ix_data(&data, &pk, &msg).is_err());
@@ -169,7 +175,8 @@ mod tests {
     #[test]
     fn rejects_num_sigs_not_one() {
         let pk = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
 
         let mut zero = build_ed25519_ix_data(&pk, &msg);
         zero[0] = 0;
@@ -183,7 +190,8 @@ mod tests {
     #[test]
     fn rejects_short_data() {
         let pk = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
         let data = vec![1u8; 15]; // < 16
         assert!(verify_ed25519_ix_data(&data, &pk, &msg).is_err());
     }
@@ -192,7 +200,8 @@ mod tests {
     fn rejects_wrong_pubkey() {
         let pk = Pubkey::new_unique();
         let other = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
         let data = build_ed25519_ix_data(&pk, &msg);
         assert!(verify_ed25519_ix_data(&data, &other, &msg).is_err());
     }
@@ -200,8 +209,9 @@ mod tests {
     #[test]
     fn rejects_wrong_message() {
         let pk = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
-        let forged = attestation_msg(&pk, 9999, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
+        let forged = attestation_msg(&pk, 9999, 5, 1_700_000_000, &battle);
         let data = build_ed25519_ix_data(&pk, &msg);
         assert!(verify_ed25519_ix_data(&data, &pk, &forged).is_err());
     }
@@ -209,7 +219,8 @@ mod tests {
     #[test]
     fn rejects_oob_offset() {
         let pk = Pubkey::new_unique();
-        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000);
+        let battle = Pubkey::new_unique();
+        let msg = attestation_msg(&pk, 1000, 5, 1_700_000_000, &battle);
         let mut data = build_ed25519_ix_data(&pk, &msg);
         // message_data_offset mas alla del final del buffer.
         data[10..12].copy_from_slice(&u16::MAX.to_le_bytes());
@@ -234,8 +245,18 @@ mod tests {
         let close = value_start.find('"').expect("comilla de cierre del valor");
         let expected_hex = &value_start[..close];
 
-        // Construir el mensaje con los parámetros del primer vector.
-        let msg = attestation_msg(&Pubkey::new_from_array([0u8; 32]), 1200, 9, 1700000000);
+        // El fixture usa "11111111111111111111111111111111" (System Program = 32 bytes cero)
+        // como battle de prueba — lo construimos directamente sin base58 externo.
+        let battle_pubkey = Pubkey::new_from_array([0u8; 32]);
+
+        // Construir el mensaje con los parámetros del primer vector (incluido battle).
+        let msg = attestation_msg(
+            &Pubkey::new_from_array([0u8; 32]),
+            1200,
+            9,
+            1700000000,
+            &battle_pubkey,
+        );
         let built_hex: String = msg.iter().map(|b| format!("{:02x}", b)).collect();
 
         assert_eq!(
@@ -251,11 +272,12 @@ mod tests {
         let value_usd: u64 = 1_234_567;
         let grade: u8 = 7;
         let ts: i64 = 1_700_000_000;
+        let battle = Pubkey::new_unique();
 
-        let msg = attestation_msg(&mint, value_usd, grade, ts);
+        let msg = attestation_msg(&mint, value_usd, grade, ts, &battle);
 
-        // Longitud total esperada.
-        assert_eq!(msg.len(), 49);
+        // Longitud total esperada: 32+8+1+8+32 = 81 bytes.
+        assert_eq!(msg.len(), 81);
 
         // Los primeros 32 bytes son el mint.
         assert_eq!(&msg[0..32], mint.as_ref());
@@ -268,5 +290,8 @@ mod tests {
 
         // ts LE en bytes 41..49.
         assert_eq!(&msg[41..49], &ts.to_le_bytes());
+
+        // battle en bytes 49..81.
+        assert_eq!(&msg[49..81], battle.as_ref());
     }
 }

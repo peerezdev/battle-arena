@@ -403,7 +403,7 @@ impl Match {
         ts_a: i64,
         oracle_signer: &SigningKey,
     ) -> Vec<Instruction> {
-        let msg_a = attestation_msg(&self.pa.nft_mint, value_a, grade_a, ts_a);
+        let msg_a = attestation_msg(&self.pa.nft_mint, value_a, grade_a, ts_a, &self.battle_pda);
         let ed_a = ed25519_attest_ix(oracle_signer, &msg_a);
         let init_ix = Instruction {
             program_id: h.program_id,
@@ -453,7 +453,7 @@ impl Match {
         ts_b: i64,
         oracle_signer: &SigningKey,
     ) -> Vec<Instruction> {
-        let msg_b = attestation_msg(&self.pb.nft_mint, value_b, grade_b, ts_b);
+        let msg_b = attestation_msg(&self.pb.nft_mint, value_b, grade_b, ts_b, &self.battle_pda);
         let ed_b = ed25519_attest_ix(oracle_signer, &msg_b);
         let join_ix = Instruction {
             program_id: h.program_id,
