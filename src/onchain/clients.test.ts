@@ -5,20 +5,24 @@ import { getOpenMatches, registerMatch, syncMatch, compareElo, getNonce, verify 
 
 beforeEach(() => vi.restoreAllMocks())
 
+const BATTLE_ZERO = '11111111111111111111111111111111'
+
 describe('oracleClient', () => {
-  it('attest llama al endpoint del oráculo', async () => {
+  it('attest llama al endpoint del oráculo con mint y battle', async () => {
     const json = { mint: 'M', value_usd: 1200, grade: 9, grading_company: 'PSA', ts: 1, message_hex: 'aa', signature_hex: 'bb', oracle_pubkey: 'O' }
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => json })
     vi.stubGlobal('fetch', fetchMock)
-    const r = await attest('M')
+    const r = await attest('M', BATTLE_ZERO)
     expect(r.value_usd).toBe(1200)
-    expect(fetchMock.mock.calls[0][0]).toContain('/attest?mint=M')
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('/attest?mint=M')
+    expect(url).toContain('battle=')
   })
 
   it('attest lanza si resp.ok es false', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({}) })
     vi.stubGlobal('fetch', fetchMock)
-    await expect(attest('BADMINT')).rejects.toThrow()
+    await expect(attest('BADMINT', BATTLE_ZERO)).rejects.toThrow()
   })
 })
 

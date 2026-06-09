@@ -11,9 +11,11 @@ export interface AttestResponse {
   oracle_pubkey: string
 }
 
-/** Obtiene la atestación del oráculo para un mint dado. */
-export async function attest(mint: string): Promise<AttestResponse> {
-  const url = `${config.oracleUrl}/attest?mint=${encodeURIComponent(mint)}`
+/** Obtiene la atestación del oráculo para un mint y una batalla dados.
+ *  El parámetro `battle` (base58) liga la atestación a esa batalla concreta,
+ *  impidiendo el reuso de la firma en otra batalla (anti-replay). */
+export async function attest(mint: string, battle: string): Promise<AttestResponse> {
+  const url = `${config.oracleUrl}/attest?mint=${encodeURIComponent(mint)}&battle=${encodeURIComponent(battle)}`
   const resp = await fetch(url)
   if (!resp.ok) throw new Error(`Oracle attest error: ${resp.status}`)
   return resp.json() as Promise<AttestResponse>

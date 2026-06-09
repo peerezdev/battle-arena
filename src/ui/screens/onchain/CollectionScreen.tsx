@@ -40,7 +40,11 @@ export function CollectionScreen({ onBack, onSelectCard }: Props) {
     setError(null)
     setAttestation(null)
     try {
-      const att = await attest(mint.trim())
+      // En esta pantalla solo se valora la carta para mostrar el grado/precio;
+      // la atestación real ligada a la batalla se pide en el Lobby cuando se
+      // conoce el PDA concreto. Se usa el System Program como battle placeholder.
+      const PREVIEW_BATTLE = '11111111111111111111111111111111'
+      const att = await attest(mint.trim(), PREVIEW_BATTLE)
       setAttestation(att)
     } catch (e) {
       setError((e as Error).message)

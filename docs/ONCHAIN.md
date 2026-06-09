@@ -74,5 +74,5 @@ npm run dev   # http://localhost:5173
 ## Antes de mainnet (recordatorio)
 
 - Broadcast de transacciones server-side (el RPC público de mainnet da 403 en `sendTransaction`).
-- Atar la atestación del oráculo a la batalla (nonce) para evitar reuso dentro de la ventana de frescura.
+- ~~Atar la atestación del oráculo a la batalla para evitar reuso dentro de la ventana de frescura.~~ **RESUELTO**: el mensaje firmado incluye el battle PDA (81 bytes), el endpoint `/attest?battle=<pubkey>` es obligatorio, y el contrato verifica que el battle embebido en la firma corresponde al account de la instrucción.
 - Auditoría del contrato + verificación legal (ya anotado en los riesgos del programa y el oráculo).

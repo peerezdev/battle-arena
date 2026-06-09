@@ -122,7 +122,16 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
     setCreateError(null)
     setCreateSuccess(null)
     try {
-      const att = await attest(selectedCard.mint)
+      // FIX F (MEDIUM-3): Stronger nonce with added random entropy (stays within u64 safely).
+      const nonce =
+        BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000))
+
+      // Derivar el battle PDA ANTES de pedir la atestación para que el oráculo
+      // pueda ligar la firma a esta batalla específica (anti-replay).
+      const [battleKey] = battlePda(publicKey, nonce)
+      const battlePubkeyStr = battleKey.toBase58()
+
+      const att = await attest(selectedCard.mint, battlePubkeyStr)
 
       // FIX B (HIGH-1): Assert oracle pubkey matches the pinned config value if set.
       if (config.oraclePubkey && att.oracle_pubkey !== config.oraclePubkey) {
@@ -137,10 +146,6 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
         throw new Error(`Oracle ts is not an integer: ${att.ts}`)
       if (!Number.isInteger(att.value_usd) || att.value_usd == null)
         throw new Error(`Oracle value_usd is not an integer: ${att.value_usd}`)
-
-      // FIX F (MEDIUM-3): Stronger nonce with added random entropy (stays within u64 safely).
-      const nonce =
-        BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000))
 
       const stakeMintPk = new PublicKey(config.stakeMint)
       const treasuryPk = new PublicKey(config.treasury)
@@ -167,10 +172,6 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
       })
 
       await signAndSendTransaction(ixs)
-
-      // Derive the deterministic battle pubkey
-      const [battleKey] = battlePda(publicKey, nonce)
-      const battlePubkeyStr = battleKey.toBase58()
 
       const minElo = minEloInput ? Number(minEloInput) : null
       const maxElo = maxEloInput ? Number(maxEloInput) : null
@@ -203,7 +204,8 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
     setJoiningBattle(match.battle_pubkey)
     setJoinError(null)
     try {
-      const att = await attest(selectedCard.mint)
+      // Pasar el battle pubkey al oráculo para ligar la atestación a esta batalla (anti-replay).
+      const att = await attest(selectedCard.mint, match.battle_pubkey)
 
       // FIX B (HIGH-1): Assert oracle pubkey matches the pinned config value if set.
       if (config.oraclePubkey && att.oracle_pubkey !== config.oraclePubkey) {
