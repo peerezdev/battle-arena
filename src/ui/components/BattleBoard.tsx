@@ -486,35 +486,32 @@ function FrontColumn(props: FrontColumnProps) {
     const opponentChargeY = s(24, 44)   // px to slide down toward center
     const playerChargeY = s(24, 44)     // px to slide up toward center
 
-    // animate values for each block
+    // animate values for each block.
+    // NOTE: only vertical charge (y) + opacity — NO scale on the boxes (they are
+    // width:100% inside a 3-col grid; scaling widens them and they overflow into
+    // the neighbouring column, which looked "misaligned"). Winner emphasis is the
+    // glow (box-shadow) + bold colour; loser dims via opacity. Everything returns
+    // to y:0, so the final layout is always pixel-stable.
     const opponentMotion = !reduced
       ? clashPhase === 'hidden'
-        ? { y: 0, scale: 1, opacity: 0.6 }
+        ? { y: 0, opacity: 0.6 }
         : clashPhase === 'charge'
-        ? { y: opponentChargeY, scale: 1.06, opacity: 1 }
+        ? { y: opponentChargeY, opacity: 1 }
         : clashPhase === 'impact'
-        ? { y: opponentChargeY * 0.5, scale: 1.12, opacity: 1 }
+        ? { y: opponentChargeY * 0.5, opacity: 1 }
         : // settle
-          {
-            y: 0,
-            scale: winnerB ? 1.08 : disputed ? 1 : 0.92,
-            opacity: winnerB ? 1 : disputed ? 0.85 : 0.45,
-          }
+          { y: 0, opacity: winnerB ? 1 : disputed ? 0.85 : 0.5 }
       : {}
 
     const playerMotion = !reduced
       ? clashPhase === 'hidden'
-        ? { y: 0, scale: 1, opacity: 0.6 }
+        ? { y: 0, opacity: 0.6 }
         : clashPhase === 'charge'
-        ? { y: -playerChargeY, scale: 1.06, opacity: 1 }
+        ? { y: -playerChargeY, opacity: 1 }
         : clashPhase === 'impact'
-        ? { y: -playerChargeY * 0.5, scale: 1.12, opacity: 1 }
+        ? { y: -playerChargeY * 0.5, opacity: 1 }
         : // settle
-          {
-            y: 0,
-            scale: winnerA ? 1.08 : disputed ? 1 : 0.92,
-            opacity: winnerA ? 1 : disputed ? 0.85 : 0.45,
-          }
+          { y: 0, opacity: winnerA ? 1 : disputed ? 0.85 : 0.5 }
       : {}
 
     // Sigil shake on impact
