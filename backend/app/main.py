@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, Query
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -16,23 +17,40 @@ from .elo import gap_label
 
 
 class VerifyBody(BaseModel):
-    wallet: str
+    wallet: str = Field(min_length=32, max_length=44)
     signature_hex: str
 
 
 class AliasBody(BaseModel):
-    alias: str
+    alias: str = Field(min_length=1, max_length=32)
 
 
 class CreateMatchBody(BaseModel):
-    battle_pubkey: str
-    min_elo: Optional[int] = None
-    max_elo: Optional[int] = None
+    battle_pubkey: str = Field(min_length=32, max_length=44)
+    min_elo: Optional[int] = Field(default=None, ge=0, le=9999)
+    max_elo: Optional[int] = Field(default=None, ge=0, le=9999)
+
+    @model_validator(mode="after")
+    def check_elo_range(self) -> "CreateMatchBody":
+        if self.min_elo is not None and self.max_elo is not None:
+            if self.min_elo > self.max_elo:
+                raise ValueError("min_elo no puede ser mayor que max_elo")
+        return self
 
 
 def create_app(session_factory, chain: ChainSource, auth: AuthService,
-               elo_start: int = 1200, elo_k: int = 32) -> FastAPI:
+               elo_start: int = 1200, elo_k: int = 32,
+               cors_origins: list[str] | None = None) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
+
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     def db() -> Session:
         s = session_factory()
@@ -64,6 +82,13 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
         except AuthError as e:
             raise HTTPException(401, str(e))
         return {"token": token}
+
+    @app.post("/auth/logout")
+    async def auth_logout(authorization: Optional[str] = Header(None),
+                          wallet: str = Depends(current_wallet)):
+        token = authorization[len("Bearer "):]
+        auth.revoke(token)
+        return {"ok": True}
 
     @app.post("/users/me/alias")
     async def me_alias(body: AliasBody, wallet: str = Depends(current_wallet), s: Session = Depends(db)):
@@ -98,7 +123,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
         return rows
 
     @app.post("/matches/{battle_pubkey}/sync")
-    async def post_sync(battle_pubkey: str, s: Session = Depends(db)):
+    async def post_sync(battle_pubkey: str, wallet: str = Depends(current_wallet), s: Session = Depends(db)):
         try:
             m = await sync_match(s, chain, battle_pubkey, elo_start=elo_start, k=elo_k)
         except MatchError as e:
@@ -115,7 +140,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
         return {"elo_a": va, "elo_b": vb, "diff": diff, "gap_label": gap_label(diff)}
 
     @app.get("/leaderboard")
-    async def get_leaderboard(limit: int = 50, s: Session = Depends(db)):
+    async def get_leaderboard(limit: int = Query(default=50, ge=1, le=200), s: Session = Depends(db)):
         return [{"wallet": u.wallet, "alias": u.alias, "elo": u.elo} for u in leaderboard(s, limit)]
 
     return app
@@ -128,7 +153,8 @@ def build_default_app() -> FastAPI:
     session_factory = make_session_factory(engine)
     chain: ChainSource = MockChainSource()  # 'solana' se cablea cuando el lector real esté validado
     auth = AuthService(ttl=s.session_ttl)
-    return create_app(session_factory, chain, auth, elo_start=s.elo_start, elo_k=s.elo_k)
+    return create_app(session_factory, chain, auth, elo_start=s.elo_start, elo_k=s.elo_k,
+                      cors_origins=s.cors_origins)
 
 
 app = build_default_app()

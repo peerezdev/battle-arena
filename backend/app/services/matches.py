@@ -64,7 +64,7 @@ def list_open(session: Session, viewer: Optional[str] = None) -> list[dict]:
 
 async def sync_match(session: Session, chain: ChainSource, battle_pubkey: str,
                      elo_start: int, k: int) -> Match:
-    m = session.get(Match, battle_pubkey)
+    m = session.get(Match, battle_pubkey, with_for_update=True)
     if m is None:
         raise MatchError("partida no registrada")
     try:

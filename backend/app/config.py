@@ -1,3 +1,4 @@
+from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,7 @@ class Settings(BaseSettings):
     elo_start: int = 1200
     elo_k: int = 32
     session_ttl: int = 3600
+    cors_origins: List[str] = []
 
 
 def get_settings() -> Settings:

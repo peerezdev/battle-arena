@@ -8,6 +8,10 @@ from app.db import make_session_factory, init_db
 from app.auth import AuthService, auth_message
 from app.chain.mock import MockChainSource
 
+# Realistic-length Solana pubkey stubs for HTTP-layer tests (44 chars, base58-like)
+BP1 = "BattlePubkey1111111111111111111111111111111"   # 43 chars
+BP2 = "BattlePubkey2222222222222222222222222222222"   # 43 chars
+
 
 def _client():
     engine = create_engine(
@@ -40,19 +44,19 @@ def test_auth_and_create_match_flow():
     c, chain, _ = _client()
     key = SigningKey.generate()
     wallet, token = _login(c, key)
-    chain.set_battle("B1", player_a=wallet, stake=100)
-    r = c.post("/matches", json={"battle_pubkey": "B1", "min_elo": 1000, "max_elo": 1500},
+    chain.set_battle(BP1, player_a=wallet, stake=100)
+    r = c.post("/matches", json={"battle_pubkey": BP1, "min_elo": 1000, "max_elo": 1500},
                headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200 and r.json()["stake"] == 100
     # listado con viewer
     rows = c.get("/matches/open", params={"viewer": wallet}).json()
-    assert rows[0]["battle_pubkey"] == "B1" and rows[0]["joinable"] is True
+    assert rows[0]["battle_pubkey"] == BP1 and rows[0]["joinable"] is True
 
 
 def test_create_match_requires_auth():
     c, chain, _ = _client()
-    chain.set_battle("B1", player_a="A", stake=100)
-    r = c.post("/matches", json={"battle_pubkey": "B1"})
+    chain.set_battle(BP1, player_a="A" * 44, stake=100)
+    r = c.post("/matches", json={"battle_pubkey": BP1})
     assert r.status_code == 401
 
 
@@ -66,8 +70,16 @@ def test_get_unknown_user_is_readonly():
 
 def test_sync_unknown_match_404():
     c, chain, _ = _client()
-    r = c.post("/matches/UNREGISTERED/sync")
+    key = SigningKey.generate()
+    _, token = _login(c, key)
+    r = c.post("/matches/UNREGISTERED/sync", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 404
+
+
+def test_sync_requires_auth():
+    c, chain, _ = _client()
+    r = c.post("/matches/SOMEMATCH/sync")
+    assert r.status_code == 401
 
 
 def test_sync_applies_elo_and_compare():
@@ -75,10 +87,35 @@ def test_sync_applies_elo_and_compare():
     ka, kb = SigningKey.generate(), SigningKey.generate()
     wa, token = _login(c, ka)
     wb = based58.b58encode(bytes(kb.verify_key)).decode()
-    chain.set_battle("B1", player_a=wa, stake=100)
-    c.post("/matches", json={"battle_pubkey": "B1"}, headers={"Authorization": f"Bearer {token}"})
-    chain.join("B1", player_b=wb); chain.settle("B1", winner=wa)
-    r = c.post("/matches/B1/sync")
+    chain.set_battle(BP1, player_a=wa, stake=100)
+    c.post("/matches", json={"battle_pubkey": BP1}, headers={"Authorization": f"Bearer {token}"})
+    chain.join(BP1, player_b=wb); chain.settle(BP1, winner=wa)
+    r = c.post(f"/matches/{BP1}/sync", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200 and r.json()["elo_applied"] is True
     cmp = c.get("/elo/compare", params={"a": wa, "b": wb}).json()
     assert cmp["elo_a"] == 1216 and cmp["elo_b"] == 1184 and cmp["diff"] == 32
+
+
+def test_alias_too_long_rejected():
+    c, _, _ = _client()
+    key = SigningKey.generate()
+    _, token = _login(c, key)
+    r = c.post("/users/me/alias", json={"alias": "a" * 33},
+               headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 422
+
+
+def test_leaderboard_limit_over_200_rejected():
+    c, _, _ = _client()
+    r = c.get("/leaderboard", params={"limit": 201})
+    assert r.status_code == 422
+
+
+def test_create_match_min_elo_greater_than_max_elo_rejected():
+    c, chain, _ = _client()
+    key = SigningKey.generate()
+    wallet, token = _login(c, key)
+    chain.set_battle(BP2, player_a=wallet, stake=50)
+    r = c.post("/matches", json={"battle_pubkey": BP2, "min_elo": 1500, "max_elo": 1000},
+               headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 422
