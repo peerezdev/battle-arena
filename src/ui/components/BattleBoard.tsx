@@ -225,18 +225,21 @@ function HeroPortrait({
   )
 }
 
-/** Your mana crystal strip: number + orb row + breakdown. */
+/**
+ * Your mana strip — single, interactive energy readout.
+ * Shows the energy you still have LEFT this round (decreases as you allocate),
+ * with plain tags for where the extra came from (ventaja / reserva) and a hint
+ * that unspent mana is banked.
+ */
 function ManaCrystals({
-  available,
-  base,
+  pool,
   edge,
   banked,
   accentColor,
   reduced,
   wide,
 }: {
-  available: number
-  base: number
+  pool: number
   edge: number
   banked: number
   accentColor: string
@@ -244,11 +247,22 @@ function ManaCrystals({
   wide: boolean
 }) {
   const s = pick(wide)
-  const parts: string[] = []
-  if (base > 0) parts.push(`${base}b`)
-  if (edge > 0) parts.push(`+${edge}e`)
-  if (banked > 0) parts.push(`+${banked}bk`)
   const cap = s(12, 18)
+  const tag = (text: string) => (
+    <span
+      style={{
+        fontSize: s(8, 11),
+        color: accentColor,
+        fontFamily: FONTS.mono,
+        background: `${accentColor}1a`,
+        border: `1px solid ${accentColor}44`,
+        borderRadius: '6px',
+        padding: '1px 5px',
+      }}
+    >
+      {text}
+    </span>
+  )
 
   return (
     <div
@@ -265,14 +279,24 @@ function ManaCrystals({
       <div>
         <div
           style={{
-            fontSize: s(8, 12),
-            color: COLORS.muted,
-            fontFamily: FONTS.mono,
-            letterSpacing: '.05em',
+            display: 'flex',
+            alignItems: 'center',
+            gap: s(5, 7),
             marginBottom: '2px',
           }}
         >
-          MANÁ
+          <span
+            style={{
+              fontSize: s(8, 12),
+              color: COLORS.muted,
+              fontFamily: FONTS.mono,
+              letterSpacing: '.05em',
+            }}
+          >
+            MANÁ DISPONIBLE
+          </span>
+          {edge > 0 && tag(`+${edge} ventaja`)}
+          {banked > 0 && tag(`+${banked} reserva`)}
         </div>
         <div
           style={{
@@ -283,20 +307,19 @@ function ManaCrystals({
             lineHeight: 1,
           }}
         >
-          {available}
+          {pool}
         </div>
-        {parts.length > 0 && (
-          <div
-            style={{
-              fontSize: s(8, 12),
-              color: COLORS.muted,
-              fontFamily: FONTS.mono,
-              marginTop: '1px',
-            }}
-          >
-            {parts.join(' ')}
-          </div>
-        )}
+        <div
+          style={{
+            fontSize: s(8, 12),
+            color: COLORS.muted,
+            fontFamily: FONTS.mono,
+            fontStyle: 'italic',
+            marginTop: '2px',
+          }}
+        >
+          lo que no uses se banca
+        </div>
       </div>
       <div
         style={{
@@ -306,10 +329,10 @@ function ManaCrystals({
           maxWidth: s(88, 260),
         }}
       >
-        {Array.from({ length: Math.min(available, cap) }, (_, i) => (
+        {Array.from({ length: Math.min(pool, cap) }, (_, i) => (
           <EnergyOrb key={i} color={accentColor} reduced={reduced} size={s(11, 16)} />
         ))}
-        {available > cap && (
+        {pool > cap && (
           <span
             style={{
               fontSize: s(9, 13),
@@ -318,7 +341,7 @@ function ManaCrystals({
               alignSelf: 'center',
             }}
           >
-            +{available - cap}
+            +{pool - cap}
           </span>
         )}
       </div>
@@ -836,7 +859,6 @@ export function BattleBoard(props: BattleBoardProps) {
   const spent = alloc.apertura + alloc.choque + alloc.remate
   const pool = available - spent
 
-  const base = state.config.baseEnergyPerRound
   const edge = state.edgePerRound[playerKey]
   const banked = state.bankedEnergy[playerKey]
 
@@ -1105,8 +1127,7 @@ export function BattleBoard(props: BattleBoardProps) {
             </div>
             {props.phase === 'allocate' && (
               <ManaCrystals
-                available={available}
-                base={base}
+                pool={pool}
                 edge={edge}
                 banked={banked}
                 accentColor={accentColor}
@@ -1117,30 +1138,6 @@ export function BattleBoard(props: BattleBoardProps) {
           </div>
         </div>
 
-        {props.phase === 'allocate' && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: s(6, 10),
-              fontSize: s(10, 14),
-              color: COLORS.muted,
-              fontFamily: FONTS.mono,
-              padding: '0 2px',
-            }}
-          >
-            <span>
-              Sin asignar:{' '}
-              <strong style={{ color: accentColor, fontFamily: FONTS.orbitron }}>{pool}</strong>
-            </span>
-            <span>
-              Asignada:{' '}
-              <strong style={{ color: accentColor, fontFamily: FONTS.orbitron }}>{spent}</strong>
-              {pool > 0 ? ` · ${pool} se banca` : ''}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Reveal: aguante notes + round winner banner */}
