@@ -23,4 +23,18 @@ describe('computeEdge', () => {
   it('edgeEnabled=false -> 0', () => {
     expect(computeEdge(100000, 1000, cfg({ edgeEnabled: false }))).toEqual({ high: 0, low: 0 })
   })
+
+  // FIX J: non-power-of-2 ratios must use integer thresholds (no log2 FP drift)
+  it('ratio 3 (3k vs 1k) -> +1 (>=2 but <8)', () => {
+    expect(computeEdge(3000, 1000, cfg())).toEqual({ high: 1, low: 0 })
+  })
+  it('ratio 40 (40k vs 1k) -> +3 (>=32 but <128)', () => {
+    expect(computeEdge(40000, 1000, cfg())).toEqual({ high: 3, low: 0 })
+  })
+  it('ratio 130 (130k vs 1k) -> +4 (>=128, capped at maxEdge=4)', () => {
+    expect(computeEdge(130000, 1000, cfg())).toEqual({ high: 4, low: 0 })
+  })
+  it('v_low == 0 -> 0', () => {
+    expect(computeEdge(1000, 0, cfg())).toEqual({ high: 0, low: 0 })
+  })
 })

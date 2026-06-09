@@ -62,6 +62,9 @@ export async function reveal(
   salt: string,
 ): Promise<MatchState> {
   if (state.phase !== 'revealing') throw new Error('No se puede revelar fuera de la fase revealing')
+  // FIX I (engine #1): Guard against double-reveal by the same player in the same round.
+  if (player === 'a' && state.rounds[state.round].revealA) throw new Error('Jugador a ya ha revelado')
+  if (player === 'b' && state.rounds[state.round].revealB) throw new Error('Jugador b ya ha revelado')
   if (allocation.apertura < 0 || allocation.choque < 0 || allocation.remate < 0)
     throw new Error('Asignación inválida: valores negativos')
   if (!Number.isInteger(allocation.apertura) || !Number.isInteger(allocation.choque) || !Number.isInteger(allocation.remate))

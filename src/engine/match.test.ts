@@ -109,6 +109,33 @@ describe('commit + reveal', () => {
     s = commit(s, 'a', 'hashA1')
     expect(() => commit(s, 'a', 'hashA2')).toThrow(/ya ha commiteado/)
   })
+
+  it('rechaza doble reveal del jugador a en la misma ronda (FIX I)', async () => {
+    let s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
+    const allocA = { apertura: 4, choque: 3, remate: 3 }
+    const hA = await hashAllocation(allocA, 'sA')
+    s = commit(s, 'a', hA)
+    s = commit(s, 'b', 'hB')
+    s = await reveal(s, 'a', allocA, 'sA')
+    // Second reveal by a should throw even though state hasn't advanced (b hasn't revealed)
+    const hA2 = await hashAllocation(allocA, 'sA')
+    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/ya ha revelado/)
+    void hA2 // suppress unused var warning
+  })
+
+  it('rechaza doble reveal del jugador b en la misma ronda (FIX I)', async () => {
+    let s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
+    const allocA = { apertura: 4, choque: 3, remate: 3 }
+    const allocB = { apertura: 3, choque: 4, remate: 3 }
+    const hA = await hashAllocation(allocA, 'sA')
+    const hB = await hashAllocation(allocB, 'sB')
+    s = commit(s, 'a', hA)
+    s = commit(s, 'b', hB)
+    s = await reveal(s, 'a', allocA, 'sA')
+    s = await reveal(s, 'b', allocB, 'sB')
+    // Second reveal by b should throw
+    await expect(reveal(s, 'b', allocB, 'sB')).rejects.toThrow(/ya ha revelado/)
+  })
 })
 
 // helper: monta un estado en fase revealing con asignaciones ya puestas
