@@ -22,14 +22,15 @@ PRICING_SOURCE=collectorcrypt uvicorn app.main:app --port 8787
 
 - `GET /health` → `{ "status": "ok" }`
 - `GET /pubkey` → `{ "oracle_pubkey": "<base58>" }` — la clave a registrar on-chain (campo `oracle` de `Battle`).
-- `GET /attest?mint=<pubkey>` →
+- `GET /attest?mint=<pubkey>&battle=<pubkey>` →
   ```json
   {
     "mint": "<base58>", "value_usd": 1200, "grade": 9, "grading_company": "PSA",
     "ts": 1700000000, "message_hex": "…", "signature_hex": "…", "oracle_pubkey": "<base58>"
   }
   ```
-  - `409` si la carta no puede valorarse (sin `insuredValue` / sin grade / mint no encontrado). `422` si el mint no es una pubkey válida (no decodifica a 32 bytes).
+  - **`battle` es obligatorio** (base58, debe decodificar a 32 bytes). La firma liga la atestación al PDA de batalla concreto, impidiendo reutilizarla en otra batalla (anti-replay).
+  - `409` si la carta no puede valorarse (sin `insuredValue` / sin grade / mint no encontrado). `422` si `mint` o `battle` no son pubkeys válidas (no decodifican a 32 bytes).
   - El cliente construye la instrucción Ed25519 de la tx con `message_hex` + `signature_hex` + `oracle_pubkey`, con índices auto-referenciales `0xFFFF` (igual que en los tests litesvm del contrato), y la pone ANTES de la instrucción del programa, pasando `ed25519_ix_index`.
 
 ## Decisión de valor: solo `insuredValue` (resistente a manipulación)
@@ -55,7 +56,7 @@ La clave del oráculo **nunca se commitea** (`.gitignore` cubre `oracle_key.json
 
 ## Garantía de no-desincronización con el contrato
 
-El mensaje canónico es `mint(32) || value_usd(8 LE u64) || grade(1) || ts(8 LE i64)` — idéntico a `attestation_msg` del contrato. Un **vector de equivalencia compartido** (`tests/fixtures/attestation_vectors.json`) lo verifican **a la vez** el test Python (`test_shared_vector_matches`) y un test Rust del contrato (`shared_attestation_vector_matches`). Si alguien cambia el formato en un lado, ambos tests rompen.
+El mensaje canónico es `mint(32) || value_usd(8 LE u64) || grade(1) || ts(8 LE i64) || battle(32)` = **81 bytes** — idéntico a `attestation_msg` del contrato. El campo `battle` liga la firma al PDA de la batalla concreta (anti-replay). Un **vector de equivalencia compartido** (`tests/fixtures/attestation_vectors.json`) lo verifican **a la vez** el test Python (`test_shared_vector_matches`) y un test Rust del contrato (`shared_attestation_vector_matches`). Si alguien cambia el formato en un lado, ambos tests rompen.
 
 ## Arquitectura
 
@@ -74,5 +75,5 @@ oracle/app/
 ## Riesgos / pendientes (pre-producción)
 
 - **Disponibilidad = liveness**: si el oráculo cae, no se pueden crear batallas. Producción querrá redundancia / rotación de clave.
-- **Binding por batalla**: una atestación válida es reutilizable dentro de la ventana de frescura (5 min) — ligar al PDA/nonce de la batalla antes de mainnet (anotado también en los riesgos del contrato).
+- **Binding por batalla**: RESUELTO. El endpoint `/attest` exige el parámetro `battle` (PDA de la batalla) y lo incluye en el mensaje firmado, impidiendo el reuso de una atestación en otra batalla.
 - **Esquema CC**: el mapeo de campos está tomado de MarketAgg; conviene confirmarlo contra una respuesta real (el parser es tolerante a variantes de envoltorio).

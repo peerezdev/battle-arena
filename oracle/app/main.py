@@ -14,14 +14,19 @@ from .pricing.collector_crypt import CollectorCryptSource
 from .config import get_settings
 
 
+def _validate_pubkey(value: str, field_name: str = "mint") -> None:
+    """Raises HTTPException(422) if value is not a valid 32-byte base58 pubkey."""
+    try:
+        decoded = based58.b58decode(value.encode())
+    except Exception:
+        raise HTTPException(status_code=422, detail=f"{field_name} inválido (no es base58): {value}")
+    if len(decoded) != 32:
+        raise HTTPException(status_code=422, detail=f"{field_name} debe decodificar a 32 bytes, got {len(decoded)}: {value}")
+
+
 def _validate_mint(mint: str) -> None:
     """Raises HTTPException(422) if mint is not a valid 32-byte base58 pubkey."""
-    try:
-        decoded = based58.b58decode(mint.encode())
-    except Exception:
-        raise HTTPException(status_code=422, detail=f"mint inválido (no es base58): {mint}")
-    if len(decoded) != 32:
-        raise HTTPException(status_code=422, detail=f"mint debe decodificar a 32 bytes, got {len(decoded)}: {mint}")
+    _validate_pubkey(mint, "mint")
 
 
 class _RateLimiter:
@@ -73,16 +78,21 @@ def create_app(signing_key: SigningKey, pricing: PricingSource,
         return {"oracle_pubkey": oracle_b58}
 
     @app.get("/attest")
-    async def attest(request: Request, mint: str = Query(..., min_length=1, max_length=44)):
+    async def attest(
+        request: Request,
+        mint: str = Query(..., min_length=1, max_length=44),
+        battle: str = Query(..., min_length=1, max_length=44),
+    ):
         limiter.check(request.client.host if request.client else "unknown")
         _validate_mint(mint)
+        _validate_pubkey(battle, "battle")
         try:
             card = await pricing.get_value(mint)
         except ValueUnavailable as e:
             raise HTTPException(status_code=409, detail=str(e))
         ts = now_fn()
         try:
-            signed = sign_attestation(signing_key, mint, card["value_usd"], card["grade"], ts)
+            signed = sign_attestation(signing_key, mint, card["value_usd"], card["grade"], ts, battle)
         except (ValueError, OverflowError) as e:
             raise HTTPException(status_code=422, detail=str(e))
         return {
