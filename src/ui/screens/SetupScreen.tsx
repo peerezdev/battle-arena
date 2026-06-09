@@ -12,6 +12,8 @@ export interface Setup {
   mode: Mode
   edgeEnabled: boolean
   difficulty: Difficulty
+  /** Seconds per round (allocate phase). 0 = no limit. */
+  timerSeconds: number
 }
 
 const S = {
@@ -65,7 +67,7 @@ function CardPreview({ cardId, playerKey }: { cardId: string; playerKey: 'a' | '
 export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; error?: string }) {
   const [s, setS] = useState<Setup>({
     opponent: 'vs-bot', cardAId: MOCK_CARDS[0].id, cardBId: MOCK_CARDS[1].id,
-    mode: 'ranked', edgeEnabled: true, difficulty: 'medium',
+    mode: 'ranked', edgeEnabled: true, difficulty: 'medium', timerSeconds: 45,
   })
   const upd = (p: Partial<Setup>) => setS({ ...s, ...p })
 
@@ -197,6 +199,20 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
               </select>
             </>
           )}
+
+          {/* Round timer */}
+          <label style={S.label}>Tiempo por ronda</label>
+          <select
+            style={S.select}
+            value={s.timerSeconds}
+            onChange={(e) => upd({ timerSeconds: Number(e.target.value) })}
+            aria-label="Tiempo por ronda"
+          >
+            <option value={0}>Sin límite</option>
+            <option value={30}>30 s</option>
+            <option value={45}>45 s (recomendado)</option>
+            <option value={60}>60 s</option>
+          </select>
 
           {sameCard && (
             <div style={{ color: COLORS.red, fontSize: '12px', marginBottom: '12px' }}>

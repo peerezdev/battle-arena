@@ -131,6 +131,7 @@ export default function App() {
           playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Jugador A)` : `Tu — ${nameA}`}
           onCommit={commitA}
           state={state}
+          timerSeconds={setup!.timerSeconds}
         />
       )
 
@@ -145,6 +146,7 @@ export default function App() {
           playerLabel={`${nameB} (Jugador B)`}
           onCommit={commitB}
           state={state}
+          timerSeconds={setup!.timerSeconds}
         />
       )
 
