@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     elo_k: int = 32
     session_ttl: int = 3600
     cors_origins: List[str] = []
+    gacha_base_url: str = "https://dev-gacha.collectorcrypt.com"
+    gacha_api_key: str = ""  # vacío => módulo gacha deshabilitado
 
 
 def get_settings() -> Settings:

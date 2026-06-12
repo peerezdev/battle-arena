@@ -43,3 +43,13 @@ class RatingHistory(Base):
     elo_after: Mapped[int] = mapped_column(Integer)
     result: Mapped[str] = mapped_column(String)  # win|loss|draw
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class GachaPack(Base):
+    __tablename__ = "gacha_packs"
+    memo: Mapped[str] = mapped_column(String, primary_key=True)
+    wallet: Mapped[str] = mapped_column(String, index=True)
+    pack_type: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    nft_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
