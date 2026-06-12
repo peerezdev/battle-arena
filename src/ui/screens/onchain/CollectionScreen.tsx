@@ -23,9 +23,10 @@ interface Props {
   token: string
   onSelectCard: (card: SelectedCard) => void
   onBack: () => void
+  onOpenGacha?: () => void
 }
 
-export function CollectionScreen({ onBack, onSelectCard }: Props) {
+export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
   const { publicKey } = useWallet()
   const reduced = useReducedMotion()
 
@@ -72,19 +73,37 @@ export function CollectionScreen({ onBack, onSelectCard }: Props) {
     >
       <div style={{ maxWidth: '420px', margin: '0 auto', paddingTop: '40px' }}>
         {/* Back */}
-        <button
-          onClick={onBack}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: COLORS.muted,
-            cursor: 'pointer',
-            fontSize: '13px',
-            padding: '0 0 24px',
-          }}
-        >
-          ← Volver
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '24px' }}>
+          <button
+            onClick={onBack}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: COLORS.muted,
+              cursor: 'pointer',
+              fontSize: '13px',
+              padding: 0,
+            }}
+          >
+            ← Volver
+          </button>
+          {onOpenGacha && (
+            <button
+              onClick={onOpenGacha}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${COLORS.border}`,
+                color: COLORS.muted,
+                cursor: 'pointer',
+                fontSize: '13px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+              }}
+            >
+              🎰 Gacha — abre un pack
+            </button>
+          )}
+        </div>
 
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>

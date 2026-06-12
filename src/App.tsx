@@ -35,12 +35,15 @@ const LobbyScreen = lazy(() =>
 const OnchainBattleScreen = lazy(() =>
   import('./ui/screens/onchain/OnchainBattleScreen').then((m) => ({ default: m.OnchainBattleScreen }))
 )
+const GachaScreen = lazy(() =>
+  import('./ui/screens/onchain/GachaScreen').then((m) => ({ default: m.GachaScreen }))
+)
 
 // ── Offline screen names ────────────────────────────────────────────────────
 type OfflineScreen = 'setup' | 'allocateA' | 'passToB' | 'allocateB' | 'reveal' | 'result' | 'feedback'
 
 // ── On-chain screen names ───────────────────────────────────────────────────
-type OnchainScreen = 'connect' | 'collection' | 'lobby' | 'battle'
+type OnchainScreen = 'connect' | 'collection' | 'lobby' | 'battle' | 'gacha'
 
 export default function App() {
   const reduced = useReducedMotion()
@@ -208,6 +211,17 @@ export default function App() {
             setOnchainScreen('lobby')
           }}
           onBack={() => setOnchainScreen('connect')}
+          onOpenGacha={() => setOnchainScreen('gacha')}
+        />
+      )
+    }
+
+    if (onchainScreen === 'gacha' && authToken) {
+      return (
+        <GachaScreen
+          token={authToken}
+          onGoToCollection={() => setOnchainScreen('collection')}
+          onBack={() => setOnchainScreen('collection')}
         />
       )
     }
