@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import time as _time
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +17,8 @@ from .chain.mock import MockChainSource
 from .services.users import get_or_create_user, read_user_view, set_alias, leaderboard, history
 from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
+from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
+from .models import GachaPack
 
 
 class VerifyBody(BaseModel):
@@ -23,6 +28,26 @@ class VerifyBody(BaseModel):
 
 class AliasBody(BaseModel):
     alias: str = Field(min_length=1, max_length=32)
+
+
+class GeneratePackBody(BaseModel):
+    pack_type: str = Field(min_length=1, max_length=32, pattern=r"^[a-z0-9_]+$")
+
+
+class SubmitTxBody(BaseModel):
+    signed_transaction: str = Field(min_length=1, max_length=3000)
+
+    @model_validator(mode="after")
+    def check_base64(self) -> "SubmitTxBody":
+        try:
+            base64.b64decode(self.signed_transaction, validate=True)
+        except Exception:
+            raise ValueError("signed_transaction debe ser base64 válido")
+        return self
+
+
+class OpenPackBody(BaseModel):
+    memo: str = Field(min_length=1, max_length=128)
 
 
 class CreateMatchBody(BaseModel):
@@ -40,7 +65,9 @@ class CreateMatchBody(BaseModel):
 
 def create_app(session_factory, chain: ChainSource, auth: AuthService,
                elo_start: int = 1200, elo_k: int = 32,
-               cors_origins: list[str] | None = None) -> FastAPI:
+               cors_origins: list[str] | None = None,
+               gacha: GachaService | None = None,
+               gacha_rate_limit: int = 10) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
 
     if cors_origins:
@@ -143,6 +170,82 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
     async def get_leaderboard(limit: int = Query(default=50, ge=1, le=200), s: Session = Depends(db)):
         return [{"wallet": u.wallet, "alias": u.alias, "elo": u.elo} for u in leaderboard(s, limit)]
 
+    # ── Gacha (proxy a Collector Crypt; la x-api-key vive solo aquí) ─────────
+    _gacha_hits: dict[str, list[float]] = {}
+
+    def _gacha_throttle(wallet: str) -> None:
+        now = _time.time()
+        hits = [t for t in _gacha_hits.get(wallet, []) if now - t < 60.0]
+        if len(hits) >= gacha_rate_limit:
+            raise HTTPException(429, "demasiadas peticiones al gacha")
+        hits.append(now)
+        _gacha_hits[wallet] = hits
+
+    def _gacha_or_503() -> GachaService:
+        if gacha is None or not gacha.enabled:
+            raise HTTPException(503, "gacha_disabled")
+        return gacha
+
+    @app.get("/gacha/machines")
+    async def gacha_machines():
+        svc = _gacha_or_503()
+        try:
+            return await svc.machines()
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError:
+            raise HTTPException(502, "gacha upstream no disponible")
+
+    @app.post("/gacha/generate-pack")
+    async def gacha_generate(body: GeneratePackBody,
+                             wallet: str = Depends(current_wallet),
+                             s: Session = Depends(db)):
+        svc = _gacha_or_503()
+        _gacha_throttle(wallet)
+        try:
+            out = await svc.generate_pack(player_address=wallet, pack_type=body.pack_type)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError:
+            raise HTTPException(502, "gacha upstream no disponible")
+        if not out.get("memo"):
+            raise HTTPException(502, "gacha upstream no disponible")
+        s.add(GachaPack(memo=out["memo"], wallet=wallet, pack_type=body.pack_type))
+        s.commit()
+        return out
+
+    @app.post("/gacha/submit-tx")
+    async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_wallet)):
+        svc = _gacha_or_503()
+        _gacha_throttle(wallet)
+        try:
+            return await svc.submit_tx(signed_transaction=body.signed_transaction)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError:
+            raise HTTPException(502, "gacha upstream no disponible")
+
+    @app.post("/gacha/open-pack")
+    async def gacha_open(body: OpenPackBody,
+                         wallet: str = Depends(current_wallet),
+                         s: Session = Depends(db)):
+        svc = _gacha_or_503()
+        _gacha_throttle(wallet)
+        pack = s.get(GachaPack, body.memo)
+        if pack is None or pack.wallet != wallet:
+            raise HTTPException(403, "memo no pertenece a esta wallet")
+        try:
+            out = await svc.open_pack(memo=body.memo)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError:
+            raise HTTPException(502, "gacha upstream no disponible")
+        if not out.get("pending") and out.get("nft_address"):
+            pack.opened_at = datetime.now(timezone.utc)
+            pack.nft_address = out["nft_address"]
+            s.commit()
+        return out
+
     return app
 
 
@@ -153,8 +256,9 @@ def build_default_app() -> FastAPI:
     session_factory = make_session_factory(engine)
     chain: ChainSource = MockChainSource()  # 'solana' se cablea cuando el lector real esté validado
     auth = AuthService(ttl=s.session_ttl)
+    gacha = GachaService(base_url=s.gacha_base_url, api_key=s.gacha_api_key)
     return create_app(session_factory, chain, auth, elo_start=s.elo_start, elo_k=s.elo_k,
-                      cors_origins=s.cors_origins)
+                      cors_origins=s.cors_origins, gacha=gacha)
 
 
 app = build_default_app()
