@@ -42,6 +42,33 @@ cd backend && source .venv/bin/activate && uvicorn app.main:app --port 8080
 npm run dev   # http://localhost:5173
 ```
 
+## Gacha (devnet)
+
+Flujo completo para adquirir cartas on-chain vía el módulo Gacha (máquinas de sorpresas):
+
+1. **Conseguir `GACHA_API_KEY`:** solicitar en el Discord de Collector Crypt y guardar en `backend/.env`:
+   ```env
+   GACHA_API_KEY=<tu-key>
+   ```
+   Sin esta key, los endpoints `/gacha/*` responden `503 gacha_disabled`. La API del Gacha se consume a través del proxy del backend, **nunca exponen la `x-api-key` al navegador**.
+
+2. **USDC devnet:** adquirir fondos de test desde el faucet:
+   - URL: https://spl-token-faucet.com/?token-name=USDC-Dev
+   - Mint (USDC-Dev): `Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr`
+   - Cantidad mínima para gacha: 50 USDC por pack.
+
+3. **Interacción en la app:**
+   - App → modo **On-chain (devnet)** → conectar wallet → ir a **Colección**.
+   - Botón **«🎰 Gacha»** → elegir máquina tragaperras.
+   - **«Abrir pack»** (50 USDC) → firma en la wallet → reveal cinemático de la carta.
+
+4. **Usar la carta en batalla:**
+   - Botón **«Crear desafío con esta carta»** → la carta nueva aparece en tu Colección.
+   - Atestación del oráculo: OK (el oráculo valida automáticamente la nueva carta).
+   - Crear batalla y jugarla normalmente (vs otro jugador).
+
+> **Nota arquitectónica:** el navegador nunca ve la `x-api-key`. Las transacciones on-chain (pago USDC, mint NFT) se firman en la wallet; el revelado de la carta es off-chain (JSON).
+
 ## Checklist de verificación en devnet (lo haces tú)
 
 1. **Toolchain + fondos:**

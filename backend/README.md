@@ -57,6 +57,8 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 | `PROGRAM_ID` | — | program id del contrato |
 | `ELO_START` / `ELO_K` | 1200 / 32 | parámetros ELO |
 | `SESSION_TTL` | 3600 | TTL del token (s) |
+| `GACHA_BASE_URL` | `https://dev-gacha.collectorcrypt.com` | URL base del API del Gacha; producción: `https://gacha.collectorcrypt.com` |
+| `GACHA_API_KEY` | — | API key para el Gacha (solicitar en Discord de Collector Crypt); sin ella, `/gacha/*` responde 503 con `gacha_disabled` |
 
 ## Arquitectura
 
