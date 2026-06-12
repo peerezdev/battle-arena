@@ -2,6 +2,7 @@ import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/re
 import { PublicKey, Transaction, Connection } from '@solana/web3.js'
 import type { TransactionInstruction } from '@solana/web3.js'
 import type { Provider as SolanaProvider } from '@reown/appkit-utils/solana'
+import { Buffer } from 'buffer'
 import { config } from '../onchain/config'
 
 export interface WalletApi {
@@ -12,6 +13,8 @@ export interface WalletApi {
   signAndSendTransaction: (ixs: TransactionInstruction[]) => Promise<string>
   /** Sign an arbitrary message for backend auth. Returns the signature bytes. */
   signMessage: (message: Uint8Array) => Promise<Uint8Array>
+  /** Sign a pre-built (partially signed) base64 transaction without sending. Returns the fully signed tx re-serialized as base64. */
+  signTransactionBase64: (txBase64: string) => Promise<string>
 }
 
 export function useWallet(): WalletApi {
@@ -73,5 +76,18 @@ export function useWallet(): WalletApi {
     return walletProvider.signMessage(message)
   }
 
-  return { publicKey, isConnected, connect, signAndSendTransaction, signMessage }
+  // -- signTransactionBase64 ---------------------------------------------------------------
+  async function signTransactionBase64(txBase64: string): Promise<string> {
+    if (!isConnected || publicKey == null) {
+      throw new Error('Wallet not connected')
+    }
+    if (walletProvider == null) {
+      throw new Error('Solana wallet provider not available')
+    }
+    const tx = Transaction.from(Buffer.from(txBase64, 'base64'))
+    const signed = await walletProvider.signTransaction(tx)
+    return Buffer.from(signed.serialize()).toString('base64')
+  }
+
+  return { publicKey, isConnected, connect, signAndSendTransaction, signMessage, signTransactionBase64 }
 }

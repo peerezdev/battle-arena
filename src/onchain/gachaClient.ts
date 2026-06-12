@@ -1,0 +1,90 @@
+// Cliente fino del proxy /gacha/* del backend. La x-api-key vive en el
+// backend; aquí solo viajan el token de sesión y datos públicos.
+import { config } from './config'
+
+export interface GachaMachine {
+  code: string
+  name: string
+  price: number
+  odds: Record<string, number>
+  stock: Record<string, number>
+  ev: number | null
+  image: string | null
+}
+
+export interface GeneratePackResponse {
+  memo: string
+  transaction: string // base64, parcialmente firmada (50 USDC)
+}
+
+export interface SubmitTxResponse {
+  signature: string
+  confirmation_status: string
+}
+
+export type OpenPackResult =
+  | { pending: true }
+  | { pending: false; nft_address: string; rarity: string; name: string | null; image: string | null }
+
+export class GachaDisabledError extends Error {
+  constructor() { super('gacha_disabled') }
+}
+
+async function gachaFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const resp = await fetch(`${config.backendUrl}${path}`, options)
+  if (resp.status === 503) throw new GachaDisabledError()
+  if (!resp.ok) throw new Error(`Gacha error ${resp.status}`)
+  return resp.json() as Promise<T>
+}
+
+function authHeaders(token: string): Record<string, string> {
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+}
+
+export function fetchMachines(): Promise<GachaMachine[]> {
+  return gachaFetch<GachaMachine[]>('/gacha/machines')
+}
+
+export function generatePack(token: string, packType: string): Promise<GeneratePackResponse> {
+  return gachaFetch<GeneratePackResponse>('/gacha/generate-pack', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ pack_type: packType }),
+  })
+}
+
+export function submitTx(token: string, signedTransaction: string): Promise<SubmitTxResponse> {
+  return gachaFetch<SubmitTxResponse>('/gacha/submit-tx', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ signed_transaction: signedTransaction }),
+  })
+}
+
+export function openPack(token: string, memo: string): Promise<OpenPackResult> {
+  return gachaFetch<OpenPackResult>('/gacha/open-pack', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ memo }),
+  })
+}
+
+// ── Polling (puro, testeable) ───────────────────────────────────────────────
+
+export function defaultDelayMs(attempt: number): number {
+  return Math.min(2000 * 2 ** attempt, 30000)
+}
+
+export async function pollOpenPack(
+  open: () => Promise<OpenPackResult>,
+  opts: { maxAttempts?: number; delayMs?: (attempt: number) => number } = {},
+): Promise<OpenPackResult> {
+  const maxAttempts = opts.maxAttempts ?? 8
+  const delayMs = opts.delayMs ?? defaultDelayMs
+  let last: OpenPackResult = { pending: true }
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    last = await open()
+    if (!last.pending) return last
+    if (attempt < maxAttempts - 1) {
+      await new Promise((r) => setTimeout(r, delayMs(attempt)))
+    }
+  }
+  return last
+}
