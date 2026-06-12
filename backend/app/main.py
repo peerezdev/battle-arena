@@ -210,8 +210,14 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
             raise HTTPException(502, "gacha upstream no disponible")
         if not out.get("memo"):
             raise HTTPException(502, "gacha upstream no disponible")
-        s.add(GachaPack(memo=out["memo"], wallet=wallet, pack_type=body.pack_type))
-        s.commit()
+        existing = s.get(GachaPack, out["memo"])
+        if existing is not None:
+            if existing.wallet != wallet:
+                raise HTTPException(502, "gacha upstream no disponible")
+            # mismo wallet: el pack ya existe, devolver sin re-insertar
+        else:
+            s.add(GachaPack(memo=out["memo"], wallet=wallet, pack_type=body.pack_type))
+            s.commit()
         return out
 
     @app.post("/gacha/submit-tx")

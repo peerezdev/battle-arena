@@ -19,6 +19,65 @@ interface Props {
   onBack: () => void
 }
 
+// ── Shell wrapper (module scope — evita re-montaje por nueva identidad) ──────
+function Shell({ children, onBack }: { children: React.ReactNode; onBack: () => void }) {
+  return (
+    <div
+      style={{
+        minHeight: '100dvh',
+        background: COLORS.bg,
+        color: COLORS.text,
+        fontFamily: 'Inter, system-ui, sans-serif',
+        padding: '0 16px 48px',
+      }}
+    >
+      <div style={{ maxWidth: '520px', margin: '0 auto', paddingTop: '40px' }}>
+        {/* Back */}
+        <button
+          onClick={onBack}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: COLORS.muted,
+            cursor: 'pointer',
+            fontSize: '13px',
+            padding: '0 0 24px',
+          }}
+        >
+          ← Volver
+        </button>
+
+        {/* Header */}
+        <div style={{ marginBottom: '28px' }}>
+          <div
+            style={{
+              fontSize: '11px',
+              color: COLORS.muted,
+              letterSpacing: '.06em',
+              marginBottom: '4px',
+            }}
+          >
+            ON-CHAIN · GACHA
+          </div>
+          <div
+            style={{
+              fontSize: '26px',
+              fontWeight: 900,
+              fontFamily: FONTS.orbitron,
+              letterSpacing: '.08em',
+              color: COLORS.text,
+            }}
+          >
+            GACHA
+          </div>
+        </div>
+
+        {children}
+      </div>
+    </div>
+  )
+}
+
 const RARITY_COLOR: Record<string, string> = {
   Epic: '#c084fc', Rare: '#5ad1ff', Uncommon: COLORS.green, Common: COLORS.muted,
 }
@@ -51,13 +110,21 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
 
   async function buy(machine: GachaMachine) {
     setError(null)
+    let pack: { memo: string; transaction: string }
     try {
       setPhase({ kind: 'opening', step: 'firmando' })
-      const pack = await generatePack(token, machine.code)
+      pack = await generatePack(token, machine.code)
       const signed = await signTransactionBase64(pack.transaction)
       setPhase({ kind: 'opening', step: 'enviando' })
       await submitTx(token, signed)
-      setPhase({ kind: 'opening', step: 'abriendo' })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setPhase({ kind: 'machines' })
+      return
+    }
+    // Pago confirmado — a partir de aquí los errores van a 'pending' para reintentar
+    setPhase({ kind: 'opening', step: 'abriendo' })
+    try {
       const result = await pollOpenPack(() => openPack(token, pack.memo))
       if (result.pending) {
         setPhase({ kind: 'pending', memo: pack.memo })
@@ -66,80 +133,27 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-      setPhase({ kind: 'machines' })
+      setPhase({ kind: 'pending', memo: pack.memo })
     }
   }
 
   async function retryOpen(memo: string) {
+    setError(null)
     setPhase({ kind: 'opening', step: 'abriendo' })
-    const result = await pollOpenPack(() => openPack(token, memo))
-    if (result.pending) setPhase({ kind: 'pending', memo })
-    else setPhase({ kind: 'result', result })
-  }
-
-  // ── Shell wrapper ────────────────────────────────────────────────────────────
-  function Shell({ children }: { children: React.ReactNode }) {
-    return (
-      <div
-        style={{
-          minHeight: '100dvh',
-          background: COLORS.bg,
-          color: COLORS.text,
-          fontFamily: 'Inter, system-ui, sans-serif',
-          padding: '0 16px 48px',
-        }}
-      >
-        <div style={{ maxWidth: '520px', margin: '0 auto', paddingTop: '40px' }}>
-          {/* Back */}
-          <button
-            onClick={onBack}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: COLORS.muted,
-              cursor: 'pointer',
-              fontSize: '13px',
-              padding: '0 0 24px',
-            }}
-          >
-            ← Volver
-          </button>
-
-          {/* Header */}
-          <div style={{ marginBottom: '28px' }}>
-            <div
-              style={{
-                fontSize: '11px',
-                color: COLORS.muted,
-                letterSpacing: '.06em',
-                marginBottom: '4px',
-              }}
-            >
-              ON-CHAIN · GACHA
-            </div>
-            <div
-              style={{
-                fontSize: '26px',
-                fontWeight: 900,
-                fontFamily: FONTS.orbitron,
-                letterSpacing: '.08em',
-                color: COLORS.text,
-              }}
-            >
-              GACHA
-            </div>
-          </div>
-
-          {children}
-        </div>
-      </div>
-    )
+    try {
+      const result = await pollOpenPack(() => openPack(token, memo))
+      if (result.pending) setPhase({ kind: 'pending', memo })
+      else setPhase({ kind: 'result', result })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setPhase({ kind: 'pending', memo })
+    }
   }
 
   // ── State: disabled ──────────────────────────────────────────────────────────
   if (disabled) {
     return (
-      <Shell>
+      <Shell onBack={onBack}>
         <div
           style={{
             background: COLORS.panel,
@@ -165,7 +179,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
   // ── State: opening ───────────────────────────────────────────────────────────
   if (phase.kind === 'opening') {
     return (
-      <Shell>
+      <Shell onBack={onBack}>
         <div
           style={{
             background: COLORS.panel,
@@ -212,7 +226,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
   if (phase.kind === 'pending') {
     const memo = phase.memo
     return (
-      <Shell>
+      <Shell onBack={onBack}>
         <div
           style={{
             background: COLORS.panel,
@@ -255,7 +269,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
     const rarityColor = RARITY_COLOR[r.rarity] ?? COLORS.muted
 
     return (
-      <Shell>
+      <Shell onBack={onBack}>
         <motion.div
           initial={reduced ? undefined : { scale: 0.8, opacity: 0 }}
           animate={reduced ? undefined : { scale: 1, opacity: 1 }}
@@ -375,7 +389,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
 
   // ── State: machines (default) ────────────────────────────────────────────────
   return (
-    <Shell>
+    <Shell onBack={onBack}>
       {/* Error */}
       {error && (
         <div

@@ -16,6 +16,7 @@
     "@reown/appkit": "^1.8.20",
     "@reown/appkit-adapter-solana": "^1.8.20",
     "@solana/web3.js": "^1.98.4",
+    "buffer": "^6.0.3",
     "framer-motion": "^12.40.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"

@@ -115,6 +115,14 @@ async def test_open_pack_success_whitelists_fields():
 
 @respx.mock
 @pytest.mark.asyncio
+async def test_open_pack_respuesta_invalida_es_upstream_error():
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={"success": True}))
+    with pytest.raises(GachaUpstreamError):
+        await _svc().open_pack(memo="slug-uuid-1")
+
+
+@respx.mock
+@pytest.mark.asyncio
 async def test_submit_tx():
     route = respx.post(f"{BASE}/api/submitTransaction").mock(
         return_value=Response(200, json={"success": True, "signature": "s1",

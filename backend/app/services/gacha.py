@@ -79,6 +79,8 @@ class GachaService:
         raw = await self._request("POST", "/api/openPack", json={"memo": memo})
         if raw.get("code") == "WAITING_FOR_WEBHOOK":
             return {"pending": True}
+        if not raw.get("nft_address"):
+            raise GachaUpstreamError("gacha upstream: respuesta openPack sin nft_address")
         nft_won = raw.get("nftWon") or {}
         metadata = ((nft_won.get("content") or {}).get("metadata") or {})
         return {
