@@ -8,10 +8,11 @@ de producto** hasta tener la API key de devnet del Gacha.
 ## Propósito
 
 Cuarto juego de BattleArena y el **máximo motor de volumen para CC**: un battle
-royale de packs para 2-10 jugadores. Cada ronda todos abren un pack; cae el de
-menor `insured_value`; el último en pie se lleva el bote de cartas eliminadas.
-Al ser tiradas frescas cada ronda, una sola partida genera **muchas ventas de
-pack** (hasta 54 con 10 jugadores). Reutiliza la infraestructura de Pack Battle.
+royale de packs para 2-10 jugadores. Cada ronda todos abren un pack y **todas las
+cartas se acumulan en un bote**; cae el de menor `insured_value`; el último en pie
+se lleva **el bote entero** (todas las cartas tiradas en la partida). Al ser
+tiradas frescas cada ronda, una sola partida genera **muchas ventas de pack**
+(hasta 54 con 10 jugadores). Reutiliza la infraestructura de Pack Battle.
 
 ## Decisiones de diseño (cerradas con el usuario)
 
@@ -19,10 +20,10 @@ pack** (hasta 54 con 10 jugadores). Reutiliza la infraestructura de Pack Battle.
    máximo de jugadores, **límite 10** (mínimo 2).
 2. **Tiradas frescas cada ronda:** cada superviviente abre un pack nuevo del tier
    en cada ronda; el de menor `insured_value` queda eliminado.
-3. **Premio "solo caen las del eliminado":** cada ronda tiras para competir; si
-   sobrevives **recuperas tu carta**, si te eliminan **tu carta de esa ronda va
-   al bote del ganador**. El ganador final se lleva **sus propias cartas
-   conservadas + una carta de cada eliminado**.
+3. **Premio "bote total acumulado":** **todas** las cartas tiradas (de todos los
+   jugadores, en todas las rondas) se quedan en el escrow y forman un único bote.
+   El **último en pie se lleva el bote entero**. Si te eliminan, pierdes todo lo
+   que hayas tirado.
 4. **Solo modo Directo (por valor).** El Blotto no escala a N jugadores; un
    bracket de duelos queda fuera de alcance (posible variante futura).
 5. **Sin ELO, sin stake de USDC aparte.** La apuesta es la carta de la ronda;
@@ -39,23 +40,24 @@ pack** (hasta 54 con 10 jugadores). Reutiliza la infraestructura de Pack Battle.
 3. **Eliminación:** el oráculo atesta el valor de cada carta (formato de 81 bytes
    ya existente). Cae el de **menor `insured_value`**. Desempate determinista
    (sin azar que controlemos nosotros): rareza más baja → grade más bajo →
-   índice de asiento. Su carta queda retenida en el escrow (bote).
-4. **Devolución:** las cartas de los supervivientes salen del escrow de vuelta a
-   sus dueños (ya están a salvo, no vuelven a estar en juego salvo que tiren la
-   ronda siguiente).
+   índice de asiento.
+4. **Acumulación:** **todas** las cartas de la ronda (la del eliminado y las de
+   los supervivientes) permanecen en el escrow PDA y se suman al bote. Nadie
+   recupera nada hasta el final.
 5. Se repite con los supervivientes hasta que queda **uno**.
 
 ## Settlement
 
-- El **bote** (una carta por cada jugador eliminado) vive en el escrow PDA y se
-  transfiere al **último en pie** por CPI con las seeds del PDA al cerrar la
-  partida.
-- Las cartas conservadas por cada superviviente se le devuelven en cuanto
-  sobrevive su ronda (no esperan al final).
+- El **bote** (todas las cartas tiradas en la partida) vive en el escrow PDA y se
+  transfiere íntegro al **último en pie** por CPI con las seeds del PDA al cerrar
+  la partida. Nadie más recupera nada.
 - **Timeout:** quien no completa su tirada en la ventana de la ronda queda
-  **auto-eliminado**; si tiene carta en el escrow, queda en el bote. Si en una
-  ronda nadie más cumple, el patrón `claim_timeout` cierra la partida a favor de
-  los supervivientes.
+  **auto-eliminado**; sus cartas ya tiradas se quedan en el bote. Si el timeout
+  deja a **un solo** jugador activo, ese se lleva el bote (último en pie por
+  abandono). Caso borde a concretar en implementación: si **todos** los
+  supervivientes de una ronda hacen timeout a la vez, se devuelve a cada uno solo
+  su última tirada de esa ronda y el bote previo va al de mayor valor de la ronda
+  anterior.
 
 ## Arranque y llenado
 
@@ -99,8 +101,10 @@ Hereda las garantías de Pack Battle (ver
   rondas sobreviva. El ganador de una partida de 10 paga ~9 tiradas.
 - Volumen para CC por partida llena de 10: **54 tiradas** (10+9+…+2). Es el juego
   que más volumen genera del catálogo.
+- **Bote = las 54 cartas** (todas las tiradas) → premio enorme para el ganador y
+  pérdida total para el resto: alta varianza, muy "battle royale", pero duro.
 - Recomendación de producto: ofrecer Battle Royale sobre todo en **tiers baratos**
-  para que el coste acumulado sea razonable.
+  para que el coste acumulado y la pérdida potencial sean razonables.
 
 ## No-goals (YAGNI)
 
