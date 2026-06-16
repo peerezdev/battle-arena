@@ -43,8 +43,8 @@ const S = {
 function CardPreview({ cardId, playerKey }: { cardId: string; playerKey: 'a' | 'b' }) {
   const card = MOCK_CARDS.find((c) => c.id === cardId)
   if (!card) return null
-  const color = playerKey === 'a' ? COLORS.green : COLORS.red
-  const label = playerKey === 'a' ? '🟢' : '🔴'
+  const color = playerKey === 'a' ? COLORS.green : COLORS.violet
+  const label = playerKey === 'a' ? '🟢' : '🟣'
   return (
     <div
       style={{
@@ -89,7 +89,7 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
           <div style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px', color: COLORS.green, fontFamily: FONTS.display }}>
             ⚡ TCG Battle Arena
           </div>
-          <div style={{ fontSize: '12px', color: COLORS.muted, marginTop: '4px', fontFamily: FONTS.mono }}>Fase 0 · Arena Oscura</div>
+          <div style={{ fontSize: '12px', color: COLORS.muted, marginTop: '4px', fontFamily: FONTS.mono }}>Phase 0 · Dark Arena</div>
         </div>
 
         {/* Error */}
@@ -118,13 +118,13 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
             padding: '20px',
           }}
         >
-          <label style={S.label}>Rival</label>
+          <label style={S.label}>Opponent</label>
           <select style={S.select} value={s.opponent} onChange={(e) => upd({ opponent: e.target.value as Setup['opponent'] })}>
             <option value="vs-bot">vs Bot</option>
-            <option value="hotseat">Hotseat (2 jugadores)</option>
+            <option value="hotseat">Hotseat (2 players)</option>
           </select>
 
-          <label style={S.label}>Carta A (🟢 Verde)</label>
+          <label style={S.label}>Card A (🟢 Green)</label>
           <select style={S.select} value={s.cardAId} onChange={(e) => upd({ cardAId: e.target.value })}>
             {MOCK_CARDS.map((c) => (
               <option key={c.id} value={c.id}>{c.name} ({formatUsd(c.valueUsd)} · {c.gradeCompany}{c.grade})</option>
@@ -132,7 +132,7 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
           </select>
           <CardPreview cardId={s.cardAId} playerKey="a" />
 
-          <label style={S.label}>Carta B (🔴 Rojo)</label>
+          <label style={S.label}>Card B (🟣 Violet)</label>
           <select style={S.select} value={s.cardBId} onChange={(e) => upd({ cardBId: e.target.value })}>
             {MOCK_CARDS.map((c) => (
               <option key={c.id} value={c.id}>{c.name} ({formatUsd(c.valueUsd)} · {c.gradeCompany}{c.grade})</option>
@@ -140,10 +140,10 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
           </select>
           <CardPreview cardId={s.cardBId} playerKey="b" />
 
-          <label style={S.label}>Modo</label>
+          <label style={S.label}>Mode</label>
           <select style={S.select} value={s.mode} onChange={(e) => upd({ mode: e.target.value as Mode })}>
             <option value="ranked">Ranked (cap 4x)</option>
-            <option value="challenge">Challenge (sin cap)</option>
+            <option value="challenge">Challenge (no cap)</option>
           </select>
 
           {/* Edge toggle */}
@@ -185,38 +185,38 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
                 }}
               />
             </div>
-            <span>Edge de carta activado</span>
-            <span style={{ color: COLORS.muted, fontSize: '11px' }}>(ventaja por valor)</span>
+            <span>Card edge enabled</span>
+            <span style={{ color: COLORS.muted, fontSize: '11px' }}>(edge by value)</span>
           </label>
 
           {s.opponent === 'vs-bot' && (
             <>
-              <label style={S.label}>Dificultad bot</label>
+              <label style={S.label}>Bot difficulty</label>
               <select style={S.select} value={s.difficulty} onChange={(e) => upd({ difficulty: e.target.value as Difficulty })}>
-                <option value="easy">Fácil</option>
-                <option value="medium">Medio</option>
-                <option value="hard">Difícil</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Normal</option>
+                <option value="hard">Hard</option>
               </select>
             </>
           )}
 
           {/* Round timer */}
-          <label style={S.label}>Tiempo por ronda</label>
+          <label style={S.label}>Round timer</label>
           <select
             style={S.select}
             value={s.timerSeconds}
             onChange={(e) => upd({ timerSeconds: Number(e.target.value) })}
-            aria-label="Tiempo por ronda"
+            aria-label="Round timer"
           >
-            <option value={0}>Sin límite</option>
+            <option value={0}>No limit</option>
             <option value={30}>30 s</option>
-            <option value={45}>45 s (recomendado)</option>
+            <option value={45}>45 s (recommended)</option>
             <option value={60}>60 s</option>
           </select>
 
           {sameCard && (
             <div style={{ color: COLORS.red, fontSize: '12px', marginBottom: '12px' }}>
-              Las dos cartas deben ser distintas.
+              Both cards must be different.
             </div>
           )}
 
@@ -238,7 +238,7 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
               transition: 'box-shadow 0.2s',
             }}
           >
-            ⚡ EMPEZAR PARTIDA
+            ⚡ START GAME
           </button>
         </div>
       </div>

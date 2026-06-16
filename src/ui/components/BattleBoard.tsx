@@ -22,7 +22,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { AnimatePresence, motion, type Transition } from 'framer-motion'
 import type { Allocation, FrontKey, FrontWinner, MatchState } from '../../engine'
 import { solidez, availableEnergy } from '../../engine'
-import { COLORS, player as playerTheme, FONTS } from '../theme'
+import { COLORS, player as playerTheme, FONTS, SHADOW } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
 import { FrontSigil } from './FrontSigil'
 import { ArenaBackdrop } from './ArenaBackdrop'
@@ -86,9 +86,9 @@ export type BattleBoardProps = {
 
 const FRONT_KEYS: FrontKey[] = ['apertura', 'choque', 'remate']
 const FRONT_LABELS: Record<FrontKey, string> = {
-  apertura: 'Apertura',
-  choque: 'Choque',
-  remate: 'Remate',
+  apertura: 'Opening',
+  choque: 'Clash',
+  remate: 'Finisher',
 }
 const STAGGER_MS = 700
 
@@ -295,10 +295,10 @@ function ManaCrystals({
               letterSpacing: '.05em',
             }}
           >
-            MANÁ DISPONIBLE
+            MANA AVAILABLE
           </span>
-          {edge > 0 && tag(`+${edge} ventaja`)}
-          {banked > 0 && tag(`+${banked} reserva`)}
+          {edge > 0 && tag(`+${edge} edge`)}
+          {banked > 0 && tag(`+${banked} reserve`)}
         </div>
         <div
           style={{
@@ -320,7 +320,7 @@ function ManaCrystals({
             marginTop: '2px',
           }}
         >
-          lo que no uses se banca
+          unspent mana is banked
         </div>
       </div>
       <div
@@ -369,7 +369,7 @@ function OpponentReserve({ wide }: { wide: boolean }) {
         alignItems: 'center',
         gap: s(5, 8),
       }}
-      aria-label="Reserva del rival: oculta"
+      aria-label="Opponent reserve: hidden"
     >
       <svg
         width={ico}
@@ -395,7 +395,7 @@ function OpponentReserve({ wide }: { wide: boolean }) {
             letterSpacing: '.04em',
           }}
         >
-          MANÁ
+          MANA
         </div>
         <div
           style={{
@@ -405,7 +405,7 @@ function OpponentReserve({ wide }: { wide: boolean }) {
             fontStyle: 'italic',
           }}
         >
-          oculto
+          hidden
         </div>
       </div>
     </div>
@@ -456,7 +456,7 @@ function FrontColumn(props: FrontColumnProps) {
       displayWinner === 'a'
         ? COLORS.green
         : displayWinner === 'b'
-        ? COLORS.red
+        ? COLORS.violet
         : COLORS.muted
     const winLabel =
       displayWinner === 'a' ? nameA : displayWinner === 'b' ? nameB : '—'
@@ -558,16 +558,16 @@ function FrontColumn(props: FrontColumnProps) {
             width: '100%',
             background:
               isRevealed && winner === 'b'
-                ? `linear-gradient(180deg, ${COLORS.red}22, ${COLORS.panel})`
+                ? `linear-gradient(180deg, ${COLORS.violet}22, ${COLORS.panel})`
                 : COLORS.panel,
-            border: `1px solid ${isRevealed && winner === 'b' ? `${COLORS.red}55` : COLORS.border}`,
+            border: `1px solid ${isRevealed && winner === 'b' ? `${COLORS.violet}55` : COLORS.border}`,
             borderRadius: '8px',
             padding: s(6, 14),
             textAlign: 'center',
             boxShadow:
               clashPhase === 'settle' && winnerB && !reduced
-                ? `0 0 ${s(10, 18)}px ${COLORS.red}88`
-                : 'none',
+                ? SHADOW.glow(COLORS.violet)
+                : SHADOW.panel,
             transition: 'border-color .2s, background .2s, box-shadow .3s',
           }}
         >
@@ -576,7 +576,7 @@ function FrontColumn(props: FrontColumnProps) {
               fontSize: s(20, 40),
               fontWeight: isRevealed && winner === 'b' ? 800 : 400,
               fontFamily: FONTS.display,
-              color: isRevealed && winner === 'b' ? COLORS.red : COLORS.text,
+              color: isRevealed && winner === 'b' ? COLORS.violet : COLORS.text,
             }}
           >
             {isRevealed ? allocB : '?'}
@@ -624,7 +624,7 @@ function FrontColumn(props: FrontColumnProps) {
                 fontFamily: FONTS.mono,
               }}
             >
-              {displayWinner === 'disputed' ? 'Emp.' : winLabel}
+              {displayWinner === 'disputed' ? 'Tie' : winLabel}
             </span>
           )}
           {aguanteNote && isRevealed && (
@@ -639,7 +639,7 @@ function FrontColumn(props: FrontColumnProps) {
                 lineHeight: 1.2,
               }}
             >
-              Sol.
+              Solidity
             </span>
           )}
         </motion.div>
@@ -660,8 +660,8 @@ function FrontColumn(props: FrontColumnProps) {
             textAlign: 'center',
             boxShadow:
               clashPhase === 'settle' && winnerA && !reduced
-                ? `0 0 ${s(10, 18)}px ${COLORS.green}88`
-                : 'none',
+                ? SHADOW.glow(COLORS.green)
+                : SHADOW.panel,
             transition: 'border-color .2s, background .2s, box-shadow .3s',
           }}
         >
@@ -736,7 +736,7 @@ function FrontColumn(props: FrontColumnProps) {
           fontSize: s(13, 20),
           letterSpacing: '.3em',
         }}
-        aria-label="Zona del rival — oculta"
+        aria-label="Opponent zone — hidden"
       >
         ···
       </div>
@@ -778,7 +778,7 @@ function FrontColumn(props: FrontColumnProps) {
           padding: s(6, 10) + 'px 4px',
           width: '100%',
           transition: 'border-color .15s, box-shadow .15s',
-          boxShadow: hasAlloc ? `0 0 10px ${accentColor}22` : 'none',
+          boxShadow: hasAlloc ? SHADOW.glow(accentColor) : SHADOW.panel,
         }}
       >
         {/* Big tap-to-add area */}
@@ -787,7 +787,7 @@ function FrontColumn(props: FrontColumnProps) {
           onClick={onAdd}
           disabled={disabledAdd}
           aria-disabled={disabledAdd || undefined}
-          aria-label={`Añadir 1 energía a ${label}`}
+          aria-label={`Add 1 energy to ${label}`}
           style={{
             width: '100%',
             background: 'transparent',
@@ -867,7 +867,7 @@ function FrontColumn(props: FrontColumnProps) {
             onClick={onRemove}
             disabled={disabledRemove}
             aria-disabled={disabledRemove || undefined}
-            aria-label={`Quitar 1 energía de ${label}`}
+            aria-label={`Remove 1 energy from ${label}`}
             style={{
               flex: 1,
               background: COLORS.bg,
@@ -891,7 +891,7 @@ function FrontColumn(props: FrontColumnProps) {
             onClick={onAdd}
             disabled={disabledAdd}
             aria-disabled={disabledAdd || undefined}
-            aria-label={`Añadir 1 energía a ${label}`}
+            aria-label={`Add 1 energy to ${label}`}
             style={{
               flex: 1,
               background: disabledAdd ? COLORS.bg : `${accentColor}1a`,
@@ -1061,7 +1061,7 @@ export function BattleBoard(props: BattleBoardProps) {
       const winnerSol = winner === 'a' ? solA : solB
       const loserSol = winner === 'a' ? solB : solA
       const winName = winner === 'a' ? nameA : nameB
-      return `Aguante: ${winName} gana por Solidez ${winnerSol} vs ${loserSol}`
+      return `Solidity tiebreak: ${winName} wins — Solidity ${winnerSol} vs ${loserSol}`
     }
     return null
   }
@@ -1071,17 +1071,17 @@ export function BattleBoard(props: BattleBoardProps) {
       ? props.roundWinner === 'a'
         ? COLORS.green
         : props.roundWinner === 'b'
-        ? COLORS.red
+        ? COLORS.violet
         : COLORS.muted
       : COLORS.muted
 
   const roundWinLabel =
     props.phase === 'reveal'
       ? props.roundWinner === 'disputed'
-        ? 'Ronda nula (rejugar)'
+        ? 'Tie (replay)'
         : props.roundWinner === 'a'
-        ? `Gana la ronda: ${nameA}`
-        : `Gana la ronda: ${nameB}`
+        ? `Round winner: ${nameA}`
+        : `Round winner: ${nameB}`
       : ''
 
   // ── Timer display ─────────────────────────────────────────────────────────
@@ -1096,7 +1096,7 @@ export function BattleBoard(props: BattleBoardProps) {
           gap: '2px',
           flexShrink: 0,
         }}
-        aria-label={`Tiempo restante: ${timeLeft} segundos`}
+        aria-label={`Time remaining: ${timeLeft} seconds`}
         aria-live="polite"
       >
         {/* Ring + number */}
@@ -1168,7 +1168,7 @@ export function BattleBoard(props: BattleBoardProps) {
             transition: 'color 0.3s',
           }}
         >
-          se auto-confirma al llegar a 0
+          auto-commits at 0
         </span>
       </div>
     ) : null
@@ -1193,14 +1193,14 @@ export function BattleBoard(props: BattleBoardProps) {
             fontFamily: FONTS.mono,
           }}
         >
-          RONDA {state.round + 1}
+          ROUND {state.round + 1}
         </div>
         <div style={{ display: 'flex', gap: s(5, 8), alignItems: 'center' }}>
           <span style={{ fontWeight: 700, fontFamily: FONTS.display, fontSize: s(16, 30), color: COLORS.green }}>
             {state.roundWins.a}
           </span>
           <span style={{ fontSize: s(12, 20), color: COLORS.muted, fontFamily: FONTS.mono }}>–</span>
-          <span style={{ fontWeight: 700, fontFamily: FONTS.display, fontSize: s(16, 30), color: COLORS.red }}>
+          <span style={{ fontWeight: 700, fontFamily: FONTS.display, fontSize: s(16, 30), color: COLORS.violet }}>
             {state.roundWins.b}
           </span>
         </div>
@@ -1261,6 +1261,7 @@ export function BattleBoard(props: BattleBoardProps) {
         borderRadius: '12px',
         width: '100%',
         boxSizing: 'border-box',
+        boxShadow: SHADOW.panel,
       }}
     >
       {FRONT_KEYS.map((fk, idx) => {
@@ -1293,7 +1294,7 @@ export function BattleBoard(props: BattleBoardProps) {
                     inset: 0,
                     borderRadius: '8px',
                     background: `radial-gradient(ellipse at center, ${
-                      winner === 'a' ? COLORS.green : COLORS.red
+                      winner === 'a' ? COLORS.green : COLORS.violet
                     }33 0%, transparent 70%)`,
                     pointerEvents: 'none',
                   }}
@@ -1438,7 +1439,7 @@ export function BattleBoard(props: BattleBoardProps) {
                   padding: s(12, 18) + 'px ' + s(14, 18) + 'px',
                   textAlign: 'center',
                   marginTop: s(10, 16),
-                  boxShadow: `0 0 16px ${roundWinColor}44`,
+                  boxShadow: SHADOW.glow(roundWinColor),
                 }}
               >
                 <div
@@ -1450,7 +1451,7 @@ export function BattleBoard(props: BattleBoardProps) {
                     fontFamily: FONTS.mono,
                   }}
                 >
-                  RESULTADO DE LA RONDA
+                  ROUND RESULT
                 </div>
                 <div
                   style={{
@@ -1477,11 +1478,11 @@ export function BattleBoard(props: BattleBoardProps) {
           whileTap={reduced ? undefined : { scale: 0.96 }}
           animate={committing && !reduced ? { scale: [1, 1.04, 1] } : undefined}
           transition={{ duration: 0.26 }}
-          aria-label="Confirmar asignación de energía"
+          aria-label="Commit energy allocation"
           style={{
             width: '100%',
             background: accentColor,
-            color: playerKey === 'a' ? '#04130c' : '#1a040a',
+            color: playerKey === 'a' ? '#04130c' : '#0d0820',
             border: 'none',
             borderRadius: '10px',
             padding: s(15, 20),
@@ -1490,7 +1491,7 @@ export function BattleBoard(props: BattleBoardProps) {
             fontFamily: FONTS.display,
             cursor: committing ? 'default' : 'pointer',
             letterSpacing: '.03em',
-            boxShadow: `0 0 14px ${accentColor}66`,
+            boxShadow: SHADOW.glow(accentColor),
             minHeight: s(52, 64),
             opacity: committing ? 0.7 : 1,
             pointerEvents: committing ? 'none' : undefined,
@@ -1513,7 +1514,7 @@ export function BattleBoard(props: BattleBoardProps) {
             <rect x="2.5" y="7" width="11" height="8" rx="2" />
             <circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none" />
           </svg>
-          COMMIT · {spent} asignada{pool > 0 ? ` · ${pool} se banca` : ''}
+          COMMIT · {spent} committed{pool > 0 ? ` · ${pool} banked` : ''}
         </motion.button>
       )}
 
@@ -1538,12 +1539,12 @@ export function BattleBoard(props: BattleBoardProps) {
                 fontFamily: FONTS.display,
                 cursor: 'pointer',
                 letterSpacing: '.03em',
-                boxShadow: '0 0 12px #34e29b55',
+                boxShadow: SHADOW.glow(COLORS.green),
                 minHeight: s(52, 64),
                 marginTop: s(10, 16),
               }}
             >
-              Continuar →
+              Continue →
             </motion.button>
           )}
         </AnimatePresence>

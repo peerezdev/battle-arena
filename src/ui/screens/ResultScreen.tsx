@@ -108,7 +108,7 @@ export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Prop
           {celebrate ? <TrophySvg /> : <MedalSvg />}
         </motion.div>
         <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.08em', marginBottom: '8px', fontFamily: FONTS.mono }}>
-          RESULTADO FINAL
+          FINAL RESULT
         </div>
         <div style={{ fontSize: '26px', fontWeight: 800, color: accent, marginBottom: '32px', lineHeight: 1.2, fontFamily: FONTS.display }}>
           {winnerLabel}
@@ -131,7 +131,7 @@ export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Prop
             minHeight: '52px',
           }}
         >
-          Valorar la partida
+          Rate the game
         </motion.button>
       </motion.div>
     </div>

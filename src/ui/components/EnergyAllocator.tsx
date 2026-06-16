@@ -17,9 +17,9 @@ interface Props {
 }
 
 const FRONTS: { key: FrontKey; label: string }[] = [
-  { key: 'apertura', label: 'Apertura' },
-  { key: 'choque',   label: 'Choque'   },
-  { key: 'remate',   label: 'Remate'   },
+  { key: 'apertura', label: 'Opening'  },
+  { key: 'choque',   label: 'Clash'    },
+  { key: 'remate',   label: 'Finisher' },
 ]
 
 /**
@@ -88,10 +88,10 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
           }}
         >
           <span style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', fontFamily: FONTS.mono }}>
-            ENERGÍA DISPONIBLE
+            ENERGY AVAILABLE
           </span>
           <span style={{ fontSize: '11px', color: COLORS.muted, fontFamily: FONTS.mono }}>
-            sin asignar <strong style={{ color: accentColor, fontSize: '13px', fontFamily: FONTS.display }}>{pool}</strong> · se banca
+            unassigned <strong style={{ color: accentColor, fontSize: '13px', fontFamily: FONTS.display }}>{pool}</strong> · banked
           </span>
         </div>
         <motion.div
@@ -111,7 +111,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
           </AnimatePresence>
           {pool === 0 && (
             <span style={{ fontSize: '11px', color: COLORS.muted, fontStyle: 'italic', fontFamily: FONTS.mono }}>
-              Sin energía en reserva
+              No energy in reserve
             </span>
           )}
         </motion.div>
@@ -153,7 +153,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                   onClick={() => add(f.key)}
                   disabled={disabledAdd}
                   aria-disabled={disabledAdd || undefined}
-                  aria-label={`Añadir 1 energía a ${f.label}`}
+                  aria-label={`Add 1 energy to ${f.label}`}
                   style={{
                     flex: 1,
                     display: 'flex',
@@ -178,7 +178,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                   <span style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '15px', fontWeight: 700 }}>{f.label}</span>
                     <span style={{ fontSize: '10px', color: COLORS.muted, fontFamily: FONTS.mono }}>
-                      {disabledAdd ? 'pulsa − para quitar' : 'pulsa para sumar'}
+                      {disabledAdd ? 'tap − to remove' : 'tap to add'}
                     </span>
                   </span>
                 </button>
@@ -209,7 +209,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                   onClick={() => remove(f.key)}
                   disabled={disabledRemove}
                   aria-disabled={disabledRemove || undefined}
-                  aria-label={`Quitar 1 energía de ${f.label}`}
+                  aria-label={`Remove 1 energy from ${f.label}`}
                   style={{
                     width: '44px',
                     height: '44px',

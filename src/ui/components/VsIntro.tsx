@@ -156,7 +156,7 @@ export function VsIntro({ cardA, cardB, reducedMotion, onDone }: Props) {
                 gradeCompany={cardB.gradeCompany}
                 grade={cardB.grade}
                 cert={cardB.id}
-                accentColor={COLORS.red}
+                accentColor={COLORS.violet}
                 variant="compact"
                 sheen={!reducedMotion}
               />
@@ -178,7 +178,7 @@ export function VsIntro({ cardA, cardB, reducedMotion, onDone }: Props) {
               position: 'relative',
             }}
           >
-            Toca para continuar
+            Tap to continue
           </motion.div>
 
           {/* Explicit skip button (also accessible via tap-anywhere above) */}
