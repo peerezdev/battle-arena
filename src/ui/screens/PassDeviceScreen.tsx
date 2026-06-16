@@ -28,13 +28,13 @@ export function PassDeviceScreen({ nextPlayer, onReady }: { nextPlayer: string; 
       >
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>📲</div>
         <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', color: COLORS.text }}>
-          Pasa el dispositivo a
+          Pass the device to
         </div>
-        <div style={{ fontSize: '22px', fontWeight: 800, color: COLORS.red, marginBottom: '16px' }}>
+        <div style={{ fontSize: '22px', fontWeight: 800, color: COLORS.violet, marginBottom: '16px' }}>
           {nextPlayer}
         </div>
         <div style={{ fontSize: '13px', color: COLORS.muted, marginBottom: '28px', lineHeight: 1.5 }}>
-          Que el otro jugador no vea la pantalla anterior.
+          Don't let the other player see the previous screen.
         </div>
         <button
           onClick={onReady}
@@ -49,10 +49,10 @@ export function PassDeviceScreen({ nextPlayer, onReady }: { nextPlayer: string; 
             fontWeight: 800,
             cursor: 'pointer',
             letterSpacing: '.03em',
-            boxShadow: '0 0 12px #34e29b55',
+            boxShadow: '0 0 12px #14F19555',
           }}
         >
-          Listo ✓
+          Ready ✓
         </button>
       </div>
     </div>

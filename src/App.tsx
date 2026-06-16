@@ -388,7 +388,7 @@ export default function App() {
 
   // ── On-chain flow (wrapped in AppKitProvider, lazy-loaded) ────────────────
   return (
-    <Suspense fallback={<div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Cargando...</div>}>
+    <Suspense fallback={<div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>}>
       <AppKitProvider>
         <AnimatePresence mode="wait">
           <motion.div

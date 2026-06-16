@@ -44,7 +44,7 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
         }}
       >
         <div style={{ fontSize: '22px', fontWeight: 800, marginBottom: '20px', color: COLORS.text }}>
-          ¿Fue divertida?
+          Was it fun?
         </div>
 
         {/* Star rating */}
@@ -88,7 +88,7 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
             boxSizing: 'border-box',
           }}
           rows={3}
-          placeholder="Comentario (opcional)"
+          placeholder="Comment (optional)"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
         />
@@ -106,11 +106,11 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
               fontSize: '15px',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 0 12px #34e29b55',
+              boxShadow: '0 0 12px #14F19555',
               marginBottom: '12px',
             }}
           >
-            Enviar
+            Submit
           </button>
         ) : (
           <div
@@ -121,7 +121,7 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
               fontWeight: 600,
             }}
           >
-            ✓ ¡Gracias! Registrado.
+            ✓ Thanks! Recorded.
           </div>
         )}
 
@@ -140,7 +140,7 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
               cursor: 'pointer',
             }}
           >
-            Exportar JSON
+            Export JSON
           </button>
           <button
             onClick={onPlayAgain}
@@ -156,7 +156,7 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
               cursor: 'pointer',
             }}
           >
-            Jugar otra
+            Play again
           </button>
         </div>
       </div>

@@ -169,7 +169,7 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
                 cursor: 'pointer',
                 transition: 'background 0.2s',
                 flexShrink: 0,
-                boxShadow: s.edgeEnabled ? '0 0 8px #34e29b66' : 'none',
+                boxShadow: s.edgeEnabled ? '0 0 8px #14F19566' : 'none',
               }}
             >
               <div
@@ -234,7 +234,7 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
               fontWeight: 800,
               cursor: sameCard ? 'not-allowed' : 'pointer',
               letterSpacing: '.03em',
-              boxShadow: sameCard ? 'none' : '0 0 12px #34e29b55',
+              boxShadow: sameCard ? 'none' : '0 0 12px #14F19555',
               transition: 'box-shadow 0.2s',
             }}
           >
