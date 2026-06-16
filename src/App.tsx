@@ -15,7 +15,8 @@ import { FeedbackScreen } from './ui/screens/FeedbackScreen'
 import { MuteButton } from './ui/components/MuteButton'
 import { VsIntro } from './ui/components/VsIntro'
 import { useReducedMotion } from './ui/useReducedMotion'
-import { ModeSelect, type AppMode } from './mode/ModeSelect'
+import { type AppMode } from './mode/ModeSelect'
+import { Landing } from './ui/screens/Landing'
 import type { SelectedCard } from './ui/screens/onchain/CollectionScreen'
 import type { BattleInfo } from './ui/screens/onchain/LobbyScreen'
 import { createRoyale, playRound } from './royale/engine'
@@ -295,19 +296,23 @@ export default function App() {
         exit: { opacity: 0, x: -24 },
       }
 
-  // ── Mode select ──────────────────────────────────────────────────────────
+  // ── Landing (entry screen) ────────────────────────────────────────────────
   if (appMode === null) {
     return (
       <AnimatePresence mode="wait">
         <motion.div
-          key="mode-select"
+          key="landing"
           variants={variants}
           initial="initial"
           animate="animate"
           exit="exit"
           transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
         >
-          <ModeSelect onSelect={setAppMode} />
+          <Landing
+            onPlayOffline={() => setAppMode('offline')}
+            onPlayRoyale={() => setAppMode('royale')}
+            onConnect={() => setAppMode('onchain')}
+          />
         </motion.div>
       </AnimatePresence>
     )
