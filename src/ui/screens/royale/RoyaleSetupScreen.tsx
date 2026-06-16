@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { TIERS } from '../../../royale/pulls'
 import type { RoyaleConfig } from '../../../royale/types'
-import { COLORS, FONTS } from '../../theme'
+import { COLORS, FONTS, SHADOW } from '../../theme'
 
 interface Props {
   onStart: (config: RoyaleConfig) => void
@@ -64,7 +64,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
               fontFamily: FONTS.mono,
             }}
           >
-            Último en pie se lleva el bote
+            Last one standing takes the pot
           </div>
         </div>
 
@@ -77,8 +77,8 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
             padding: '20px',
           }}
         >
-          {/* Número de jugadores */}
-          <label style={S.label}>Jugadores</label>
+          {/* Number of players */}
+          <label style={S.label}>Players</label>
           <div
             style={{
               display: 'flex',
@@ -91,7 +91,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
               type="button"
               onClick={() => setNumPlayers((n) => Math.max(2, n - 1))}
               disabled={!canDecrease}
-              aria-label="Reducir jugadores"
+              aria-label="Decrease players"
               style={{
                 width: '40px',
                 height: '40px',
@@ -122,7 +122,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
                 lineHeight: 1,
               }}
               aria-live="polite"
-              aria-label={`${numPlayers} jugadores`}
+              aria-label={`${numPlayers} players`}
             >
               {numPlayers}
               <span
@@ -136,14 +136,14 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
                   letterSpacing: '.04em',
                 }}
               >
-                jugadores (2–10)
+                players (2–10)
               </span>
             </div>
             <button
               type="button"
               onClick={() => setNumPlayers((n) => Math.min(10, n + 1))}
               disabled={!canIncrease}
-              aria-label="Aumentar jugadores"
+              aria-label="Increase players"
               style={{
                 width: '40px',
                 height: '40px',
@@ -233,7 +233,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
             })}
           </div>
 
-          {/* Resumen del bote estimado */}
+          {/* Estimated pot summary */}
           <div
             style={{
               background: COLORS.bg,
@@ -246,13 +246,13 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
               fontFamily: FONTS.mono,
             }}
           >
-            Bote estimado: <strong style={{ color: COLORS.text }}>
-              {numPlayers} × {tier.price} USDC en cartas por ronda
+            Estimated pot: <strong style={{ color: COLORS.text }}>
+              {numPlayers} × {tier.price} USDC in cards per round
             </strong>{' '}
-            — el ganador se lo lleva todo.
+            — winner takes all.
           </div>
 
-          {/* Botón empezar */}
+          {/* Start button */}
           <button
             type="button"
             onClick={handleStart}
@@ -267,15 +267,15 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '.03em',
-              boxShadow: '0 0 12px #34e29b55',
+              boxShadow: SHADOW.glow(COLORS.green),
               transition: 'box-shadow 0.2s',
               marginBottom: '12px',
             }}
           >
-            🏆 Empezar
+            🏆 Start
           </button>
 
-          {/* Volver */}
+          {/* Back */}
           <button
             type="button"
             onClick={onBack}
@@ -292,7 +292,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
               letterSpacing: '.02em',
             }}
           >
-            ← Volver
+            ← Back
           </button>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { RoyaleState, Rarity } from '../../../royale/types'
-import { COLORS, FONTS, formatUsd } from '../../theme'
+import { COLORS, FONTS, RARITY, SHADOW, formatUsd } from '../../theme'
 
 interface Props {
   state: RoyaleState
@@ -11,10 +11,10 @@ interface Props {
 }
 
 const RARITY_COLOR: Record<Rarity, string> = {
-  common: COLORS.muted,
-  uncommon: COLORS.green,
-  rare: '#5ad1ff',
-  epic: '#c084fc',
+  common: RARITY.common,
+  uncommon: RARITY.uncommon,
+  rare: RARITY.rare,
+  epic: RARITY.epic,
 }
 
 const RARITY_LABEL: Record<Rarity, string> = {
@@ -23,6 +23,7 @@ const RARITY_LABEL: Record<Rarity, string> = {
   rare: 'RARE',
   epic: 'EPIC',
 }
+// RARITY_COLOR is now derived from shared tokens (no local purple for epic)
 
 /** Total value of all cards in the pot */
 function potValue(pot: RoyaleState['pot']): number {
@@ -114,7 +115,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                 lineHeight: 1,
               }}
             >
-              RONDA{' '}
+              ROUND{' '}
               <span style={{ color: COLORS.green }}>{state.round}</span>
             </div>
           </div>
@@ -130,7 +131,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                 marginBottom: '2px',
               }}
             >
-              {activePlayers} superviviente{activePlayers !== 1 ? 's' : ''}
+              {activePlayers} survivor{activePlayers !== 1 ? 's' : ''}
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', justifyContent: 'flex-end' }}>
               <span
@@ -150,7 +151,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                   color: COLORS.muted,
                 }}
               >
-                ({state.pot.length} carta{state.pot.length !== 1 ? 's' : ''})
+                ({state.pot.length} card{state.pot.length !== 1 ? 's' : ''} in pot)
               </span>
             </div>
           </div>
@@ -170,7 +171,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
               letterSpacing: '.03em',
             }}
           >
-            Estás eliminado — viendo el desenlace
+            You're out — watching the finish
           </div>
         )}
 
@@ -224,7 +225,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                       : { duration: 0.2 }
                   }
                   style={{
-                    background: isEliminated ? '#0f0d14' : COLORS.panel,
+                    background: isEliminated ? `${COLORS.red}08` : COLORS.panel,
                     border: `1px solid ${borderColor}`,
                     borderRadius: '10px',
                     padding: '12px',
@@ -232,6 +233,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                     transition: 'border-color .2s, opacity .3s',
                     position: 'relative',
                     overflow: 'hidden',
+                    boxShadow: isEliminated ? 'none' : isHuman ? SHADOW.glow(COLORS.green) : SHADOW.panel,
                   }}
                 >
                   {/* Winner crown */}
@@ -282,10 +284,10 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                     }}
                   >
                     {isEliminated && player.eliminatedRound !== null
-                      ? `fuera R${player.eliminatedRound}`
+                      ? `out R${player.eliminatedRound}`
                       : isWinner
-                      ? 'GANADOR'
-                      : 'activo'}
+                      ? 'WINNER'
+                      : 'active'}
                   </div>
 
                   {/* Latest card */}
@@ -399,7 +401,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                   marginBottom: '6px',
                 }}
               >
-                RONDA {last.round} — ELIMINADO
+                ROUND {last.round} — ELIMINATED
               </div>
               {(() => {
                 const eliminated = state.players.find((p) => p.id === last.eliminatedId)
@@ -430,7 +432,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                         color: COLORS.muted,
                       }}
                     >
-                      tiró {elimCard.name} ·{' '}
+                      drew {elimCard.name} ·{' '}
                       <span style={{ color: RARITY_COLOR[elimCard.rarity] }}>
                         {RARITY_LABEL[elimCard.rarity]}
                       </span>{' '}
@@ -462,11 +464,11 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '.03em',
-              boxShadow: '0 0 16px #34e29b55',
+              boxShadow: `${SHADOW.panel}, ${SHADOW.glow(COLORS.green)}`,
               fontFamily: FONTS.display,
             }}
           >
-            Ver resultado →
+            See result →
           </motion.button>
         ) : (
           <button
@@ -483,11 +485,11 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '.03em',
-              boxShadow: '0 0 12px #34e29b55',
+              boxShadow: SHADOW.glow(COLORS.green),
               fontFamily: FONTS.display,
             }}
           >
-            🎴 Abrir pack (ronda {state.round})
+            🎴 Open pack (round {state.round})
           </button>
         )}
       </div>

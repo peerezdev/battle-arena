@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import type { RoyaleState } from '../../../royale/types'
-import { COLORS, FONTS, formatUsd } from '../../theme'
+import { COLORS, FONTS, SHADOW, formatUsd } from '../../theme'
 
 interface Props {
   state: RoyaleState
@@ -64,9 +64,9 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
                 scale: 1,
                 y: 0,
                 boxShadow: [
-                  `0 0 32px ${COLORS.green}33`,
-                  `0 0 56px ${COLORS.green}66`,
-                  `0 0 32px ${COLORS.green}33`,
+                  `${SHADOW.panel}, ${SHADOW.glow(COLORS.green)}`,
+                  `${SHADOW.panel}, 0 0 32px ${COLORS.green}44`,
+                  `${SHADOW.panel}, ${SHADOW.glow(COLORS.green)}`,
                 ],
               }
             : { opacity: 1, scale: 1, y: 0, boxShadow: 'none' }
@@ -123,7 +123,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             fontFamily: FONTS.mono,
           }}
         >
-          RESULTADO FINAL
+          FINAL RESULT
         </div>
 
         {/* Winner name */}
@@ -137,7 +137,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             marginBottom: '4px',
           }}
         >
-          {isHumanWinner ? '¡Has ganado!' : winner?.name ?? '—'}
+          {isHumanWinner ? 'You won!' : winner?.name ?? '—'}
         </div>
         {!isHumanWinner && winner && (
           <div
@@ -148,7 +148,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
               marginBottom: '8px',
             }}
           >
-            se lleva el bote
+            takes the pot
           </div>
         )}
 
@@ -171,7 +171,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
               marginBottom: '4px',
             }}
           >
-            BOTE GANADO
+            POT WON
           </div>
           <div
             style={{
@@ -192,7 +192,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
               color: COLORS.muted,
             }}
           >
-            {pot.length} carta{pot.length !== 1 ? 's' : ''} en el bote
+            {pot.length} card{pot.length !== 1 ? 's' : ''} in the pot
           </div>
         </div>
 
@@ -210,11 +210,11 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             gap: '4px',
           }}
         >
-          <RecapRow label="Rondas jugadas" value={String(roundsPlayed)} />
-          <RecapRow label="Jugadores" value={String(players.length)} />
+          <RecapRow label="Rounds played" value={String(roundsPlayed)} />
+          <RecapRow label="Players" value={String(players.length)} />
           {!isHumanWinner && humanEliminatedRound !== null && (
             <RecapRow
-              label="Caíste en la ronda"
+              label="Out in round"
               value={String(humanEliminatedRound)}
               valueColor={COLORS.red}
             />
@@ -236,12 +236,12 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             fontWeight: 800,
             cursor: 'pointer',
             letterSpacing: '.03em',
-            boxShadow: '0 0 12px #34e29b55',
+            boxShadow: SHADOW.glow(COLORS.green),
             marginBottom: '10px',
             fontFamily: FONTS.display,
           }}
         >
-          Jugar otra
+          Play again
         </button>
         <button
           type="button"
@@ -259,7 +259,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             letterSpacing: '.02em',
           }}
         >
-          Salir
+          Exit
         </button>
       </motion.div>
     </div>

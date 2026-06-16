@@ -9,7 +9,7 @@ import {
   fetchMachines, generatePack, submitTx, openPack, pollOpenPack,
   GachaDisabledError, type GachaMachine, type OpenPackResult,
 } from '../../../onchain/gachaClient'
-import { COLORS, FONTS } from '../../theme'
+import { COLORS, FONTS, RARITY, SHADOW } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 
 interface Props {
@@ -44,7 +44,7 @@ function Shell({ children, onBack }: { children: React.ReactNode; onBack: () => 
             padding: '0 0 24px',
           }}
         >
-          ← Volver
+          ← Back
         </button>
 
         {/* Header */}
@@ -78,8 +78,9 @@ function Shell({ children, onBack }: { children: React.ReactNode; onBack: () => 
   )
 }
 
+// Map capitalized API rarity keys to the shared RARITY tokens
 const RARITY_COLOR: Record<string, string> = {
-  Epic: '#c084fc', Rare: '#5ad1ff', Uncommon: COLORS.green, Common: COLORS.muted,
+  Epic: RARITY.epic, Rare: RARITY.rare, Uncommon: RARITY.uncommon, Common: RARITY.common,
 }
 
 type Phase =
@@ -89,9 +90,9 @@ type Phase =
   | { kind: 'pending'; memo: string }
 
 const STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
-  firmando: 'Firma la transacción en tu wallet…',
-  enviando: 'Enviando a Solana…',
-  abriendo: 'Abriendo el pack…',
+  firmando: 'Sign the transaction in your wallet…',
+  enviando: 'Sending to Solana…',
+  abriendo: 'Opening the pack…',
 }
 
 export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
@@ -168,9 +169,9 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
         >
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>🎰</div>
           <div style={{ fontWeight: 700, color: COLORS.text, marginBottom: '8px' }}>
-            Gacha no disponible
+            Gacha is unavailable.
           </div>
-          Falta configurar la API key del Gacha en el backend (GACHA_API_KEY).
+          The Gacha API key isn't configured in the backend (GACHA_API_KEY).
         </div>
       </Shell>
     )
@@ -238,7 +239,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
         >
           <div style={{ fontSize: '32px', marginBottom: '14px' }}>⏳</div>
           <div style={{ fontSize: '14px', color: COLORS.text, lineHeight: 1.6, marginBottom: '20px' }}>
-            El pack se está procesando on-chain…
+            Your pack is being processed on-chain…
           </div>
           <motion.button
             onClick={() => void retryOpen(memo)}
@@ -253,10 +254,10 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '.03em',
-              boxShadow: '0 0 14px #34e29b55',
+              boxShadow: SHADOW.glow(COLORS.green),
             }}
           >
-            Seguir esperando
+            Keep waiting
           </motion.button>
         </div>
       </Shell>
@@ -280,7 +281,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
             borderRadius: '14px',
             padding: '28px 20px',
             textAlign: 'center',
-            boxShadow: `0 0 24px ${rarityColor}44`,
+            boxShadow: `${SHADOW.panel}, ${SHADOW.glow(rarityColor)}`,
             marginBottom: '20px',
           }}
         >
@@ -297,7 +298,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
               borderRadius: '4px',
               padding: '3px 10px',
               marginBottom: '16px',
-              boxShadow: `0 0 8px ${rarityColor}66`,
+              boxShadow: SHADOW.glow(rarityColor),
             }}
           >
             {r.rarity}
@@ -361,11 +362,11 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
             fontWeight: 800,
             cursor: 'pointer',
             letterSpacing: '.03em',
-            boxShadow: '0 0 14px #34e29b66',
+            boxShadow: SHADOW.glow(COLORS.green),
             marginBottom: '12px',
           }}
         >
-          Crear desafío con esta carta
+          Create a challenge with this card
         </motion.button>
 
         <a
@@ -381,7 +382,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
             padding: '8px 0',
           }}
         >
-          Vender de vuelta (buyback)
+          Sell back (buyback)
         </a>
       </Shell>
     )
@@ -418,7 +419,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
             padding: '40px 0',
           }}
         >
-          Cargando máquinas…
+          Loading machines…
         </div>
       )}
 
@@ -493,10 +494,10 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
                   fontWeight: 800,
                   cursor: 'pointer',
                   letterSpacing: '.03em',
-                  boxShadow: '0 0 10px #34e29b55',
+                  boxShadow: SHADOW.glow(COLORS.green),
                 }}
               >
-                Abrir pack
+                Open pack
               </motion.button>
             </div>
           ))}
