@@ -18,6 +18,11 @@ import { useReducedMotion } from './ui/useReducedMotion'
 import { ModeSelect, type AppMode } from './mode/ModeSelect'
 import type { SelectedCard } from './ui/screens/onchain/CollectionScreen'
 import type { BattleInfo } from './ui/screens/onchain/LobbyScreen'
+import { createRoyale, playRound } from './royale/engine'
+import type { RoyaleState, RoyaleConfig } from './royale/types'
+import { RoyaleSetupScreen } from './ui/screens/royale/RoyaleSetupScreen'
+import { RoyaleBoard } from './ui/screens/royale/RoyaleBoard'
+import { RoyaleResultScreen } from './ui/screens/royale/RoyaleResultScreen'
 
 // ── Lazy-loaded on-chain bundle (never imported for offline users) ──────────
 const AppKitProvider = lazy(() =>
@@ -45,6 +50,9 @@ type OfflineScreen = 'setup' | 'allocateA' | 'passToB' | 'allocateB' | 'reveal' 
 // ── On-chain screen names ───────────────────────────────────────────────────
 type OnchainScreen = 'connect' | 'collection' | 'lobby' | 'battle' | 'gacha'
 
+// ── Royale screen names ─────────────────────────────────────────────────────
+type RoyaleScreen = 'setup' | 'board' | 'result'
+
 export default function App() {
   const reduced = useReducedMotion()
 
@@ -58,6 +66,10 @@ export default function App() {
   const [error, setError] = useState<string | undefined>()
   const [allocA, setAllocA] = useState<Allocation | null>(null)
   const [showVsIntro, setShowVsIntro] = useState(false)
+
+  // ── Royale state ────────────────────────────────────────────────────────
+  const [royaleScreen, setRoyaleScreen] = useState<RoyaleScreen>('setup')
+  const [royaleState, setRoyaleState] = useState<RoyaleState | null>(null)
 
   // ── On-chain state ──────────────────────────────────────────────────────
   const [onchainScreen, setOnchainScreen] = useState<OnchainScreen>('connect')
@@ -118,6 +130,18 @@ export default function App() {
     }
     st = nextRound(st)
     setState(st); setAllocA(null); setOfflineScreen('allocateA')
+  }
+
+  // ── Royale handlers ─────────────────────────────────────────────────────
+  function startRoyale(config: RoyaleConfig) {
+    setRoyaleState(createRoyale(config, ['Tú']))
+    setRoyaleScreen('board')
+  }
+  function royalePlayRound() {
+    setRoyaleState((s) => (s ? playRound(s) : s))
+  }
+  function exitRoyale() {
+    setAppMode(null); setRoyaleScreen('setup'); setRoyaleState(null)
   }
 
   // ── Offline render ──────────────────────────────────────────────────────
@@ -312,6 +336,45 @@ export default function App() {
             transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
           >
             {renderOfflineScreen()}
+          </motion.div>
+        </AnimatePresence>
+      </>
+    )
+  }
+
+  // ── Royale flow ───────────────────────────────────────────────────────────
+  if (appMode === 'royale') {
+    return (
+      <>
+        <MuteButton />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={royaleScreen}
+            variants={variants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
+          >
+            {royaleScreen === 'setup' && (
+              <RoyaleSetupScreen onStart={startRoyale} onBack={exitRoyale} />
+            )}
+            {royaleScreen === 'board' && royaleState && (
+              <RoyaleBoard
+                state={royaleState}
+                onPlayRound={royalePlayRound}
+                onFinish={() => setRoyaleScreen('result')}
+                reducedMotion={!!reduced}
+              />
+            )}
+            {royaleScreen === 'result' && royaleState && (
+              <RoyaleResultScreen
+                state={royaleState}
+                onPlayAgain={() => { setRoyaleScreen('setup'); setRoyaleState(null) }}
+                onExit={exitRoyale}
+                reducedMotion={!!reduced}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </>

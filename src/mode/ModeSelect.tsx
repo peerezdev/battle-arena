@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 import { COLORS, FONTS } from '../ui/theme'
 import { useReducedMotion } from '../ui/useReducedMotion'
 
-export type AppMode = 'offline' | 'onchain'
+export type AppMode = 'offline' | 'onchain' | 'royale'
 
 interface Props {
   onSelect: (mode: AppMode) => void
@@ -98,6 +98,10 @@ export function ModeSelect({ onSelect }: Props) {
           COLORS.red,
           '⛓️',
         )}
+
+        {card('royale', 'Battle Royale (demo)',
+          'Hasta 10 jugadores abren packs por rondas; cae el de menor valor; el último en pie se lleva el bote. Tiradas simuladas, sin blockchain.',
+          '#c084fc', '👑')}
       </div>
     </div>
   )
