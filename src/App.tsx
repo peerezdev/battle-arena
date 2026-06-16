@@ -17,6 +17,7 @@ import { VsIntro } from './ui/components/VsIntro'
 import { useReducedMotion } from './ui/useReducedMotion'
 import { type AppMode } from './mode/ModeSelect'
 import { Landing } from './ui/screens/Landing'
+import { Hub } from './ui/screens/Hub/Hub'
 import type { SelectedCard } from './ui/screens/onchain/CollectionScreen'
 import type { BattleInfo } from './ui/screens/onchain/LobbyScreen'
 import { createRoyale, playRound } from './royale/engine'
@@ -58,7 +59,7 @@ export default function App() {
   const reduced = useReducedMotion()
 
   // ── Mode selection ──────────────────────────────────────────────────────
-  const [appMode, setAppMode] = useState<AppMode | null>(null)
+  const [appMode, setAppMode] = useState<AppMode | 'hub' | null>(null)
 
   // ── Offline state ───────────────────────────────────────────────────────
   const [offlineScreen, setOfflineScreen] = useState<OfflineScreen>('setup')
@@ -142,7 +143,7 @@ export default function App() {
     setRoyaleState((s) => (s ? playRound(s) : s))
   }
   function exitRoyale() {
-    setAppMode(null); setRoyaleScreen('setup'); setRoyaleState(null)
+    setAppMode('hub'); setRoyaleScreen('setup'); setRoyaleState(null)
   }
 
   // ── Offline render ──────────────────────────────────────────────────────
@@ -222,7 +223,7 @@ export default function App() {
             setAuthToken(token)
             setOnchainScreen('collection')
           }}
-          onBack={() => setAppMode(null)}
+          onBack={() => setAppMode('hub')}
         />
       )
     }
@@ -278,11 +279,11 @@ export default function App() {
       )
     }
 
-    // Fallback: back to connect
+    // Fallback: back to hub
     return (
       <ConnectScreen
         onAuthenticated={(token) => { setAuthToken(token); setOnchainScreen('collection') }}
-        onBack={() => setAppMode(null)}
+        onBack={() => setAppMode('hub')}
       />
     )
   }
@@ -309,9 +310,29 @@ export default function App() {
           transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
         >
           <Landing
-            onPlayOffline={() => setAppMode('offline')}
+            onLaunch={() => setAppMode('hub')}
+          />
+        </motion.div>
+      </AnimatePresence>
+    )
+  }
+
+  // ── Hub (lobby) ───────────────────────────────────────────────────────────
+  if (appMode === 'hub') {
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key="hub"
+          variants={variants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: reduced ? 0 : 0.28, ease: 'easeInOut' }}
+        >
+          <Hub
+            onPlayMana={() => setAppMode('offline')}
             onPlayRoyale={() => setAppMode('royale')}
-            onConnect={() => setAppMode('onchain')}
+            onOnchain={() => setAppMode('onchain')}
           />
         </motion.div>
       </AnimatePresence>

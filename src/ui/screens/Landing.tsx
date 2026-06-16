@@ -28,9 +28,7 @@ function useIsWide(query = '(min-width: 820px)'): boolean {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 export interface LandingProps {
-  onPlayOffline: () => void  // Mana Duel demo
-  onPlayRoyale: () => void   // Battle Royale demo
-  onConnect: () => void      // on-chain flow (Gacha / Pack Battle / wallet)
+  onLaunch: () => void  // open the Hub
 }
 
 // ── Gradient text helper ──────────────────────────────────────────────────────
@@ -254,7 +252,7 @@ function GameCard({ icon, title, description, pill, onClick, reduced }: GameCard
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps) {
+export function Landing({ onLaunch }: LandingProps) {
   const reduced = useReducedMotion()
   const wide = useIsWide('(min-width: 820px)')
 
@@ -319,30 +317,6 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
             BattleArena
           </div>
 
-          {/* Nav CTA */}
-          <button
-            onClick={onConnect}
-            style={{
-              background: 'transparent',
-              border: `1px solid ${COLORS.border}`,
-              color: COLORS.text,
-              borderRadius: '8px',
-              padding: '8px 18px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: FONTS.body,
-              transition: 'border-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#9945FF88'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = COLORS.border
-            }}
-          >
-            Connect wallet
-          </button>
         </div>
       </nav>
 
@@ -424,7 +398,7 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
           >
             {/* Primary gradient button */}
             <motion.button
-              onClick={onPlayOffline}
+              onClick={onLaunch}
               whileTap={reduced ? undefined : { scale: 0.97 }}
               style={{
                 background: GRADIENT,
@@ -440,26 +414,7 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
                 boxShadow: '0 0 20px #9945FF33',
               }}
             >
-              Play demo
-            </motion.button>
-
-            {/* Ghost button */}
-            <motion.button
-              onClick={onConnect}
-              whileTap={reduced ? undefined : { scale: 0.97 }}
-              style={{
-                background: 'transparent',
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: '10px',
-                padding: '13px 28px',
-                fontSize: '15px',
-                fontWeight: 600,
-                color: COLORS.text,
-                cursor: 'pointer',
-                fontFamily: FONTS.body,
-              }}
-            >
-              Connect wallet
+              Launch App
             </motion.button>
           </div>
 
@@ -572,7 +527,7 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
               title="Pack Battle"
               description="Both players open a pack; the winner takes both cards. Resolve by value or play it out."
               pill="WINNER TAKES ALL"
-              onClick={onConnect}
+              onClick={onLaunch}
               reduced={reduced}
             />
             <GameCard
@@ -580,7 +535,7 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
               title="Battle Royale"
               description="Up to 10 players open packs in rounds; lowest value falls; the last one standing takes the pot."
               pill="2–10 PLAYERS"
-              onClick={onPlayRoyale}
+              onClick={onLaunch}
               reduced={reduced}
             />
             <GameCard
@@ -588,7 +543,7 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
               title="Gacha"
               description="Open Collector Crypt packs and jump straight into a battle with the card you pull."
               pill="PULL → PLAY"
-              onClick={onConnect}
+              onClick={onLaunch}
               reduced={reduced}
             />
             <GameCard
@@ -596,7 +551,7 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
               title="Mana Duel"
               description="Hidden mana allocation across three fronts. Skill-first; card value gives a capped edge."
               pill="SKILL"
-              onClick={onPlayOffline}
+              onClick={onLaunch}
               reduced={reduced}
             />
           </motion.div>
