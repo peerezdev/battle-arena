@@ -98,7 +98,7 @@ export function OnchainFlow() {
     <Suspense fallback={<div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>}>
       <AppKitProvider>
         <AnimatePresence mode="wait">
-          <motion.div key={screen} variants={pageVariants(reduced)} initial="initial" animate="animate" exit="exit" transition={pageTransition(reduced)}>
+          <motion.div key={screen} variants={pageVariants(reduced)} initial="initial" animate="animate" exit="exit" transition={pageTransition(reduced)} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             {renderScreen()}
           </motion.div>
         </AnimatePresence>

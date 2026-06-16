@@ -170,6 +170,7 @@ export function ManaDuelFlow() {
           animate="animate"
           exit="exit"
           transition={pageTransition(reduced)}
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
         >
           {renderScreen()}
         </motion.div>

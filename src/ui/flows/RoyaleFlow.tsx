@@ -20,7 +20,7 @@ export function RoyaleFlow() {
   const exit = () => navigate('/app')
   return (
     <AnimatePresence mode="wait">
-      <motion.div key={screen} variants={pageVariants(reduced)} initial="initial" animate="animate" exit="exit" transition={pageTransition(reduced)}>
+      <motion.div key={screen} variants={pageVariants(reduced)} initial="initial" animate="animate" exit="exit" transition={pageTransition(reduced)} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {screen === 'setup' && <RoyaleSetupScreen onStart={startRoyale} onBack={exit} />}
         {screen === 'board' && rstate && <RoyaleBoard state={rstate} onPlayRound={playRoundFn} onFinish={() => setScreen('result')} reducedMotion={!!reduced} />}
         {screen === 'result' && rstate && <RoyaleResultScreen state={rstate} onPlayAgain={() => { setScreen('setup'); setRstate(null) }} onExit={exit} reducedMotion={!!reduced} />}
