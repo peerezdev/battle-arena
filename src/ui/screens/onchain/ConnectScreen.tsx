@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../../../wallet/useWallet'
 import { getNonce, verify } from '../../../onchain/backendClient'
-import { COLORS } from '../../theme'
+import { COLORS, GRADIENT, SHADOW } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 
 interface Props {
@@ -71,9 +71,9 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
   const isLoading = step === 'connecting' || step === 'authenticating'
 
   let statusText: string
-  if (step === 'connecting') statusText = 'Esperando conexion de wallet...'
-  else if (step === 'authenticating') statusText = 'Autenticando con el backend...'
-  else if (step === 'done') statusText = 'Autenticado. Cargando coleccion...'
+  if (step === 'connecting') statusText = 'Waiting for wallet connection...'
+  else if (step === 'authenticating') statusText = 'Authenticating with the backend...'
+  else if (step === 'done') statusText = 'Authenticated. Loading collection...'
   else statusText = ''
 
   return (
@@ -102,17 +102,17 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
             gap: '6px',
           }}
         >
-          ← Volver
+          ← Back
         </button>
 
         {/* Header */}
         <div style={{ marginBottom: '32px' }}>
           <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '4px' }}>
-            ON-CHAIN · PASO 1
+            ON-CHAIN · STEP 1
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800 }}>Conectar Wallet</div>
+          <div style={{ fontSize: '24px', fontWeight: 800 }}>Connect Wallet</div>
           <div style={{ fontSize: '13px', color: COLORS.muted, marginTop: '6px', lineHeight: 1.5 }}>
-            Conecta tu wallet Solana para autenticarte y acceder a tus NFTs en devnet.
+            Connect your Solana wallet to authenticate and access your NFTs on devnet.
           </div>
         </div>
 
@@ -144,6 +144,7 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
               padding: '12px 14px',
               fontSize: '13px',
               marginBottom: '16px',
+              boxShadow: SHADOW.panel,
             }}
           >
             {statusText}
@@ -162,9 +163,10 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
               color: COLORS.muted,
               marginBottom: '20px',
               wordBreak: 'break-all',
+              boxShadow: SHADOW.panel,
             }}
           >
-            <span style={{ color: COLORS.green, fontWeight: 700 }}>Conectado: </span>
+            <span style={{ color: COLORS.green, fontWeight: 700 }}>Connected: </span>
             {publicKey.toBase58()}
           </div>
         )}
@@ -176,8 +178,8 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
             whileTap={reduced ? undefined : { scale: 0.96 }}
             style={{
               width: '100%',
-              background: COLORS.green,
-              color: '#04130c',
+              background: GRADIENT,
+              color: '#fff',
               border: 'none',
               borderRadius: '10px',
               padding: '16px',
@@ -185,10 +187,10 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '.03em',
-              boxShadow: '0 0 14px #34e29b66',
+              boxShadow: SHADOW.glow(COLORS.green),
             }}
           >
-            {step === 'error' ? 'Reintentar' : isConnected ? 'Autenticar' : 'Conectar Wallet'}
+            {step === 'error' ? 'Retry' : isConnected ? 'Authenticate' : 'Connect Wallet'}
           </motion.button>
         )}
 
@@ -205,9 +207,10 @@ export function ConnectScreen({ onAuthenticated, onBack }: Props) {
               textAlign: 'center',
               color: COLORS.muted,
               letterSpacing: '.03em',
+              boxShadow: SHADOW.panel,
             }}
           >
-            Cargando...
+            Loading...
           </div>
         )}
       </div>

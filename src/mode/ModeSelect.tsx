@@ -1,11 +1,11 @@
 /**
  * ModeSelect — initial screen shown when the app loads.
  * Two paths:
- *   - Práctica (offline): the existing Fase 0 offline flow, no wallet needed.
- *   - On-chain (devnet): the full on-chain flow wrapped in AppKitProvider.
+ *   - Practice (offline): the existing offline flow, no wallet needed.
+ *   - On-chain: the full on-chain flow wrapped in AppKitProvider.
  */
 import { motion } from 'framer-motion'
-import { COLORS, FONTS } from '../ui/theme'
+import { COLORS, FONTS, SHADOW } from '../ui/theme'
 import { useReducedMotion } from '../ui/useReducedMotion'
 
 export type AppMode = 'offline' | 'onchain' | 'royale'
@@ -37,7 +37,7 @@ export function ModeSelect({ onSelect }: Props) {
         cursor: 'pointer',
         textAlign: 'left',
         color: COLORS.text,
-        boxShadow: `0 0 18px ${accent}22`,
+        boxShadow: SHADOW.panel,
         transition: 'box-shadow .2s',
         marginBottom: '16px',
       }}
@@ -58,7 +58,7 @@ export function ModeSelect({ onSelect }: Props) {
         minHeight: '100dvh',
         background: COLORS.bg,
         color: COLORS.text,
-        fontFamily: 'Inter, system-ui, sans-serif',
+        fontFamily: FONTS.body,
         padding: '0 16px 32px',
       }}
     >
@@ -78,29 +78,29 @@ export function ModeSelect({ onSelect }: Props) {
             ⚡ TCG Battle Arena
           </div>
           <div style={{ fontSize: '13px', color: COLORS.muted, fontFamily: FONTS.mono }}>
-            Elige el modo de juego
+            Choose a game mode
           </div>
         </div>
 
         {/* Mode cards */}
         {card(
           'offline',
-          'Practica (offline)',
-          'Juega en local sin wallet. Dos jugadores (hotseat) o vs bot. Sin staking ni blockchain.',
+          'Practice (offline)',
+          'Play locally without a wallet. Two players (hotseat) or vs bot. No staking or blockchain.',
           COLORS.green,
           '🎮',
         )}
 
         {card(
           'onchain',
-          'On-chain (devnet)',
-          'Conecta tu wallet Solana, valora tus NFTs con el oraculo y juega con staking real en devnet.',
-          COLORS.red,
+          'On-chain',
+          'Connect your Solana wallet, value your NFTs with the oracle and play with real staking on devnet.',
+          COLORS.violet,
           '⛓️',
         )}
 
         {card('royale', 'Battle Royale (demo)',
-          'Hasta 10 jugadores abren packs por rondas; cae el de menor valor; el último en pie se lleva el bote. Tiradas simuladas, sin blockchain.',
+          'Up to 10 players open packs by rounds; the lowest-value card is eliminated; the last one standing takes the pot. Simulated rolls, no blockchain.',
           '#c084fc', '👑')}
       </div>
     </div>

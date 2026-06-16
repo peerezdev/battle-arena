@@ -39,7 +39,7 @@ import { syncMatch } from '../../../onchain/backendClient'
 import { config } from '../../../onchain/config'
 import { DEFAULT_MATCH_CONFIG } from '../../../onchain/types'
 import idl from '../../../onchain/idl/battle_arena.json'
-import { COLORS, player as playerTheme } from '../../theme'
+import { COLORS, SHADOW, player as playerTheme } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { EnergyAllocator } from '../../components/EnergyAllocator'
 import type { BattleInfo } from './LobbyScreen'
@@ -244,7 +244,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
       const [escrowVault] = vaultPda(battlePk)
 
       if (!config.treasury) {
-        throw new Error('VITE_TREASURY no esta configurado. No se puede liquidar la batalla.')
+        throw new Error('VITE_TREASURY is not configured. Cannot settle the battle.')
       }
       const treasuryPk = new PublicKey(config.treasury)
 
@@ -277,8 +277,8 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const accentColor = isPlayerA ? COLORS.green : COLORS.red
-  const roleLabel = isPlayerA ? 'Jugador A' : 'Jugador B'
+  const accentColor = isPlayerA ? COLORS.green : COLORS.violet
+  const roleLabel = isPlayerA ? 'Player A' : 'Player B'
   const total = alloc.apertura + alloc.choque + alloc.remate
   const remaining = availableEnergy - total
 
@@ -289,20 +289,20 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
     step === 'settling'
 
   let statusLabel = ''
-  if (step === 'committing') statusLabel = 'Enviando commit...'
-  else if (step === 'revealing') statusLabel = 'Enviando reveal...'
-  else if (step === 'resolving') statusLabel = 'Resolviendo ronda...'
-  else if (step === 'settling') statusLabel = 'Liquidando batalla...'
+  if (step === 'committing') statusLabel = 'Sending commit...'
+  else if (step === 'revealing') statusLabel = 'Sending reveal...'
+  else if (step === 'resolving') statusLabel = 'Resolving round...'
+  else if (step === 'settling') statusLabel = 'Settling battle...'
 
   if (step === 'settled') {
     const winMsg =
       finalWinner === 'draw'
-        ? 'Empate'
+        ? 'Draw'
         : finalWinner === 'a'
-        ? 'Gana Jugador A'
+        ? 'Player A wins'
         : finalWinner === 'b'
-        ? 'Gana Jugador B'
-        : 'Batalla terminada'
+        ? 'Player B wins'
+        : 'Battle finished'
 
     return (
       <div
@@ -320,7 +320,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
             {winMsg}
           </div>
           <div style={{ fontSize: '13px', color: COLORS.muted, marginBottom: '24px' }}>
-            Rondas: {winsA}–{winsB}
+            Rounds: {winsA}–{winsB}
           </div>
           {txLog.length > 0 && (
             <div
@@ -334,6 +334,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
                 textAlign: 'left',
                 color: COLORS.muted,
                 marginBottom: '20px',
+                boxShadow: SHADOW.panel,
               }}
             >
               {txLog.map((line, i) => (
@@ -352,10 +353,10 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
               fontSize: '15px',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 0 12px #34e29b55',
+              boxShadow: SHADOW.glow(COLORS.green),
             }}
           >
-            Volver al Lobby
+            Back to Lobby
           </button>
         </div>
       </div>
@@ -376,13 +377,13 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
         {/* Header */}
         <div style={{ marginBottom: '16px' }}>
           <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '2px' }}>
-            ON-CHAIN · RONDA {round + 1}
+            ON-CHAIN · ROUND {round + 1}
           </div>
           <div style={{ fontSize: '18px', fontWeight: 800, color: accentColor }}>
             {roleLabel}
           </div>
           <div style={{ fontSize: '11px', color: COLORS.muted, marginTop: '2px', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Batalla: {battle.battlePubkey}
+            Battle: {battle.battlePubkey}
           </div>
         </div>
 
@@ -397,18 +398,19 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
             display: 'flex',
             justifyContent: 'space-between',
             fontSize: '13px',
+            boxShadow: SHADOW.panel,
           }}
         >
           <span>
             <span style={{ color: COLORS.green, fontWeight: 700 }}>A</span>
-            <span style={{ color: COLORS.muted }}> — rondas: </span>
+            <span style={{ color: COLORS.muted }}> — rounds: </span>
             <span style={{ color: COLORS.green, fontWeight: 800 }}>{winsA}</span>
           </span>
           <span style={{ color: COLORS.muted }}>vs</span>
           <span>
-            <span style={{ color: COLORS.red, fontWeight: 800 }}>{winsB}</span>
-            <span style={{ color: COLORS.muted }}> :rondas — </span>
-            <span style={{ color: COLORS.red, fontWeight: 700 }}>B</span>
+            <span style={{ color: COLORS.violet, fontWeight: 800 }}>{winsB}</span>
+            <span style={{ color: COLORS.muted }}> :rounds — </span>
+            <span style={{ color: COLORS.violet, fontWeight: 700 }}>B</span>
           </span>
         </div>
 
@@ -442,6 +444,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
               fontSize: '13px',
               marginBottom: '14px',
               textAlign: 'center',
+              boxShadow: SHADOW.panel,
             }}
           >
             {statusLabel}
@@ -461,11 +464,11 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
           >
             <span style={{ color: COLORS.muted }}>
               {/* FIX A: show computed available (base + banked + edge) */}
-              Energía disponible: <strong style={{ color: accentColor }}>{availableEnergy}</strong>
+              Available energy: <strong style={{ color: accentColor }}>{availableEnergy}</strong>
             </span>
             <span style={{ color: COLORS.muted }}>
-              Asignada: <strong style={{ color: accentColor }}>{total}</strong>
-              {remaining > 0 && ` · ${remaining} se banca`}
+              Assigned: <strong style={{ color: accentColor }}>{total}</strong>
+              {remaining > 0 && ` · ${remaining} banked`}
             </span>
           </div>
         )}
@@ -492,7 +495,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
             style={{
               width: '100%',
               background: accentColor,
-              color: isPlayerA ? '#04130c' : '#1a040a',
+              color: isPlayerA ? '#04130c' : '#fff',
               border: 'none',
               borderRadius: '10px',
               padding: '16px',
@@ -500,12 +503,12 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '.03em',
-              boxShadow: `0 0 14px ${accentColor}66`,
+              boxShadow: SHADOW.glow(accentColor),
               marginBottom: '12px',
             }}
           >
-            Confirmar y Commit — {total}/{availableEnergy} energía
-            {remaining > 0 ? ` · ${remaining} se banca` : ''}
+            Confirm & Commit — {total}/{availableEnergy} energy
+            {remaining > 0 ? ` · ${remaining} banked` : ''}
           </motion.button>
         )}
 
@@ -526,7 +529,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
                 cursor: 'pointer',
               }}
             >
-              Reintentar
+              Retry
             </button>
             <button
               onClick={() => void handleSettle()}
@@ -540,10 +543,10 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
                 fontSize: '13px',
                 fontWeight: 700,
                 cursor: 'pointer',
-                boxShadow: '0 0 10px #34e29b55',
+                boxShadow: SHADOW.glow(playerTheme.a.color),
               }}
             >
-              Liquidar batalla
+              Settle battle
             </button>
           </div>
         )}
@@ -560,10 +563,11 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
               fontSize: '10px',
               fontFamily: 'monospace',
               color: COLORS.muted,
+              boxShadow: SHADOW.panel,
             }}
           >
             <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '.05em', marginBottom: '4px', textTransform: 'uppercase' }}>
-              Transacciones
+              Transactions
             </div>
             {txLog.map((line, i) => (
               <div key={i}>{line}</div>

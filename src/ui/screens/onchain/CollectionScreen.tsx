@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useWallet } from '../../../wallet/useWallet'
 import { attest, type AttestResponse } from '../../../onchain/oracleClient'
-import { COLORS } from '../../theme'
+import { COLORS, GRADIENT, SHADOW } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 
 export interface SelectedCard {
@@ -85,7 +85,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
               padding: 0,
             }}
           >
-            ← Volver
+            ← Back
           </button>
           {onOpenGacha && (
             <button
@@ -100,7 +100,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
                 borderRadius: '6px',
               }}
             >
-              🎰 Gacha — abre un pack
+              🎰 Gacha — open a pack
             </button>
           )}
         </div>
@@ -108,20 +108,20 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
           <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '4px' }}>
-            ON-CHAIN · PASO 2
+            ON-CHAIN · STEP 2
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 800 }}>Tu Coleccion</div>
+          <div style={{ fontSize: '24px', fontWeight: 800 }}>Your Collection</div>
           {publicKey && (
             <div style={{ fontSize: '11px', color: COLORS.muted, marginTop: '4px', wordBreak: 'break-all' }}>
               Wallet: {publicKey.toBase58()}
             </div>
           )}
           <div style={{ fontSize: '13px', color: COLORS.muted, marginTop: '8px', lineHeight: 1.5 }}>
-            Ingresa el mint address de tu NFT y presiona «Valorar» para obtener la atestacion del oraculo.
-            Solo los NFTs con valor USD mayor a 0 son jugables.
+            Enter the mint address of your NFT and press «Value» to get the oracle attestation.
+            Only NFTs with a USD value greater than 0 are playable.
           </div>
           <div style={{ fontSize: '11px', color: COLORS.muted, marginTop: '6px', fontStyle: 'italic' }}>
-            TODO: enumeracion automatica de NFTs via DAS / getTokenAccountsByOwner (pendiente Fase 2).
+            TODO: automatic NFT enumeration via DAS / getTokenAccountsByOwner (pending Phase 2).
           </div>
         </div>
 
@@ -133,6 +133,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
             borderRadius: '10px',
             padding: '16px',
             marginBottom: '16px',
+            boxShadow: SHADOW.panel,
           }}
         >
           <label
@@ -154,7 +155,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
             type="text"
             value={mint}
             onChange={(e) => setMint(e.target.value)}
-            placeholder="Ej: EPjFWdd5AufqSSqeM2..."
+            placeholder="e.g. EPjFWdd5AufqSSqeM2..."
             style={{
               width: '100%',
               background: COLORS.bg,
@@ -185,9 +186,9 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
               lineHeight: 1.5,
             }}
           >
-            Error al valorar: {error}
+            Valuation error: {error}
             <div style={{ marginTop: '6px', fontSize: '11px' }}>
-              Verifica que el mint sea valido y que el oraculo este disponible.
+              Check that the mint address is valid and that the oracle is available.
             </div>
           </div>
         )}
@@ -201,7 +202,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
               borderRadius: '10px',
               padding: '16px',
               marginBottom: '16px',
-              boxShadow: isPlayable ? `0 0 14px ${COLORS.green}22` : 'none',
+              boxShadow: isPlayable ? SHADOW.glow(COLORS.green) : SHADOW.panel,
             }}
           >
             <div
@@ -214,7 +215,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
                 textTransform: 'uppercase',
               }}
             >
-              Resultado de valoracion
+              Valuation result
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
               <div>
@@ -224,17 +225,17 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
                 </div>
               </div>
               <div>
-                <div style={{ color: COLORS.muted, fontSize: '10px', marginBottom: '2px' }}>VALOR USD</div>
+                <div style={{ color: COLORS.muted, fontSize: '10px', marginBottom: '2px' }}>USD VALUE</div>
                 <div style={{ fontWeight: 800, fontSize: '16px', color: isPlayable ? COLORS.green : COLORS.red }}>
                   ${attestation.value_usd}
                 </div>
               </div>
               <div>
-                <div style={{ color: COLORS.muted, fontSize: '10px', marginBottom: '2px' }}>GRADO</div>
+                <div style={{ color: COLORS.muted, fontSize: '10px', marginBottom: '2px' }}>GRADE</div>
                 <div style={{ fontWeight: 700 }}>{attestation.grading_company} {attestation.grade}</div>
               </div>
               <div>
-                <div style={{ color: COLORS.muted, fontSize: '10px', marginBottom: '2px' }}>ORACULO</div>
+                <div style={{ color: COLORS.muted, fontSize: '10px', marginBottom: '2px' }}>ORACLE</div>
                 <div style={{ fontSize: '11px', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                   {attestation.oracle_pubkey.slice(0, 8)}...
                 </div>
@@ -253,7 +254,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
                   lineHeight: 1.4,
                 }}
               >
-                Este NFT no es jugable: valor USD = 0 o sin atestacion valida.
+                This NFT is not playable: USD value = 0 or no valid attestation.
               </div>
             )}
           </div>
@@ -266,8 +267,8 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
           whileTap={reduced ? undefined : { scale: 0.96 }}
           style={{
             width: '100%',
-            background: loading || !mint.trim() ? COLORS.border : COLORS.green,
-            color: loading || !mint.trim() ? COLORS.muted : '#04130c',
+            background: loading || !mint.trim() ? COLORS.border : GRADIENT,
+            color: loading || !mint.trim() ? COLORS.muted : '#fff',
             border: 'none',
             borderRadius: '10px',
             padding: '16px',
@@ -275,11 +276,11 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
             fontWeight: 800,
             cursor: loading || !mint.trim() ? 'default' : 'pointer',
             letterSpacing: '.03em',
-            boxShadow: loading || !mint.trim() ? 'none' : '0 0 14px #34e29b66',
+            boxShadow: loading || !mint.trim() ? 'none' : SHADOW.glow(COLORS.green),
             marginBottom: '12px',
           }}
         >
-          {loading ? 'Valorando...' : 'Valorar NFT'}
+          {loading ? 'Valuing...' : 'Value NFT'}
         </motion.button>
 
         {isPlayable && (
@@ -288,8 +289,8 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
             whileTap={reduced ? undefined : { scale: 0.96 }}
             style={{
               width: '100%',
-              background: COLORS.red,
-              color: '#1a040a',
+              background: COLORS.green,
+              color: '#04130c',
               border: 'none',
               borderRadius: '10px',
               padding: '16px',
@@ -297,10 +298,10 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
               fontWeight: 800,
               cursor: 'pointer',
               letterSpacing: '.03em',
-              boxShadow: `0 0 14px ${COLORS.red}66`,
+              boxShadow: SHADOW.glow(COLORS.green),
             }}
           >
-            Usar esta carta → Lobby
+            Use this card → Lobby
           </motion.button>
         )}
       </div>

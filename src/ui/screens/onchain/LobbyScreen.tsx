@@ -1,9 +1,9 @@
 /**
  * LobbyScreen — on-chain flow, step 3.
  * Lists open matches from the backend and lets the user:
- *   - Crear: open a new battle by attesting their NFT, building initialize_battle ixs, sending,
+ *   - Create: open a new battle by attesting their NFT, building initialize_battle ixs, sending,
  *     deriving the battle pubkey, and registering with the backend.
- *   - Unirse: join an existing joinable battle by attesting their NFT, building join_battle ixs,
+ *   - Join: join an existing joinable battle by attesting their NFT, building join_battle ixs,
  *     sending, syncing with the backend, and proceeding to the on-chain battle screen.
  *
  * Token account (ATA) handling:
@@ -35,7 +35,7 @@ import {
 import { battlePda } from '../../../onchain/pdas'
 import { DEFAULT_MATCH_CONFIG } from '../../../onchain/types'
 import { config } from '../../../onchain/config'
-import { COLORS } from '../../theme'
+import { COLORS, GRADIENT, SHADOW } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import type { SelectedCard } from './CollectionScreen'
 
@@ -66,7 +66,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
   const [loadingMatches, setLoadingMatches] = useState(false)
   const [matchError, setMatchError] = useState<string | null>(null)
 
-  // Crear form state
+  // Create form state
   const [stakeInput, setStakeInput] = useState('')
   const [minEloInput, setMinEloInput] = useState('')
   const [maxEloInput, setMaxEloInput] = useState('')
@@ -106,15 +106,15 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
     if (!publicKey) return
     const stakeNum = Number(stakeInput)
     if (!stakeInput || isNaN(stakeNum) || stakeNum <= 0) {
-      setCreateError('Introduce un stake valido (> 0).')
+      setCreateError('Enter a valid stake (> 0).')
       return
     }
     if (!config.stakeMint) {
-      setCreateError('VITE_STAKE_MINT no esta configurado. Completa .env antes de crear una batalla.')
+      setCreateError('VITE_STAKE_MINT is not configured. Complete .env before creating a battle.')
       return
     }
     if (!config.treasury) {
-      setCreateError('VITE_TREASURY no esta configurado. Completa .env antes de crear una batalla.')
+      setCreateError('VITE_TREASURY is not configured. Complete .env before creating a battle.')
       return
     }
 
@@ -126,8 +126,8 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
       const nonce =
         BigInt(Date.now()) * 1_000_000n + BigInt(Math.floor(Math.random() * 1_000_000))
 
-      // Derivar el battle PDA ANTES de pedir la atestación para que el oráculo
-      // pueda ligar la firma a esta batalla específica (anti-replay).
+      // Derive the battle PDA BEFORE requesting the attestation so the oracle
+      // can bind the signature to this specific battle (anti-replay).
       const [battleKey] = battlePda(publicKey, nonce)
       const battlePubkeyStr = battleKey.toBase58()
 
@@ -182,7 +182,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
         max_elo: maxElo,
       })
 
-      setCreateSuccess(`Batalla creada: ${battlePubkeyStr}`)
+      setCreateSuccess(`Battle created: ${battlePubkeyStr}`)
       setStakeInput('')
       setMinEloInput('')
       setMaxEloInput('')
@@ -197,14 +197,14 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
   async function handleJoin(match: OpenMatch) {
     if (!publicKey) return
     if (!config.stakeMint) {
-      setJoinError('VITE_STAKE_MINT no esta configurado.')
+      setJoinError('VITE_STAKE_MINT is not configured.')
       return
     }
 
     setJoiningBattle(match.battle_pubkey)
     setJoinError(null)
     try {
-      // Pasar el battle pubkey al oráculo para ligar la atestación a esta batalla (anti-replay).
+      // Pass the battle pubkey to the oracle to bind the attestation to this battle (anti-replay).
       const att = await attest(selectedCard.mint, match.battle_pubkey)
 
       // FIX B (HIGH-1): Assert oracle pubkey matches the pinned config value if set.
@@ -305,23 +305,23 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
             padding: '0 0 24px',
           }}
         >
-          ← Volver
+          ← Back
         </button>
 
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
           <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.06em', marginBottom: '4px' }}>
-            ON-CHAIN · PASO 3
+            ON-CHAIN · STEP 3
           </div>
           <div style={{ fontSize: '24px', fontWeight: 800, marginBottom: '4px' }}>Lobby</div>
           <div style={{ fontSize: '12px', color: COLORS.muted }}>
-            Carta: <span style={{ color: COLORS.green, fontWeight: 700 }}>{selectedCard.mint.slice(0, 8)}...</span>
-            {' · '}Valor: <span style={{ color: COLORS.green, fontWeight: 700 }}>${selectedCard.attestation.value_usd}</span>
+            Card: <span style={{ color: COLORS.green, fontWeight: 700 }}>{selectedCard.mint.slice(0, 8)}...</span>
+            {' · '}Value: <span style={{ color: COLORS.green, fontWeight: 700 }}>${selectedCard.attestation.value_usd}</span>
             {' · '}{selectedCard.attestation.grading_company} {selectedCard.attestation.grade}
           </div>
         </div>
 
-        {/* ── Crear batalla ────────────────────────── */}
+        {/* ── Create battle ────────────────────────── */}
         <div
           style={{
             background: COLORS.panel,
@@ -329,14 +329,15 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
             borderRadius: '10px',
             padding: '20px',
             marginBottom: '24px',
+            boxShadow: SHADOW.panel,
           }}
         >
           <div style={{ fontSize: '14px', fontWeight: 800, marginBottom: '16px', color: COLORS.green }}>
-            + Crear batalla
+            + Create battle
           </div>
 
           <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.muted, marginBottom: '4px', letterSpacing: '.05em', textTransform: 'uppercase' }}>
-            Stake (unidades del token)
+            Stake (token units)
           </label>
           <input
             style={{ ...input, marginBottom: '10px' }}
@@ -344,32 +345,32 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
             min="1"
             value={stakeInput}
             onChange={(e) => setStakeInput(e.target.value)}
-            placeholder="Ej: 1000000 (1 USDC = 1e6 lamports)"
+            placeholder="e.g. 1000000 (1 USDC = 1e6 lamports)"
           />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.muted, marginBottom: '4px', letterSpacing: '.05em', textTransform: 'uppercase' }}>
-                ELO min (opt.)
+                Min ELO (opt.)
               </label>
               <input
                 style={input}
                 type="number"
                 value={minEloInput}
                 onChange={(e) => setMinEloInput(e.target.value)}
-                placeholder="Sin límite"
+                placeholder="No limit"
               />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.muted, marginBottom: '4px', letterSpacing: '.05em', textTransform: 'uppercase' }}>
-                ELO max (opt.)
+                Max ELO (opt.)
               </label>
               <input
                 style={input}
                 type="number"
                 value={maxEloInput}
                 onChange={(e) => setMaxEloInput(e.target.value)}
-                placeholder="Sin límite"
+                placeholder="No limit"
               />
             </div>
           </div>
@@ -392,27 +393,27 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
             style={{
               ...btnBase,
               width: '100%',
-              background: creating ? COLORS.border : COLORS.green,
-              color: creating ? COLORS.muted : '#04130c',
+              background: creating ? COLORS.border : GRADIENT,
+              color: creating ? COLORS.muted : '#fff',
               padding: '14px',
               fontSize: '14px',
-              boxShadow: creating ? 'none' : '0 0 14px #34e29b55',
+              boxShadow: creating ? 'none' : SHADOW.glow(COLORS.green),
               cursor: creating ? 'default' : 'pointer',
             }}
           >
-            {creating ? 'Creando...' : 'Crear batalla on-chain'}
+            {creating ? 'Creating...' : 'Create on-chain battle'}
           </motion.button>
         </div>
 
-        {/* ── Partidas abiertas ────────────────────── */}
+        {/* ── Open matches ────────────────────────── */}
         <div style={{ marginBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div style={{ fontSize: '14px', fontWeight: 800 }}>Partidas abiertas</div>
+            <div style={{ fontSize: '14px', fontWeight: 800 }}>Open matches</div>
             <button
               onClick={() => void loadMatches()}
               style={{ ...btnBase, background: COLORS.panel, color: COLORS.muted, padding: '6px 10px', fontSize: '11px', border: `1px solid ${COLORS.border}` }}
             >
-              Actualizar
+              Refresh
             </button>
           </div>
 
@@ -424,7 +425,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
 
           {loadingMatches && (
             <div style={{ color: COLORS.muted, fontSize: '13px', textAlign: 'center', padding: '24px' }}>
-              Cargando partidas...
+              Loading matches...
             </div>
           )}
 
@@ -438,9 +439,10 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
                 textAlign: 'center',
                 color: COLORS.muted,
                 fontSize: '13px',
+                boxShadow: SHADOW.panel,
               }}
             >
-              No hay partidas abiertas. Crea la primera.
+              No open matches. Create the first one.
             </div>
           )}
 
@@ -457,7 +459,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
                 lineHeight: 1.4,
               }}
             >
-              Error al unirse: {joinError}
+              Join error: {joinError}
             </div>
           )}
 
@@ -477,6 +479,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '12px',
+                  boxShadow: SHADOW.panel,
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -494,7 +497,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
                     </span>
                     {m.elo_diff != null && (
                       <span>
-                        <span style={{ color: COLORS.muted }}>ELO diff: </span>
+                        <span style={{ color: COLORS.muted }}>Level gap: </span>
                         <span style={{ color: Math.abs(m.elo_diff) > 200 ? COLORS.red : COLORS.green, fontWeight: 700 }}>
                           {m.elo_diff > 0 ? '+' : ''}{m.elo_diff}
                         </span>
@@ -513,7 +516,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
 
                 <div style={{ flexShrink: 0 }}>
                   {isMe ? (
-                    <span style={{ fontSize: '11px', color: COLORS.green, fontWeight: 700 }}>Mi partida</span>
+                    <span style={{ fontSize: '11px', color: COLORS.green, fontWeight: 700 }}>My match</span>
                   ) : m.joinable ? (
                     <motion.button
                       onClick={() => void handleJoin(m)}
@@ -521,16 +524,16 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
                       whileTap={reduced ? undefined : { scale: 0.95 }}
                       style={{
                         ...btnBase,
-                        background: joining ? COLORS.border : COLORS.red,
-                        color: joining ? COLORS.muted : '#1a040a',
-                        boxShadow: joining ? 'none' : `0 0 10px ${COLORS.red}55`,
+                        background: joining ? COLORS.border : COLORS.violet,
+                        color: joining ? COLORS.muted : '#fff',
+                        boxShadow: joining ? 'none' : SHADOW.glow(COLORS.violet),
                         cursor: joining ? 'default' : 'pointer',
                       }}
                     >
-                      {joining ? 'Uniéndose...' : 'Unirse'}
+                      {joining ? 'Joining...' : 'Join'}
                     </motion.button>
                   ) : (
-                    <span style={{ fontSize: '11px', color: COLORS.muted }}>No unible</span>
+                    <span style={{ fontSize: '11px', color: COLORS.muted }}>Not joinable</span>
                   )}
                 </div>
               </div>
