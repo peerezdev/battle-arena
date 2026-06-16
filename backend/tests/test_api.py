@@ -127,7 +127,31 @@ def test_privy_me_503_when_privy_not_configured():
     assert r.status_code == 503
 
 
+def _client_with_privy():
+    """App con un PrivyVerifier configurado cuyo resolver rechaza todo →
+    permite ejercitar de verdad la rama 401 del endpoint (no la 503)."""
+    from app.privy import PrivyVerifier, PrivyAuthError
+
+    def _reject(_kid):
+        raise PrivyAuthError("kid desconocido (test)")
+
+    engine = create_engine("sqlite:///:memory:",
+                           connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    init_db(engine)
+    sf = make_session_factory(engine)
+    auth = AuthService(now_fn=lambda: 1000, ttl=3600)
+    privy = PrivyVerifier(app_id="app123", key_resolver=_reject)
+    app = create_app(sf, MockChainSource(), auth, elo_start=1200, elo_k=32, privy=privy)
+    return TestClient(app)
+
+
 def test_privy_me_401_without_bearer():
-    c, _, _ = _client()
-    r = c.get("/auth/privy/me", headers={"Authorization": "Token abc"})
-    assert r.status_code in (401, 503)  # 503 si privy=None, pero confirma que no es 200
+    c = _client_with_privy()
+    assert c.get("/auth/privy/me", headers={"Authorization": "Token abc"}).status_code == 401
+    assert c.get("/auth/privy/me").status_code == 401
+
+
+def test_privy_me_401_invalid_token():
+    c = _client_with_privy()
+    r = c.get("/auth/privy/me", headers={"Authorization": "Bearer not-a-real-token"})
+    assert r.status_code == 401

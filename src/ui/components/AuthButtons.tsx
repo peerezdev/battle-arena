@@ -5,10 +5,10 @@
  *   variant="nav"     → normal padding/font for the Landing nav bar
  *   variant="compact" → smaller padding/font for the Hub topbar
  *
- * No-provider safety: AppPrivyProvider only renders <PrivyProvider> when
- * VITE_PRIVY_APP_ID is set; otherwise it falls back to plain children, which
- * means usePrivy() has no context and will throw. We guard with a try/catch
- * inside a wrapper component so the app doesn't crash in no-APP_ID dev mode.
+ * No-provider safety: when VITE_PRIVY_APP_ID is unset, AppPrivyProvider renders
+ * plain children (no <PrivyProvider>). Privy's context has a non-null default
+ * with `ready: false`, so usePrivy() returns safely and the `!ready` early
+ * return below renders nothing — no crash, no provider required for build/tests.
  */
 import { usePrivy } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS } from '../theme'
@@ -23,11 +23,7 @@ interface AuthButtonsProps {
   variant?: 'nav' | 'compact'
 }
 
-/**
- * Inner component — must only be rendered when PrivyProvider is present.
- * The outer AuthButtons guard catches the context error.
- */
-function AuthButtonsInner({ variant = 'nav' }: AuthButtonsProps) {
+export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
   const { ready, authenticated, user, login, logout } = usePrivy()
 
   // While Privy is initialising, render nothing to avoid flicker.
@@ -144,18 +140,4 @@ function AuthButtonsInner({ variant = 'nav' }: AuthButtonsProps) {
       </button>
     </div>
   )
-}
-
-/**
- * Public export. Wraps the inner component in an error boundary-style guard
- * so that a missing PrivyProvider (no APP_ID) doesn't crash the render tree.
- * In production the provider is always present when the component is mounted.
- */
-export function AuthButtons(props: AuthButtonsProps) {
-  try {
-    return <AuthButtonsInner {...props} />
-  } catch {
-    // No PrivyProvider in context (dev with no APP_ID) — render nothing.
-    return null
-  }
 }
