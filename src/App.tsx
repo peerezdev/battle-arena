@@ -135,7 +135,7 @@ export default function App() {
 
   // ── Royale handlers ─────────────────────────────────────────────────────
   function startRoyale(config: RoyaleConfig) {
-    setRoyaleState(createRoyale(config, ['Tú']))
+    setRoyaleState(createRoyale(config, ['You']))
     setRoyaleScreen('board')
   }
   function royalePlayRound() {
@@ -156,7 +156,7 @@ export default function App() {
         <BattleBoard
           phase="allocate"
           playerKey="a"
-          playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Jugador A)` : `Tu — ${nameA}`}
+          playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Player A)` : `You — ${nameA}`}
           onCommit={commitA}
           state={state}
           timerSeconds={setup!.timerSeconds}
@@ -164,14 +164,14 @@ export default function App() {
       )
 
     if (offlineScreen === 'passToB')
-      return <PassDeviceScreen nextPlayer={`${nameB} (Jugador B)`} onReady={() => setOfflineScreen('allocateB')} />
+      return <PassDeviceScreen nextPlayer={`${nameB} (Player B)`} onReady={() => setOfflineScreen('allocateB')} />
 
     if (offlineScreen === 'allocateB')
       return (
         <BattleBoard
           phase="allocate"
           playerKey="b"
-          playerLabel={`${nameB} (Jugador B)`}
+          playerLabel={`${nameB} (Player B)`}
           onCommit={commitB}
           state={state}
           timerSeconds={setup!.timerSeconds}
@@ -192,7 +192,7 @@ export default function App() {
       )
 
     if (offlineScreen === 'result') {
-      const wl = state.winner === 'a' ? `Gana ${nameA}` : `Gana ${nameB}`
+      const wl = state.winner === 'a' ? `${nameA} wins` : `${nameB} wins`
       const celebrate = setup!.opponent === 'hotseat' || state.winner === 'a'
       return <ResultScreen winnerLabel={wl} celebrate={celebrate} onFeedback={() => setOfflineScreen('feedback')} />
     }

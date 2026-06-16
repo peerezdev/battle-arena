@@ -394,7 +394,7 @@ export function Landing({ onPlayOffline, onPlayRoyale, onConnect }: LandingProps
               letterSpacing: '-0.01em',
             }}
           >
-            Graded cards,{'\n'}
+            Graded cards,<br />
             <GradientText>made playable.</GradientText>
           </h1>
 
