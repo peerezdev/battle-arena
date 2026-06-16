@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { COLORS, GRADIENT, FONTS } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import type { HubNav } from './hubMockData'
@@ -36,14 +37,8 @@ const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
   { id: 'ranks',  icon: '🏆', label: 'Ranks'  },
 ]
 
-// ─── Props públicas ───────────────────────────────────────────────────────────
-interface Props {
-  onPlayMana: () => void    // Mana Duel offline
-  onPlayRoyale: () => void  // Battle Royale demo
-  onOnchain: () => void     // Pack / Gacha / Create / Find match → on-chain flow
-}
-
-export function Hub({ onPlayMana, onPlayRoyale, onOnchain }: Props) {
+export function Hub() {
+  const navigate = useNavigate()
   const [active, setActive]       = useState<HubNav>('lobby')
   const [stake, setStake]         = useState<number>(STAKE_OPTIONS[1]) // 50
   const [chatOpen, setChatOpen]   = useState(false)
@@ -55,10 +50,10 @@ export function Hub({ onPlayMana, onPlayRoyale, onOnchain }: Props) {
   /** Router centralizado de navegación */
   function go(id: HubNav) {
     switch (id) {
-      case 'mana':   return onPlayMana()
-      case 'royale': return onPlayRoyale()
+      case 'mana':   return navigate('/play/mana')
+      case 'royale': return navigate('/play/royale')
       case 'pack':
-      case 'gacha':  return onOnchain()
+      case 'gacha':  return navigate('/play/arena')
       default:       return setActive(id)
     }
   }
@@ -220,12 +215,12 @@ export function Hub({ onPlayMana, onPlayRoyale, onOnchain }: Props) {
           <QuickMatch
             selectedStake={stake}
             onStake={setStake}
-            onFindMatch={onOnchain}
-            onCreate={onOnchain}
+            onFindMatch={() => navigate('/play/arena')}
+            onCreate={() => navigate('/play/arena')}
           />
           <LiveBattles
             onSelectMode={go}
-            onBattleAction={() => onOnchain()}
+            onBattleAction={() => navigate('/play/arena')}
           />
         </div>
       </div>

@@ -4,6 +4,7 @@
  * Responsive: 2-col hero/games on ≥820px, single-col below.
  */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { COLORS, GRADIENT, FONTS } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
@@ -26,10 +27,6 @@ function useIsWide(query = '(min-width: 820px)'): boolean {
   return wide
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-export interface LandingProps {
-  onLaunch: () => void  // open the Hub
-}
 
 // ── Gradient text helper ──────────────────────────────────────────────────────
 function GradientText({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -252,7 +249,8 @@ function GameCard({ icon, title, description, pill, onClick, reduced }: GameCard
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function Landing({ onLaunch }: LandingProps) {
+export function Landing() {
+  const navigate = useNavigate()
   const reduced = useReducedMotion()
   const wide = useIsWide('(min-width: 820px)')
 
@@ -398,7 +396,7 @@ export function Landing({ onLaunch }: LandingProps) {
           >
             {/* Primary gradient button */}
             <motion.button
-              onClick={onLaunch}
+              onClick={() => navigate('/app')}
               whileTap={reduced ? undefined : { scale: 0.97 }}
               style={{
                 background: GRADIENT,
@@ -527,7 +525,7 @@ export function Landing({ onLaunch }: LandingProps) {
               title="Pack Battle"
               description="Both players open a pack; the winner takes both cards. Resolve by value or play it out."
               pill="WINNER TAKES ALL"
-              onClick={onLaunch}
+              onClick={() => navigate('/app')}
               reduced={reduced}
             />
             <GameCard
@@ -535,7 +533,7 @@ export function Landing({ onLaunch }: LandingProps) {
               title="Battle Royale"
               description="Up to 10 players open packs in rounds; lowest value falls; the last one standing takes the pot."
               pill="2–10 PLAYERS"
-              onClick={onLaunch}
+              onClick={() => navigate('/app')}
               reduced={reduced}
             />
             <GameCard
@@ -543,7 +541,7 @@ export function Landing({ onLaunch }: LandingProps) {
               title="Gacha"
               description="Open Collector Crypt packs and jump straight into a battle with the card you pull."
               pill="PULL → PLAY"
-              onClick={onLaunch}
+              onClick={() => navigate('/app')}
               reduced={reduced}
             />
             <GameCard
@@ -551,7 +549,7 @@ export function Landing({ onLaunch }: LandingProps) {
               title="Mana Duel"
               description="Hidden mana allocation across three fronts. Skill-first; card value gives a capped edge."
               pill="SKILL"
-              onClick={onLaunch}
+              onClick={() => navigate('/app')}
               reduced={reduced}
             />
           </motion.div>
