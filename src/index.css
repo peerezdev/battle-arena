@@ -1,18 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  background-color: #0a0e1a;
-  color: #e7ecf5;
+  background-color: #0b0e14;
+  color: #e9edf5;
   font-family: 'Inter', system-ui, sans-serif;
   min-height: 100dvh;
 }
 
 :root {
-  --font-orbitron: 'Orbitron', system-ui, sans-serif;
+  --font-display: 'Sora', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
 
@@ -22,8 +22,8 @@ body {
 }
 
 @keyframes orb-pulse {
-  0%, 100% { box-shadow: 0 0 6px var(--orb-color, #34e29b), 0 0 12px var(--orb-color, #34e29b44); }
-  50%       { box-shadow: 0 0 10px var(--orb-color, #34e29b), 0 0 22px var(--orb-color, #34e29b66); }
+  0%, 100% { box-shadow: 0 0 6px var(--orb-color, #14F195), 0 0 12px var(--orb-color, #14F19544); }
+  50%       { box-shadow: 0 0 10px var(--orb-color, #14F195), 0 0 22px var(--orb-color, #14F19566); }
 }
 
 /* Custom range slider — accent changes per player via CSS var */
@@ -43,8 +43,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--slider-color, #34e29b);
-  box-shadow: 0 0 8px var(--slider-color, #34e29b);
+  background: var(--slider-color, #14F195);
+  box-shadow: 0 0 8px var(--slider-color, #14F195);
   cursor: pointer;
   border: 2px solid #0a0e1a;
 }
@@ -53,8 +53,8 @@ input[type="range"]::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--slider-color, #34e29b);
-  box-shadow: 0 0 8px var(--slider-color, #34e29b);
+  background: var(--slider-color, #14F195);
+  box-shadow: 0 0 8px var(--slider-color, #14F195);
   cursor: pointer;
   border: 2px solid #0a0e1a;
 }
@@ -63,18 +63,18 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"].slider-green {
   background: linear-gradient(
     to right,
-    #34e29b 0%,
-    #34e29b var(--slider-pct, 0%),
+    #14F195 0%,
+    #14F195 var(--slider-pct, 0%),
     #121a30 var(--slider-pct, 0%),
     #121a30 100%
   );
 }
 
-input[type="range"].slider-red {
+input[type="range"].slider-violet {
   background: linear-gradient(
     to right,
-    #ff5c72 0%,
-    #ff5c72 var(--slider-pct, 0%),
+    #9945FF 0%,
+    #9945FF var(--slider-pct, 0%),
     #121a30 var(--slider-pct, 0%),
     #121a30 100%
   );

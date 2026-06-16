@@ -109,7 +109,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
               style={{
                 fontSize: '22px',
                 fontWeight: 800,
-                fontFamily: FONTS.orbitron,
+                fontFamily: FONTS.display,
                 color: COLORS.text,
                 lineHeight: 1,
               }}
@@ -137,7 +137,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                 style={{
                   fontSize: '18px',
                   fontWeight: 800,
-                  fontFamily: FONTS.orbitron,
+                  fontFamily: FONTS.display,
                   color: '#f59e0b',
                 }}
               >
@@ -354,7 +354,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                           style={{
                             fontSize: '12px',
                             fontWeight: 800,
-                            fontFamily: FONTS.orbitron,
+                            fontFamily: FONTS.display,
                             color: COLORS.text,
                           }}
                         >
@@ -463,7 +463,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
               cursor: 'pointer',
               letterSpacing: '.03em',
               boxShadow: '0 0 16px #34e29b55',
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
             }}
           >
             Ver resultado →
@@ -484,7 +484,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
               cursor: 'pointer',
               letterSpacing: '.03em',
               boxShadow: '0 0 12px #34e29b55',
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
             }}
           >
             🎴 Abrir pack (ronda {state.round})

@@ -63,7 +63,7 @@ function Shell({ children, onBack }: { children: React.ReactNode; onBack: () => 
             style={{
               fontSize: '26px',
               fontWeight: 900,
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
               letterSpacing: '.08em',
               color: COLORS.text,
             }}

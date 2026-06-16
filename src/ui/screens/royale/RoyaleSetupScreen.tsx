@@ -51,7 +51,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
               fontWeight: 800,
               letterSpacing: '-0.5px',
               color: COLORS.green,
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
             }}
           >
             🏆 Battle Royale
@@ -117,7 +117,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
                 textAlign: 'center',
                 fontSize: '32px',
                 fontWeight: 800,
-                fontFamily: FONTS.orbitron,
+                fontFamily: FONTS.display,
                 color: COLORS.green,
                 lineHeight: 1,
               }}
@@ -210,7 +210,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
                       style={{
                         fontSize: '13px',
                         fontWeight: 800,
-                        fontFamily: FONTS.orbitron,
+                        fontFamily: FONTS.display,
                         color: selected ? COLORS.green : COLORS.muted,
                       }}
                     >

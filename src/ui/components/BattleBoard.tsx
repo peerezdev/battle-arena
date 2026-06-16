@@ -184,7 +184,7 @@ function HeroPortrait({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontFamily: FONTS.orbitron,
+          fontFamily: FONTS.display,
           fontWeight: 800,
           fontSize: s(14, 26),
           color: accentColor,
@@ -304,7 +304,7 @@ function ManaCrystals({
           style={{
             fontSize: s(20, 40),
             fontWeight: 800,
-            fontFamily: FONTS.orbitron,
+            fontFamily: FONTS.display,
             color: accentColor,
             lineHeight: 1,
           }}
@@ -575,7 +575,7 @@ function FrontColumn(props: FrontColumnProps) {
             style={{
               fontSize: s(20, 40),
               fontWeight: isRevealed && winner === 'b' ? 800 : 400,
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
               color: isRevealed && winner === 'b' ? COLORS.red : COLORS.text,
             }}
           >
@@ -669,7 +669,7 @@ function FrontColumn(props: FrontColumnProps) {
             style={{
               fontSize: s(20, 40),
               fontWeight: isRevealed && winner === 'a' ? 800 : 400,
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
               color: isRevealed && winner === 'a' ? COLORS.green : COLORS.text,
             }}
           >
@@ -851,7 +851,7 @@ function FrontColumn(props: FrontColumnProps) {
             style={{
               fontSize: s(24, 42),
               fontWeight: 800,
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
               color: hasAlloc ? accentColor : COLORS.muted,
               lineHeight: 1,
             }}
@@ -1196,11 +1196,11 @@ export function BattleBoard(props: BattleBoardProps) {
           RONDA {state.round + 1}
         </div>
         <div style={{ display: 'flex', gap: s(5, 8), alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, fontFamily: FONTS.orbitron, fontSize: s(16, 30), color: COLORS.green }}>
+          <span style={{ fontWeight: 700, fontFamily: FONTS.display, fontSize: s(16, 30), color: COLORS.green }}>
             {state.roundWins.a}
           </span>
           <span style={{ fontSize: s(12, 20), color: COLORS.muted, fontFamily: FONTS.mono }}>–</span>
-          <span style={{ fontWeight: 700, fontFamily: FONTS.orbitron, fontSize: s(16, 30), color: COLORS.red }}>
+          <span style={{ fontWeight: 700, fontFamily: FONTS.display, fontSize: s(16, 30), color: COLORS.red }}>
             {state.roundWins.b}
           </span>
         </div>
@@ -1342,7 +1342,7 @@ export function BattleBoard(props: BattleBoardProps) {
             fontSize: s(13, 20),
             fontWeight: 800,
             color: accentColor,
-            fontFamily: FONTS.orbitron,
+            fontFamily: FONTS.display,
             marginBottom: s(5, 8),
             paddingLeft: '2px',
           }}
@@ -1457,7 +1457,7 @@ export function BattleBoard(props: BattleBoardProps) {
                     fontSize: s(17, 30),
                     fontWeight: 800,
                     color: roundWinColor,
-                    fontFamily: FONTS.orbitron,
+                    fontFamily: FONTS.display,
                   }}
                 >
                   {roundWinLabel}
@@ -1487,7 +1487,7 @@ export function BattleBoard(props: BattleBoardProps) {
             padding: s(15, 20),
             fontSize: s(15, 22),
             fontWeight: 800,
-            fontFamily: FONTS.orbitron,
+            fontFamily: FONTS.display,
             cursor: committing ? 'default' : 'pointer',
             letterSpacing: '.03em',
             boxShadow: `0 0 14px ${accentColor}66`,
@@ -1535,7 +1535,7 @@ export function BattleBoard(props: BattleBoardProps) {
                 padding: s(15, 20),
                 fontSize: s(15, 22),
                 fontWeight: 800,
-                fontFamily: FONTS.orbitron,
+                fontFamily: FONTS.display,
                 cursor: 'pointer',
                 letterSpacing: '.03em',
                 boxShadow: '0 0 12px #34e29b55',

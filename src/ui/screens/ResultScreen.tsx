@@ -110,7 +110,7 @@ export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Prop
         <div style={{ fontSize: '11px', color: COLORS.muted, letterSpacing: '.08em', marginBottom: '8px', fontFamily: FONTS.mono }}>
           RESULTADO FINAL
         </div>
-        <div style={{ fontSize: '26px', fontWeight: 800, color: accent, marginBottom: '32px', lineHeight: 1.2, fontFamily: FONTS.orbitron }}>
+        <div style={{ fontSize: '26px', fontWeight: 800, color: accent, marginBottom: '32px', lineHeight: 1.2, fontFamily: FONTS.display }}>
           {winnerLabel}
         </div>
         <motion.button

@@ -91,7 +91,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
             ENERGÍA DISPONIBLE
           </span>
           <span style={{ fontSize: '11px', color: COLORS.muted, fontFamily: FONTS.mono }}>
-            sin asignar <strong style={{ color: accentColor, fontSize: '13px', fontFamily: FONTS.orbitron }}>{pool}</strong> · se banca
+            sin asignar <strong style={{ color: accentColor, fontSize: '13px', fontFamily: FONTS.display }}>{pool}</strong> · se banca
           </span>
         </div>
         <motion.div
@@ -193,7 +193,7 @@ export function EnergyAllocator({ alloc, available, onChange, accentColor, reduc
                   style={{
                     fontSize: '30px',
                     fontWeight: 800,
-                    fontFamily: FONTS.orbitron,
+                    fontFamily: FONTS.display,
                     color: value > 0 ? accentColor : COLORS.muted,
                     minWidth: '34px',
                     textAlign: 'center',

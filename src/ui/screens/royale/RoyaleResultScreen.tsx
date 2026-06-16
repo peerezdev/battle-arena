@@ -132,7 +132,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             fontSize: '24px',
             fontWeight: 800,
             color: accentColor,
-            fontFamily: FONTS.orbitron,
+            fontFamily: FONTS.display,
             lineHeight: 1.2,
             marginBottom: '4px',
           }}
@@ -177,7 +177,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             style={{
               fontSize: '28px',
               fontWeight: 800,
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
               color: '#f59e0b',
               lineHeight: 1,
               marginBottom: '2px',
@@ -238,7 +238,7 @@ export function RoyaleResultScreen({ state, onPlayAgain, onExit, reducedMotion }
             letterSpacing: '.03em',
             boxShadow: '0 0 12px #34e29b55',
             marginBottom: '10px',
-            fontFamily: FONTS.orbitron,
+            fontFamily: FONTS.display,
           }}
         >
           Jugar otra

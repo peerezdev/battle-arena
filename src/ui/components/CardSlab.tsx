@@ -126,7 +126,7 @@ export function CardSlab({
           fontSize: nameFontSize,
           fontWeight: 700,
           color: accentColor,
-          fontFamily: FONTS.orbitron,
+          fontFamily: FONTS.display,
           textAlign: 'center',
           padding: '0 6px',
           letterSpacing: '.04em',
@@ -176,7 +176,7 @@ export function CardSlab({
           style={{
             fontWeight: 700,
             fontSize: isCompact ? '11px' : gradeFontSize,
-            fontFamily: FONTS.orbitron,
+            fontFamily: FONTS.display,
             color: accentColor,
           }}
         >

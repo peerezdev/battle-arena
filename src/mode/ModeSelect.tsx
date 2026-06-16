@@ -72,7 +72,7 @@ export function ModeSelect({ onSelect }: Props) {
               letterSpacing: '-0.5px',
               color: COLORS.green,
               marginBottom: '8px',
-              fontFamily: FONTS.orbitron,
+              fontFamily: FONTS.display,
             }}
           >
             ⚡ TCG Battle Arena

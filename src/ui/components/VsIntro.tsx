@@ -131,7 +131,7 @@ export function VsIntro({ cardA, cardB, reducedMotion, onDone }: Props) {
               animate={{ scale: 1, opacity: 1 }}
               transition={reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 18, delay: 0.35 }}
               style={{
-                fontFamily: FONTS.orbitron,
+                fontFamily: FONTS.display,
                 fontWeight: 900,
                 fontSize: '26px',
                 color: COLORS.text,
