@@ -1,0 +1,64 @@
+import type { ReactNode } from 'react'
+import { PrivyProvider } from '@privy-io/react-auth'
+import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit'
+
+const APP_ID = import.meta.env.VITE_PRIVY_APP_ID as string | undefined
+
+const SOLANA_RPC_URL =
+  (import.meta.env.VITE_SOLANA_RPC as string | undefined) ??
+  'https://api.devnet.solana.com'
+
+// Derive the WebSocket URL from the HTTP RPC URL.
+// e.g. https://api.devnet.solana.com → wss://api.devnet.solana.com
+const SOLANA_WS_URL = SOLANA_RPC_URL.replace(/^https?:\/\//, (match) =>
+  match.startsWith('https') ? 'wss://' : 'ws://',
+)
+
+export function AppPrivyProvider({ children }: { children: ReactNode }) {
+  if (!APP_ID) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        'VITE_PRIVY_APP_ID no configurado: auth deshabilitada',
+      )
+    }
+    return <>{children}</>
+  }
+
+  return (
+    <PrivyProvider
+      appId={APP_ID}
+      config={{
+        // Login methods: email OTP + external wallets (EVM and Solana)
+        loginMethods: ['email', 'wallet'],
+
+        // Show EVM and Solana wallets in the connect modal
+        appearance: {
+          theme: 'dark',
+          // Solana violet as primary accent
+          accentColor: '#9945FF',
+          // Show both EVM and Solana wallets in the wallet connect modal
+          walletChainType: 'ethereum-and-solana',
+        },
+
+        // Create a Solana embedded wallet for users who don't have one
+        embeddedWallets: {
+          solana: {
+            createOnLogin: 'users-without-wallets',
+          },
+        },
+
+        // Solana RPC configuration for devnet (required for embedded wallet UIs)
+        solana: {
+          rpcs: {
+            'solana:devnet': {
+              rpc: createSolanaRpc(SOLANA_RPC_URL),
+              rpcSubscriptions: createSolanaRpcSubscriptions(SOLANA_WS_URL),
+            },
+          },
+        },
+      }}
+    >
+      {children}
+    </PrivyProvider>
+  )
+}
