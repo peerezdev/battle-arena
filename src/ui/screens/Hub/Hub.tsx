@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { COLORS, GRADIENT, FONTS } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
+import { AuthButtons } from '../../components/AuthButtons'
 import type { HubNav } from './hubMockData'
 import { STAKE_OPTIONS } from './hubMockData'
 import { LeftRail } from './LeftRail'
@@ -162,6 +163,9 @@ export function Hub() {
               </div>
             </div>
           </div>
+
+          {/* Auth buttons */}
+          <AuthButtons variant="compact" />
 
           {/* + Deposit (no funcional, Coming soon) */}
           <button

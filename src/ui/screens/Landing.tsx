@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { COLORS, GRADIENT, FONTS } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
+import { AuthButtons } from '../components/AuthButtons'
 
 // ── Responsive helper ─────────────────────────────────────────────────────────
 function useIsWide(query = '(min-width: 820px)'): boolean {
@@ -315,6 +316,8 @@ export function Landing() {
             BattleArena
           </div>
 
+          {/* Auth buttons — right side of nav */}
+          <AuthButtons variant="nav" />
         </div>
       </nav>
 
