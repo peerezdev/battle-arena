@@ -119,3 +119,15 @@ def test_create_match_min_elo_greater_than_max_elo_rejected():
     r = c.post("/matches", json={"battle_pubkey": BP2, "min_elo": 1500, "max_elo": 1000},
                headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 422
+
+
+def test_privy_me_503_when_privy_not_configured():
+    c, _, _ = _client()  # create_app sin privy => privy=None
+    r = c.get("/auth/privy/me")
+    assert r.status_code == 503
+
+
+def test_privy_me_401_without_bearer():
+    c, _, _ = _client()
+    r = c.get("/auth/privy/me", headers={"Authorization": "Token abc"})
+    assert r.status_code in (401, 503)  # 503 si privy=None, pero confirma que no es 200

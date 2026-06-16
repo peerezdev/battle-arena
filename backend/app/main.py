@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from .config import get_settings
 from .db import make_engine, make_session_factory, init_db
 from .auth import AuthService, AuthError
+from .privy import PrivyVerifier, PrivyAuthError
 from .chain.base import ChainSource
 from .chain.mock import MockChainSource
 from .services.users import get_or_create_user, read_user_view, set_alias, leaderboard, history
@@ -67,7 +68,8 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
                elo_start: int = 1200, elo_k: int = 32,
                cors_origins: list[str] | None = None,
                gacha: GachaService | None = None,
-               gacha_rate_limit: int = 10) -> FastAPI:
+               gacha_rate_limit: int = 10,
+               privy: PrivyVerifier | None = None) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
 
     if cors_origins:
@@ -252,6 +254,18 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
             s.commit()
         return out
 
+    @app.get("/auth/privy/me")
+    async def privy_me(authorization: Optional[str] = Header(None)):
+        if privy is None:
+            raise HTTPException(503, "privy no configurado")
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(401, "falta token")
+        try:
+            claims = privy.verify(authorization[len("Bearer "):])
+        except PrivyAuthError:
+            raise HTTPException(401, "token Privy inválido")
+        return {"sub": claims.get("sub")}
+
     return app
 
 
@@ -263,8 +277,9 @@ def build_default_app() -> FastAPI:
     chain: ChainSource = MockChainSource()  # 'solana' se cablea cuando el lector real esté validado
     auth = AuthService(ttl=s.session_ttl)
     gacha = GachaService(base_url=s.gacha_base_url, api_key=s.gacha_api_key)
+    privy = PrivyVerifier(app_id=s.privy_app_id, jwks_url=s.privy_jwks_url.format(app_id=s.privy_app_id)) if s.privy_app_id else None
     return create_app(session_factory, chain, auth, elo_start=s.elo_start, elo_k=s.elo_k,
-                      cors_origins=s.cors_origins, gacha=gacha)
+                      cors_origins=s.cors_origins, gacha=gacha, privy=privy)
 
 
 app = build_default_app()

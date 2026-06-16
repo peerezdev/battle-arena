@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     cors_origins: List[str] = []
     gacha_base_url: str = "https://dev-gacha.collectorcrypt.com"
     gacha_api_key: str = ""  # vacío => módulo gacha deshabilitado
+    privy_app_id: str = ""
+    privy_jwks_url: str = "https://auth.privy.io/api/v1/apps/{app_id}/jwks.json"
 
 
 def get_settings() -> Settings:
