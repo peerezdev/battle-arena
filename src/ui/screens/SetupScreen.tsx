@@ -76,7 +76,7 @@ export function SetupScreen({ onStart, error }: { onStart: (s: Setup) => void; e
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        minHeight: '100%',
         background: COLORS.bg,
         color: COLORS.text,
         fontFamily: 'Inter, system-ui, sans-serif',

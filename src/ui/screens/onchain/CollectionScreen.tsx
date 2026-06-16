@@ -64,7 +64,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        minHeight: '100%',
         background: COLORS.bg,
         color: COLORS.text,
         fontFamily: 'Inter, system-ui, sans-serif',

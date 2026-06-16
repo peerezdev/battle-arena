@@ -97,7 +97,7 @@ export function ArenaBackdrop({ children, reducedMotion, accentA = '#14F195', ac
   }, [reducedMotion])
 
   return (
-    <div style={{ position: 'relative', minHeight: '100dvh', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', height: '100%', minHeight: '100%', overflow: 'hidden' }}>
       {/* Layer 1: dark base */}
       <div
         aria-hidden="true"

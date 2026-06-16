@@ -21,7 +21,7 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        minHeight: '100%',
         background: COLORS.bg,
         color: COLORS.text,
         fontFamily: 'Inter, system-ui, sans-serif',

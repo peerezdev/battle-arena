@@ -285,7 +285,7 @@ export function LobbyScreen({ token, selectedCard, onBattleJoined, onBack }: Pro
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        minHeight: '100%',
         background: COLORS.bg,
         color: COLORS.text,
         fontFamily: 'Inter, system-ui, sans-serif',

@@ -1561,7 +1561,7 @@ export function BattleBoard(props: BattleBoardProps) {
         style={{
           color: COLORS.text,
           fontFamily: 'Inter, system-ui, sans-serif',
-          height: '100dvh',
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
