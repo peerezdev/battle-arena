@@ -117,34 +117,25 @@ export function ChatDock({ drops = MOCK_DROPS, messages = MOCK_CHAT }: { drops?:
         ))}
       </div>
 
-      {/* ── CHAT TABS ── */}
+      {/* ── CHAT HEADING ── */}
       <div
         style={{
-          display: 'flex',
-          gap: 4,
           padding: '12px 16px 0',
         }}
       >
-        {(['Chat', 'Friends'] as const).map((tab) => {
-          const isActive = tab === 'Chat'
-          return (
-            <button
-              key={tab}
-              style={{
-                fontSize: 11,
-                color: isActive ? COLORS.text : COLORS.muted,
-                padding: '7px 12px',
-                borderRadius: '8px 8px 0 0',
-                cursor: 'pointer',
-                background: isActive ? '#11161f' : 'transparent',
-                border: 'none',
-                fontFamily: FONTS.body,
-              }}
-            >
-              {tab}
-            </button>
-          )
-        })}
+        <div
+          style={{
+            fontSize: 11,
+            color: COLORS.text,
+            padding: '7px 12px',
+            borderRadius: '8px 8px 0 0',
+            background: '#11161f',
+            fontFamily: FONTS.body,
+            display: 'inline-block',
+          }}
+        >
+          Chat
+        </div>
       </div>
 
       {/* Online count */}
