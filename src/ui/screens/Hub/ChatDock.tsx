@@ -1,7 +1,37 @@
+import { useState } from 'react'
 import { COLORS, FONTS, formatUsd } from '../../theme'
-import { MOCK_DROPS, MOCK_CHAT, type DropItem, type ChatMsg } from './hubMockData'
+import { MOCK_DROPS, type DropItem } from './hubMockData'
+import { useChat } from '../../../hooks/useChat'
 
-export function ChatDock({ drops = MOCK_DROPS, messages = MOCK_CHAT }: { drops?: DropItem[]; messages?: ChatMsg[] }) {
+// Palette for coloring usernames deterministically
+const USER_COLORS = ['#b78cff', '#14F195', '#5ad1ff', '#ff6b6b', '#ffd166', '#f7c59f']
+function userColor(user: string): string {
+  let hash = 0
+  for (let i = 0; i < user.length; i++) hash = (hash * 31 + user.charCodeAt(i)) | 0
+  return USER_COLORS[Math.abs(hash) % USER_COLORS.length]
+}
+
+function formatTs(ts: number): string {
+  const d = new Date(ts)
+  const hh = d.getHours().toString().padStart(2, '0')
+  const mm = d.getMinutes().toString().padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+export function ChatDock({ drops = MOCK_DROPS }: { drops?: DropItem[] }) {
+  const { messages, send, canPost } = useChat()
+  const [draft, setDraft] = useState('')
+
+  function handleSend() {
+    if (!draft.trim()) return
+    send(draft)
+    setDraft('')
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') handleSend()
+  }
+
   return (
     <aside
       style={{
@@ -173,72 +203,63 @@ export function ChatDock({ drops = MOCK_DROPS, messages = MOCK_CHAT }: { drops?:
           gap: 11,
         }}
       >
-        {messages.map((msg: ChatMsg) => (
-          <div key={msg.id}>
-            {/* Row: avatar + name + mod badge + timestamp */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                marginBottom: 2,
-              }}
-            >
-              {/* Avatar */}
+        {messages.length === 0 ? (
+          <div style={{ fontSize: 11, color: COLORS.muted, fontFamily: FONTS.body, marginTop: 8 }}>
+            Sé el primero en escribir…
+          </div>
+        ) : (
+          messages.map((msg, idx) => (
+            <div key={`${msg.ts}-${idx}`}>
+              {/* Row: avatar + name + timestamp */}
               <div
                 style={{
-                  width: 21,
-                  height: 21,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg,#9945FF,#14F195)',
-                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  marginBottom: 2,
                 }}
-              />
-              {/* Username */}
-              <span
+              >
+                {/* Avatar */}
+                <div
+                  style={{
+                    width: 21,
+                    height: 21,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg,#9945FF,#14F195)',
+                    flexShrink: 0,
+                  }}
+                />
+                {/* Username */}
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 11.5,
+                    color: userColor(msg.user),
+                    fontFamily: FONTS.body,
+                  }}
+                >
+                  {msg.user}
+                </span>
+                {/* Timestamp */}
+                <span style={{ fontSize: 9, color: '#5d6781', marginLeft: 'auto' }}>
+                  {formatTs(msg.ts)}
+                </span>
+              </div>
+              {/* Bubble text */}
+              <div
                 style={{
-                  fontWeight: 700,
-                  fontSize: 11.5,
-                  color: msg.color,
+                  fontSize: 12,
+                  color: '#cdd5e6',
+                  paddingLeft: 28,
+                  lineHeight: 1.35,
                   fontFamily: FONTS.body,
                 }}
               >
-                {msg.user}
-              </span>
-              {/* MOD badge */}
-              {msg.mod && (
-                <span
-                  style={{
-                    fontSize: 8,
-                    fontWeight: 700,
-                    background: '#e8b341',
-                    color: '#1a1206',
-                    borderRadius: 3,
-                    padding: '1px 4px',
-                  }}
-                >
-                  MOD
-                </span>
-              )}
-              {/* Timestamp */}
-              <span style={{ fontSize: 9, color: '#5d6781', marginLeft: 'auto' }}>
-                {msg.ts}
-              </span>
+                {msg.text}
+              </div>
             </div>
-            {/* Bubble text */}
-            <div
-              style={{
-                fontSize: 12,
-                color: '#cdd5e6',
-                paddingLeft: 28,
-                lineHeight: 1.35,
-                fontFamily: FONTS.body,
-              }}
-            >
-              {msg.text}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* ── CHAT INPUT ── */}
@@ -251,9 +272,11 @@ export function ChatDock({ drops = MOCK_DROPS, messages = MOCK_CHAT }: { drops?:
         }}
       >
         <input
-          disabled
-          placeholder="Chat coming soon…"
-          title="Coming soon"
+          disabled={!canPost}
+          placeholder={canPost ? 'Escribe un mensaje…' : 'Inicia sesión para chatear'}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
           style={{
             flex: 1,
             background: '#0a0e16',
@@ -264,20 +287,21 @@ export function ChatDock({ drops = MOCK_DROPS, messages = MOCK_CHAT }: { drops?:
             fontSize: 12,
             outline: 'none',
             fontFamily: FONTS.body,
-            cursor: 'not-allowed',
-            opacity: 0.6,
+            cursor: canPost ? 'text' : 'not-allowed',
+            opacity: canPost ? 1 : 0.6,
           }}
         />
         <button
-          disabled
+          disabled={!canPost}
+          onClick={handleSend}
           style={{
             width: 38,
             borderRadius: 10,
             border: 'none',
             background: 'linear-gradient(135deg,#9945FF,#14F195)',
             color: '#06120c',
-            cursor: 'not-allowed',
-            opacity: 0.5,
+            cursor: canPost ? 'pointer' : 'not-allowed',
+            opacity: canPost ? 1 : 0.5,
             fontSize: 14,
           }}
         >
