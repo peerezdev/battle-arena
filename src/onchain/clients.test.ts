@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { attest } from './oracleClient'
-import { getOpenMatches, registerMatch, syncMatch, compareElo, getNonce, verify } from './backendClient'
+import { getOpenMatches, registerMatch, syncMatch, compareElo } from './backendClient'
 
 beforeEach(() => vi.restoreAllMocks())
 
@@ -61,21 +61,4 @@ describe('backendClient', () => {
     expect(r.diff).toBe(100)
   })
 
-  it('getNonce llama GET /auth/nonce', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ nonce: 'abc123' }) })
-    vi.stubGlobal('fetch', fetchMock)
-    const r = await getNonce('WALLET_ADDR')
-    expect(fetchMock.mock.calls[0][0]).toContain('/auth/nonce')
-    expect(r.nonce).toBe('abc123')
-  })
-
-  it('verify llama POST /auth/verify y devuelve token', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ token: 'JWT123' }) })
-    vi.stubGlobal('fetch', fetchMock)
-    const r = await verify('WALLET_ADDR', 'SIGHEX')
-    expect(fetchMock.mock.calls[0][0]).toContain('/auth/verify')
-    const opts = fetchMock.mock.calls[0][1]
-    expect(opts.method).toBe('POST')
-    expect(r.token).toBe('JWT123')
-  })
 })

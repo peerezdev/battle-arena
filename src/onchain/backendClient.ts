@@ -35,14 +35,6 @@ export interface EloCompareResponse {
   diff: number
 }
 
-export interface NonceResponse {
-  nonce: string
-}
-
-export interface VerifyResponse {
-  token: string
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(
@@ -96,19 +88,3 @@ export async function compareElo(addrA: string, addrB: string): Promise<EloCompa
   return apiFetch<EloCompareResponse>(url)
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-/** Obtiene el nonce para autenticar una wallet. */
-export async function getNonce(wallet: string): Promise<NonceResponse> {
-  const url = `${config.backendUrl}/auth/nonce?wallet=${encodeURIComponent(wallet)}`
-  return apiFetch<NonceResponse>(url)
-}
-
-/** Verifica la firma del wallet y devuelve un JWT. */
-export async function verify(wallet: string, sigHex: string): Promise<VerifyResponse> {
-  return apiFetch<VerifyResponse>(`${config.backendUrl}/auth/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ wallet, signature: sigHex }),
-  })
-}
