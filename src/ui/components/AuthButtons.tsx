@@ -10,8 +10,11 @@
  * with `ready: false`, so usePrivy() returns safely and the `!ready` early
  * return below renders nothing — no crash, no provider required for build/tests.
  */
+import { useState, useRef, useEffect } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
+import { useNavigate } from 'react-router-dom'
 import { COLORS, GRADIENT, FONTS } from '../theme'
+import { useProfile } from '../../hooks/useProfile'
 
 /** Abbreviate a wallet address: "ABcd…WXyz" (first 4 + last 4 chars). */
 function abbrevAddr(addr: string): string {
@@ -23,13 +26,41 @@ interface AuthButtonsProps {
   variant?: 'nav' | 'compact'
 }
 
+const menuItemStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  textAlign: 'left',
+  background: 'transparent',
+  border: 'none',
+  color: '#e9edf5',
+  borderRadius: 7,
+  padding: '9px 11px',
+  fontSize: 13,
+  fontFamily: 'Inter, system-ui, sans-serif',
+  cursor: 'pointer',
+}
+
 export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
   const { ready, authenticated, user, login, logout } = usePrivy()
 
+  // ── All hooks must be called unconditionally, before any early return ──────
+  const navigate = useNavigate()
+  const { username } = useProfile()
+  const [open, setOpen] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const isCompact = variant === 'compact'
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
   // While Privy is initialising, render nothing to avoid flicker.
   if (!ready) return null
-
-  const isCompact = variant === 'compact'
 
   const btnBase: React.CSSProperties = {
     borderRadius: '10px',
@@ -61,15 +92,16 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
     )
   }
 
-  // ── Authenticated: account chip + Log out ──────────────────────────────────
+  // ── Authenticated: Profile button + dropdown ───────────────────────────────
   const emailAddr = user?.email?.address
   const walletAddr = user?.wallet?.address
-  const displayName = emailAddr ?? (walletAddr ? abbrevAddr(walletAddr) : 'Account')
+  const displayName = username ?? emailAddr ?? (walletAddr ? abbrevAddr(walletAddr) : 'Account')
 
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-      {/* Account chip */}
-      <div
+    <div ref={boxRef} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title={emailAddr ?? walletAddr ?? undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -81,47 +113,50 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
           fontSize: isCompact ? '11px' : '13px',
           fontFamily: FONTS.mono,
           color: COLORS.text,
-          maxWidth: isCompact ? '140px' : '200px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          maxWidth: isCompact ? '160px' : '220px',
+          cursor: 'pointer',
         }}
-        title={emailAddr ?? walletAddr ?? undefined}
       >
-        {/* Green dot — authenticated indicator */}
-        <span
+        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: COLORS.green, flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
+        <span style={{ marginLeft: 2, color: COLORS.muted, fontSize: 10 }}>▾</span>
+      </button>
+
+      {open && (
+        <div
           style={{
-            display: 'inline-block',
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            background: COLORS.green,
-            flexShrink: 0,
-          }}
-        />
-        <span
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            right: 0,
+            minWidth: 160,
+            background: '#11161f',
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 10,
+            padding: 6,
+            zIndex: 50,
+            boxShadow: '0 8px 24px #00000066',
           }}
         >
-          {displayName}
-        </span>
-      </div>
-
-      {/* Ghost: Log out */}
-      <button
-        onClick={() => void logout()}
-        style={{
-          ...btnBase,
-          background: 'transparent',
-          border: `1px solid ${COLORS.border}`,
-          color: COLORS.muted,
-        }}
-      >
-        Log out
-      </button>
+          <button
+            onClick={() => {
+              setOpen(false)
+              navigate('/profile')
+            }}
+            style={menuItemStyle}
+          >
+            View profile
+          </button>
+          <button
+            onClick={() => {
+              setOpen(false)
+              void logout()
+            }}
+            style={{ ...menuItemStyle, color: COLORS.muted }}
+          >
+            Log out
+          </button>
+        </div>
+      )}
     </div>
   )
 }
