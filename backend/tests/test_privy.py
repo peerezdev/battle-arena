@@ -54,7 +54,16 @@ def _make_id_token(priv, app_id, linked_accounts, sub="did:privy:abc", exp_delta
 
 
 def _solana_embedded(addr):
-    return {"type": "wallet", "chain_type": "solana", "connector_type": "embedded", "address": addr}
+    """Forma REAL del identity token de Privy: connector_type None, la embedded se
+    distingue por wallet_client_type == "privy"."""
+    return {"type": "wallet", "chain_type": "solana", "connector_type": None,
+            "wallet_client_type": "privy", "address": addr}
+
+
+def _solana_external(addr, client="Phantom"):
+    """Wallet externa de Solana vinculada (p.ej. Phantom): wallet_client_type != 'privy'."""
+    return {"type": "wallet", "chain_type": "solana", "connector_type": None,
+            "wallet_client_type": client, "address": addr}
 
 
 def test_embedded_solana_wallet_extracts_address():
@@ -66,6 +75,31 @@ def test_embedded_solana_wallet_extracts_address():
         _solana_embedded("So1anaAddr111111111111111111111111111111111"),
     ])
     assert v.embedded_solana_wallet(tok) == "So1anaAddr111111111111111111111111111111111"
+
+
+def test_embedded_solana_wallet_picks_embedded_over_external_phantom():
+    """Regresión: el identity token real trae Phantom + embedded, ambas con
+    connector_type None. Debe devolver la embedded (wallet_client_type 'privy'),
+    NO la externa Phantom. (Antes el matcher exigía connector_type=='embedded' y
+    fallaba con 'sin embedded Solana wallet' → el chat respondía login_required.)"""
+    priv = _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
+    tok = _make_id_token(priv, "app123", [
+        _solana_external("PhantomExternalAddr2222222222222222222222222"),
+        _solana_embedded("EmbeddedPrivyAddr11111111111111111111111111"),
+    ])
+    assert v.embedded_solana_wallet(tok) == "EmbeddedPrivyAddr11111111111111111111111111"
+
+
+def test_embedded_solana_wallet_rejects_only_external():
+    """Si solo hay una wallet externa de Solana (sin embedded), debe rechazar."""
+    priv = _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
+    tok = _make_id_token(priv, "app123", [
+        _solana_external("PhantomExternalAddr2222222222222222222222222"),
+    ])
+    with pytest.raises(PrivyAuthError):
+        v.embedded_solana_wallet(tok)
 
 
 def test_embedded_solana_wallet_requires_embedded_solana():

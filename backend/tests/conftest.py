@@ -37,8 +37,11 @@ def make_id_token(priv, app_id, linked_accounts, sub="did:privy:abc", exp_delta=
 
 
 def solana_embedded(addr):
-    """Devuelve un linked_account de tipo embedded Solana wallet."""
-    return {"type": "wallet", "chain_type": "solana", "connector_type": "embedded", "address": addr}
+    """Devuelve un linked_account de embedded Solana wallet con la forma REAL del
+    identity token de Privy: connector_type viene None y la embedded se identifica
+    por wallet_client_type == "privy"."""
+    return {"type": "wallet", "chain_type": "solana", "connector_type": None,
+            "wallet_client_type": "privy", "address": addr}
 
 
 def privy_auth_headers(priv, app_id, wallet_addr):

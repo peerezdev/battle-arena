@@ -64,7 +64,16 @@ class PrivyVerifier:
         except (TypeError, ValueError):
             raise PrivyAuthError("linked_accounts ilegible")
         for acc in accounts:
+            # La embedded wallet de Privy se identifica por wallet_client_type == "privy".
+            # OJO: en el identity token real, connector_type viene None (no "embedded"),
+            # así que NO se puede discriminar por connector_type. Una wallet externa
+            # (Phantom, Solflare…) trae wallet_client_type == "Phantom"/"Solflare"/… y
+            # nunca "privy", por lo que queda excluida. Mantenemos connector_type ==
+            # "embedded" como fallback por compatibilidad. Debe coincidir con el selector
+            # del frontend en src/wallet/embedded.ts.
             if (acc.get("type") == "wallet" and acc.get("chain_type") == "solana"
-                    and acc.get("connector_type") == "embedded" and acc.get("address")):
+                    and (acc.get("wallet_client_type") == "privy"
+                         or acc.get("connector_type") == "embedded")
+                    and acc.get("address")):
                 return acc["address"]
         raise PrivyAuthError("sin embedded Solana wallet")
