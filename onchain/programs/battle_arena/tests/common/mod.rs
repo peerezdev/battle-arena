@@ -182,6 +182,11 @@ impl Harness {
         battle_arena::state::Battle::try_deserialize(&mut &acc.data[..]).unwrap()
     }
 
+    pub fn pack(&self, pack_pda: &Pubkey) -> battle_arena::pack_state::PackBattle {
+        let acc = self.svm.get_account(pack_pda).unwrap();
+        battle_arena::pack_state::PackBattle::try_deserialize(&mut &acc.data[..]).unwrap()
+    }
+
     // ---- SPL helpers -------------------------------------------------------
 
     /// Crea un mint (cualquier decimales) cuya autoridad es `authority`.
@@ -286,6 +291,8 @@ pub mod err {
     pub const INVALID_SETTLE_STATE: u32 = 6014;
     pub const INVALID_COMMIT: u32 = 6015;
     pub const UNAUTHORIZED_TOKEN_ACCOUNT: u32 = 6016;
+    pub const NOT_ALL_DEPOSITED: u32 = 6019;
+    pub const BAD_VAULT: u32 = 6020;
 }
 
 /// Afirma que los logs de una tx fallida contienen el error Anchor esperado,
