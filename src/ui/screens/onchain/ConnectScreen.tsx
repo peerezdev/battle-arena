@@ -1,6 +1,7 @@
 /**
  * ConnectScreen — on-chain flow, step 1.
- * Opens the AppKit wallet modal, then authenticates against the backend:
+ * Opens the Privy login modal (via useWallet().connect), then authenticates
+ * against the backend:
  *   getNonce → build message → signMessage → verify → token
  * Once authenticated, calls onAuthenticated(token) to proceed to the Collection.
  */
