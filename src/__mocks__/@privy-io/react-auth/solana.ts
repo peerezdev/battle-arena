@@ -3,3 +3,4 @@
 import { vi } from 'vitest'
 
 export const useWallets = vi.fn(() => ({ wallets: [], ready: false }))
+export const toSolanaWalletConnectors = vi.fn(() => [])

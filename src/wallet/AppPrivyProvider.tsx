@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react'
 import { PrivyProvider } from '@privy-io/react-auth'
+import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana'
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit'
+
+// Conectores de wallets externas de Solana (Phantom, Solflare, Backpack…).
+// Sin esto Privy no detecta las wallets Solana inyectadas.
+const solanaConnectors = toSolanaWalletConnectors()
 
 const APP_ID = import.meta.env.VITE_PRIVY_APP_ID as string | undefined
 
@@ -45,6 +50,11 @@ export function AppPrivyProvider({ children }: { children: ReactNode }) {
           solana: {
             createOnLogin: 'users-without-wallets',
           },
+        },
+
+        // External Solana wallets (Phantom, etc.) — needed for detection
+        externalWallets: {
+          solana: { connectors: solanaConnectors },
         },
 
         // Solana RPC configuration for devnet (required for embedded wallet UIs)
