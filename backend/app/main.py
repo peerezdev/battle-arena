@@ -8,6 +8,7 @@ from fastapi import FastAPI, Depends, Header, HTTPException, Query, WebSocket, W
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from .config import get_settings
 from .db import make_engine, make_session_factory, init_db
@@ -104,9 +105,12 @@ def create_app(session_factory, chain: ChainSource,
         get_or_create_user(s, wallet, elo_start)
         try:
             set_alias(s, wallet, body.alias)
+            s.commit()
         except AliasTakenError:
             raise HTTPException(409, "username_taken")
-        s.commit()
+        except IntegrityError:
+            s.rollback()
+            raise HTTPException(409, "username_taken")
         return {"wallet": wallet, "alias": body.alias}
 
     @app.get("/users/{wallet}")
