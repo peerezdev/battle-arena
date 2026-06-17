@@ -88,4 +88,8 @@ pub mod battle_arena {
     pub fn join_pack_battle(ctx: Context<JoinPackBattle>) -> Result<()> {
         instructions::pack_join::handler(ctx)
     }
+
+    pub fn deposit_card(ctx: Context<DepositCard>, nft_mint: Pubkey, value_usd: u64, grade: u8, ts: i64, ed25519_ix_index: u8) -> Result<()> {
+        instructions::pack_deposit::handler(ctx, nft_mint, value_usd, grade, ts, ed25519_ix_index)
+    }
 }
