@@ -48,4 +48,6 @@ pub enum ErrorCode {
     AlreadyJoined,
     #[msg("No puedes unirte a tu propio duelo.")]
     SelfJoinNotAllowed,
+    #[msg("El modo de duelo todavía no está soportado.")]
+    ModeNotSupported,
 }

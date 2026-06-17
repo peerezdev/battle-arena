@@ -296,6 +296,35 @@ fn double_settle_rejected() {
     assert!(res.is_err(), "el segundo settle debe fallar");
 }
 
+// ── 10. Rechazo: creación con PackMode::Mana (no soportado en Fase 1) ───────
+
+#[test]
+fn create_mana_mode_rejected() {
+    use anchor_lang::{InstructionData, ToAccountMetas};
+    use solana_signer::Signer;
+    let mut h = Harness::new();
+    let s = PackScenario::setup(&mut h);
+    let create_mana = solana_instruction::Instruction {
+        program_id: h.program_id,
+        accounts: battle_arena::accounts::CreatePackBattle {
+            player_a: s.player_a.pubkey(),
+            pack: s.pack_pda,
+            system_program: solana_sdk_ids::system_program::ID,
+        }
+        .to_account_metas(None),
+        data: battle_arena::instruction::CreatePackBattle {
+            nonce: s.nonce,
+            oracle: h.oracle_pubkey,
+            mode: battle_arena::pack_state::PackMode::Mana,
+        }
+        .data(),
+    };
+    let logs = h
+        .try_send(&[create_mana], &s.player_a, &[&s.player_a])
+        .unwrap_err();
+    assert_error(&logs, "ModeNotSupported", 6023);
+}
+
 // ── 9. Rechazo: depósito después de que el pack está en fase Ready ────────────
 
 #[test]

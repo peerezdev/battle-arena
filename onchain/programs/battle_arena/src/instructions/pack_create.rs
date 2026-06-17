@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 
+use crate::error::ErrorCode;
 use crate::pack_state::*;
 
 #[derive(Accounts)]
@@ -19,6 +20,7 @@ pub struct CreatePackBattle<'info> {
 }
 
 pub fn handler(ctx: Context<CreatePackBattle>, nonce: u64, oracle: Pubkey, mode: PackMode) -> Result<()> {
+    require!(mode == PackMode::Direct, ErrorCode::ModeNotSupported);
     let now = Clock::get()?.unix_timestamp;
     let p = &mut ctx.accounts.pack;
     p.player_a = ctx.accounts.player_a.key();
