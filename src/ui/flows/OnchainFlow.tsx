@@ -6,7 +6,6 @@ import { pageVariants, pageTransition } from '../transitions'
 import type { SelectedCard } from '../screens/onchain/CollectionScreen'
 import type { BattleInfo } from '../screens/onchain/LobbyScreen'
 
-const AppKitProvider = lazy(() => import('../../wallet/AppKitProvider').then((m) => ({ default: m.AppKitProvider })))
 const ConnectScreen = lazy(() => import('../screens/onchain/ConnectScreen').then((m) => ({ default: m.ConnectScreen })))
 const CollectionScreen = lazy(() => import('../screens/onchain/CollectionScreen').then((m) => ({ default: m.CollectionScreen })))
 const LobbyScreen = lazy(() => import('../screens/onchain/LobbyScreen').then((m) => ({ default: m.LobbyScreen })))
@@ -96,13 +95,11 @@ export function OnchainFlow() {
   }
   return (
     <Suspense fallback={<div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>}>
-      <AppKitProvider>
-        <AnimatePresence mode="wait">
-          <motion.div key={screen} variants={pageVariants(reduced)} initial="initial" animate="animate" exit="exit" transition={pageTransition(reduced)} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {renderScreen()}
-          </motion.div>
-        </AnimatePresence>
-      </AppKitProvider>
+      <AnimatePresence mode="wait">
+        <motion.div key={screen} variants={pageVariants(reduced)} initial="initial" animate="animate" exit="exit" transition={pageTransition(reduced)} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          {renderScreen()}
+        </motion.div>
+      </AnimatePresence>
     </Suspense>
   )
 }
