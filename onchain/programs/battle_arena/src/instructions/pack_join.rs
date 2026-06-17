@@ -17,8 +17,8 @@ pub struct JoinPackBattle<'info> {
 pub fn handler(ctx: Context<JoinPackBattle>) -> Result<()> {
     let p = &mut ctx.accounts.pack;
     require!(p.phase == PackPhase::Open, ErrorCode::WrongPhase);
-    require!(p.player_b == Pubkey::default(), ErrorCode::AlreadyDeposited);
-    require!(ctx.accounts.player_b.key() != p.player_a, ErrorCode::UnauthorizedTokenAccount);
+    require!(p.player_b == Pubkey::default(), ErrorCode::AlreadyJoined);
+    require!(ctx.accounts.player_b.key() != p.player_a, ErrorCode::SelfJoinNotAllowed);
     p.player_b = ctx.accounts.player_b.key();
     p.phase = PackPhase::Joined;
     Ok(())

@@ -44,4 +44,8 @@ pub enum ErrorCode {
     NotAllDeposited,
     #[msg("La cuenta de vault no es del PDA o no contiene la carta esperada.")]
     BadVault,
+    #[msg("El oponente ya se unió al duelo.")]
+    AlreadyJoined,
+    #[msg("No puedes unirte a tu propio duelo.")]
+    SelfJoinNotAllowed,
 }
