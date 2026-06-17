@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { MOCK_DROPS, type DropItem } from './hubMockData'
 import { useChat } from '../../../hooks/useChat'
@@ -12,7 +12,7 @@ function userColor(user: string): string {
 }
 
 function formatTs(ts: number): string {
-  // El backend emite ts en segundos (epoch); Date espera milisegundos.
+  // Backend emits ts in seconds (epoch); Date expects milliseconds.
   const d = new Date(ts * 1000)
   const hh = d.getHours().toString().padStart(2, '0')
   const mm = d.getMinutes().toString().padStart(2, '0')
@@ -20,8 +20,29 @@ function formatTs(ts: number): string {
 }
 
 export function ChatDock({ drops = MOCK_DROPS }: { drops?: DropItem[] }) {
-  const { messages, send, canPost } = useChat()
+  const { messages, send, canPost, online } = useChat()
   const [draft, setDraft] = useState('')
+
+  // ── Resizable divider state ──
+  const [dropsHeight, setDropsHeight] = useState(240)
+  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null)
+
+  function handleResizerPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = { startY: e.clientY, startHeight: dropsHeight }
+  }
+
+  function handleResizerPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragRef.current) return
+    const newHeight = dragRef.current.startHeight + (e.clientY - dragRef.current.startY)
+    const clamped = Math.max(120, Math.min(newHeight, window.innerHeight - 260))
+    setDropsHeight(clamped)
+  }
+
+  function handleResizerPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    dragRef.current = null
+  }
 
   function handleSend() {
     if (!draft.trim()) return
@@ -47,7 +68,9 @@ export function ChatDock({ drops = MOCK_DROPS }: { drops?: DropItem[] }) {
       <div
         style={{
           padding: '14px 16px',
-          borderBottom: `1px solid ${COLORS.border}`,
+          height: dropsHeight,
+          overflowY: 'auto',
+          flexShrink: 0,
         }}
       >
         {/* Header */}
@@ -148,166 +171,200 @@ export function ChatDock({ drops = MOCK_DROPS }: { drops?: DropItem[] }) {
         ))}
       </div>
 
-      {/* ── CHAT HEADING ── */}
+      {/* ── RESIZER HANDLE ── */}
       <div
+        onPointerDown={handleResizerPointerDown}
+        onPointerMove={handleResizerPointerMove}
+        onPointerUp={handleResizerPointerUp}
         style={{
-          padding: '12px 16px 0',
-        }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            color: COLORS.text,
-            padding: '7px 12px',
-            borderRadius: '8px 8px 0 0',
-            background: '#11161f',
-            fontFamily: FONTS.body,
-            display: 'inline-block',
-          }}
-        >
-          Chat
-        </div>
-      </div>
-
-      {/* Online count */}
-      <div
-        style={{
-          padding: '6px 16px',
-          fontSize: 10.5,
-          color: COLORS.muted,
+          height: 6,
+          cursor: 'row-resize',
+          flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
+          justifyContent: 'center',
+          background: '#0c1019',
+          borderTop: `1px solid ${COLORS.border}`,
+          borderBottom: `1px solid ${COLORS.border}`,
         }}
       >
-        <span
+        {/* Grip dots */}
+        <div
           style={{
-            width: 7,
-            height: 7,
-            borderRadius: '50%',
-            background: COLORS.green,
-            boxShadow: `0 0 8px ${COLORS.green}`,
-            display: 'inline-block',
+            width: 24,
+            height: 3,
+            borderRadius: 2,
+            background: COLORS.border,
           }}
         />
-        18 online
       </div>
 
-      {/* ── MESSAGES ── */}
+      {/* ── CHAT REGION (flex: 1, scrolls internally) ── */}
       <div
         style={{
           flex: 1,
-          overflow: 'hidden',
-          padding: '6px 16px',
+          minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          gap: 11,
         }}
       >
-        {messages.length === 0 ? (
-          <div style={{ fontSize: 11, color: COLORS.muted, fontFamily: FONTS.body, marginTop: 8 }}>
-            Sé el primero en escribir…
-          </div>
-        ) : (
-          messages.map((msg, idx) => (
-            <div key={`${msg.ts}-${idx}`}>
-              {/* Row: avatar + name + timestamp */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  marginBottom: 2,
-                }}
-              >
-                {/* Avatar */}
+        {/* CHAT heading — matches LIVE DROPS style */}
+        <div
+          style={{
+            padding: '10px 16px 4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+          }}
+        >
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: COLORS.green,
+              boxShadow: `0 0 8px ${COLORS.green}`,
+              display: 'inline-block',
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 10.5,
+              letterSpacing: '0.16em',
+              color: COLORS.muted,
+            }}
+          >
+            CHAT
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              color: COLORS.muted,
+              marginLeft: 4,
+            }}
+          >
+            {online} online
+          </span>
+        </div>
+
+        {/* ── MESSAGES ── */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '6px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 11,
+          }}
+        >
+          {messages.length === 0 ? (
+            <div style={{ fontSize: 11, color: COLORS.muted, fontFamily: FONTS.body, marginTop: 8 }}>
+              Be the first to write…
+            </div>
+          ) : (
+            messages.map((msg, idx) => (
+              <div key={`${msg.ts}-${idx}`}>
+                {/* Row: avatar + name + timestamp */}
                 <div
                   style={{
-                    width: 21,
-                    height: 21,
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg,#9945FF,#14F195)',
-                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    marginBottom: 2,
                   }}
-                />
-                {/* Username */}
-                <span
+                >
+                  {/* Avatar */}
+                  <div
+                    style={{
+                      width: 21,
+                      height: 21,
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg,#9945FF,#14F195)',
+                      flexShrink: 0,
+                    }}
+                  />
+                  {/* Username */}
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 11.5,
+                      color: userColor(msg.user),
+                      fontFamily: FONTS.body,
+                    }}
+                  >
+                    {msg.user}
+                  </span>
+                  {/* Timestamp */}
+                  <span style={{ fontSize: 9, color: '#5d6781', marginLeft: 'auto' }}>
+                    {formatTs(msg.ts)}
+                  </span>
+                </div>
+                {/* Bubble text */}
+                <div
                   style={{
-                    fontWeight: 700,
-                    fontSize: 11.5,
-                    color: userColor(msg.user),
+                    fontSize: 12,
+                    color: '#cdd5e6',
+                    paddingLeft: 28,
+                    lineHeight: 1.35,
                     fontFamily: FONTS.body,
                   }}
                 >
-                  {msg.user}
-                </span>
-                {/* Timestamp */}
-                <span style={{ fontSize: 9, color: '#5d6781', marginLeft: 'auto' }}>
-                  {formatTs(msg.ts)}
-                </span>
+                  {msg.text}
+                </div>
               </div>
-              {/* Bubble text */}
-              <div
-                style={{
-                  fontSize: 12,
-                  color: '#cdd5e6',
-                  paddingLeft: 28,
-                  lineHeight: 1.35,
-                  fontFamily: FONTS.body,
-                }}
-              >
-                {msg.text}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
 
-      {/* ── CHAT INPUT ── */}
-      <div
-        style={{
-          padding: '12px 16px',
-          borderTop: `1px solid ${COLORS.border}`,
-          display: 'flex',
-          gap: 8,
-        }}
-      >
-        <input
-          disabled={!canPost}
-          placeholder={canPost ? 'Escribe un mensaje…' : 'Inicia sesión para chatear'}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
+        {/* ── CHAT INPUT ── */}
+        <div
           style={{
-            flex: 1,
-            background: '#0a0e16',
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 10,
-            padding: '10px 12px',
-            color: COLORS.text,
-            fontSize: 12,
-            outline: 'none',
-            fontFamily: FONTS.body,
-            cursor: canPost ? 'text' : 'not-allowed',
-            opacity: canPost ? 1 : 0.6,
-          }}
-        />
-        <button
-          disabled={!canPost}
-          onClick={handleSend}
-          style={{
-            width: 38,
-            borderRadius: 10,
-            border: 'none',
-            background: 'linear-gradient(135deg,#9945FF,#14F195)',
-            color: '#06120c',
-            cursor: canPost ? 'pointer' : 'not-allowed',
-            opacity: canPost ? 1 : 0.5,
-            fontSize: 14,
+            padding: '12px 16px',
+            borderTop: `1px solid ${COLORS.border}`,
+            display: 'flex',
+            gap: 8,
           }}
         >
-          ➤
-        </button>
+          <input
+            disabled={!canPost}
+            placeholder={canPost ? 'Type a message…' : 'Log in to chat'}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            style={{
+              flex: 1,
+              background: '#0a0e16',
+              border: `1px solid ${COLORS.border}`,
+              borderRadius: 10,
+              padding: '10px 12px',
+              color: COLORS.text,
+              fontSize: 12,
+              outline: 'none',
+              fontFamily: FONTS.body,
+              cursor: canPost ? 'text' : 'not-allowed',
+              opacity: canPost ? 1 : 0.6,
+            }}
+          />
+          <button
+            disabled={!canPost}
+            onClick={handleSend}
+            style={{
+              width: 38,
+              borderRadius: 10,
+              border: 'none',
+              background: 'linear-gradient(135deg,#9945FF,#14F195)',
+              color: '#06120c',
+              cursor: canPost ? 'pointer' : 'not-allowed',
+              opacity: canPost ? 1 : 0.5,
+              fontSize: 14,
+            }}
+          >
+            ➤
+          </button>
+        </div>
       </div>
     </aside>
   )

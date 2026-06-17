@@ -90,7 +90,7 @@ export function DepositModal({ open, onClose }: DepositModalProps) {
           </span>
           <button
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label="Close"
             style={{
               background: 'transparent',
               border: `1px solid ${COLORS.border}`,
@@ -120,7 +120,7 @@ export function DepositModal({ open, onClose }: DepositModalProps) {
               padding: '20px 0',
             }}
           >
-            Inicia sesión para depositar.
+            Log in to deposit.
           </p>
         ) : (
           <>
@@ -188,7 +188,7 @@ export function DepositModal({ open, onClose }: DepositModalProps) {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {copied ? 'Copiado ✓' : 'Copiar'}
+                {copied ? 'Copied ✓' : 'Copy'}
               </button>
             </div>
 
@@ -223,7 +223,7 @@ export function DepositModal({ open, onClose }: DepositModalProps) {
                   transition: reducedMotion ? 'none' : 'opacity 0.15s',
                 }}
               >
-                ↗ Obtener USDC de prueba
+                ↗ Get test USDC
               </a>
               <span
                 style={{
@@ -233,7 +233,7 @@ export function DepositModal({ open, onClose }: DepositModalProps) {
                   paddingLeft: 2,
                 }}
               >
-                USDC de prueba (devnet)
+                Test USDC (devnet)
               </span>
             </div>
 

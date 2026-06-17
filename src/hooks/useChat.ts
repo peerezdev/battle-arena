@@ -16,10 +16,12 @@ export function useChat(): {
   send: (text: string) => void
   connected: boolean
   canPost: boolean
+  online: number
 } {
   const { identityToken } = useIdentityToken()
   const [messages, setMessages] = useState<ChatLine[]>([])
   const [connected, setConnected] = useState(false)
+  const [online, setOnline] = useState(0)
 
   const wsRef = useRef<WebSocket | null>(null)
   const mountedRef = useRef(true)
@@ -66,6 +68,8 @@ export function useChat(): {
               ...prev,
               { user: msg.user as string, text: msg.text as string, ts: msg.ts as number },
             ])
+          } else if (msg.type === 'presence') {
+            setOnline(msg.online as number)
           } else if (msg.type === 'error') {
             console.warn('[useChat] server error:', msg.error)
           }
@@ -111,5 +115,5 @@ export function useChat(): {
     }
   }, [])
 
-  return { messages, send, connected, canPost }
+  return { messages, send, connected, canPost, online }
 }
