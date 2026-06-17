@@ -80,4 +80,12 @@ pub mod battle_arena {
     pub fn claim_timeout(ctx: Context<ClaimTimeout>) -> Result<()> {
         instructions::timeout::handler(ctx)
     }
+
+    pub fn create_pack_battle(ctx: Context<CreatePackBattle>, nonce: u64, oracle: Pubkey, mode: PackMode) -> Result<()> {
+        instructions::pack_create::handler(ctx, nonce, oracle, mode)
+    }
+
+    pub fn join_pack_battle(ctx: Context<JoinPackBattle>) -> Result<()> {
+        instructions::pack_join::handler(ctx)
+    }
 }
