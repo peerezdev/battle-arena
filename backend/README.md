@@ -63,7 +63,7 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 
 ```
 backend/app/
-  main.py             # FastAPI: factory create_app + endpoints + deps (db, current_wallet)
+  main.py             # FastAPI: factory create_app + endpoints + deps (db, current_user)
   config.py, db.py    # settings + SQLAlchemy (Base, engine, session)
   models.py           # User, Match, RatingHistory
   elo.py              # expected_score, updated_ratings, gap_label (puro)
