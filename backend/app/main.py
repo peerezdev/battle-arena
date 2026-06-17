@@ -4,7 +4,7 @@ import base64
 import time as _time
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import FastAPI, Depends, Header, HTTPException, Query
+from fastapi import FastAPI, Depends, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .models import GachaPack
+from .chat import ConnectionManager, ChatBuffer, abbreviate
 
 
 class AliasBody(BaseModel):
@@ -242,6 +243,53 @@ def create_app(session_factory, chain: ChainSource,
         except PrivyAuthError:
             raise HTTPException(401, "token Privy inválido")
         return {"sub": claims.get("sub")}
+
+    # ── Chat de lobby por WebSocket ───────────────────────────────────────────
+    _chat_mgr = ConnectionManager()
+    _chat_buf = ChatBuffer()
+    _chat_hits: dict[str, list[float]] = {}
+    _CHAT_RATE_LIMIT = 5
+    _CHAT_RATE_WINDOW = 10.0
+
+    def _chat_allow(wallet: str) -> bool:
+        now = _time.time()
+        hits = [t for t in _chat_hits.get(wallet, []) if now - t < _CHAT_RATE_WINDOW]
+        if len(hits) >= _CHAT_RATE_LIMIT:
+            return False
+        hits.append(now)
+        _chat_hits[wallet] = hits
+        return True
+
+    @app.websocket("/ws/chat")
+    async def ws_chat(ws: WebSocket, token: Optional[str] = Query(None)):
+        wallet = None
+        if token and privy is not None:
+            try:
+                wallet = privy.embedded_solana_wallet(token)
+            except PrivyAuthError:
+                wallet = None
+        await _chat_mgr.connect(ws)
+        try:
+            await ws.send_json({"type": "history", "messages": _chat_buf.history()})
+            while True:
+                data = await ws.receive_json()
+                text = (data.get("text") or "").strip()
+                if wallet is None:
+                    await ws.send_json({"type": "error", "error": "login_required"})
+                    continue
+                if not text:
+                    continue
+                text = text[:280]
+                if not _chat_allow(wallet):
+                    await ws.send_json({"type": "error", "error": "rate_limited"})
+                    continue
+                msg = {"user": abbreviate(wallet), "text": text, "ts": int(_time.time())}
+                _chat_buf.add(msg)
+                await _chat_mgr.broadcast({"type": "message", **msg})
+        except WebSocketDisconnect:
+            _chat_mgr.disconnect(ws)
+        except Exception:
+            _chat_mgr.disconnect(ws)
 
     return app
 
