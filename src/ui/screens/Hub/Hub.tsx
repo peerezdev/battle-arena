@@ -10,6 +10,7 @@ import { LeftRail } from './LeftRail'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
 import { ChatDock } from './ChatDock'
+import { DepositModal } from '../../components/DepositModal'
 
 // ─── Responsive helper — copiado del patrón de BattleBoard ───────────────────
 function useIsWide(query: string): boolean {
@@ -44,6 +45,7 @@ export function Hub() {
   const [active, setActive]       = useState<HubNav>('lobby')
   const [stake, setStake]         = useState<number>(STAKE_OPTIONS[1]) // 50
   const [chatOpen, setChatOpen]   = useState(false)
+  const [depositOpen, setDepositOpen] = useState(false)
 
   const reducedMotion = useReducedMotion()
   const wideDock = useIsWide('(min-width: 1100px)')
@@ -167,10 +169,9 @@ export function Hub() {
           {/* Auth buttons */}
           <AuthButtons variant="compact" />
 
-          {/* + Deposit (no funcional, Coming soon) */}
+          {/* + Deposit */}
           <button
-            onClick={() => {/* no-op */}}
-            title="Coming soon"
+            onClick={() => setDepositOpen(true)}
             style={{
               background: GRADIENT,
               color: '#06120c',
@@ -259,6 +260,9 @@ export function Hub() {
           💬
         </button>
       )}
+
+      {/* ── DEPOSIT MODAL ─────────────────────────────────────────────────── */}
+      <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
 
       {/* ── CHAT DRAWER OVERLAY (tablet / móvil) ──────────────────────────── */}
       {!(wideRail && wideDock) && chatOpen && (

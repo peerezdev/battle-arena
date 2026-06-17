@@ -45,35 +45,19 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
 
   if (!authenticated) {
     return (
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {/* Ghost: Log in */}
-        <button
-          onClick={() => login()}
-          style={{
-            ...btnBase,
-            background: 'transparent',
-            border: `1px solid ${COLORS.border}`,
-            color: COLORS.text,
-          }}
-        >
-          Log in
-        </button>
-
-        {/* Primary gradient: Sign up */}
-        <button
-          onClick={() => login()}
-          style={{
-            ...btnBase,
-            background: GRADIENT,
-            border: 'none',
-            color: '#06120c',
-            fontWeight: 800,
-            boxShadow: '0 0 14px #9945FF33',
-          }}
-        >
-          Sign up
-        </button>
-      </div>
+      <button
+        onClick={() => login()}
+        style={{
+          ...btnBase,
+          background: GRADIENT,
+          border: 'none',
+          color: '#06120c',
+          fontWeight: 800,
+          boxShadow: '0 0 14px #9945FF33',
+        }}
+      >
+        Log in
+      </button>
     )
   }
 
