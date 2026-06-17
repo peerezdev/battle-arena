@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from typing import Optional
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.orm import Session
 from ..models import User, RatingHistory
+
+
+class AliasTakenError(Exception):
+    """Otro usuario ya tiene ese username (case-insensitive)."""
 
 
 def read_user_view(session: Session, wallet: str, elo_start: int) -> dict:
@@ -27,6 +31,11 @@ def set_alias(session: Session, wallet: str, alias: str) -> None:
     user = session.get(User, wallet)
     if user is None:
         raise ValueError("usuario no existe")
+    clash = session.scalar(
+        select(User).where(func.lower(User.alias) == alias.lower(), User.wallet != wallet)
+    )
+    if clash is not None:
+        raise AliasTakenError(alias)
     user.alias = alias
 
 

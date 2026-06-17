@@ -14,7 +14,9 @@ from .db import make_engine, make_session_factory, init_db
 from .privy import PrivyVerifier, PrivyAuthError
 from .chain.base import ChainSource
 from .chain.mock import MockChainSource
-from .services.users import get_or_create_user, read_user_view, set_alias, leaderboard, history
+from .services.users import (
+    get_or_create_user, read_user_view, set_alias, leaderboard, history, AliasTakenError,
+)
 from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
@@ -23,7 +25,7 @@ from .chat import ConnectionManager, ChatBuffer, abbreviate
 
 
 class AliasBody(BaseModel):
-    alias: str = Field(min_length=1, max_length=32)
+    alias: str = Field(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_]+$")
 
 
 class GeneratePackBody(BaseModel):
@@ -100,7 +102,10 @@ def create_app(session_factory, chain: ChainSource,
     @app.post("/users/me/alias")
     async def me_alias(body: AliasBody, wallet: str = Depends(current_user), s: Session = Depends(db)):
         get_or_create_user(s, wallet, elo_start)
-        set_alias(s, wallet, body.alias)
+        try:
+            set_alias(s, wallet, body.alias)
+        except AliasTakenError:
+            raise HTTPException(409, "username_taken")
         s.commit()
         return {"wallet": wallet, "alias": body.alias}
 

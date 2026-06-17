@@ -184,3 +184,39 @@ def test_current_user_401_invalid_token():
     r = c.post("/matches", json={"battle_pubkey": "B" * 44},
                headers={"Authorization": "Bearer not-a-jwt"})
     assert r.status_code == 401
+
+
+def test_alias_must_be_unique_case_insensitive():
+    c, _, priv = _client()
+    wa = "WalletAAAA1111111111111111111111111111111111"
+    wb = "WalletBBBB2222222222222222222222222222222222"
+    tok_a = make_id_token(priv, APP_ID, [solana_embedded(wa)])
+    tok_b = make_id_token(priv, APP_ID, [solana_embedded(wb)])
+
+    r1 = c.post("/users/me/alias", json={"alias": "Neo"},
+                headers={"Authorization": f"Bearer {tok_a}"})
+    assert r1.status_code == 200
+
+    r2 = c.post("/users/me/alias", json={"alias": "neo"},
+                headers={"Authorization": f"Bearer {tok_b}"})
+    assert r2.status_code == 409
+    assert r2.json()["detail"] == "username_taken"
+
+
+def test_alias_rejects_bad_charset_and_length():
+    c, _, priv = _client()
+    wa = "WalletAAAA1111111111111111111111111111111111"
+    tok = make_id_token(priv, APP_ID, [solana_embedded(wa)])
+    for bad in ["ab", "a" * 21, "has space", "emoji😀", "dash-no"]:
+        r = c.post("/users/me/alias", json={"alias": bad},
+                   headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 422, bad
+
+
+def test_alias_same_wallet_can_keep_its_name():
+    c, _, priv = _client()
+    wa = "WalletAAAA1111111111111111111111111111111111"
+    tok = make_id_token(priv, APP_ID, [solana_embedded(wa)])
+    h = {"Authorization": f"Bearer {tok}"}
+    assert c.post("/users/me/alias", json={"alias": "Trinity"}, headers=h).status_code == 200
+    assert c.post("/users/me/alias", json={"alias": "Trinity"}, headers=h).status_code == 200

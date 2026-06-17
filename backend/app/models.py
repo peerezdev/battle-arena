@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, Integer, Boolean, DateTime
+from sqlalchemy import String, Integer, Boolean, DateTime, Index, func
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -16,6 +16,10 @@ class User(Base):
     elo: Mapped[int] = mapped_column(Integer, default=1200)
     games_played: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    __table_args__ = (
+        Index("ux_users_alias_lower", func.lower(alias), unique=True),
+    )
 
 
 class Match(Base):
