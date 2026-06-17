@@ -28,7 +28,9 @@ export function useProfile(): ProfileData & { loading: boolean; refresh: () => v
         if (cancelled || !u) return
         setData({ username: u.alias ?? null, elo: u.elo ?? null, gamesPlayed: u.games_played ?? null })
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (import.meta.env.DEV) console.warn('[useProfile] fetch error:', err)
+      })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })

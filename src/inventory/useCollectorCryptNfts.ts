@@ -39,7 +39,7 @@ export function useCollectorCryptNfts(): { cards: OwnedCard[]; loading: boolean 
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `wallets` y `key` van siempre en sync (key deriva de wallets); depender de `key` evita el bucle por identidad del array
   }, [key])
 
   return { cards, loading }
