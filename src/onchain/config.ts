@@ -46,4 +46,19 @@ export const config = {
    * Set VITE_ORACLE_PUBKEY in your .env file (base-58 public key of the trusted oracle).
    */
   oraclePubkey: import.meta.env.VITE_ORACLE_PUBKEY ?? '',
+  /**
+   * Collector Crypt verified collection mint (DAS `grouping` group_value). Used to
+   * filter the on-chain inventory to CC cards only. Defaults to the known mainnet
+   * collection; override with the devnet collection when available.
+   */
+  ccCollectionMint:
+    import.meta.env.VITE_CC_COLLECTION_MINT ?? 'CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf',
+  /**
+   * DAS-capable RPC (e.g. Helius) for reading NFTs via getAssetsByOwner. Falls back
+   * to the regular Solana RPC (public devnet does not support DAS → empty inventory).
+   */
+  dasRpcUrl:
+    (import.meta.env.VITE_DAS_RPC as string | undefined) ??
+    (import.meta.env.VITE_SOLANA_RPC as string | undefined) ??
+    'https://api.devnet.solana.com',
 }
