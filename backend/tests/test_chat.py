@@ -129,3 +129,33 @@ def test_ws_chat_presence_reflects_connections():
         # al cerrar b, a recibe presencia con online == 1
         pa2 = a.receive_json()
         assert pa2["type"] == "presence" and pa2["online"] == 1
+
+
+def test_ws_chat_shows_alias_when_set():
+    """Si el wallet tiene alias, el chat emite el alias como `user`, no el wallet abreviado."""
+    app, priv = _chat_app()
+    token = make_id_token(priv, APP_ID, [solana_embedded(WALLET)])
+    client = TestClient(app)
+    assert client.post("/users/me/alias", json={"alias": "Morpheus"},
+                       headers={"Authorization": f"Bearer {token}"}).status_code == 200
+
+    with client.websocket_connect(f"/ws/chat?token={token}") as ws:
+        ws.receive_json()  # history
+        ws.receive_json()  # presence(1)
+        ws.send_json({"text": "hi"})
+        msg = ws.receive_json()
+        assert msg["type"] == "message"
+        assert msg["user"] == "Morpheus"
+
+
+def test_ws_chat_falls_back_to_abbreviated_wallet():
+    """Sin alias, el chat emite el wallet abreviado."""
+    app, priv = _chat_app()
+    token = make_id_token(priv, APP_ID, [solana_embedded(WALLET)])
+    client = TestClient(app)
+    with client.websocket_connect(f"/ws/chat?token={token}") as ws:
+        ws.receive_json()  # history
+        ws.receive_json()  # presence(1)
+        ws.send_json({"text": "hi"})
+        msg = ws.receive_json()
+        assert msg["user"] == abbreviate(WALLET)

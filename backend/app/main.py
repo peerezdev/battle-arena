@@ -278,6 +278,16 @@ def create_app(session_factory, chain: ChainSource,
             except PrivyAuthError:
                 wallet = None
         await _chat_mgr.connect(ws)
+        # Nombre a mostrar: alias del usuario si lo tiene, si no el wallet abreviado.
+        display_name = abbreviate(wallet) if wallet else None
+        if wallet:
+            s = session_factory()
+            try:
+                alias = read_user_view(s, wallet, elo_start).get("alias")
+                if alias:
+                    display_name = alias
+            finally:
+                s.close()
         try:
             await ws.send_json({"type": "history", "messages": _chat_buf.history()})
             await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
@@ -293,7 +303,7 @@ def create_app(session_factory, chain: ChainSource,
                 if not _chat_allow(wallet):
                     await ws.send_json({"type": "error", "error": "rate_limited"})
                     continue
-                msg = {"user": abbreviate(wallet), "text": text, "ts": int(_time.time())}
+                msg = {"user": display_name, "text": text, "ts": int(_time.time())}
                 _chat_buf.add(msg)
                 await _chat_mgr.broadcast({"type": "message", **msg})
         except WebSocketDisconnect:
