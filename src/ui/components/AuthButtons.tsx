@@ -1,5 +1,5 @@
 /**
- * AuthButtons — Log in / Sign up / Account chip using Privy.
+ * AuthButtons — Log in / Account chip using Privy.
  *
  * Works in two layouts:
  *   variant="nav"     → normal padding/font for the Landing nav bar
