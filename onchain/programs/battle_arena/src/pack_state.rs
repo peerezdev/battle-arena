@@ -28,6 +28,8 @@ pub struct PackBattle {
     pub mode: PackMode,
     pub nft_mint_a: Pubkey,
     pub nft_mint_b: Pubkey,
+    pub vault_a: Pubkey,
+    pub vault_b: Pubkey,
     pub value_usd_a: u64,
     pub value_usd_b: u64,
     pub grade_a: u8,
@@ -47,6 +49,7 @@ impl PackBattle {
         + 32 * 3                      // player_a, player_b, oracle
         + 2                           // mode (enum, holgado)
         + 32 * 2                      // nft_mint_a, nft_mint_b
+        + 32 * 2                      // vault_a, vault_b
         + 8 * 2                       // value_usd_a, value_usd_b
         + 1 * 2                       // grade_a, grade_b
         + 1 * 2                       // deposited_a, deposited_b

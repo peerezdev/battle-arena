@@ -59,12 +59,20 @@ pub fn handler(
     // Atribuir el depósito al lado correcto.
     if depositor == p.player_a {
         require!(!p.deposited_a, ErrorCode::AlreadyDeposited);
+        if p.deposited_b {
+            require!(ctx.accounts.vault.key() != p.vault_b, ErrorCode::BadVault);
+        }
+        p.vault_a = ctx.accounts.vault.key();
         p.nft_mint_a = nft_mint;
         p.value_usd_a = value_usd;
         p.grade_a = grade;
         p.deposited_a = true;
     } else if depositor == p.player_b {
         require!(!p.deposited_b, ErrorCode::AlreadyDeposited);
+        if p.deposited_a {
+            require!(ctx.accounts.vault.key() != p.vault_a, ErrorCode::BadVault);
+        }
+        p.vault_b = ctx.accounts.vault.key();
         p.nft_mint_b = nft_mint;
         p.value_usd_b = value_usd;
         p.grade_b = grade;

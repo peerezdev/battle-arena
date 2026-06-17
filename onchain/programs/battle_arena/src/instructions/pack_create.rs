@@ -27,6 +27,8 @@ pub fn handler(ctx: Context<CreatePackBattle>, nonce: u64, oracle: Pubkey, mode:
     p.mode = mode;
     p.nft_mint_a = Pubkey::default();
     p.nft_mint_b = Pubkey::default();
+    p.vault_a = Pubkey::default();
+    p.vault_b = Pubkey::default();
     p.value_usd_a = 0;
     p.value_usd_b = 0;
     p.grade_a = 0;
