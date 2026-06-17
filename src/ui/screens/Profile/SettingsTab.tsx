@@ -17,6 +17,7 @@ export function SettingsTab() {
   }, [username])
 
   async function save() {
+    if (saving) return
     const err = validateUsername(value)
     if (err) {
       setStatus({ kind: 'error', msg: err })
@@ -56,7 +57,10 @@ export function SettingsTab() {
       </label>
       <input
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          setValue(e.target.value)
+          setStatus({ kind: 'idle' })
+        }}
         placeholder="3–20 chars, letters/numbers/_"
         style={{
           width: '100%',

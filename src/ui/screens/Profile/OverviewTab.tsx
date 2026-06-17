@@ -27,7 +27,9 @@ export function OverviewTab() {
       .then((rows) => {
         if (!cancelled && Array.isArray(rows)) setWl(countResults(rows))
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (import.meta.env.DEV) console.warn('[OverviewTab] history fetch error:', err)
+      })
     return () => {
       cancelled = true
     }

@@ -21,6 +21,7 @@ export function ProfilePage() {
         {TABS.map((t) => (
           <button
             key={t.key}
+            type="button"
             onClick={() => setTab(t.key)}
             style={{
               background: 'transparent',
