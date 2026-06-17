@@ -271,6 +271,7 @@ def create_app(session_factory, chain: ChainSource,
         await _chat_mgr.connect(ws)
         try:
             await ws.send_json({"type": "history", "messages": _chat_buf.history()})
+            await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
             while True:
                 data = await ws.receive_json()
                 text = (data.get("text") or "").strip()
@@ -288,8 +289,10 @@ def create_app(session_factory, chain: ChainSource,
                 await _chat_mgr.broadcast({"type": "message", **msg})
         except WebSocketDisconnect:
             _chat_mgr.disconnect(ws)
+            await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
         except Exception:
             _chat_mgr.disconnect(ws)
+            await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
 
     return app
 

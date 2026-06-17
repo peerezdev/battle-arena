@@ -32,6 +32,9 @@ class ConnectionManager:
     def disconnect(self, ws: WebSocket) -> None:
         self._active.discard(ws)
 
+    def online_count(self) -> int:
+        return len(self._active)
+
     async def broadcast(self, msg: dict) -> None:
         for ws in list(self._active):
             try:
