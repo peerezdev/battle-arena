@@ -27,8 +27,7 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 | Método | Ruta | Auth | Qué |
 |---|---|---|---|
 | GET | `/health` | — | ping |
-| GET | `/auth/nonce?wallet=` | — | nonce a firmar |
-| POST | `/auth/verify {wallet, signature_hex}` | — | verifica firma ed25519 → token de sesión |
+| GET | `/auth/privy/me` | ✓ (Bearer identity token) | sub del usuario de Privy |
 | POST | `/users/me/alias {alias}` | ✓ | fija alias |
 | GET | `/users/{wallet}` | — | perfil (lectura pura; default 1200 si no existe) |
 | GET | `/users/{wallet}/history` | — | historial de rating |
@@ -42,7 +41,7 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 
 ## Decisiones clave
 
-- **Identidad = wallet + firma.** Login challenge-response: `GET /auth/nonce` → firmar `"BattleArena auth: <nonce>"` con la wallet → `POST /auth/verify` → token Bearer. Nonce de **un solo uso**; token con TTL. Las acciones que cambian estado usan el token (no se confía en una wallet del body → no puedes actuar por otra).
+- **Identidad = identity token de Privy.** El frontend manda el identity token de Privy como Bearer; el backend lo verifica (JWKS ES256, `aud`=App ID) y extrae la **embedded Solana wallet** de `linked_accounts` (`current_user`). Esa dirección es la identidad para ELO/matches. Las acciones que cambian estado usan el token (no se confía en una wallet del body).
 - **ELO solo desde batallas liquidadas on-chain.** El resultado (ganador/empate) se lee de la cuenta `Battle` (`Settled`/`Closed`) vía `ChainSource`. Trustless: nadie reporta resultados. Elo estándar (inicio 1200, K=32, empate 0.5).
 - **Sin matchmaking automático**: lobby tipo desafío (crear → listar → unirse).
 - **Límite de ELO del creador (`min_elo`/`max_elo`)** = **gate off-chain** (capa de lobby). El backend/UI marcan `joinable=false` fuera de rango, pero el contrato no conoce el ELO — técnicamente alguien podría unirse on-chain saltándose el lobby. Aceptado para el MVP; hacerlo garantía dura sería una mejora futura del contrato.
@@ -68,7 +67,7 @@ backend/app/
   config.py, db.py    # settings + SQLAlchemy (Base, engine, session)
   models.py           # User, Match, RatingHistory
   elo.py              # expected_score, updated_ratings, gap_label (puro)
-  auth.py             # AuthService (nonce, verify firma ed25519, token)
+  privy.py            # PrivyVerifier (verifica identity/access token, extrae embedded Solana wallet)
   chain/
     base.py           # BattleState, ChainSource, BattleNotFound
     mock.py           # MockChainSource (dev/tests)
