@@ -278,17 +278,14 @@ def create_app(session_factory, chain: ChainSource,
             except PrivyAuthError:
                 wallet = None
         await _chat_mgr.connect(ws)
-        # Nombre a mostrar: alias del usuario si lo tiene, si no el wallet abreviado.
-        display_name = abbreviate(wallet) if wallet else None
-        if wallet:
-            s = session_factory()
-            try:
-                alias = read_user_view(s, wallet, elo_start).get("alias")
-                if alias:
-                    display_name = alias
-            finally:
-                s.close()
         try:
+            # Nombre a mostrar: alias del usuario si lo tiene, si no el wallet abreviado.
+            # NOTA: se resuelve una vez al conectar; cambiar el username requiere reconectar.
+            display_name = None
+            if wallet:
+                with session_factory() as s:
+                    alias = read_user_view(s, wallet, elo_start).get("alias")
+                display_name = alias or abbreviate(wallet)
             await ws.send_json({"type": "history", "messages": _chat_buf.history()})
             await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
             while True:
