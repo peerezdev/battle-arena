@@ -12,7 +12,8 @@ function userColor(user: string): string {
 }
 
 function formatTs(ts: number): string {
-  const d = new Date(ts)
+  // El backend emite ts en segundos (epoch); Date espera milisegundos.
+  const d = new Date(ts * 1000)
   const hh = d.getHours().toString().padStart(2, '0')
   const mm = d.getMinutes().toString().padStart(2, '0')
   return `${hh}:${mm}`

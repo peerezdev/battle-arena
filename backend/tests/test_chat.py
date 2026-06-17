@@ -76,3 +76,31 @@ def test_ws_unauthenticated_post_returns_error_and_no_broadcast():
         err = anon.receive_json()
         assert err["type"] == "error"
         assert err["error"] == "login_required"
+
+
+def test_ws_chat_truncates_to_280_chars():
+    app, priv = _chat_app()
+    token = make_id_token(priv, APP_ID, [solana_embedded(WALLET)])
+    client = TestClient(app)
+    with client.websocket_connect(f"/ws/chat?token={token}") as ws:
+        ws.receive_json()  # history
+        ws.send_json({"text": "a" * 500})
+        msg = ws.receive_json()
+        assert msg["type"] == "message"
+        assert len(msg["text"]) == 280
+
+
+def test_ws_chat_rate_limits_after_5_in_10s():
+    """El 6º mensaje en la ventana recibe rate_limited (5 msg / 10s)."""
+    app, priv = _chat_app()
+    token = make_id_token(priv, APP_ID, [solana_embedded(WALLET)])
+    client = TestClient(app)
+    with client.websocket_connect(f"/ws/chat?token={token}") as ws:
+        ws.receive_json()  # history
+        for i in range(5):
+            ws.send_json({"text": f"m{i}"})
+            assert ws.receive_json()["type"] == "message"
+        ws.send_json({"text": "over"})
+        resp = ws.receive_json()
+        assert resp["type"] == "error"
+        assert resp["error"] == "rate_limited"
