@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Connection, PublicKey } from '@solana/web3.js'
 import { usePrivy } from '@privy-io/react-auth'
-import { useWallets } from '@privy-io/react-auth/solana'
+import { useEmbeddedSolanaAddress } from './embedded'
 import { config } from '../onchain/config'
 
 // ─── Pure helper (exported for unit tests) ───────────────────────────────────
@@ -35,12 +35,10 @@ export function sumUsdc(tokenAccounts: TokenAccountLike[]): number {
 
 export function useUsdcBalance(): { usdc: number | null; loading: boolean } {
   const { authenticated } = usePrivy()
-  const { wallets } = useWallets()
+  const address = useEmbeddedSolanaAddress()
   const [usdc, setUsdc] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const unmountedRef = useRef(false)
-
-  const address = wallets[0]?.address ?? null
   const STAKE_MINT = import.meta.env.VITE_STAKE_MINT as string | undefined
 
   useEffect(() => {

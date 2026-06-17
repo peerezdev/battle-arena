@@ -45,10 +45,12 @@ export function AppPrivyProvider({ children }: { children: ReactNode }) {
           walletChainType: 'ethereum-and-solana',
         },
 
-        // Create a Solana embedded wallet for users who don't have one
+        // Create a Solana embedded wallet for ALL users — incluso si conectan una
+        // wallet externa (Phantom). La embedded es la wallet del juego (balance,
+        // identidad on-chain, escrow no-exportable); la externa queda vinculada.
         embeddedWallets: {
           solana: {
-            createOnLogin: 'users-without-wallets',
+            createOnLogin: 'all-users',
           },
         },
 

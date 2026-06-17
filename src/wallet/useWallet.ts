@@ -5,6 +5,7 @@ import type { TransactionInstruction } from '@solana/web3.js'
 import bs58 from 'bs58'
 import { Buffer } from 'buffer'
 import { config } from '../onchain/config'
+import { useEmbeddedSolanaAddress } from './embedded'
 
 export interface WalletApi {
   publicKey: PublicKey | null
@@ -34,10 +35,13 @@ export function useWallet(): WalletApi {
   // -- Account / connection state ----------------------------------------------------------
   const { authenticated, login } = usePrivy()
   const { wallets } = useWallets()
-  const wallet = wallets[0] ?? null
+  // Firma/identidad SIEMPRE con la embedded (la wallet del juego), no wallets[0]
+  // (que podría ser una externa conectada como Phantom).
+  const embeddedAddress = useEmbeddedSolanaAddress()
+  const wallet = wallets.find((w) => w.address === embeddedAddress) ?? null
 
   // Map base-58 address string → PublicKey, or null when disconnected
-  const publicKey: PublicKey | null = wallet ? new PublicKey(wallet.address) : null
+  const publicKey: PublicKey | null = embeddedAddress ? new PublicKey(embeddedAddress) : null
 
   // -- Connection --------------------------------------------------------------------------
   const isConnected: boolean = authenticated && wallet !== null
