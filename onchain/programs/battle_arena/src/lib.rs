@@ -96,4 +96,8 @@ pub mod battle_arena {
     pub fn settle_direct(ctx: Context<SettleDirect>) -> Result<()> {
         instructions::pack_settle_direct::handler(ctx)
     }
+
+    pub fn claim_pack_timeout(ctx: Context<ClaimPackTimeout>) -> Result<()> {
+        instructions::pack_timeout::handler(ctx)
+    }
 }
