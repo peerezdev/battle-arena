@@ -4,6 +4,7 @@ pub mod error;
 pub mod hashing;
 pub mod instructions;
 pub mod oracle;
+pub mod pack_state;
 pub mod rules;
 pub mod state;
 
@@ -11,6 +12,7 @@ use anchor_lang::prelude::*;
 
 pub use constants::*;
 pub use instructions::*;
+pub use pack_state::*;
 pub use state::*;
 
 declare_id!("89qGDjXGcV9zi3968DtRLNzBn5KXhYmSGJkjKntksCdk");

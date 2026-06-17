@@ -36,4 +36,12 @@ pub enum ErrorCode {
     InvalidCommit,
     #[msg("La cuenta de tokens de stake no pertenece al jugador")]
     UnauthorizedTokenAccount,
+    #[msg("El oponente todavía no se ha unido al duelo.")]
+    OpponentNotJoined,
+    #[msg("Este lado ya depositó su carta.")]
+    AlreadyDeposited,
+    #[msg("Faltan cartas por depositar en el escrow.")]
+    NotAllDeposited,
+    #[msg("La cuenta de vault no es del PDA o no contiene la carta esperada.")]
+    BadVault,
 }
