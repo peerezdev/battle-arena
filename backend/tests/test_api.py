@@ -1,16 +1,21 @@
-import based58
 from fastapi.testclient import TestClient
-from nacl.signing import SigningKey
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from app.main import create_app
 from app.db import make_session_factory, init_db
-from app.auth import AuthService, auth_message
+from app.privy import PrivyVerifier
 from app.chain.mock import MockChainSource
+
+from tests.conftest import make_es256, make_id_token, solana_embedded, privy_auth_headers
 
 # Realistic-length Solana pubkey stubs for HTTP-layer tests (44 chars, base58-like)
 BP1 = "BattlePubkey1111111111111111111111111111111"   # 43 chars
 BP2 = "BattlePubkey2222222222222222222222222222222"   # 43 chars
+
+APP_ID = "app123"
+
+# Par de clave / verifier compartido para cada instancia de cliente
+_PRIV = make_es256()
 
 
 def _client():
@@ -22,17 +27,15 @@ def _client():
     init_db(engine)
     sf = make_session_factory(engine)
     chain = MockChainSource()
-    auth = AuthService(now_fn=lambda: 1000, ttl=3600)
-    app = create_app(sf, chain, auth, elo_start=1200, elo_k=32)
-    return TestClient(app), chain, auth
+    priv = make_es256()
+    privy = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv.public_key())
+    app = create_app(sf, chain, elo_start=1200, elo_k=32, privy=privy)
+    return TestClient(app), chain, priv
 
 
-def _login(c, key):
-    wallet = based58.b58encode(bytes(key.verify_key)).decode()
-    nonce = c.get("/auth/nonce", params={"wallet": wallet}).json()["nonce"]
-    sig = key.sign(auth_message(nonce).encode()).signature.hex()
-    token = c.post("/auth/verify", json={"wallet": wallet, "signature_hex": sig}).json()["token"]
-    return wallet, token
+def _auth_headers(priv, wallet):
+    """Devuelve headers de Authorization para `wallet` usando `priv`."""
+    return privy_auth_headers(priv, APP_ID, wallet)
 
 
 def test_health():
@@ -41,12 +44,12 @@ def test_health():
 
 
 def test_auth_and_create_match_flow():
-    c, chain, _ = _client()
-    key = SigningKey.generate()
-    wallet, token = _login(c, key)
+    c, chain, priv = _client()
+    wallet = "So1ana1111111111111111111111111111111111111"
+    hdrs = _auth_headers(priv, wallet)
     chain.set_battle(BP1, player_a=wallet, stake=100)
     r = c.post("/matches", json={"battle_pubkey": BP1, "min_elo": 1000, "max_elo": 1500},
-               headers={"Authorization": f"Bearer {token}"})
+               headers=hdrs)
     assert r.status_code == 200 and r.json()["stake"] == 100
     # listado con viewer
     rows = c.get("/matches/open", params={"viewer": wallet}).json()
@@ -69,10 +72,10 @@ def test_get_unknown_user_is_readonly():
 
 
 def test_sync_unknown_match_404():
-    c, chain, _ = _client()
-    key = SigningKey.generate()
-    _, token = _login(c, key)
-    r = c.post("/matches/UNREGISTERED/sync", headers={"Authorization": f"Bearer {token}"})
+    c, chain, priv = _client()
+    wallet = "So1ana1111111111111111111111111111111111111"
+    hdrs = _auth_headers(priv, wallet)
+    r = c.post("/matches/UNREGISTERED/sync", headers=hdrs)
     assert r.status_code == 404
 
 
@@ -83,25 +86,25 @@ def test_sync_requires_auth():
 
 
 def test_sync_applies_elo_and_compare():
-    c, chain, _ = _client()
-    ka, kb = SigningKey.generate(), SigningKey.generate()
-    wa, token = _login(c, ka)
-    wb = based58.b58encode(bytes(kb.verify_key)).decode()
+    c, chain, priv = _client()
+    wa = "So1anaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    wb = "So1anaBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    hdrs_a = _auth_headers(priv, wa)
     chain.set_battle(BP1, player_a=wa, stake=100)
-    c.post("/matches", json={"battle_pubkey": BP1}, headers={"Authorization": f"Bearer {token}"})
-    chain.join(BP1, player_b=wb); chain.settle(BP1, winner=wa)
-    r = c.post(f"/matches/{BP1}/sync", headers={"Authorization": f"Bearer {token}"})
+    c.post("/matches", json={"battle_pubkey": BP1}, headers=hdrs_a)
+    chain.join(BP1, player_b=wb)
+    chain.settle(BP1, winner=wa)
+    r = c.post(f"/matches/{BP1}/sync", headers=hdrs_a)
     assert r.status_code == 200 and r.json()["elo_applied"] is True
     cmp = c.get("/elo/compare", params={"a": wa, "b": wb}).json()
     assert cmp["elo_a"] == 1216 and cmp["elo_b"] == 1184 and cmp["diff"] == 32
 
 
 def test_alias_too_long_rejected():
-    c, _, _ = _client()
-    key = SigningKey.generate()
-    _, token = _login(c, key)
-    r = c.post("/users/me/alias", json={"alias": "a" * 33},
-               headers={"Authorization": f"Bearer {token}"})
+    c, _, priv = _client()
+    wallet = "So1ana1111111111111111111111111111111111111"
+    hdrs = _auth_headers(priv, wallet)
+    r = c.post("/users/me/alias", json={"alias": "a" * 33}, headers=hdrs)
     assert r.status_code == 422
 
 
@@ -112,17 +115,23 @@ def test_leaderboard_limit_over_200_rejected():
 
 
 def test_create_match_min_elo_greater_than_max_elo_rejected():
-    c, chain, _ = _client()
-    key = SigningKey.generate()
-    wallet, token = _login(c, key)
+    c, chain, priv = _client()
+    wallet = "So1ana1111111111111111111111111111111111111"
+    hdrs = _auth_headers(priv, wallet)
     chain.set_battle(BP2, player_a=wallet, stake=50)
     r = c.post("/matches", json={"battle_pubkey": BP2, "min_elo": 1500, "max_elo": 1000},
-               headers={"Authorization": f"Bearer {token}"})
+               headers=hdrs)
     assert r.status_code == 422
 
 
 def test_privy_me_503_when_privy_not_configured():
-    c, _, _ = _client()  # create_app sin privy => privy=None
+    # create_app sin privy => privy=None
+    engine = create_engine("sqlite:///:memory:",
+                           connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    init_db(engine)
+    sf = make_session_factory(engine)
+    app = create_app(sf, MockChainSource(), elo_start=1200, elo_k=32)
+    c = TestClient(app)
     r = c.get("/auth/privy/me")
     assert r.status_code == 503
 
@@ -139,9 +148,8 @@ def _client_with_privy():
                            connect_args={"check_same_thread": False}, poolclass=StaticPool)
     init_db(engine)
     sf = make_session_factory(engine)
-    auth = AuthService(now_fn=lambda: 1000, ttl=3600)
-    privy = PrivyVerifier(app_id="app123", key_resolver=_reject)
-    app = create_app(sf, MockChainSource(), auth, elo_start=1200, elo_k=32, privy=privy)
+    privy = PrivyVerifier(app_id=APP_ID, key_resolver=_reject)
+    app = create_app(sf, MockChainSource(), elo_start=1200, elo_k=32, privy=privy)
     return TestClient(app)
 
 
@@ -154,4 +162,25 @@ def test_privy_me_401_without_bearer():
 def test_privy_me_401_invalid_token():
     c = _client_with_privy()
     r = c.get("/auth/privy/me", headers={"Authorization": "Bearer not-a-real-token"})
+    assert r.status_code == 401
+
+
+def test_current_user_503_when_privy_not_configured():
+    """Sin privy, los endpoints protegidos devuelven 503."""
+    engine = create_engine("sqlite:///:memory:",
+                           connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    init_db(engine)
+    sf = make_session_factory(engine)
+    app = create_app(sf, MockChainSource(), elo_start=1200, elo_k=32)
+    c = TestClient(app)
+    r = c.post("/matches", json={"battle_pubkey": "B" * 44},
+               headers={"Authorization": "Bearer tok"})
+    assert r.status_code == 503
+
+
+def test_current_user_401_invalid_token():
+    """Token Bearer inválido (no firma de Privy) → 401."""
+    c, _, _ = _client()
+    r = c.post("/matches", json={"battle_pubkey": "B" * 44},
+               headers={"Authorization": "Bearer not-a-jwt"})
     assert r.status_code == 401

@@ -1,3 +1,4 @@
+import json
 import time
 import jwt
 import pytest
@@ -43,3 +44,43 @@ def test_rejects_tampered_signature():
     v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: other.public_key())
     with pytest.raises(PrivyAuthError):
         v.verify(_make_token(priv, "app123"))
+
+
+def _make_id_token(priv, app_id, linked_accounts, sub="did:privy:abc", exp_delta=3600):
+    now = int(time.time())
+    payload = {"aud": app_id, "iss": "privy.io", "sub": sub, "iat": now, "exp": now + exp_delta,
+               "linked_accounts": json.dumps(linked_accounts)}
+    return jwt.encode(payload, priv, algorithm="ES256", headers={"kid": "test-kid", "alg": "ES256"})
+
+
+def _solana_embedded(addr):
+    return {"type": "wallet", "chain_type": "solana", "connector_type": "embedded", "address": addr}
+
+
+def test_embedded_solana_wallet_extracts_address():
+    priv = _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
+    tok = _make_id_token(priv, "app123", [
+        {"type": "email", "address": "a@b.c"},
+        {"type": "wallet", "chain_type": "ethereum", "connector_type": "embedded", "address": "0xabc"},
+        _solana_embedded("So1anaAddr111111111111111111111111111111111"),
+    ])
+    assert v.embedded_solana_wallet(tok) == "So1anaAddr111111111111111111111111111111111"
+
+
+def test_embedded_solana_wallet_requires_embedded_solana():
+    priv = _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
+    tok = _make_id_token(priv, "app123", [
+        {"type": "wallet", "chain_type": "solana", "connector_type": "wallet_connect", "address": "ext"},
+    ])
+    with pytest.raises(PrivyAuthError):
+        v.embedded_solana_wallet(tok)
+
+
+def test_embedded_solana_wallet_rejects_tampered():
+    priv, other = _es256(), _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: other.public_key())
+    tok = _make_id_token(priv, "app123", [_solana_embedded("x")])
+    with pytest.raises(PrivyAuthError):
+        v.embedded_solana_wallet(tok)

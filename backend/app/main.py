@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import make_engine, make_session_factory, init_db
-from .auth import AuthService, AuthError
 from .privy import PrivyVerifier, PrivyAuthError
 from .chain.base import ChainSource
 from .chain.mock import MockChainSource
@@ -20,11 +19,6 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .models import GachaPack
-
-
-class VerifyBody(BaseModel):
-    wallet: str = Field(min_length=32, max_length=44)
-    signature_hex: str
 
 
 class AliasBody(BaseModel):
@@ -64,7 +58,7 @@ class CreateMatchBody(BaseModel):
         return self
 
 
-def create_app(session_factory, chain: ChainSource, auth: AuthService,
+def create_app(session_factory, chain: ChainSource,
                elo_start: int = 1200, elo_k: int = 32,
                cors_origins: list[str] | None = None,
                gacha: GachaService | None = None,
@@ -88,39 +82,22 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
         finally:
             s.close()
 
-    def current_wallet(authorization: Optional[str] = Header(None)) -> str:
+    def current_user(authorization: Optional[str] = Header(None)) -> str:
+        if privy is None:
+            raise HTTPException(503, "privy no configurado")
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(401, "falta token")
-        wallet = auth.wallet_for_token(authorization[len("Bearer "):])
-        if wallet is None:
-            raise HTTPException(401, "token inválido o caducado")
-        return wallet
+        try:
+            return privy.embedded_solana_wallet(authorization[len("Bearer "):])
+        except PrivyAuthError:
+            raise HTTPException(401, "identity token inválido")
 
     @app.get("/health")
     async def health():
         return {"status": "ok"}
 
-    @app.get("/auth/nonce")
-    async def auth_nonce(wallet: str = Query(..., min_length=32, max_length=44)):
-        return {"nonce": auth.issue_nonce(wallet)}
-
-    @app.post("/auth/verify")
-    async def auth_verify(body: VerifyBody):
-        try:
-            token = auth.verify(body.wallet, body.signature_hex)
-        except AuthError as e:
-            raise HTTPException(401, str(e))
-        return {"token": token}
-
-    @app.post("/auth/logout")
-    async def auth_logout(authorization: Optional[str] = Header(None),
-                          wallet: str = Depends(current_wallet)):
-        token = authorization[len("Bearer "):]
-        auth.revoke(token)
-        return {"ok": True}
-
     @app.post("/users/me/alias")
-    async def me_alias(body: AliasBody, wallet: str = Depends(current_wallet), s: Session = Depends(db)):
+    async def me_alias(body: AliasBody, wallet: str = Depends(current_user), s: Session = Depends(db)):
         get_or_create_user(s, wallet, elo_start)
         set_alias(s, wallet, body.alias)
         s.commit()
@@ -136,7 +113,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
                  "elo_after": h.elo_after, "result": h.result} for h in history(s, wallet)]
 
     @app.post("/matches")
-    async def post_match(body: CreateMatchBody, wallet: str = Depends(current_wallet), s: Session = Depends(db)):
+    async def post_match(body: CreateMatchBody, wallet: str = Depends(current_user), s: Session = Depends(db)):
         try:
             m = await register_match(s, chain, creator=wallet, battle_pubkey=body.battle_pubkey,
                                      min_elo=body.min_elo, max_elo=body.max_elo, elo_start=elo_start)
@@ -152,7 +129,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
         return rows
 
     @app.post("/matches/{battle_pubkey}/sync")
-    async def post_sync(battle_pubkey: str, wallet: str = Depends(current_wallet), s: Session = Depends(db)):
+    async def post_sync(battle_pubkey: str, wallet: str = Depends(current_user), s: Session = Depends(db)):
         try:
             m = await sync_match(s, chain, battle_pubkey, elo_start=elo_start, k=elo_k)
         except MatchError as e:
@@ -200,7 +177,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
 
     @app.post("/gacha/generate-pack")
     async def gacha_generate(body: GeneratePackBody,
-                             wallet: str = Depends(current_wallet),
+                             wallet: str = Depends(current_user),
                              s: Session = Depends(db)):
         svc = _gacha_or_503()
         _gacha_throttle(wallet)
@@ -223,7 +200,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
         return out
 
     @app.post("/gacha/submit-tx")
-    async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_wallet)):
+    async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_user)):
         svc = _gacha_or_503()
         _gacha_throttle(wallet)
         try:
@@ -235,7 +212,7 @@ def create_app(session_factory, chain: ChainSource, auth: AuthService,
 
     @app.post("/gacha/open-pack")
     async def gacha_open(body: OpenPackBody,
-                         wallet: str = Depends(current_wallet),
+                         wallet: str = Depends(current_user),
                          s: Session = Depends(db)):
         svc = _gacha_or_503()
         _gacha_throttle(wallet)
@@ -275,10 +252,9 @@ def build_default_app() -> FastAPI:
     init_db(engine)
     session_factory = make_session_factory(engine)
     chain: ChainSource = MockChainSource()  # 'solana' se cablea cuando el lector real esté validado
-    auth = AuthService(ttl=s.session_ttl)
     gacha = GachaService(base_url=s.gacha_base_url, api_key=s.gacha_api_key)
     privy = PrivyVerifier(app_id=s.privy_app_id, jwks_url=s.privy_jwks_url.format(app_id=s.privy_app_id)) if s.privy_app_id else None
-    return create_app(session_factory, chain, auth, elo_start=s.elo_start, elo_k=s.elo_k,
+    return create_app(session_factory, chain, elo_start=s.elo_start, elo_k=s.elo_k,
                       cors_origins=s.cors_origins, gacha=gacha, privy=privy)
 
 

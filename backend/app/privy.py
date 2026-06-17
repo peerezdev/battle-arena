@@ -5,6 +5,7 @@ inyectable para tests (sin red).
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Callable, Optional
 
 import httpx
@@ -54,3 +55,16 @@ class PrivyVerifier:
             raise
         except jwt.PyJWTError as e:
             raise PrivyAuthError(f"token inválido: {type(e).__name__}")
+
+    def embedded_solana_wallet(self, token: str) -> str:
+        claims = self.verify(token)
+        raw = claims.get("linked_accounts")
+        try:
+            accounts = json.loads(raw) if isinstance(raw, str) else (raw or [])
+        except (TypeError, ValueError):
+            raise PrivyAuthError("linked_accounts ilegible")
+        for acc in accounts:
+            if (acc.get("type") == "wallet" and acc.get("chain_type") == "solana"
+                    and acc.get("connector_type") == "embedded" and acc.get("address")):
+                return acc["address"]
+        raise PrivyAuthError("sin embedded Solana wallet")
