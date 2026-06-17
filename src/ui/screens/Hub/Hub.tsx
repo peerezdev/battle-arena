@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { COLORS, GRADIENT, FONTS } from '../../theme'
+import { COLORS, GRADIENT, FONTS, formatUsd } from '../../theme'
+import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import { useReducedMotion } from '../../useReducedMotion'
 import { AuthButtons } from '../../components/AuthButtons'
 import type { HubNav } from './hubMockData'
@@ -47,6 +48,7 @@ export function Hub() {
   const reducedMotion = useReducedMotion()
   const wideDock = useIsWide('(min-width: 1100px)')
   const wideRail = useIsWide('(min-width: 760px)')
+  const { usdc } = useUsdcBalance()
 
   /** Router centralizado de navegación */
   function go(id: HubNav) {
@@ -127,7 +129,6 @@ export function Hub() {
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Balance pill — EJEMPLO — no es un saldo real */}
           <div
             style={{
               display: 'flex',
@@ -158,8 +159,7 @@ export function Hub() {
                   color: COLORS.text,
                 }}
               >
-                {/* EJEMPLO — no es un saldo real */}
-                $128.40
+                {usdc != null ? formatUsd(usdc) : '—'}
               </div>
             </div>
           </div>
