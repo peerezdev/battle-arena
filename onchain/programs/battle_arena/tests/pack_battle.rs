@@ -7,6 +7,9 @@
 //!   4. Rechazo: settle antes de que ambos depositen.
 //!   5. Rechazo: depósito con oráculo incorrecto.
 //!   6. Timeout: A deposita, B nunca; A reclama pasado el deadline.
+//!   7. Rechazo: self-join (player_b == player_a).
+//!   8. Rechazo: doble settle (segunda llamada tras settle exitoso).
+//!   9. Rechazo: depósito después de que el pack está en fase Ready.
 
 mod pack_common;
 mod common;
@@ -201,6 +204,7 @@ fn deposit_rejected_with_wrong_oracle() {
 
 // ── 6. Timeout: A recupera su carta cuando B nunca deposita ─────────────────
 
+
 #[test]
 fn timeout_lets_depositor_reclaim_when_opponent_never_deposits() {
     let mut h = Harness::new();
@@ -233,4 +237,92 @@ fn timeout_lets_depositor_reclaim_when_opponent_never_deposits() {
 
     let p = h.pack(&s.pack_pda);
     assert_eq!(p.phase, battle_arena::pack_state::PackPhase::Settled);
+}
+
+// ── 7. Rechazo: self-join (player_b == player_a) ─────────────────────────────
+
+#[test]
+fn self_join_rejected() {
+    use anchor_lang::{InstructionData, ToAccountMetas};
+    use solana_signer::Signer;
+    let mut h = Harness::new();
+    let s = PackScenario::setup(&mut h);
+    h.send(&[s.create_ix(&h)], &s.player_a, &[&s.player_a]);
+    let self_join = solana_instruction::Instruction {
+        program_id: h.program_id,
+        accounts: battle_arena::accounts::JoinPackBattle {
+            player_b: s.player_a.pubkey(),
+            pack: s.pack_pda,
+        }
+        .to_account_metas(None),
+        data: battle_arena::instruction::JoinPackBattle {}.data(),
+    };
+    let logs = h
+        .try_send(&[self_join], &s.player_a, &[&s.player_a])
+        .unwrap_err();
+    assert_error(&logs, "SelfJoinNotAllowed", 6022);
+}
+
+// ── 8. Rechazo: doble settle ─────────────────────────────────────────────────
+
+#[test]
+fn double_settle_rejected() {
+    let mut h = Harness::new();
+    let s = PackScenario::setup(&mut h);
+    h.send(&[s.create_ix(&h)], &s.player_a, &[&s.player_a]);
+    h.send(&[s.join_ix(&h)], &s.player_b, &[&s.player_b]);
+    let oracle = h.oracle.clone();
+    h.send(
+        &s.deposit_ixs(&h, &s.player_a, s.vault_a, s.nft_mint_a, 1000, 9, &oracle),
+        &s.player_a,
+        &[&s.player_a],
+    );
+    h.send(
+        &s.deposit_ixs(&h, &s.player_b, s.vault_b, s.nft_mint_b, 500, 8, &oracle),
+        &s.player_b,
+        &[&s.player_b],
+    );
+    h.send(
+        &[s.settle_direct_ix(&h, s.dest_a_for_a, s.dest_b_for_a)],
+        &s.payer,
+        &[&s.payer],
+    );
+    h.expire_blockhash();
+    let res = h.try_send(
+        &[s.settle_direct_ix(&h, s.dest_a_for_a, s.dest_b_for_a)],
+        &s.payer,
+        &[&s.payer],
+    );
+    assert!(res.is_err(), "el segundo settle debe fallar");
+}
+
+// ── 9. Rechazo: depósito después de que el pack está en fase Ready ────────────
+
+#[test]
+fn deposit_after_ready_rejected() {
+    let mut h = Harness::new();
+    let s = PackScenario::setup(&mut h);
+    h.send(&[s.create_ix(&h)], &s.player_a, &[&s.player_a]);
+    h.send(&[s.join_ix(&h)], &s.player_b, &[&s.player_b]);
+    let oracle = h.oracle.clone();
+    h.send(
+        &s.deposit_ixs(&h, &s.player_a, s.vault_a, s.nft_mint_a, 1000, 9, &oracle),
+        &s.player_a,
+        &[&s.player_a],
+    );
+    h.send(
+        &s.deposit_ixs(&h, &s.player_b, s.vault_b, s.nft_mint_b, 500, 8, &oracle),
+        &s.player_b,
+        &[&s.player_b],
+    );
+    h.expire_blockhash();
+    // La fase ahora es Ready; otro depósito debe ser rechazado con WrongPhase.
+    let logs = h
+        .try_send(
+            &s.deposit_ixs(&h, &s.player_a, s.vault_a, s.nft_mint_a, 1000, 9, &oracle),
+            &s.player_a,
+            &[&s.player_a],
+        )
+        .unwrap_err();
+    assert_error(&logs, "WrongPhase", 6000);
 }
