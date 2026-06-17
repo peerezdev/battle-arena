@@ -29,7 +29,6 @@ export const config = {
   programId: import.meta.env.VITE_PROGRAM_ID ?? '89qGDjXGcV9zi3968DtRLNzBn5KXhYmSGJkjKntksCdk',
   oracleUrl,
   backendUrl,
-  reownProjectId: import.meta.env.VITE_REOWN_PROJECT_ID ?? '',
   /**
    * USDC (or any SPL token) mint used as the battle stake token.
    * On devnet this is usually 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU (USDC devnet faucet).
