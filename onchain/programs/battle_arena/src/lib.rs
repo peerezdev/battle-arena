@@ -92,4 +92,8 @@ pub mod battle_arena {
     pub fn deposit_card(ctx: Context<DepositCard>, nft_mint: Pubkey, value_usd: u64, grade: u8, ts: i64, ed25519_ix_index: u8) -> Result<()> {
         instructions::pack_deposit::handler(ctx, nft_mint, value_usd, grade, ts, ed25519_ix_index)
     }
+
+    pub fn settle_direct(ctx: Context<SettleDirect>) -> Result<()> {
+        instructions::pack_settle_direct::handler(ctx)
+    }
 }
