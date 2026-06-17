@@ -20,4 +20,11 @@ describe('pickLinkedSolanaWallets', () => {
   it('devuelve [] sin cuentas', () => {
     expect(pickLinkedSolanaWallets([])).toEqual([])
   })
+
+  it('clasifica como embedded por connectorType==="embedded" (sin walletClientType)', () => {
+    const accounts = [
+      { type: 'wallet', chainType: 'solana', connectorType: 'embedded', address: 'EMB2' },
+    ]
+    expect(pickLinkedSolanaWallets(accounts as any)).toEqual([{ address: 'EMB2', source: 'embedded' }])
+  })
 })

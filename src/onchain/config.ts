@@ -20,9 +20,14 @@ function assertSecureUrl(label: string, url: string): void {
 
 const oracleUrl = import.meta.env.VITE_ORACLE_URL ?? 'http://localhost:8787'
 const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080'
+const dasRpcUrl =
+  (import.meta.env.VITE_DAS_RPC as string | undefined) ??
+  (import.meta.env.VITE_SOLANA_RPC as string | undefined) ??
+  'https://api.devnet.solana.com'
 
 assertSecureUrl('VITE_ORACLE_URL', oracleUrl)
 assertSecureUrl('VITE_BACKEND_URL', backendUrl)
+assertSecureUrl('VITE_DAS_RPC', dasRpcUrl)
 
 export const config = {
   rpcUrl: import.meta.env.VITE_SOLANA_RPC ?? 'https://api.devnet.solana.com',
@@ -57,8 +62,5 @@ export const config = {
    * DAS-capable RPC (e.g. Helius) for reading NFTs via getAssetsByOwner. Falls back
    * to the regular Solana RPC (public devnet does not support DAS → empty inventory).
    */
-  dasRpcUrl:
-    (import.meta.env.VITE_DAS_RPC as string | undefined) ??
-    (import.meta.env.VITE_SOLANA_RPC as string | undefined) ??
-    'https://api.devnet.solana.com',
+  dasRpcUrl,
 }

@@ -55,4 +55,14 @@ describe('getAssetsByOwner', () => {
     vi.stubGlobal('fetch', fetchMock)
     expect(await getAssetsByOwner('https://rpc', 'OWNER')).toEqual([])
   })
+
+  it('devuelve [] si la respuesta no es ok', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429 }))
+    expect(await getAssetsByOwner('https://rpc', 'OWNER')).toEqual([])
+  })
+
+  it('devuelve [] si fetch lanza', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')))
+    expect(await getAssetsByOwner('https://rpc', 'OWNER')).toEqual([])
+  })
 })

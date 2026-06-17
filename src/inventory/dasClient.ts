@@ -31,7 +31,8 @@ export function dasAssetToCard(a: DasAsset): InventoryCard {
   const md = a.content?.metadata
   const attrs = md?.attributes ?? []
   const insuredAttr = attrs.find((t) => /insured/i.test(t.trait_type ?? ''))
-  const insuredValue = insuredAttr != null ? Number(insuredAttr.value) : NaN
+  const rawInsured = insuredAttr?.value
+  const insuredValue = rawInsured == null || rawInsured === '' ? NaN : Number(rawInsured)
   return {
     mint: a.id,
     name: md?.name ?? 'Unnamed',
