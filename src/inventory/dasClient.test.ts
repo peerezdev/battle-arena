@@ -19,20 +19,50 @@ describe('filterCollectorCryptAssets', () => {
 })
 
 describe('dasAssetToCard', () => {
-  it('extrae mint, name, image e insuredValue de attributes', () => {
+  it('extrae campos base + grading/rarity/year/authenticated', () => {
     const card = dasAssetToCard({
       id: 'mint1',
       content: {
-        metadata: { name: 'Charizard', attributes: [{ trait_type: 'Insured Value', value: '1200' }] },
+        metadata: {
+          name: '2020 Charizard',
+          attributes: [
+            { trait_type: 'Insured Value', value: '1200' },
+            { trait_type: 'Rarity', value: 'Epic' },
+            { trait_type: 'Grading Company', value: 'PSA' },
+            { trait_type: 'The Grade', value: '10' },
+            { trait_type: 'Grading ID', value: '12345678' },
+            { trait_type: 'Year', value: '2020' },
+            { trait_type: 'Authenticated', value: 'true' },
+          ],
+        },
         links: { image: 'http://img/x.png' },
       },
     } as any)
-    expect(card).toEqual({ mint: 'mint1', name: 'Charizard', image: 'http://img/x.png', insuredValue: 1200 })
+    expect(card).toEqual({
+      mint: 'mint1', name: '2020 Charizard', image: 'http://img/x.png', insuredValue: 1200,
+      rarity: 'epic', grade: 'PSA 10', gradingCompany: 'PSA', gradingId: '12345678',
+      year: '2020', authenticated: true,
+    })
   })
 
-  it('usa fallbacks cuando faltan campos', () => {
-    const card = dasAssetToCard({ id: 'mint2' } as any)
-    expect(card).toEqual({ mint: 'mint2', name: 'Unnamed', image: null, insuredValue: null })
+  it('usa fallbacks/null cuando faltan campos; year desde el nombre', () => {
+    const card = dasAssetToCard({
+      id: 'mint2',
+      content: { metadata: { name: '1999 Pikachu' } },
+    } as any)
+    expect(card).toEqual({
+      mint: 'mint2', name: '1999 Pikachu', image: null, insuredValue: null,
+      rarity: null, grade: null, gradingCompany: null, gradingId: null,
+      year: '1999', authenticated: null,
+    })
+  })
+
+  it('id-only asset → todo null y name Unnamed', () => {
+    const card = dasAssetToCard({ id: 'mint3' } as any)
+    expect(card.name).toBe('Unnamed')
+    expect(card.grade).toBeNull()
+    expect(card.year).toBeNull()
+    expect(card.authenticated).toBeNull()
   })
 })
 

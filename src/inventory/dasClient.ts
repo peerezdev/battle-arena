@@ -17,6 +17,12 @@ export interface InventoryCard {
   name: string
   image: string | null
   insuredValue: number | null
+  rarity: string | null
+  grade: string | null
+  gradingCompany: string | null
+  gradingId: string | null
+  year: string | null
+  authenticated: boolean | null
 }
 
 /** Keep only assets that belong to the given Collector Crypt collection (DAS grouping). */
@@ -26,18 +32,50 @@ export function filterCollectorCryptAssets(assets: DasAsset[], collectionMint: s
   )
 }
 
+/** trait_type -> string value (coerced), for whichever attributes exist. */
+function attrMap(attrs: Array<{ trait_type?: string; value?: unknown }>): Record<string, string> {
+  const m: Record<string, string> = {}
+  for (const t of attrs) {
+    if (t.trait_type != null && t.value != null && t.value !== '') m[t.trait_type] = String(t.value)
+  }
+  return m
+}
+
 /** Map a DAS asset to a display card, with safe fallbacks. */
 export function dasAssetToCard(a: DasAsset): InventoryCard {
   const md = a.content?.metadata
   const attrs = md?.attributes ?? []
+  const m = attrMap(attrs)
+  const name = md?.name ?? 'Unnamed'
+
   const insuredAttr = attrs.find((t) => /insured/i.test(t.trait_type ?? ''))
   const rawInsured = insuredAttr?.value
   const insuredValue = rawInsured == null || rawInsured === '' ? NaN : Number(rawInsured)
+
+  const company = (m['Grading Company'] ?? '').trim()
+  const gradeLabel = (m['The Grade'] ?? m['GradeNum'] ?? '').trim()
+  const grade = `${company} ${gradeLabel}`.trim() || null
+
+  let year: string | null = m['Year'] ?? null
+  if (!year) {
+    const match = /^\s*(\d{4})\b/.exec(name)
+    if (match) year = match[1]
+  }
+
+  const authRaw = m['Authenticated']
+  const authenticated = authRaw == null ? null : authRaw.trim().toLowerCase() === 'true'
+
   return {
     mint: a.id,
-    name: md?.name ?? 'Unnamed',
+    name,
     image: a.content?.links?.image ?? null,
     insuredValue: Number.isFinite(insuredValue) ? insuredValue : null,
+    rarity: m['Rarity'] != null ? m['Rarity'].toLowerCase() : null,
+    grade,
+    gradingCompany: company || null,
+    gradingId: m['Grading ID'] ?? null,
+    year,
+    authenticated,
   }
 }
 
