@@ -72,6 +72,20 @@ class GachaService:
             except (httpx.HTTPError, ValueError) as e:
                 raise GachaUpstreamError("gacha upstream no disponible")
 
+    async def _availability(self) -> dict:
+        """code -> available (status == 'open') from /api/status. Fail-open: {} on error."""
+        try:
+            raw = await self._request("GET", "/api/status")
+        except GachaUpstreamError:
+            return {}
+        gachas = raw.get("gachas") if isinstance(raw, dict) else None
+        avail = {}
+        if isinstance(gachas, list):
+            for g in gachas:
+                if isinstance(g, dict) and g.get("code"):
+                    avail[g["code"]] = (g.get("status") == "open")
+        return avail
+
     async def machines(self) -> list[dict]:
         self._check_enabled()
         now = self._now()
@@ -88,6 +102,9 @@ class GachaService:
         for mach in out:
             for f in ("image", "thumbnailUrl", "videoSrc", "videoHevc"):
                 mach[f] = self._absolutize(mach.get(f))
+        avail = await self._availability()
+        for mach in out:
+            mach["available"] = avail.get(mach.get("code"), True)  # default available if unknown
         self._machines_cache = (now, out)
         return out
 
@@ -110,12 +127,16 @@ class GachaService:
             raise GachaUpstreamError("gacha upstream: respuesta openPack sin nft_address")
         nft_won = raw.get("nftWon") or {}
         metadata = ((nft_won.get("content") or {}).get("metadata") or {})
+        attributes = nft_won.get("attributes") or metadata.get("attributes") or []
+        name = metadata.get("name")
         return {
             "pending": False,
             "nft_address": raw.get("nft_address"),
             "rarity": raw.get("rarity"),
-            "name": metadata.get("name"),
+            "name": name,
             "image": nft_won.get("image"),
+            "grade": self._extract_grade(attributes),
+            "year": self._extract_year(attributes, name),
         }
 
     @staticmethod
@@ -125,6 +146,19 @@ class GachaService:
         label = (a.get("The Grade") or a.get("GradeNum") or "").strip()
         grade = f"{company} {label}".strip()
         return grade or None
+
+    @staticmethod
+    def _extract_year(attributes: list, name: Optional[str] = None) -> Optional[str]:
+        a = {t.get("trait_type"): t.get("value") for t in attributes if isinstance(t, dict)}
+        year = a.get("Year")
+        if year:
+            return str(year)
+        if name:
+            import re
+            m = re.match(r"\s*(\d{4})\b", name)
+            if m:
+                return m.group(1)
+        return None
 
     async def get_nfts(self, code: str, rarity: Optional[str] = None,
                        page: int = 1, limit: int = 20) -> list:

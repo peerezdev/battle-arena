@@ -46,6 +46,7 @@ def test_machines_keyless_ok():
     respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
         {"code": "pokemon_50", "name": "P50", "price": 50, "odds": {}, "stock": {},
          "ev": 1.0, "image": None}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     c, _ = _client(api_key="")
     r = c.get("/gacha/machines")
     assert r.status_code == 200
@@ -64,6 +65,7 @@ def test_machines_ok():
     respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
         {"code": "pokemon_50", "name": "P50", "price": 50, "odds": {}, "stock": {},
          "ev": 1.0, "image": None}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     c, _ = _client()
     r = c.get("/gacha/machines")
     assert r.status_code == 200
@@ -112,7 +114,8 @@ def test_open_pack_ok_marca_abierto():
     r = c.post("/gacha/open-pack", json={"memo": "slug-m3"}, headers=hdrs)
     assert r.status_code == 200
     assert r.json() == {"pending": False, "nft_address": "Mint" + "1" * 40,
-                        "rarity": "Rare", "name": "Pika", "image": "https://x/p.png"}
+                        "rarity": "Rare", "name": "Pika", "image": "https://x/p.png",
+                        "grade": None, "year": None}
 
 
 @respx.mock

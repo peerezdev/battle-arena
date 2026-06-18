@@ -45,6 +45,7 @@ async def test_enabled_keyless_devnet():
     """Sin API key pero con base_url, el gacha está habilitado (devnet keyless)
     y NO envía el header x-api-key."""
     route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [MACHINE]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     svc = GachaService(base_url=BASE, api_key="")
     assert svc.enabled is True
     out = await svc.machines()
@@ -64,6 +65,7 @@ async def test_disabled_without_base_url():
 @pytest.mark.asyncio
 async def test_machines_maps_and_caches():
     route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [MACHINE]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": [{"code": "pokemon_50", "status": "open"}]}))
     svc = _svc()
     out = await svc.machines()
     assert out == [{
@@ -73,6 +75,7 @@ async def test_machines_maps_and_caches():
         "shortName": "Poke50", "thumbnailUrl": f"{BASE}/pokemon_50.png",
         "videoSrc": f"{BASE}/pokemon_50.webm", "videoHevc": f"{BASE}/pokemon_50.hevc.mp4",
         "instantBuyback": 80, "contains": 1,
+        "available": True,
     }]
     assert "tierRanges" not in out[0]
     assert "extra_ignored" not in out[0]
@@ -85,6 +88,7 @@ async def test_machines_maps_and_caches():
 async def test_machines_accepts_top_level_list():
     """Tolerante: si el upstream devolviera una lista top-level, también se parsea."""
     respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[MACHINE]))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     out = await _svc().machines()
     assert out[0]["code"] == "pokemon_50"
 
@@ -93,6 +97,7 @@ async def test_machines_accepts_top_level_list():
 @pytest.mark.asyncio
 async def test_machines_cache_expira():
     route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [MACHINE]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     t = {"v": 1000.0}
     svc = _svc(now=lambda: t["v"])
     await svc.machines(); t["v"] = 1061.0; await svc.machines()
@@ -140,7 +145,8 @@ async def test_open_pack_success_whitelists_fields():
     respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=payload))
     out = await _svc().open_pack(memo="slug-uuid-1")
     assert out == {"pending": False, "nft_address": payload["nft_address"],
-                   "rarity": "Epic", "name": "Charizard", "image": "https://x/c.png"}
+                   "rarity": "Epic", "name": "Charizard", "image": "https://x/c.png",
+                   "grade": None, "year": None}
 
 
 @respx.mock
@@ -202,3 +208,41 @@ async def test_generate_pack_surfaces_machine_empty_reason():
     with pytest.raises(GachaUpstreamError) as ei:
         await _svc().generate_pack(player_address="W" * 43, pack_type="pokemon_250")
     assert "Machine is empty" in str(ei.value)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_machines_merges_availability():
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {**MACHINE, "code": "pokemon_50"}, {**MACHINE, "code": "pokemon_25"}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": [
+        {"code": "pokemon_50", "status": "open"}, {"code": "pokemon_25", "status": "closed"}]}))
+    out = await _svc().machines()
+    by = {m["code"]: m for m in out}
+    assert by["pokemon_50"]["available"] is True
+    assert by["pokemon_25"]["available"] is False
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_machines_available_defaults_true_when_status_fails():
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [{**MACHINE, "code": "pokemon_50"}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(500, json={"error": "x"}))
+    out = await _svc().machines()
+    assert out[0]["available"] is True
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_open_pack_extracts_year_and_grade():
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "nft_address": "MINT1", "rarity": "epic",
+        "nftWon": {"image": "https://img/x", "attributes": [
+            {"trait_type": "Year", "value": "2017"},
+            {"trait_type": "Grading Company", "value": "CGC"},
+            {"trait_type": "The Grade", "value": "GEM MINT 9.5"}],
+            "content": {"metadata": {"name": "2017 #78 Mewtwo GX"}}}}))
+    out = await _svc().open_pack(memo="cc-x")
+    assert out["year"] == "2017"
+    assert out["grade"] == "CGC GEM MINT 9.5"
+    assert out["rarity"] == "epic"
