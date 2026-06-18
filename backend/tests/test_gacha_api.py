@@ -158,3 +158,23 @@ def test_rate_limit_429():
              for _ in range(3)]
     # las 2 primeras llegan al upstream (memo nulo → 502); la 3ª ni sale → 429
     assert codes[2] == 429
+
+
+@respx.mock
+def test_machine_cards_ok():
+    respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [
+        {"nft_address": "A", "name": "Card A", "image": "i", "rarity": "rare",
+         "insured_value": 400, "attributes": [{"trait_type": "Grading Company", "value": "PSA"},
+                                               {"trait_type": "The Grade", "value": "MINT 9"}]}]}))
+    c, _ = _client(api_key="")
+    r = c.get("/gacha/machines/pokemon_50/cards?limit=10")
+    assert r.status_code == 200
+    body = r.json()
+    assert body[0]["name"] == "Card A"
+    assert body[0]["grade"] == "PSA MINT 9"
+
+
+def test_machine_cards_503_when_base_url_empty():
+    c, _ = _client(api_key="", base_url="")
+    r = c.get("/gacha/machines/pokemon_50/cards")
+    assert r.status_code == 503

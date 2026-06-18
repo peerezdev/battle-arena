@@ -20,6 +20,7 @@ class GachaUpstreamError(Exception):
 
 
 _MACHINE_FIELDS = ("code", "name", "price", "odds", "stock", "ev", "image")
+_NFT_FIELDS = ("nft_address", "name", "image", "rarity", "insured_value")
 _CACHE_TTL = 60.0
 
 
@@ -40,7 +41,8 @@ class GachaService:
         if not self.enabled:
             raise GachaDisabled()
 
-    async def _request(self, method: str, path: str, json: Optional[dict] = None) -> Any:
+    async def _request(self, method: str, path: str, json: Optional[dict] = None,
+                       params: Optional[dict] = None) -> Any:
         self._check_enabled()
         url = f"{self._base}{path}"
         headers = {"accept": "application/json"}
@@ -48,7 +50,7 @@ class GachaService:
             headers["x-api-key"] = self._key
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             try:
-                resp = await client.request(method, url, json=json, headers=headers)
+                resp = await client.request(method, url, json=json, params=params, headers=headers)
                 resp.raise_for_status()
                 return resp.json()
             except (httpx.HTTPError, ValueError) as e:
@@ -97,3 +99,33 @@ class GachaService:
             "name": metadata.get("name"),
             "image": nft_won.get("image"),
         }
+
+    @staticmethod
+    def _extract_grade(attributes: list) -> Optional[str]:
+        a = {t.get("trait_type"): t.get("value") for t in attributes if isinstance(t, dict)}
+        company = (a.get("Grading Company") or "").strip()
+        label = (a.get("The Grade") or a.get("GradeNum") or "").strip()
+        grade = f"{company} {label}".strip()
+        return grade or None
+
+    async def get_nfts(self, code: str, rarity: Optional[str] = None,
+                       page: int = 1, limit: int = 20) -> list:
+        self._check_enabled()
+        params: dict = {"code": code, "page": page, "limit": limit}
+        if rarity:
+            params["rarity"] = rarity
+        raw = await self._request("GET", "/api/getNfts", params=params)
+        if isinstance(raw, dict):
+            items = raw.get("nfts", [])
+        elif isinstance(raw, list):
+            items = raw
+        else:
+            items = []
+        out = []
+        for n in items:
+            if not isinstance(n, dict):
+                continue
+            card = {k: n.get(k) for k in _NFT_FIELDS}
+            card["grade"] = self._extract_grade(n.get("attributes") or [])
+            out.append(card)
+        return out

@@ -154,3 +154,35 @@ async def test_submit_tx():
     assert out == {"signature": "s1", "confirmation_status": "confirmed"}
     import json as _json
     assert _json.loads(route.calls[0].request.content) == {"signedTransaction": "dGVzdA=="}
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_nfts_maps_and_extracts_grade():
+    nft = {
+        "nft_address": "H5Ez", "name": "Mewtwo GX", "image": "https://img/x",
+        "rarity": "epic", "insured_value": 1628, "description": "d", "id": "H5Ez",
+        "attributes": [{"trait_type": "Grading Company", "value": "CGC"},
+                       {"trait_type": "The Grade", "value": "GEM MINT 9.5"}],
+        "content": {}, "ownership": {},
+    }
+    route = respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [nft]}))
+    out = await _svc().get_nfts(code="pokemon_50", limit=3)
+    assert out == [{
+        "nft_address": "H5Ez", "name": "Mewtwo GX", "image": "https://img/x",
+        "rarity": "epic", "insured_value": 1628, "grade": "CGC GEM MINT 9.5",
+    }]
+    # query params sent
+    req = route.calls[0].request
+    assert "code=pokemon_50" in str(req.url)
+    assert "limit=3" in str(req.url)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_nfts_grade_none_when_no_attributes():
+    nft = {"nft_address": "A", "name": "n", "image": None, "rarity": "common",
+           "insured_value": 10, "attributes": []}
+    respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [nft]}))
+    out = await _svc().get_nfts(code="pokemon_50")
+    assert out[0]["grade"] is None

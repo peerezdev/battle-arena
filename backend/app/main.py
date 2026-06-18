@@ -185,6 +185,19 @@ def create_app(session_factory, chain: ChainSource,
         except GachaUpstreamError:
             raise HTTPException(502, "gacha upstream no disponible")
 
+    @app.get("/gacha/machines/{code}/cards")
+    async def gacha_machine_cards(code: str,
+                                  rarity: Optional[str] = None,
+                                  page: int = Query(default=1, ge=1, le=1000),
+                                  limit: int = Query(default=24, ge=1, le=100)):
+        svc = _gacha_or_503()
+        try:
+            return await svc.get_nfts(code=code, rarity=rarity, page=page, limit=limit)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError:
+            raise HTTPException(502, "gacha upstream no disponible")
+
     @app.post("/gacha/generate-pack")
     async def gacha_generate(body: GeneratePackBody,
                              wallet: str = Depends(current_user),
