@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate, Suspense, lazy } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { COLORS } from './ui/theme'
 import { Landing } from './ui/screens/Landing'
 import { Hub } from './ui/screens/Hub/Hub'
