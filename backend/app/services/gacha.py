@@ -148,8 +148,11 @@ class GachaService:
             iv = attr.get("Insured Value")
             if isinstance(iv, (int, float)):
                 insured = iv
-            elif isinstance(iv, str) and iv.strip().isdigit():
-                insured = int(iv)
+            elif isinstance(iv, str):
+                try:
+                    insured = float(iv.replace(",", "").strip())
+                except ValueError:
+                    pass
 
         authed = attr.get("Authenticated")
         authenticated = (str(authed).strip().lower() == "true") if authed is not None else None

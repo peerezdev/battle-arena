@@ -276,3 +276,17 @@ async def test_open_pack_returns_rich_metadata():
     assert out["authenticated"] is True
     assert out["year"] == "2023"
     assert out["name"] == "2023 #006 Tony Tony Chopper"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_open_pack_insured_value_from_attribute_and_unauthenticated():
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "nft_address": "MINT2", "rarity": "common",
+        "nftWon": {"image": "https://img/y", "attributes": [
+            {"trait_type": "Insured Value", "value": "1,500.50"},
+            {"trait_type": "Authenticated", "value": "false"}],
+            "content": {"metadata": {"name": "n"}}}}))
+    out = await _svc().open_pack(memo="cc-y")
+    assert out["insured_value"] == 1500.5
+    assert out["authenticated"] is False

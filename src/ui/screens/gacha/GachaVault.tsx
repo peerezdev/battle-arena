@@ -1,7 +1,7 @@
 // GachaVault — Polished gacha entry screen.
 // Shows machine selector, pack detail, and card pool grid.
 // Opening a pack uses the same buy() → sign → submit → poll → reveal flow as GachaScreen.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
@@ -706,6 +706,9 @@ function CardDetailsView({
 }) {
   const [activeImg, setActiveImg] = useState(0)
   const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current) }, [])
 
   // Build image list: prefer result.images, fallback to result.image
   const images: string[] = result.images.length > 0
@@ -717,9 +720,11 @@ function CardDetailsView({
   const mainImgSrc = images[activeImg] ?? null
 
   function handleCopy() {
+    if (!navigator.clipboard) return
     void navigator.clipboard.writeText(result.nft_address).then(() => {
       setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), 1800)
     })
   }
 
