@@ -119,6 +119,22 @@ class GachaService:
         return {"signature": raw.get("signature"),
                 "confirmation_status": raw.get("confirmationStatus")}
 
+    async def buyback_available(self, wallet: str, nft: str) -> dict:
+        raw = await self._request("GET", "/api/buyback/available",
+                                  params={"wallet": wallet, "nft": nft})
+        available = bool(raw.get("available")) if isinstance(raw, dict) else False
+        amount = raw.get("amount") if (isinstance(raw, dict) and available) else None
+        return {"available": available, "amount": amount}
+
+    async def buyback(self, player_address: str, nft_address: str) -> dict:
+        raw = await self._request("POST", "/api/buyback",
+                                  json={"playerAddress": player_address, "nftAddress": nft_address})
+        return {
+            "serialized_transaction": raw.get("serializedTransaction"),
+            "refund_amount": raw.get("refundAmount"),
+            "memo": raw.get("memo"),
+        }
+
     async def open_pack(self, memo: str) -> dict:
         raw = await self._request("POST", "/api/openPack", json={"memo": memo})
         if raw.get("code") == "WAITING_FOR_WEBHOOK":

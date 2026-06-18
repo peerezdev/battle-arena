@@ -49,6 +49,10 @@ class OpenPackBody(BaseModel):
     memo: str = Field(min_length=1, max_length=128)
 
 
+class BuybackBody(BaseModel):
+    nft_address: str
+
+
 class CreateMatchBody(BaseModel):
     battle_pubkey: str = Field(min_length=32, max_length=44)
     min_elo: Optional[int] = Field(default=None, ge=0, le=9999)
@@ -228,6 +232,27 @@ def create_app(session_factory, chain: ChainSource,
         _gacha_throttle(wallet)
         try:
             return await svc.submit_tx(signed_transaction=body.signed_transaction)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+
+    @app.get("/gacha/buyback/available")
+    async def gacha_buyback_available(wallet: str, nft: str):
+        svc = _gacha_or_503()
+        try:
+            return await svc.buyback_available(wallet=wallet, nft=nft)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+
+    @app.post("/gacha/buyback")
+    async def gacha_buyback(body: BuybackBody, wallet: str = Depends(current_user)):
+        svc = _gacha_or_503()
+        _gacha_throttle(wallet)
+        try:
+            return await svc.buyback(player_address=wallet, nft_address=body.nft_address)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:

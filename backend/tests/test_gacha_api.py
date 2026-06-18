@@ -193,3 +193,60 @@ def test_generate_pack_502_detail_carries_reason():
     r = c.post("/gacha/generate-pack", json={"pack_type": "pokemon_25"}, headers=_hdrs(priv, WALLET_A))
     assert r.status_code == 502
     assert "Machine is off" in r.json()["detail"]
+
+
+@respx.mock
+def test_buyback_available_ok():
+    respx.get(f"{BASE}/api/buyback/available").mock(
+        return_value=Response(200, json={"available": True, "amount": 42500000}))
+    c, _ = _client()
+    r = c.get("/gacha/buyback/available", params={"wallet": WALLET_A, "nft": "NFT1"})
+    assert r.status_code == 200
+    assert r.json() == {"available": True, "amount": 42500000}
+
+
+@respx.mock
+def test_buyback_available_false():
+    respx.get(f"{BASE}/api/buyback/available").mock(
+        return_value=Response(200, json={"available": False}))
+    c, _ = _client()
+    r = c.get("/gacha/buyback/available", params={"wallet": WALLET_A, "nft": "NFT1"})
+    assert r.status_code == 200
+    assert r.json() == {"available": False, "amount": None}
+
+
+def test_buyback_available_requiere_params():
+    c, _ = _client()
+    assert c.get("/gacha/buyback/available", params={"wallet": WALLET_A}).status_code == 422
+
+
+def test_buyback_requiere_auth():
+    c, _ = _client()
+    assert c.post("/gacha/buyback", json={"nft_address": "NFT1"}).status_code == 401
+
+
+@respx.mock
+def test_buyback_fija_player_y_whitelista():
+    route = respx.post(f"{BASE}/api/buyback").mock(return_value=Response(200, json={
+        "success": True,
+        "serializedTransaction": "BASE64TX",
+        "refundAmount": 42500000,
+        "memo": "memo-xyz",
+        "secret": "should-not-leak",
+    }))
+    c, priv = _client()
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 200
+    assert r.json() == {"serialized_transaction": "BASE64TX", "refund_amount": 42500000, "memo": "memo-xyz"}
+    sent = json.loads(route.calls.last.request.content)
+    assert sent == {"playerAddress": WALLET_A, "nftAddress": "NFT1"}
+
+
+@respx.mock
+def test_buyback_upstream_error_502():
+    respx.post(f"{BASE}/api/buyback").mock(
+        return_value=Response(400, json={"error": "outside 72-hour window"}))
+    c, priv = _client()
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 502
+    assert "72-hour" in r.json()["detail"]
