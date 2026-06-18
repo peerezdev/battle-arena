@@ -197,7 +197,7 @@ class GachaService:
     def _extract_grade(attributes: list) -> Optional[str]:
         a = {t.get("trait_type"): t.get("value") for t in attributes if isinstance(t, dict)}
         company = (a.get("Grading Company") or "").strip()
-        label = (a.get("The Grade") or a.get("GradeNum") or "").strip()
+        label = str(a.get("The Grade") or a.get("GradeNum") or "").strip()
         grade = f"{company} {label}".strip()
         return grade or None
 

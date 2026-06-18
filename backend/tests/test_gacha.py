@@ -204,6 +204,29 @@ async def test_get_nfts_grade_none_when_no_attributes():
     respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [nft]}))
     out = await _svc().get_nfts(code="pokemon_50")
     assert out[0]["grade"] is None
+    assert out[0]["images"] == []
+    assert out[0]["grading_company"] is None
+    assert out[0]["generic_grade"] is None
+    assert out[0]["authenticated"] is None
+    assert out[0]["year"] is None
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_nfts_grade_num_int_no_the_grade():
+    """GradeNum como int (sin The Grade) no debe lanzar AttributeError."""
+    nft = {
+        "nft_address": "B", "name": "Pikachu PSA9", "image": "https://img/p",
+        "rarity": "rare", "insured_value": 50,
+        "attributes": [
+            {"trait_type": "Grading Company", "value": "PSA"},
+            {"trait_type": "GradeNum", "value": 9},
+        ],
+        "content": {}, "ownership": {},
+    }
+    respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [nft]}))
+    out = await _svc().get_nfts(code="pokemon_50")
+    assert out[0]["grade"] == "PSA 9"
 
 
 @respx.mock
