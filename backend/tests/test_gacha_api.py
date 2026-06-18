@@ -23,14 +23,14 @@ WALLET_A = "So1anaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1"
 WALLET_B = "So1anaBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB1"
 
 
-def _client(api_key="k123", rate_limit=10):
+def _client(api_key="k123", rate_limit=10, base_url=BASE):
     engine = create_engine("sqlite:///:memory:",
                            connect_args={"check_same_thread": False}, poolclass=StaticPool)
     init_db(engine)
     sf = make_session_factory(engine)
     priv = make_es256()
     privy = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv.public_key())
-    gacha = GachaService(base_url=BASE, api_key=api_key)
+    gacha = GachaService(base_url=base_url, api_key=api_key)
     app = create_app(sf, MockChainSource(), elo_start=1200, elo_k=32,
                      gacha=gacha, gacha_rate_limit=rate_limit, privy=privy)
     return TestClient(app), priv
@@ -41,8 +41,19 @@ def _hdrs(priv, wallet):
     return privy_auth_headers(priv, APP_ID, wallet)
 
 
-def test_machines_publico_y_503_sin_key():
+@respx.mock
+def test_machines_keyless_ok():
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[
+        {"code": "pokemon_50", "name": "P50", "price": 50, "odds": {}, "stock": {},
+         "ev": 1.0, "image": None}]))
     c, _ = _client(api_key="")
+    r = c.get("/gacha/machines")
+    assert r.status_code == 200
+    assert r.json()[0]["code"] == "pokemon_50"
+
+
+def test_503_when_base_url_empty():
+    c, _ = _client(api_key="", base_url="")
     r = c.get("/gacha/machines")
     assert r.status_code == 503
     assert r.json()["detail"] == "gacha_disabled"

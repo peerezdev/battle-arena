@@ -36,9 +36,23 @@ def test_gacha_pack_model(Session):
     s.close()
 
 
+@respx.mock
 @pytest.mark.asyncio
-async def test_disabled_without_key():
+async def test_enabled_keyless_devnet():
+    """Sin API key pero con base_url, el gacha está habilitado (devnet keyless)
+    y NO envía el header x-api-key."""
+    route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[MACHINE]))
     svc = GachaService(base_url=BASE, api_key="")
+    assert svc.enabled is True
+    out = await svc.machines()
+    assert out[0]["code"] == "pokemon_50"
+    assert "x-api-key" not in route.calls[0].request.headers
+
+
+@pytest.mark.asyncio
+async def test_disabled_without_base_url():
+    """Sin base_url el gacha está deshabilitado (kill-switch)."""
+    svc = GachaService(base_url="", api_key="")
     with pytest.raises(GachaDisabled):
         await svc.machines()
 

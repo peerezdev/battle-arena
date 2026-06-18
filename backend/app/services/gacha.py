@@ -34,7 +34,7 @@ class GachaService:
 
     @property
     def enabled(self) -> bool:
-        return bool(self._key)
+        return bool(self._base)
 
     def _check_enabled(self) -> None:
         if not self.enabled:
@@ -43,7 +43,9 @@ class GachaService:
     async def _request(self, method: str, path: str, json: Optional[dict] = None) -> Any:
         self._check_enabled()
         url = f"{self._base}{path}"
-        headers = {"x-api-key": self._key, "accept": "application/json"}
+        headers = {"accept": "application/json"}
+        if self._key:
+            headers["x-api-key"] = self._key
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             try:
                 resp = await client.request(method, url, json=json, headers=headers)
