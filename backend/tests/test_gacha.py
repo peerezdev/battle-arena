@@ -187,6 +187,8 @@ async def test_get_nfts_maps_and_extracts_grade():
     assert out == [{
         "nft_address": "H5Ez", "name": "Mewtwo GX", "image": "https://img/x",
         "rarity": "epic", "insured_value": 1628, "grade": "CGC GEM MINT 9.5",
+        "images": ["https://img/x"], "grading_company": "CGC", "grading_id": None,
+        "the_grade": "GEM MINT 9.5", "generic_grade": None, "authenticated": None, "year": None,
     }]
     # query params sent
     req = route.calls[0].request

@@ -149,14 +149,7 @@ class GachaService:
         name = metadata.get("name") or nft_won.get("name")
 
         # images: prefer content.files (cc_cdn > cdn_uri > uri); fallback to the single image
-        images: list = []
-        for f in content.get("files") or []:
-            if isinstance(f, dict):
-                u = f.get("cc_cdn") or f.get("cdn_uri") or f.get("uri")
-                if u and u not in images:
-                    images.append(u)
-        if not images and nft_won.get("image"):
-            images = [nft_won["image"]]
+        images = self._extract_images(content, nft_won.get("image"))
 
         # insured value: top-level number, else the "Insured Value" attribute
         insured = nft_won.get("insured_value")
@@ -187,6 +180,18 @@ class GachaService:
             "authenticated": authenticated,
             "insured_value": insured,
         }
+
+    @staticmethod
+    def _extract_images(content: dict, fallback: Optional[str]) -> list:
+        images: list = []
+        for f in (content.get("files") or []):
+            if isinstance(f, dict):
+                u = f.get("cc_cdn") or f.get("cdn_uri") or f.get("uri")
+                if u and u not in images:
+                    images.append(u)
+        if not images and fallback:
+            images = [fallback]
+        return images
 
     @staticmethod
     def _extract_grade(attributes: list) -> Optional[str]:
@@ -226,7 +231,18 @@ class GachaService:
         for n in items:
             if not isinstance(n, dict):
                 continue
+            attributes = n.get("attributes") or []
+            a = {t.get("trait_type"): t.get("value") for t in attributes if isinstance(t, dict)}
+            authed = a.get("Authenticated")
+            gradenum = a.get("GradeNum")
             card = {k: n.get(k) for k in _NFT_FIELDS}
-            card["grade"] = self._extract_grade(n.get("attributes") or [])
+            card["grade"] = self._extract_grade(attributes)
+            card["images"] = self._extract_images(n.get("content") or {}, n.get("image"))
+            card["grading_company"] = a.get("Grading Company")
+            card["grading_id"] = a.get("Grading ID")
+            card["the_grade"] = a.get("The Grade")
+            card["generic_grade"] = str(gradenum) if gradenum is not None else None
+            card["authenticated"] = (str(authed).strip().lower() == "true") if authed is not None else None
+            card["year"] = self._extract_year(attributes, n.get("name"))
             out.append(card)
         return out

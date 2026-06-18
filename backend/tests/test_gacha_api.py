@@ -250,3 +250,34 @@ def test_buyback_upstream_error_502():
     r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
     assert r.status_code == 502
     assert "72-hour" in r.json()["detail"]
+
+
+@respx.mock
+def test_machine_cards_enriched():
+    respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [{
+        "nft_address": "MINT1", "name": "1999 Charizard", "image": "img-front",
+        "rarity": "epic", "insured_value": 5000,
+        "content": {"files": [
+            {"cc_cdn": "img-front"}, {"cdn_uri": "img-back"},
+        ]},
+        "attributes": [
+            {"trait_type": "Year", "value": "1999"},
+            {"trait_type": "Grading Company", "value": "PSA"},
+            {"trait_type": "Grading ID", "value": "44272228"},
+            {"trait_type": "The Grade", "value": "MINT 9"},
+            {"trait_type": "GradeNum", "value": 9},
+            {"trait_type": "Authenticated", "value": "true"},
+        ],
+    }]}))
+    c, _ = _client(api_key="")
+    r = c.get("/gacha/machines/pokemon_50/cards?limit=10")
+    assert r.status_code == 200
+    card = r.json()[0]
+    assert card["images"] == ["img-front", "img-back"]
+    assert card["grading_company"] == "PSA"
+    assert card["grading_id"] == "44272228"
+    assert card["the_grade"] == "MINT 9"
+    assert card["generic_grade"] == "9"
+    assert card["authenticated"] is True
+    assert card["year"] == "1999"
+    assert card["grade"] == "PSA MINT 9"  # existing composed field unchanged
