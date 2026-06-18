@@ -4,7 +4,7 @@ import { COLORS, FONTS, formatUsd } from '../../theme'
 import type { OwnedCard } from '../../../inventory/useCollectorCryptNfts'
 import { useWallet } from '../../../wallet/useWallet'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
-import { fetchBuybackAvailable, requestBuyback, submitTx } from '../../../onchain/gachaClient'
+import { fetchBuybackAvailable, requestBuyback, submitTx, ccAssetUrl } from '../../../onchain/gachaClient'
 
 /** USDC base units (6 decimals) → dollars. */
 export function buybackUsd(amountBaseUnits: number): number {
@@ -77,7 +77,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
     })
   }
 
-  const explorerUrl = `https://explorer.solana.com/address/${card.mint}?cluster=devnet`
+  const explorerUrl = ccAssetUrl(card.mint)
   const label = { fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '0.12em', color: COLORS.muted } as const
   const value = { fontSize: 13, color: COLORS.text, fontWeight: 600 } as const
 
@@ -128,7 +128,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.text }}>{abbreviate(card.mint)}</span>
             <button onClick={copyMint} style={{ background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.muted, borderRadius: 6, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}>{copied ? 'Copied' : 'Copy'}</button>
-            <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.violet }}>View token ↗</a>
+            <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: COLORS.violet }}>View on CollectorCrypt ↗</a>
           </div>
         </div>
 

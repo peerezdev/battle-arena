@@ -14,6 +14,7 @@ import {
   openPack,
   pollOpenPack,
   GachaDisabledError,
+  ccAssetUrl,
   type GachaMachine,
   type MachineCard,
   type OpenPackResult,
@@ -747,7 +748,7 @@ function CardDetailsView({
   }
 
   const shortAddr = `${result.nft_address.slice(0, 4)}…${result.nft_address.slice(-4)}`
-  const explorerUrl = `https://explorer.solana.com/address/${result.nft_address}?cluster=devnet`
+  const explorerUrl = ccAssetUrl(result.nft_address)
 
   const buybackOffer =
     result.insured_value != null && buybackPct != null
@@ -1031,7 +1032,7 @@ function CardDetailsView({
               whiteSpace: 'nowrap',
             }}
           >
-            View token &#8599;
+            View on CollectorCrypt &#8599;
           </a>
         </div>
       </div>
