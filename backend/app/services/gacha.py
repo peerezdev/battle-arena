@@ -126,17 +126,47 @@ class GachaService:
         if not raw.get("nft_address"):
             raise GachaUpstreamError("gacha upstream: respuesta openPack sin nft_address")
         nft_won = raw.get("nftWon") or {}
-        metadata = ((nft_won.get("content") or {}).get("metadata") or {})
+        content = nft_won.get("content") or {}
+        metadata = content.get("metadata") or {}
         attributes = nft_won.get("attributes") or metadata.get("attributes") or []
-        name = metadata.get("name")
+        attr = {t.get("trait_type"): t.get("value") for t in attributes if isinstance(t, dict)}
+        name = metadata.get("name") or nft_won.get("name")
+
+        # images: prefer content.files (cc_cdn > cdn_uri > uri); fallback to the single image
+        images: list = []
+        for f in content.get("files") or []:
+            if isinstance(f, dict):
+                u = f.get("cc_cdn") or f.get("cdn_uri") or f.get("uri")
+                if u and u not in images:
+                    images.append(u)
+        if not images and nft_won.get("image"):
+            images = [nft_won["image"]]
+
+        # insured value: top-level number, else the "Insured Value" attribute
+        insured = nft_won.get("insured_value")
+        if insured is None:
+            iv = attr.get("Insured Value")
+            if isinstance(iv, (int, float)):
+                insured = iv
+            elif isinstance(iv, str) and iv.strip().isdigit():
+                insured = int(iv)
+
+        authed = attr.get("Authenticated")
+        authenticated = (str(authed).strip().lower() == "true") if authed is not None else None
+
         return {
             "pending": False,
             "nft_address": raw.get("nft_address"),
             "rarity": raw.get("rarity"),
             "name": name,
-            "image": nft_won.get("image"),
-            "grade": self._extract_grade(attributes),
+            "image": images[0] if images else nft_won.get("image"),
+            "images": images,
             "year": self._extract_year(attributes, name),
+            "grade": self._extract_grade(attributes),
+            "grading_company": attr.get("Grading Company"),
+            "grading_id": attr.get("Grading ID"),
+            "authenticated": authenticated,
+            "insured_value": insured,
         }
 
     @staticmethod

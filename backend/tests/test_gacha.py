@@ -146,7 +146,10 @@ async def test_open_pack_success_whitelists_fields():
     out = await _svc().open_pack(memo="slug-uuid-1")
     assert out == {"pending": False, "nft_address": payload["nft_address"],
                    "rarity": "Epic", "name": "Charizard", "image": "https://x/c.png",
-                   "grade": None, "year": None}
+                   "images": ["https://x/c.png"],
+                   "grade": None, "year": None,
+                   "grading_company": None, "grading_id": None,
+                   "authenticated": None, "insured_value": None}
 
 
 @respx.mock
@@ -246,3 +249,30 @@ async def test_open_pack_extracts_year_and_grade():
     assert out["year"] == "2017"
     assert out["grade"] == "CGC GEM MINT 9.5"
     assert out["rarity"] == "epic"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_open_pack_returns_rich_metadata():
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "nft_address": "MINT1", "rarity": "epic",
+        "nftWon": {
+            "image": "https://img/primary", "insured_value": 35,
+            "attributes": [
+                {"trait_type": "Year", "value": "2023"},
+                {"trait_type": "Grading Company", "value": "PSA"},
+                {"trait_type": "The Grade", "value": "GEM MT 10"},
+                {"trait_type": "Grading ID", "value": "12345"},
+                {"trait_type": "Authenticated", "value": "true"}],
+            "content": {
+                "metadata": {"name": "2023 #006 Tony Tony Chopper"},
+                "files": [{"cc_cdn": "https://cdn/front"}, {"cc_cdn": "https://cdn/back"}]}}}))
+    out = await _svc().open_pack(memo="cc-x")
+    assert out["insured_value"] == 35
+    assert out["images"] == ["https://cdn/front", "https://cdn/back"]
+    assert out["grading_company"] == "PSA"
+    assert out["grading_id"] == "12345"
+    assert out["grade"] == "PSA GEM MT 10"
+    assert out["authenticated"] is True
+    assert out["year"] == "2023"
+    assert out["name"] == "2023 #006 Tony Tony Chopper"

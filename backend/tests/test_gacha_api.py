@@ -115,7 +115,10 @@ def test_open_pack_ok_marca_abierto():
     assert r.status_code == 200
     assert r.json() == {"pending": False, "nft_address": "Mint" + "1" * 40,
                         "rarity": "Rare", "name": "Pika", "image": "https://x/p.png",
-                        "grade": None, "year": None}
+                        "images": ["https://x/p.png"],
+                        "grade": None, "year": None,
+                        "grading_company": None, "grading_id": None,
+                        "authenticated": None, "insured_value": None}
 
 
 @respx.mock
