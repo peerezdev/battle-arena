@@ -1,9 +1,17 @@
+import { useState } from 'react'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { useCollectorCryptNfts, type OwnedCard } from '../../../inventory/useCollectorCryptNfts'
+import { InventoryCardModal } from './InventoryCardModal'
 
-function CardTile({ card }: { card: OwnedCard }) {
+function CardTile({ card, onClick }: { card: OwnedCard; onClick: () => void }) {
   return (
-    <div style={{ width: 150, background: '#161b24', border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: 'hidden' }}>
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
+      style={{ width: 150, background: '#161b24', border: `1px solid ${COLORS.border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer' }}
+    >
       <div style={{ height: 190, background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {card.image ? (
           <img src={card.image} alt={card.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
@@ -25,7 +33,7 @@ function CardTile({ card }: { card: OwnedCard }) {
   )
 }
 
-function Section({ title, cards }: { title: string; cards: OwnedCard[] }) {
+function Section({ title, cards, onSelect }: { title: string; cards: OwnedCard[]; onSelect: (c: OwnedCard) => void }) {
   if (cards.length === 0) return null
   return (
     <div style={{ marginBottom: 22 }}>
@@ -34,7 +42,7 @@ function Section({ title, cards }: { title: string; cards: OwnedCard[] }) {
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {cards.map((c) => (
-          <CardTile key={`${c.source}-${c.mint}`} card={c} />
+          <CardTile key={`${c.source}-${c.mint}`} card={c} onClick={() => onSelect(c)} />
         ))}
       </div>
     </div>
@@ -42,7 +50,8 @@ function Section({ title, cards }: { title: string; cards: OwnedCard[] }) {
 }
 
 export function InventoryTab() {
-  const { cards, loading } = useCollectorCryptNfts()
+  const { cards, loading, refresh } = useCollectorCryptNfts()
+  const [selected, setSelected] = useState<OwnedCard | null>(null)
   const embedded = cards.filter((c) => c.source === 'embedded')
   const connected = cards.filter((c) => c.source === 'connected')
 
@@ -60,8 +69,15 @@ export function InventoryTab() {
   }
   return (
     <div>
-      <Section title="EMBEDDED WALLET" cards={embedded} />
-      <Section title="CONNECTED WALLET" cards={connected} />
+      <Section title="EMBEDDED WALLET" cards={embedded} onSelect={setSelected} />
+      <Section title="CONNECTED WALLET" cards={connected} onSelect={setSelected} />
+      {selected && (
+        <InventoryCardModal
+          card={selected}
+          onClose={() => setSelected(null)}
+          onSold={() => { refresh(); setSelected(null) }}
+        />
+      )}
     </div>
   )
 }
