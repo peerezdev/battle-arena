@@ -1,7 +1,7 @@
 // GachaVault — Polished gacha entry screen.
 // Shows machine selector, pack detail, and card pool grid.
 // Opening a pack uses the same buy() → sign → submit → poll → reveal flow as GachaScreen.
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
@@ -57,16 +57,40 @@ export default function GachaVault() {
   const [cardsLoading, setCardsLoading] = useState(false)
   const [cardsError, setCardsError] = useState(false)
 
-  // ── Load machines on mount ──────────────────────────────────────────────────
+  // ── Load machines on mount + 60s availability poll ─────────────────────────
   useEffect(() => {
-    fetchMachines()
-      .then((ms) => {
-        setMachines(ms)
-        if (ms.length > 0) setSelected(ms[0])
-      })
-      .catch((e) =>
-        e instanceof GachaDisabledError ? setDisabled(true) : setFetchError(String(e)),
+    let mounted = true
+
+    function applyMachines(ms: GachaMachine[]) {
+      if (!mounted) return
+      setMachines(ms)
+      // On first load, select the first machine. On subsequent polls, preserve
+      // the user's selection by code — only swap to the refreshed object so
+      // `available` and other fields stay current.
+      setSelected((cur) =>
+        cur
+          ? (ms.find((m) => m.code === cur.code) ?? cur)
+          : (ms[0] ?? null),
       )
+    }
+
+    fetchMachines()
+      .then(applyMachines)
+      .catch((e) => {
+        if (!mounted) return
+        e instanceof GachaDisabledError ? setDisabled(true) : setFetchError(String(e))
+      })
+
+    const id = setInterval(() => {
+      fetchMachines()
+        .then(applyMachines)
+        .catch(() => { /* ignore poll failures — stale data is fine */ })
+    }, 60_000)
+
+    return () => {
+      mounted = false
+      clearInterval(id)
+    }
   }, [])
 
   // ── Load card pool when selected machine changes ────────────────────────────
@@ -540,112 +564,248 @@ function RevealOverlay({
         </div>
       )}
 
-      {/* Result */}
-      {phase.kind === 'result' && (() => {
-        const r = phase.result
-        const rarityColor = RARITY_COLOR[r.rarity] ?? COLORS.muted
-        return (
-          <motion.div
-            initial={reduced ? undefined : { scale: 0.82, opacity: 0 }}
-            animate={reduced ? undefined : { scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+      {/* Result — staged reveal */}
+      {phase.kind === 'result' && (
+        <RevealResult result={phase.result} reduced={reduced} onClose={onClose} />
+      )}
+    </motion.div>
+  )
+}
+
+// ── Staged reveal: year → grade → rarity → card ──────────────────────────────
+function RevealResult({
+  result,
+  reduced,
+  onClose,
+}: {
+  result: Extract<OpenPackResult, { pending: false }>
+  reduced: boolean
+  onClose: () => void
+}) {
+  const rarityColor = RARITY_COLOR[result.rarity] ?? COLORS.muted
+
+  const steps = useMemo(() => {
+    const s: Array<'year' | 'grade' | 'rarity' | 'card'> = []
+    if (result.year) s.push('year')
+    if (result.grade) s.push('grade')
+    s.push('rarity')
+    s.push('card')
+    return s
+  }, [result.year, result.grade])
+
+  // Reduced motion: jump straight to the final card step
+  const [i, setI] = useState(reduced ? steps.length - 1 : 0)
+
+  useEffect(() => {
+    if (reduced) return
+    if (i >= steps.length - 1) return
+    const t = setTimeout(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1000)
+    return () => clearTimeout(t)
+  }, [i, steps.length, reduced])
+
+  const step = steps[i]
+
+  // Pre-card stages: year / grade / rarity
+  if (step !== 'card') {
+    const label = step.toUpperCase()
+    const value = step === 'year' ? result.year : step === 'grade' ? result.grade : result.rarity
+    const valueColor = step === 'rarity' ? rarityColor : COLORS.text
+    const valueShadow = step === 'rarity' ? SHADOW.glow(rarityColor) : 'none'
+
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={step}
+          initial={{ scale: 0.72, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 1.12, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+          style={{
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 12,
+            userSelect: 'none',
+          }}
+        >
+          <div
             style={{
-              background: COLORS.panel,
-              border: `2px solid ${rarityColor}`,
-              borderRadius: 16,
-              padding: '32px 24px',
-              textAlign: 'center',
-              maxWidth: 380,
-              width: '100%',
-              boxShadow: `${SHADOW.panel}, ${SHADOW.glow(rarityColor)}`,
+              fontFamily: FONTS.mono,
+              fontSize: 11,
+              letterSpacing: '.14em',
+              textTransform: 'uppercase',
+              color: COLORS.muted,
             }}
           >
-            {/* Rarity badge */}
-            <div
-              style={{
-                display: 'inline-block',
-                fontSize: 11,
-                fontWeight: 800,
-                letterSpacing: '.1em',
-                textTransform: 'uppercase',
-                color: rarityColor,
-                border: `1px solid ${rarityColor}`,
-                borderRadius: 4,
-                padding: '3px 10px',
-                marginBottom: 18,
-                boxShadow: SHADOW.glow(rarityColor),
-              }}
-            >
-              {r.rarity}
-            </div>
+            {label}
+          </div>
+          <div
+            style={{
+              fontFamily: FONTS.display,
+              fontWeight: 900,
+              fontSize: 52,
+              color: valueColor,
+              textShadow: valueShadow,
+              lineHeight: 1,
+            }}
+          >
+            {value}
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    )
+  }
 
-            {/* Card image */}
-            {r.image && (
-              <div style={{ marginBottom: 16 }}>
-                <img
-                  src={r.image}
-                  alt={r.name ?? undefined}
-                  style={{
-                    maxWidth: 220,
-                    width: '100%',
-                    borderRadius: 10,
-                    border: `1px solid ${rarityColor}44`,
-                    display: 'block',
-                    margin: '0 auto',
-                  }}
-                />
-              </div>
-            )}
+  // Card stage — full card UI
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key="card"
+        initial={reduced ? undefined : { scale: 0.82, opacity: 0 }}
+        animate={reduced ? undefined : { scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+        style={{
+          background: COLORS.panel,
+          border: `2px solid ${rarityColor}`,
+          borderRadius: 16,
+          padding: '32px 24px',
+          textAlign: 'center',
+          maxWidth: 380,
+          width: '100%',
+          boxShadow: `${SHADOW.panel}, ${SHADOW.glow(rarityColor)}`,
+        }}
+      >
+        {/* Rarity badge */}
+        <div
+          style={{
+            display: 'inline-block',
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: '.1em',
+            textTransform: 'uppercase',
+            color: rarityColor,
+            border: `1px solid ${rarityColor}`,
+            borderRadius: 4,
+            padding: '3px 10px',
+            marginBottom: 18,
+            boxShadow: SHADOW.glow(rarityColor),
+          }}
+        >
+          {result.rarity}
+        </div>
 
-            {/* Card name */}
-            <div
+        {/* Card image */}
+        {result.image && (
+          <div style={{ marginBottom: 16 }}>
+            <img
+              src={result.image}
+              alt={result.name ?? undefined}
               style={{
-                fontFamily: FONTS.display,
-                fontWeight: 800,
-                fontSize: 20,
-                color: COLORS.text,
-                marginBottom: 8,
-              }}
-            >
-              {r.name}
-            </div>
-
-            {/* NFT address */}
-            <div
-              style={{
-                fontSize: 11,
-                color: COLORS.muted,
-                fontFamily: FONTS.mono,
-                wordBreak: 'break-all',
-                marginBottom: 22,
-              }}
-            >
-              {r.nft_address}
-            </div>
-
-            {/* Close */}
-            <button
-              onClick={onClose}
-              style={{
+                maxWidth: 220,
                 width: '100%',
-                background: GRADIENT,
-                color: '#06120c',
-                border: 'none',
                 borderRadius: 10,
-                padding: '14px',
-                fontSize: 14,
-                fontWeight: 800,
-                cursor: 'pointer',
-                fontFamily: FONTS.display,
-                letterSpacing: '.03em',
-                boxShadow: SHADOW.glow(COLORS.green),
+                border: `1px solid ${rarityColor}44`,
+                display: 'block',
+                margin: '0 auto',
               }}
-            >
-              Back to Vault
-            </button>
-          </motion.div>
-        )
-      })()}
-    </motion.div>
+            />
+          </div>
+        )}
+
+        {/* Card name */}
+        <div
+          style={{
+            fontFamily: FONTS.display,
+            fontWeight: 800,
+            fontSize: 20,
+            color: COLORS.text,
+            marginBottom: 8,
+          }}
+        >
+          {result.name}
+        </div>
+
+        {/* Year + grade chips (when present) */}
+        {(result.year || result.grade) && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: 8,
+              marginBottom: 12,
+              flexWrap: 'wrap',
+            }}
+          >
+            {result.year && (
+              <span
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 11,
+                  color: COLORS.muted,
+                  background: COLORS.panel2,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                  letterSpacing: '.04em',
+                }}
+              >
+                {result.year}
+              </span>
+            )}
+            {result.grade && (
+              <span
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 11,
+                  color: COLORS.muted,
+                  background: COLORS.panel2,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 4,
+                  padding: '2px 8px',
+                  letterSpacing: '.04em',
+                }}
+              >
+                {result.grade}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* NFT address */}
+        <div
+          style={{
+            fontSize: 11,
+            color: COLORS.muted,
+            fontFamily: FONTS.mono,
+            wordBreak: 'break-all',
+            marginBottom: 22,
+          }}
+        >
+          {result.nft_address}
+        </div>
+
+        {/* Close */}
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%',
+            background: GRADIENT,
+            color: '#06120c',
+            border: 'none',
+            borderRadius: 10,
+            padding: '14px',
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: 'pointer',
+            fontFamily: FONTS.display,
+            letterSpacing: '.03em',
+            boxShadow: SHADOW.glow(COLORS.green),
+          }}
+        >
+          Back to Vault
+        </button>
+      </motion.div>
+    </AnimatePresence>
   )
 }
