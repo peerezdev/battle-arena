@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePrivy } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd } from '../../theme'
 import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import { useReducedMotion } from '../../useReducedMotion'
@@ -51,6 +52,7 @@ export function Hub() {
   const wideDock = useIsWide('(min-width: 1100px)')
   const wideRail = useIsWide('(min-width: 760px)')
   const { usdc } = useUsdcBalance()
+  const { authenticated } = usePrivy()
 
   /** Router centralizado de navegación */
   function go(id: HubNav) {
@@ -131,61 +133,66 @@ export function Hub() {
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              background: '#11161f',
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 12,
-              padding: '8px 15px',
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 9,
-                  color: COLORS.muted,
-                  letterSpacing: '0.1em',
-                  fontFamily: FONTS.mono,
-                }}
-              >
-                BALANCE
-              </div>
-              <div
-                style={{
-                  fontFamily: FONTS.display,
-                  fontWeight: 800,
-                  fontSize: 15,
-                  color: COLORS.text,
-                }}
-              >
-                {usdc != null ? formatUsd(usdc) : '—'}
+          {/* Balance — solo con sesión */}
+          {authenticated && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                background: '#11161f',
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 12,
+                padding: '8px 15px',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: COLORS.muted,
+                    letterSpacing: '0.1em',
+                    fontFamily: FONTS.mono,
+                  }}
+                >
+                  BALANCE
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONTS.display,
+                    fontWeight: 800,
+                    fontSize: 15,
+                    color: COLORS.text,
+                  }}
+                >
+                  {usdc != null ? formatUsd(usdc) : '—'}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Auth buttons */}
           <AuthButtons variant="compact" />
 
-          {/* + Deposit */}
-          <button
-            onClick={() => setDepositOpen(true)}
-            style={{
-              background: GRADIENT,
-              color: '#06120c',
-              border: 'none',
-              borderRadius: 12,
-              padding: '11px 20px',
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: 'pointer',
-              fontFamily: FONTS.display,
-            }}
-          >
-            + Deposit
-          </button>
+          {/* + Deposit — solo con sesión */}
+          {authenticated && (
+            <button
+              onClick={() => setDepositOpen(true)}
+              style={{
+                background: GRADIENT,
+                color: '#06120c',
+                border: 'none',
+                borderRadius: 12,
+                padding: '11px 20px',
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: FONTS.display,
+              }}
+            >
+              + Deposit
+            </button>
+          )}
 
           {/* Sound (inert) */}
           <button
