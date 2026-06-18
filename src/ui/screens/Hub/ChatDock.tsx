@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useReducer, useEffect } from 'react'
 import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
 import { useChat } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
@@ -43,6 +43,12 @@ export function ChatDock({
   const drops = useDrops()
   const { messages, send, canPost, online } = useChat()
   const [draft, setDraft] = useState('')
+
+  const [, forceTick] = useReducer((x: number) => x + 1, 0)
+  useEffect(() => {
+    const id = setInterval(forceTick, 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   // ── Resizable divider state ──
   const [dropsHeight, setDropsHeight] = useState(240)
@@ -91,7 +97,7 @@ export function ChatDock({
         }}
       >
         <button
-          onClick={onToggle}
+          onClick={() => onToggle?.()}
           title="Expand chat"
           style={{
             background: 'transparent',

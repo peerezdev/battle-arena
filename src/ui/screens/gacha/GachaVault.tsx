@@ -24,6 +24,18 @@ import { useReducedMotion } from '../../useReducedMotion'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardPoolGrid } from './CardPoolGrid'
 
+function recordDrop(result: Extract<OpenPackResult, { pending: false }>): void {
+  addDrop({
+    id: result.nft_address,
+    name: result.name ?? 'Card',
+    valueUsd: result.insured_value,
+    rarity: result.rarity,
+    image: result.image,
+    source: 'gacha',
+    ts: Date.now(),
+  })
+}
+
 // Map capitalized rarity → RARITY color token (same as GachaScreen)
 const RARITY_COLOR: Record<string, string> = {
   Epic: RARITY.epic, Rare: RARITY.rare, Uncommon: RARITY.uncommon, Common: RARITY.common,
@@ -136,15 +148,7 @@ export default function GachaVault() {
         setPhase({ kind: 'pending', memo: pack.memo })
       } else {
         setPhase({ kind: 'result', result })
-        addDrop({
-          id: result.nft_address,
-          name: result.name ?? 'Card',
-          valueUsd: result.insured_value,
-          rarity: result.rarity,
-          image: result.image,
-          source: 'gacha',
-          ts: Date.now(),
-        })
+        recordDrop(result)
       }
     } catch (e) {
       setOpenError(e instanceof Error ? e.message : String(e))
@@ -162,15 +166,7 @@ export default function GachaVault() {
         setPhase({ kind: 'pending', memo })
       } else {
         setPhase({ kind: 'result', result })
-        addDrop({
-          id: result.nft_address,
-          name: result.name ?? 'Card',
-          valueUsd: result.insured_value,
-          rarity: result.rarity,
-          image: result.image,
-          source: 'gacha',
-          ts: Date.now(),
-        })
+        recordDrop(result)
       }
     } catch (e) {
       setOpenError(e instanceof Error ? e.message : String(e))
