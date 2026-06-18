@@ -19,7 +19,15 @@ function formatTs(ts: number): string {
   return `${hh}:${mm}`
 }
 
-export function ChatDock({ drops = MOCK_DROPS }: { drops?: DropItem[] }) {
+export function ChatDock({
+  drops = MOCK_DROPS,
+  collapsed = false,
+  onToggle,
+}: {
+  drops?: DropItem[]
+  collapsed?: boolean
+  onToggle?: () => void
+}) {
   const { messages, send, canPost, online } = useChat()
   const [draft, setDraft] = useState('')
 
@@ -52,6 +60,54 @@ export function ChatDock({ drops = MOCK_DROPS }: { drops?: DropItem[] }) {
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') handleSend()
+  }
+
+  if (collapsed) {
+    return (
+      <aside
+        style={{
+          background: '#0c1019',
+          borderLeft: `1px solid ${COLORS.border}`,
+          height: '100vh',
+          width: 36,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingTop: 14,
+          gap: 10,
+        }}
+      >
+        <button
+          onClick={onToggle}
+          title="Expand chat"
+          style={{
+            background: 'transparent',
+            border: `1px solid ${COLORS.border}`,
+            color: COLORS.muted,
+            borderRadius: 8,
+            width: 26,
+            height: 26,
+            cursor: 'pointer',
+            fontSize: 13,
+          }}
+        >
+          ‹
+        </button>
+        <div
+          style={{
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+            fontFamily: FONTS.mono,
+            fontSize: 10,
+            letterSpacing: '0.16em',
+            color: COLORS.muted,
+            marginTop: 8,
+          }}
+        >
+          LIVE · CHAT
+        </div>
+      </aside>
+    )
   }
 
   return (
@@ -107,6 +163,22 @@ export function ChatDock({ drops = MOCK_DROPS }: { drops?: DropItem[] }) {
             LIVE DROPS
           </div>
           <span style={{ fontSize: 10, color: COLORS.muted, cursor: 'pointer' }}>view all</span>
+          {onToggle && (
+            <button
+              onClick={onToggle}
+              title="Collapse"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: COLORS.muted,
+                cursor: 'pointer',
+                fontSize: 14,
+                lineHeight: 1,
+              }}
+            >
+              ›
+            </button>
+          )}
         </div>
 
         {/* Drop items */}
