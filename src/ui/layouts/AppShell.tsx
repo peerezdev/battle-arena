@@ -6,7 +6,6 @@ import { useUsdcBalance } from '../../wallet/useUsdcBalance'
 import { useReducedMotion } from '../useReducedMotion'
 import { useIsWide } from '../useIsWide'
 import { AuthButtons } from '../components/AuthButtons'
-import { MuteButton } from '../components/MuteButton'
 import { DepositModal } from '../components/DepositModal'
 import { LeftRail } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
@@ -155,8 +154,6 @@ export function AppShell() {
             </button>
           )}
 
-          {/* Mute */}
-          <MuteButton />
         </header>
 
         {/* Routed page content */}
