@@ -57,8 +57,8 @@ export function Hub() {
     switch (id) {
       case 'mana':   return navigate('/play/mana')
       case 'royale': return navigate('/play/royale')
-      case 'pack':
-      case 'gacha':  return navigate('/play/arena')
+      case 'pack':   return navigate('/play/arena')
+      case 'gacha':  return navigate('/play/gacha')
       default:       return setActive(id)
     }
   }
