@@ -100,7 +100,7 @@ export default function GachaVault() {
       setPhase({ kind: 'opening', step: 'enviando' })
       await submitTx(identityToken, signed)
     } catch (e) {
-      setOpenError(e instanceof Error ? e.message : String(e))
+      setOpenError(`Couldn't open this pack: ${e instanceof Error ? e.message : String(e)}. Try another machine.`)
       setPhase({ kind: 'machines' })
       return
     }

@@ -178,3 +178,12 @@ def test_machine_cards_503_when_base_url_empty():
     c, _ = _client(api_key="", base_url="")
     r = c.get("/gacha/machines/pokemon_50/cards")
     assert r.status_code == 503
+
+
+@respx.mock
+def test_generate_pack_502_detail_carries_reason():
+    respx.post(f"{BASE}/api/generatePack").mock(return_value=Response(500, json={"details": "Machine is off"}))
+    c, priv = _client(api_key="")
+    r = c.post("/gacha/generate-pack", json={"pack_type": "pokemon_25"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 502
+    assert "Machine is off" in r.json()["detail"]

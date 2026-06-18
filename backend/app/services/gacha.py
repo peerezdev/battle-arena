@@ -60,9 +60,17 @@ class GachaService:
                 resp = await client.request(method, url, json=json, params=params, headers=headers)
                 resp.raise_for_status()
                 return resp.json()
+            except httpx.HTTPStatusError as e:
+                reason = None
+                try:
+                    body = e.response.json()
+                    if isinstance(body, dict):
+                        reason = body.get("details") or body.get("error")
+                except Exception:
+                    reason = None
+                raise GachaUpstreamError(str(reason)[:140] if reason else "gacha upstream no disponible")
             except (httpx.HTTPError, ValueError) as e:
-                # Nunca propagar el cuerpo upstream: solo la clase de error.
-                raise GachaUpstreamError(f"gacha upstream: {type(e).__name__}")
+                raise GachaUpstreamError("gacha upstream no disponible")
 
     async def machines(self) -> list[dict]:
         self._check_enabled()

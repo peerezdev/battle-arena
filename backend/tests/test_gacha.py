@@ -193,3 +193,12 @@ async def test_get_nfts_grade_none_when_no_attributes():
     respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [nft]}))
     out = await _svc().get_nfts(code="pokemon_50")
     assert out[0]["grade"] is None
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_generate_pack_surfaces_machine_empty_reason():
+    respx.post(f"{BASE}/api/generatePack").mock(return_value=Response(500, json={"error": "Internal server error", "details": "Machine is empty"}))
+    with pytest.raises(GachaUpstreamError) as ei:
+        await _svc().generate_pack(player_address="W" * 43, pack_type="pokemon_250")
+    assert "Machine is empty" in str(ei.value)

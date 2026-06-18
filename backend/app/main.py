@@ -182,8 +182,8 @@ def create_app(session_factory, chain: ChainSource,
             return await svc.machines()
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
-        except GachaUpstreamError:
-            raise HTTPException(502, "gacha upstream no disponible")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
 
     @app.get("/gacha/machines/{code}/cards")
     async def gacha_machine_cards(code: str,
@@ -195,8 +195,8 @@ def create_app(session_factory, chain: ChainSource,
             return await svc.get_nfts(code=code, rarity=rarity, page=page, limit=limit)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
-        except GachaUpstreamError:
-            raise HTTPException(502, "gacha upstream no disponible")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
 
     @app.post("/gacha/generate-pack")
     async def gacha_generate(body: GeneratePackBody,
@@ -208,8 +208,8 @@ def create_app(session_factory, chain: ChainSource,
             out = await svc.generate_pack(player_address=wallet, pack_type=body.pack_type)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
-        except GachaUpstreamError:
-            raise HTTPException(502, "gacha upstream no disponible")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
         if not out.get("memo"):
             raise HTTPException(502, "gacha upstream no disponible")
         existing = s.get(GachaPack, out["memo"])
@@ -230,8 +230,8 @@ def create_app(session_factory, chain: ChainSource,
             return await svc.submit_tx(signed_transaction=body.signed_transaction)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
-        except GachaUpstreamError:
-            raise HTTPException(502, "gacha upstream no disponible")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
 
     @app.post("/gacha/open-pack")
     async def gacha_open(body: OpenPackBody,
@@ -246,8 +246,8 @@ def create_app(session_factory, chain: ChainSource,
             out = await svc.open_pack(memo=body.memo)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
-        except GachaUpstreamError:
-            raise HTTPException(502, "gacha upstream no disponible")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
         if not out.get("pending") and out.get("nft_address"):
             pack.opened_at = datetime.now(timezone.utc)
             pack.nft_address = out["nft_address"]

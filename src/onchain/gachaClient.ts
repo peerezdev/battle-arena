@@ -39,7 +39,11 @@ export class GachaDisabledError extends Error {
 async function gachaFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(`${config.backendUrl}${path}`, options)
   if (resp.status === 503) throw new GachaDisabledError()
-  if (!resp.ok) throw new Error(`Gacha error ${resp.status}`)
+  if (!resp.ok) {
+    let detail: string | undefined
+    try { detail = (await resp.json())?.detail } catch { /* ignore */ }
+    throw new Error(detail || `Gacha error ${resp.status}`)
+  }
   return resp.json() as Promise<T>
 }
 
