@@ -29,12 +29,15 @@ export function MachineDetailPanel({ machine, onOpen, authed, usdc }: Props) {
   // shortfall, so a slow/unavailable RPC never wedges the button.
   const price = machine.price ?? 0
   const insufficient = authed && usdc != null && usdc < price
-  const blocked = !authed || insufficient
-  const buttonLabel = !authed
-    ? 'Log in to open'
-    : insufficient
-      ? `Insufficient USDC · $${(usdc ?? 0).toFixed(2)}`
-      : `OPEN NOW · ${formatUsd(machine.price)}`
+  const unavailable = machine.available === false
+  const blocked = !authed || insufficient || unavailable
+  const buttonLabel = unavailable
+    ? 'Currently unavailable'
+    : !authed
+      ? 'Log in to open'
+      : insufficient
+        ? `Insufficient USDC · $${(usdc ?? 0).toFixed(2)}`
+        : `OPEN NOW · ${formatUsd(machine.price)}`
 
   // Sort odds with the canonical order; unknown rarities go last
   const oddsEntries = Object.entries(machine.odds ?? {}).sort(([a], [b]) => {
@@ -189,6 +192,20 @@ export function MachineDetailPanel({ machine, onOpen, authed, usdc }: Props) {
         </div>
       </div>
 
+      {/* Unavailability reason */}
+      {unavailable && (
+        <div
+          style={{
+            textAlign: 'center',
+            fontFamily: FONTS.mono,
+            fontSize: 12,
+            color: COLORS.muted,
+          }}
+        >
+          ⚠ This machine is currently off — try another pack.
+        </div>
+      )}
+
       {/* OPEN NOW button */}
       <motion.button
         onClick={onOpen}
@@ -284,7 +301,7 @@ export function MachineDetailPanel({ machine, onOpen, authed, usdc }: Props) {
                   <span style={{ color: accent, textTransform: 'capitalize', fontWeight: 700 }}>
                     {rarity.toLowerCase()}
                   </span>
-                  <span style={{ color: COLORS.muted }}>{pct}%</span>
+                  <span style={{ color: COLORS.muted }}>{+(pct * 100).toFixed(2)}%</span>
                 </div>
                 <div
                   style={{

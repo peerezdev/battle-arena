@@ -6,7 +6,7 @@ describe('pollOpenPack', () => {
     const attempts: OpenPackResult[] = [
       { pending: true },
       { pending: true },
-      { pending: false, nft_address: 'M1', rarity: 'Rare', name: 'Pika', image: null },
+      { pending: false, nft_address: 'M1', rarity: 'Rare', name: 'Pika', image: null, year: null, grade: null },
     ]
     let i = 0
     const open = vi.fn(async () => attempts[i++])

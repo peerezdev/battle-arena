@@ -473,7 +473,7 @@ export function GachaScreen({ token, onGoToCollection, onBack }: Props) {
                 {m.odds && Object.keys(m.odds).length > 0 && (
                   <div style={{ fontSize: '11px', color: COLORS.muted }}>
                     {Object.entries(m.odds)
-                      .map(([rarity, pct]) => `${rarity.toLowerCase()} ${pct}%`)
+                      .map(([rarity, pct]) => `${rarity.toLowerCase()} ${+(pct * 100).toFixed(2)}%`)
                       .join(' · ')}
                   </div>
                 )}

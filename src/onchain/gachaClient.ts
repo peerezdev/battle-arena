@@ -16,6 +16,7 @@ export interface GachaMachine {
   contains?: number | null
   videoSrc?: string | null
   videoHevc?: string | null
+  available?: boolean | null
 }
 
 export interface GeneratePackResponse {
@@ -30,7 +31,7 @@ export interface SubmitTxResponse {
 
 export type OpenPackResult =
   | { pending: true }
-  | { pending: false; nft_address: string; rarity: string; name: string | null; image: string | null }
+  | { pending: false; nft_address: string; rarity: string; name: string | null; image: string | null; year: string | null; grade: string | null }
 
 export class GachaDisabledError extends Error {
   constructor() { super('gacha_disabled') }
