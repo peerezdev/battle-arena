@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
-import { COLORS, FONTS, formatUsd } from '../../theme'
-import { MOCK_DROPS, type DropItem } from './hubMockData'
+import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
 import { useChat } from '../../../hooks/useChat'
+import { useDrops } from '../../drops/useDrops'
 
 // Palette for coloring usernames deterministically
 const USER_COLORS = ['#b78cff', '#14F195', '#5ad1ff', '#ff6b6b', '#ffd166', '#f7c59f']
@@ -19,15 +19,28 @@ function formatTs(ts: number): string {
   return `${hh}:${mm}`
 }
 
+function ago(ts: number): string {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000))
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
+const RARITY_ACCENT: Record<string, string> = {
+  epic: RARITY.epic, rare: RARITY.rare, uncommon: RARITY.uncommon, common: RARITY.common,
+}
+
 export function ChatDock({
-  drops = MOCK_DROPS,
   collapsed = false,
   onToggle,
 }: {
-  drops?: DropItem[]
   collapsed?: boolean
   onToggle?: () => void
 }) {
+  const drops = useDrops()
   const { messages, send, canPost, online } = useChat()
   const [draft, setDraft] = useState('')
 
@@ -162,16 +175,21 @@ export function ChatDock({
             />
             LIVE DROPS
           </div>
-          <span style={{ fontSize: 10, color: COLORS.muted, cursor: 'pointer' }}>view all</span>
           {onToggle && (
             <button
               onClick={onToggle}
-              title="Collapse"
+              title="Collapse panel"
               style={{
                 background: 'transparent',
-                border: 'none',
+                border: `1px solid ${COLORS.border}`,
                 color: COLORS.muted,
                 cursor: 'pointer',
+                borderRadius: 7,
+                width: 24,
+                height: 24,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 fontSize: 14,
                 lineHeight: 1,
               }}
@@ -182,65 +200,94 @@ export function ChatDock({
         </div>
 
         {/* Drop items */}
-        {drops.map((drop) => (
-          <div
-            key={drop.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '7px 0',
-            }}
-          >
-            {/* Card image / emoji */}
-            <div
-              style={{
-                width: 28,
-                height: 38,
-                borderRadius: 6,
-                background: `radial-gradient(circle at 40% 30%,${drop.accent}33,#10141c)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 13,
-                flexShrink: 0,
-              }}
-            >
-              {drop.emoji}
-            </div>
-
-            {/* Name + set */}
-            <div style={{ minWidth: 0, flex: 1 }}>
+        {drops.length === 0 ? (
+          <div style={{ fontSize: 11, color: COLORS.muted }}>
+            No drops yet — open a pack to see it here.
+          </div>
+        ) : (
+          drops.map((drop) => {
+            const accent = RARITY_ACCENT[(drop.rarity ?? '').toLowerCase()] ?? COLORS.green
+            return (
               <div
+                key={drop.id}
                 style={{
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  color: COLORS.text,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '7px 0',
                 }}
               >
-                {drop.name}
-              </div>
-              <div style={{ fontSize: 9, color: COLORS.muted }}>{drop.set}</div>
-            </div>
+                {/* Card image / emoji */}
+                <div
+                  style={{
+                    width: 28,
+                    height: 38,
+                    borderRadius: 6,
+                    background: `radial-gradient(circle at 40% 30%,${accent}33,#10141c)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 13,
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {drop.image ? (
+                    <img
+                      src={drop.image}
+                      alt={drop.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
+                    />
+                  ) : (
+                    '🃏'
+                  )}
+                </div>
 
-            {/* Value */}
-            <div
-              style={{
-                fontFamily: FONTS.display,
-                fontWeight: 800,
-                fontSize: 12,
-                color: COLORS.green,
-                marginLeft: 'auto',
-                flexShrink: 0,
-              }}
-            >
-              {formatUsd(drop.valueUsd)}
-            </div>
-          </div>
-        ))}
+                {/* Name + rarity */}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: COLORS.text,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {drop.name}
+                  </div>
+                  <div style={{ fontSize: 9, color: COLORS.muted }}>{drop.rarity ?? ''}</div>
+                </div>
+
+                {/* Value + time */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-end',
+                    flexShrink: 0,
+                    marginLeft: 'auto',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: FONTS.display,
+                      fontWeight: 800,
+                      fontSize: 12,
+                      color: COLORS.green,
+                    }}
+                  >
+                    {drop.valueUsd != null ? formatUsd(drop.valueUsd) : ''}
+                  </div>
+                  <div style={{ fontSize: 9, color: COLORS.muted }}>
+                    {ago(drop.ts)}
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
       </div>
 
       {/* ── RESIZER HANDLE ── */}
