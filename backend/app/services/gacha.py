@@ -19,7 +19,8 @@ class GachaUpstreamError(Exception):
     """La API del Gacha falló (4xx/5xx/timeout/JSON inválido)."""
 
 
-_MACHINE_FIELDS = ("code", "name", "price", "odds", "stock", "ev", "image")
+_MACHINE_FIELDS = ("code", "name", "price", "odds", "stock", "ev", "image",
+                   "shortName", "thumbnailUrl", "instantBuyback", "contains")
 _NFT_FIELDS = ("nft_address", "name", "image", "rarity", "insured_value")
 _CACHE_TTL = 60.0
 
