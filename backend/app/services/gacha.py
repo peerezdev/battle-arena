@@ -61,7 +61,12 @@ class GachaService:
         if self._machines_cache and now - self._machines_cache[0] < _CACHE_TTL:
             return self._machines_cache[1]
         raw = await self._request("GET", "/api/machines")
-        items = raw if isinstance(raw, list) else []
+        if isinstance(raw, dict):
+            items = raw.get("machines", [])
+        elif isinstance(raw, list):
+            items = raw
+        else:
+            items = []
         out = [{k: m.get(k) for k in _MACHINE_FIELDS} for m in items if isinstance(m, dict)]
         self._machines_cache = (now, out)
         return out

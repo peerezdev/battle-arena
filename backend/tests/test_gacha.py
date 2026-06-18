@@ -41,7 +41,7 @@ def test_gacha_pack_model(Session):
 async def test_enabled_keyless_devnet():
     """Sin API key pero con base_url, el gacha está habilitado (devnet keyless)
     y NO envía el header x-api-key."""
-    route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[MACHINE]))
+    route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [MACHINE]}))
     svc = GachaService(base_url=BASE, api_key="")
     assert svc.enabled is True
     out = await svc.machines()
@@ -60,7 +60,7 @@ async def test_disabled_without_base_url():
 @respx.mock
 @pytest.mark.asyncio
 async def test_machines_maps_and_caches():
-    route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[MACHINE]))
+    route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [MACHINE]}))
     svc = _svc()
     out = await svc.machines()
     assert out == [{
@@ -75,8 +75,17 @@ async def test_machines_maps_and_caches():
 
 @respx.mock
 @pytest.mark.asyncio
+async def test_machines_accepts_top_level_list():
+    """Tolerante: si el upstream devolviera una lista top-level, también se parsea."""
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[MACHINE]))
+    out = await _svc().machines()
+    assert out[0]["code"] == "pokemon_50"
+
+
+@respx.mock
+@pytest.mark.asyncio
 async def test_machines_cache_expira():
-    route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[MACHINE]))
+    route = respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [MACHINE]}))
     t = {"v": 1000.0}
     svc = _svc(now=lambda: t["v"])
     await svc.machines(); t["v"] = 1061.0; await svc.machines()
