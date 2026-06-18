@@ -105,6 +105,29 @@ export function submitTx(token: string, signedTransaction: string): Promise<Subm
   })
 }
 
+export interface BuybackAvailable {
+  available: boolean
+  amount: number | null // USDC base units (6 decimals)
+}
+
+export interface BuybackResponse {
+  serialized_transaction: string
+  refund_amount: number | null
+  memo: string | null
+}
+
+export function fetchBuybackAvailable(wallet: string, nft: string): Promise<BuybackAvailable> {
+  const p = new URLSearchParams({ wallet, nft })
+  return gachaFetch<BuybackAvailable>(`/gacha/buyback/available?${p.toString()}`)
+}
+
+export function requestBuyback(token: string, nftAddress: string): Promise<BuybackResponse> {
+  return gachaFetch<BuybackResponse>('/gacha/buyback', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ nft_address: nftAddress }),
+  })
+}
+
 export function openPack(token: string, memo: string): Promise<OpenPackResult> {
   return gachaFetch<OpenPackResult>('/gacha/open-pack', {
     method: 'POST', headers: authHeaders(token),

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { pollOpenPack, defaultDelayMs, type OpenPackResult } from './gachaClient'
+import { fetchBuybackAvailable, requestBuyback } from './gachaClient'
+import { config } from './config'
 
 describe('pollOpenPack', () => {
   it('devuelve el resultado en cuanto deja de estar pendiente', async () => {
@@ -27,5 +29,39 @@ describe('pollOpenPack', () => {
     expect(defaultDelayMs(1)).toBe(4000)
     expect(defaultDelayMs(2)).toBe(8000)
     expect(defaultDelayMs(10)).toBe(30000)
+  })
+})
+
+describe('fetchBuybackAvailable', () => {
+  it('hace GET con wallet+nft y devuelve el JSON', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ available: true, amount: 42500000 }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await fetchBuybackAvailable('WALLET', 'NFT1')
+    expect(out).toEqual({ available: true, amount: 42500000 })
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url.startsWith(`${config.backendUrl}/gacha/buyback/available?`)).toBe(true)
+    expect(url).toContain('wallet=WALLET')
+    expect(url).toContain('nft=NFT1')
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('requestBuyback', () => {
+  it('hace POST con Bearer y body {nft_address}', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ serialized_transaction: 'TX', refund_amount: 42500000, memo: 'm' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await requestBuyback('TOKEN', 'NFT1')
+    expect(out).toEqual({ serialized_transaction: 'TX', refund_amount: 42500000, memo: 'm' })
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.method).toBe('POST')
+    expect(init.headers.Authorization).toBe('Bearer TOKEN')
+    expect(JSON.parse(init.body)).toEqual({ nft_address: 'NFT1' })
+    vi.unstubAllGlobals()
+  })
+
+  it('propaga el detail del backend en error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({ detail: 'outside 72-hour window' }) }))
+    await expect(requestBuyback('TOKEN', 'NFT1')).rejects.toThrow('72-hour')
+    vi.unstubAllGlobals()
   })
 })
