@@ -43,6 +43,18 @@ export function AppPrivyProvider({ children }: { children: ReactNode }) {
           accentColor: '#9945FF',
           // Show both EVM and Solana wallets in the wallet connect modal
           walletChainType: 'ethereum-and-solana',
+          // Botones de wallet a mostrar. Sin esto, Privy usa una lista por
+          // defecto que incluye Phantom pero NO Backpack → no aparecía el botón.
+          // `detected_solana_wallets` además lista cualquier wallet Solana
+          // inyectada (Wallet Standard), p.ej. Backpack/Solflare.
+          walletList: [
+            'detected_solana_wallets',
+            'phantom',
+            'backpack',
+            'solflare',
+            'detected_ethereum_wallets',
+            'metamask',
+          ],
         },
 
         // Create a Solana embedded wallet for ALL users — incluso si conectan una
