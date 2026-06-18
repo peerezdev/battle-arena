@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     elo_k: int = 32
     session_ttl: int = 3600
     cors_origins: List[str] = []
-    gacha_base_url: str = "https://dev-gacha.collectorcrypt.com"
-    gacha_api_key: str = ""  # vacío => módulo gacha deshabilitado
+    gacha_base_url: str = "https://dev-gacha.collectorcrypt.com"  # vacío => gacha deshabilitado (kill-switch)
+    gacha_api_key: str = ""  # opcional; devnet es keyless, solo necesario si el entorno lo exige (p.ej. mainnet)
     privy_app_id: str = ""
     privy_jwks_url: str = "https://auth.privy.io/api/v1/apps/{app_id}/jwks.json"
 

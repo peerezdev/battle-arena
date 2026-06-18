@@ -12,7 +12,7 @@ import httpx
 
 
 class GachaDisabled(Exception):
-    """No hay gacha_api_key configurada."""
+    """Gacha deshabilitado: no hay gacha_base_url configurado (kill-switch)."""
 
 
 class GachaUpstreamError(Exception):
