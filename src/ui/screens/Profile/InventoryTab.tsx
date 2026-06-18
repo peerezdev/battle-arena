@@ -75,7 +75,7 @@ export function InventoryTab() {
         <InventoryCardModal
           card={selected}
           onClose={() => setSelected(null)}
-          onSold={() => { refresh(); setSelected(null) }}
+          onSold={() => refresh()}
         />
       )}
     </div>

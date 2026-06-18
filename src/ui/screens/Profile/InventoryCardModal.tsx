@@ -54,6 +54,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
   }, [eligibleWallet, card.mint])
 
   async function confirmSell(amount: number) {
+    if (bb.kind === 'selling') return
     if (!identityToken) { setBb({ kind: 'error', amount, message: 'Sign in to sell back.' }); return }
     setBb({ kind: 'selling', amount })
     try {
@@ -153,7 +154,13 @@ export function InventoryCardModal({ card, onClose, onSold }: {
           </div>
         )}
         {bb.kind === 'selling' && <div style={{ ...label, color: COLORS.muted }}>Selling back…</div>}
-        {bb.kind === 'sold' && <div style={{ fontSize: 13, color: COLORS.green, fontWeight: 700 }}>Sold — {formatUsd(buybackUsd(bb.amount))} credited.</div>}
+        {bb.kind === 'sold' && (
+          <div>
+            <div style={{ fontSize: 13, color: COLORS.green, fontWeight: 700, marginBottom: 10 }}>Sold — {formatUsd(buybackUsd(bb.amount))} credited.</div>
+            <button onClick={onClose}
+              style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', cursor: 'pointer', background: COLORS.green, color: '#03110a', fontFamily: FONTS.display, fontWeight: 800 }}>Done</button>
+          </div>
+        )}
         {bb.kind === 'error' && (
           <div>
             <div style={{ fontSize: 12, color: COLORS.red, marginBottom: 8 }}>{bb.message}</div>
