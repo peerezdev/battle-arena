@@ -10,6 +10,10 @@ export interface GachaMachine {
   stock: Record<string, number>
   ev: number | null
   image: string | null
+  shortName?: string | null
+  thumbnailUrl?: string | null
+  instantBuyback?: number | null
+  contains?: number | null
 }
 
 export interface GeneratePackResponse {
@@ -43,6 +47,28 @@ function authHeaders(token: string): Record<string, string> {
 
 export function fetchMachines(): Promise<GachaMachine[]> {
   return gachaFetch<GachaMachine[]>('/gacha/machines')
+}
+
+export interface MachineCard {
+  nft_address: string | null
+  name: string | null
+  image: string | null
+  rarity: string | null
+  insured_value: number | null
+  grade: string | null
+}
+
+export function fetchMachineCards(
+  code: string,
+  opts?: { rarity?: string; page?: number; limit?: number },
+): Promise<MachineCard[]> {
+  const p = new URLSearchParams()
+  if (opts?.rarity) p.set('rarity', opts.rarity)
+  if (opts?.page) p.set('page', String(opts.page))
+  p.set('limit', String(opts?.limit ?? 24))
+  return gachaFetch<MachineCard[]>(
+    `/gacha/machines/${encodeURIComponent(code)}/cards?${p.toString()}`,
+  )
 }
 
 export function generatePack(token: string, packType: string): Promise<GeneratePackResponse> {
