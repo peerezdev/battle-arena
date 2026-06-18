@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { pollOpenPack, defaultDelayMs, type OpenPackResult } from './gachaClient'
 import { fetchBuybackAvailable, requestBuyback } from './gachaClient'
 import { config } from './config'
+import { ccAssetUrl } from './gachaClient'
 
 describe('pollOpenPack', () => {
   it('devuelve el resultado en cuanto deja de estar pendiente', async () => {
@@ -63,5 +64,12 @@ describe('requestBuyback', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({ detail: 'outside 72-hour window' }) }))
     await expect(requestBuyback('TOKEN', 'NFT1')).rejects.toThrow('72-hour')
     vi.unstubAllGlobals()
+  })
+})
+
+describe('ccAssetUrl', () => {
+  it('apunta a la página del asset en CollectorCrypt', () => {
+    expect(ccAssetUrl('7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH'))
+      .toBe('https://collectorcrypt.com/assets/solana/7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH')
   })
 })

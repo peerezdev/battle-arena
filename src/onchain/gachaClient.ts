@@ -76,6 +76,13 @@ export interface MachineCard {
   rarity: string | null
   insured_value: number | null
   grade: string | null
+  images: string[]
+  grading_company: string | null
+  grading_id: string | null
+  the_grade: string | null
+  generic_grade: string | null
+  authenticated: boolean | null
+  year: string | null
 }
 
 export function fetchMachineCards(
@@ -156,4 +163,9 @@ export async function pollOpenPack(
     }
   }
   return last
+}
+
+/** Public CollectorCrypt asset page for a Solana NFT mint. */
+export function ccAssetUrl(mint: string): string {
+  return `https://collectorcrypt.com/assets/solana/${mint}`
 }
