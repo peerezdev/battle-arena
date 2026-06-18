@@ -53,6 +53,7 @@ export default function GachaVault() {
 
   const [cards, setCards] = useState<MachineCard[]>([])
   const [cardsLoading, setCardsLoading] = useState(false)
+  const [cardsError, setCardsError] = useState(false)
 
   // ── Load machines on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -69,12 +70,15 @@ export default function GachaVault() {
   // ── Load card pool when selected machine changes ────────────────────────────
   useEffect(() => {
     if (!selected) return
+    let cancelled = false
     setCardsLoading(true)
+    setCardsError(false)
     setCards([])
     fetchMachineCards(selected.code, { limit: 24 })
-      .then(setCards)
-      .catch(() => setCards([]))
-      .finally(() => setCardsLoading(false))
+      .then((data) => { if (!cancelled) setCards(data) })
+      .catch(() => { if (!cancelled) setCardsError(true) })
+      .finally(() => { if (!cancelled) setCardsLoading(false) })
+    return () => { cancelled = true }
   }, [selected?.code])
 
   // ── Buy / open flow (mirrors GachaScreen.buy) ──────────────────────────────
@@ -238,6 +242,20 @@ export default function GachaVault() {
         </div>
       )}
 
+      {machines !== null && machines.length === 0 && (
+        <div
+          style={{
+            color: COLORS.muted,
+            fontSize: 13,
+            textAlign: 'center',
+            padding: '40px 0',
+            fontFamily: FONTS.body,
+          }}
+        >
+          No machines available right now.
+        </div>
+      )}
+
       {machines !== null && machines.length > 0 && (
         <div
           style={{
@@ -337,6 +355,8 @@ export default function GachaVault() {
             cards={cards}
             loading={cardsLoading}
             liveCount={cards.length > 0 ? cards.length : undefined}
+            error={cardsError}
+            machineCode={selected.code}
           />
         </div>
       )}

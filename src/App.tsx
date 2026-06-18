@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Suspense, lazy } from 'react-router-dom'
+import { COLORS } from './ui/theme'
 import { Landing } from './ui/screens/Landing'
 import { Hub } from './ui/screens/Hub/Hub'
 import { GameLayout } from './ui/layouts/GameLayout'
@@ -30,7 +31,7 @@ export default function App() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       height: '100%',
-                      color: '#9aa3b2',
+                      color: COLORS.muted,
                     }}
                   >
                     Loading…

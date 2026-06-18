@@ -7,6 +7,8 @@ interface Props {
   cards: MachineCard[]
   loading: boolean
   liveCount?: number
+  error?: boolean
+  machineCode: string
 }
 
 const RARITY_COLOR: Record<string, string> = {
@@ -16,7 +18,7 @@ const RARITY_COLOR: Record<string, string> = {
   common: RARITY.common,
 }
 
-export function CardPoolGrid({ cards, loading, liveCount }: Props) {
+export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: Props) {
   const reduced = useReducedMotion()
 
   const containerVariants = {
@@ -85,8 +87,27 @@ export function CardPoolGrid({ cards, loading, liveCount }: Props) {
         </div>
       )}
 
+      {/* Error state */}
+      {!loading && error && (
+        <div
+          style={{
+            background: COLORS.panel,
+            border: `1px solid ${COLORS.red}`,
+            borderRadius: 12,
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: COLORS.red,
+            fontSize: 14,
+            fontFamily: FONTS.body,
+          }}
+        >
+          <div style={{ fontSize: 32, marginBottom: 10 }}>⚠️</div>
+          Couldn't load the card pool. Try another machine.
+        </div>
+      )}
+
       {/* Empty state */}
-      {!loading && cards.length === 0 && (
+      {!loading && !error && cards.length === 0 && (
         <div
           style={{
             background: COLORS.panel,
@@ -105,9 +126,9 @@ export function CardPoolGrid({ cards, loading, liveCount }: Props) {
       )}
 
       {/* Grid */}
-      {!loading && cards.length > 0 && (
+      {!loading && !error && cards.length > 0 && (
         <motion.div
-          key={cards.length}
+          key={machineCode}
           variants={containerVariants}
           initial="hidden"
           animate="show"

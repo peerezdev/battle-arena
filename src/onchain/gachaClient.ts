@@ -64,7 +64,7 @@ export function fetchMachineCards(
 ): Promise<MachineCard[]> {
   const p = new URLSearchParams()
   if (opts?.rarity) p.set('rarity', opts.rarity)
-  if (opts?.page) p.set('page', String(opts.page))
+  if (opts?.page != null) p.set('page', String(opts.page))
   p.set('limit', String(opts?.limit ?? 24))
   return gachaFetch<MachineCard[]>(
     `/gacha/machines/${encodeURIComponent(code)}/cards?${p.toString()}`,
