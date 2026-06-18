@@ -6,8 +6,10 @@ import type { GachaMachine } from '../../../onchain/gachaClient'
 interface Props {
   machine: GachaMachine
   onOpen: () => void
-  /** True when identityToken is null (not authenticated) */
-  disabled: boolean
+  /** Logged in (identity token present). */
+  authed: boolean
+  /** Embedded-wallet USDC balance; null = unknown/still loading. */
+  usdc: number | null
 }
 
 const RARITY_ORDER = ['epic', 'rare', 'uncommon', 'common'] as const
@@ -18,8 +20,21 @@ const RARITY_COLOR: Record<string, string> = {
   Common: RARITY.common, common: RARITY.common,
 }
 
-export function MachineDetailPanel({ machine, onOpen, disabled }: Props) {
+export function MachineDetailPanel({ machine, onOpen, authed, usdc }: Props) {
   const reduced = useReducedMotion()
+
+  // Gate the OPEN button by USDC balance. We only BLOCK when we positively know
+  // the balance is below the pack price; while the balance is unknown (null /
+  // still loading) we allow the attempt and let the on-chain tx surface any
+  // shortfall, so a slow/unavailable RPC never wedges the button.
+  const price = machine.price ?? 0
+  const insufficient = authed && usdc != null && usdc < price
+  const blocked = !authed || insufficient
+  const buttonLabel = !authed
+    ? 'Log in to open'
+    : insufficient
+      ? `Insufficient USDC · $${(usdc ?? 0).toFixed(2)}`
+      : `OPEN NOW · ${formatUsd(machine.price)}`
 
   // Sort odds with the canonical order; unknown rarities go last
   const oddsEntries = Object.entries(machine.odds ?? {}).sort(([a], [b]) => {
@@ -177,26 +192,45 @@ export function MachineDetailPanel({ machine, onOpen, disabled }: Props) {
       {/* OPEN NOW button */}
       <motion.button
         onClick={onOpen}
-        disabled={disabled}
-        whileTap={reduced || disabled ? undefined : { scale: 0.97 }}
+        disabled={blocked}
+        whileTap={reduced || blocked ? undefined : { scale: 0.97 }}
         style={{
           width: '100%',
-          background: disabled ? COLORS.panel2 : GRADIENT,
-          color: disabled ? COLORS.muted : '#06120c',
-          border: disabled ? `1px solid ${COLORS.border}` : 'none',
+          background: blocked ? COLORS.panel2 : GRADIENT,
+          color: blocked ? COLORS.muted : '#06120c',
+          border: blocked ? `1px solid ${COLORS.border}` : 'none',
           borderRadius: 12,
           padding: '16px 20px',
           fontSize: 15,
           fontWeight: 800,
           fontFamily: FONTS.display,
-          cursor: disabled ? 'not-allowed' : 'pointer',
+          cursor: blocked ? 'not-allowed' : 'pointer',
           letterSpacing: '.03em',
-          boxShadow: disabled ? 'none' : SHADOW.glow(COLORS.green),
+          boxShadow: blocked ? 'none' : SHADOW.glow(COLORS.green),
           transition: 'background 0.2s',
         }}
       >
-        {disabled ? 'Log in to open' : `OPEN NOW · ${formatUsd(machine.price)}`}
+        {buttonLabel}
       </motion.button>
+
+      {/* Balance / deposit hint (only when logged in) */}
+      {authed && (
+        <div
+          style={{
+            marginTop: 10,
+            textAlign: 'center',
+            fontFamily: FONTS.mono,
+            fontSize: 11,
+            color: insufficient ? COLORS.red : COLORS.muted,
+          }}
+        >
+          {usdc == null
+            ? 'Checking balance…'
+            : insufficient
+              ? `Balance $${usdc.toFixed(2)} — deposit USDC to open`
+              : `Balance $${usdc.toFixed(2)}`}
+        </div>
+      )}
 
       {/* Contains + Buyback meta */}
       <div

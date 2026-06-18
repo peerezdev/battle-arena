@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
+import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import {
   fetchMachines,
   fetchMachineCards,
@@ -43,6 +44,7 @@ export default function GachaVault() {
   const reduced = useReducedMotion()
   const { identityToken } = useIdentityToken()
   const { signTransactionBase64 } = useWallet()
+  const { usdc } = useUsdcBalance()
 
   const [machines, setMachines] = useState<GachaMachine[] | null>(null)
   const [selected, setSelected] = useState<GachaMachine | null>(null)
@@ -84,6 +86,11 @@ export default function GachaVault() {
   // ── Buy / open flow (mirrors GachaScreen.buy) ──────────────────────────────
   async function handleOpen() {
     if (!selected || !identityToken) return
+    // Defensive: don't start a pull we positively know can't be paid.
+    if (usdc != null && usdc < (selected.price ?? 0)) {
+      setOpenError(`Insufficient USDC — this pack costs $${selected.price}. Deposit USDC and try again.`)
+      return
+    }
     setOpenError(null)
     let pack: { memo: string; transaction: string }
     try {
@@ -347,7 +354,8 @@ export default function GachaVault() {
           <MachineDetailPanel
             machine={selected}
             onOpen={() => void handleOpen()}
-            disabled={!identityToken}
+            authed={!!identityToken}
+            usdc={usdc}
           />
 
           {/* RIGHT — Card pool */}
