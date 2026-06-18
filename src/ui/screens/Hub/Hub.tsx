@@ -6,7 +6,7 @@ import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import { useReducedMotion } from '../../useReducedMotion'
 import { AuthButtons } from '../../components/AuthButtons'
 import type { HubNav } from './hubMockData'
-import { STAKE_OPTIONS } from './hubMockData'
+import { STAKE_OPTIONS, NAV_ITEMS } from './hubMockData'
 import { LeftRail } from './LeftRail'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
@@ -31,15 +31,6 @@ function useIsWide(query: string): boolean {
   return wide
 }
 
-// ─── Items del bottom nav móvil (mismos que LeftRail) ────────────────────────
-const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
-  { id: 'lobby',  icon: '⌂',  label: 'Lobby'  },
-  { id: 'pack',   icon: '⚔️', label: 'Pack'   },
-  { id: 'royale', icon: '👑', label: 'Royale' },
-  { id: 'gacha',  icon: '🎰', label: 'Gacha'  },
-  { id: 'mana',   icon: '🎯', label: 'Mana'   },
-  { id: 'ranks',  icon: '🏆', label: 'Ranks'  },
-]
 
 export function Hub() {
   const navigate = useNavigate()
