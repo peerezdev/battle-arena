@@ -19,6 +19,7 @@ import {
   type OpenPackResult,
 } from '../../../onchain/gachaClient'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
+import { addDrop } from '../../drops/dropsStore'
 import { useReducedMotion } from '../../useReducedMotion'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardPoolGrid } from './CardPoolGrid'
@@ -135,6 +136,15 @@ export default function GachaVault() {
         setPhase({ kind: 'pending', memo: pack.memo })
       } else {
         setPhase({ kind: 'result', result })
+        addDrop({
+          id: result.nft_address,
+          name: result.name ?? 'Card',
+          valueUsd: result.insured_value,
+          rarity: result.rarity,
+          image: result.image,
+          source: 'gacha',
+          ts: Date.now(),
+        })
       }
     } catch (e) {
       setOpenError(e instanceof Error ? e.message : String(e))
@@ -148,8 +158,20 @@ export default function GachaVault() {
     setPhase({ kind: 'opening', step: 'abriendo' })
     try {
       const result = await pollOpenPack(() => openPack(identityToken, memo))
-      if (result.pending) setPhase({ kind: 'pending', memo })
-      else setPhase({ kind: 'result', result })
+      if (result.pending) {
+        setPhase({ kind: 'pending', memo })
+      } else {
+        setPhase({ kind: 'result', result })
+        addDrop({
+          id: result.nft_address,
+          name: result.name ?? 'Card',
+          valueUsd: result.insured_value,
+          rarity: result.rarity,
+          image: result.image,
+          source: 'gacha',
+          ts: Date.now(),
+        })
+      }
     } catch (e) {
       setOpenError(e instanceof Error ? e.message : String(e))
       setPhase({ kind: 'pending', memo })
