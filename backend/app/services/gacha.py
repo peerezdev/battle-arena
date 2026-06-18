@@ -20,7 +20,8 @@ class GachaUpstreamError(Exception):
 
 
 _MACHINE_FIELDS = ("code", "name", "price", "odds", "stock", "ev", "image",
-                   "shortName", "thumbnailUrl", "instantBuyback", "contains")
+                   "shortName", "thumbnailUrl", "instantBuyback", "contains",
+                   "videoSrc", "videoHevc")
 _NFT_FIELDS = ("nft_address", "name", "image", "rarity", "insured_value")
 _CACHE_TTL = 60.0
 
@@ -37,6 +38,11 @@ class GachaService:
     @property
     def enabled(self) -> bool:
         return bool(self._base)
+
+    def _absolutize(self, url: Any) -> Any:
+        if isinstance(url, str) and url.startswith("/"):
+            return f"{self._base}{url}"
+        return url
 
     def _check_enabled(self) -> None:
         if not self.enabled:
@@ -71,6 +77,9 @@ class GachaService:
         else:
             items = []
         out = [{k: m.get(k) for k in _MACHINE_FIELDS} for m in items if isinstance(m, dict)]
+        for mach in out:
+            for f in ("image", "thumbnailUrl", "videoSrc", "videoHevc"):
+                mach[f] = self._absolutize(mach.get(f))
         self._machines_cache = (now, out)
         return out
 

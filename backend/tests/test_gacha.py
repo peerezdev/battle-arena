@@ -10,8 +10,9 @@ MACHINE = {
     "code": "pokemon_50", "name": "Pokemon 50", "price": 50,
     "odds": {"epic": 1, "rare": 9, "uncommon": 30, "common": 60},
     "stock": {"epic": 2, "rare": 10, "uncommon": 40, "common": 100},
-    "ev": 42.5, "image": "https://x/img.png",
-    "shortName": "Poke50", "thumbnailUrl": "https://x/thumb.png",
+    "ev": 42.5, "image": "",
+    "shortName": "Poke50", "thumbnailUrl": "/pokemon_50.png",
+    "videoSrc": "/pokemon_50.webm", "videoHevc": "/pokemon_50.hevc.mp4",
     "instantBuyback": 80, "contains": 1,
     "tierRanges": {}, "extra_ignored": "x",
 }
@@ -68,8 +69,9 @@ async def test_machines_maps_and_caches():
     assert out == [{
         "code": "pokemon_50", "name": "Pokemon 50", "price": 50,
         "odds": MACHINE["odds"], "stock": MACHINE["stock"], "ev": 42.5,
-        "image": "https://x/img.png",
-        "shortName": "Poke50", "thumbnailUrl": "https://x/thumb.png",
+        "image": "",
+        "shortName": "Poke50", "thumbnailUrl": f"{BASE}/pokemon_50.png",
+        "videoSrc": f"{BASE}/pokemon_50.webm", "videoHevc": f"{BASE}/pokemon_50.hevc.mp4",
         "instantBuyback": 80, "contains": 1,
     }]
     assert "tierRanges" not in out[0]

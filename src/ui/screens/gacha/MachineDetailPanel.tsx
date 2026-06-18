@@ -56,9 +56,21 @@ export function MachineDetailPanel({ machine, onOpen, disabled }: Props) {
           border: `1px solid ${COLORS.border}`,
         }}
       >
-        {machine.image ? (
+        {machine.videoSrc ? (
+          <video
+            poster={machine.thumbnailUrl ?? machine.image ?? undefined}
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }}
+          >
+            <source src={machine.videoSrc} type="video/webm" />
+            {machine.videoHevc && <source src={machine.videoHevc} type="video/mp4" />}
+          </video>
+        ) : machine.thumbnailUrl || machine.image ? (
           <img
-            src={machine.image}
+            src={(machine.thumbnailUrl ?? machine.image)!}
             alt={machine.name}
             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           />
@@ -125,7 +137,7 @@ export function MachineDetailPanel({ machine, onOpen, disabled }: Props) {
               color: COLORS.green,
             }}
           >
-            {machine.ev != null ? formatUsd(machine.ev) : '—'}
+            {machine.ev != null ? `$${machine.ev.toFixed(2)}` : '—'}
           </div>
         </div>
         <div

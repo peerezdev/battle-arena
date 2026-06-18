@@ -14,6 +14,8 @@ export interface GachaMachine {
   thumbnailUrl?: string | null
   instantBuyback?: number | null
   contains?: number | null
+  videoSrc?: string | null
+  videoHevc?: string | null
 }
 
 export interface GeneratePackResponse {
