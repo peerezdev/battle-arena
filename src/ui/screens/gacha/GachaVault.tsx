@@ -18,7 +18,7 @@ import {
   type MachineCard,
   type OpenPackResult,
 } from '../../../onchain/gachaClient'
-import { COLORS, FONTS, RARITY, SHADOW, GRADIENT } from '../../theme'
+import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardPoolGrid } from './CardPoolGrid'
@@ -416,6 +416,7 @@ export default function GachaVault() {
           <RevealOverlay
             phase={phase}
             reduced={reduced}
+            buybackPct={selected?.instantBuyback ?? null}
             onRetry={(memo) => void retryOpen(memo)}
             onClose={() => setPhase({ kind: 'machines' })}
           />
@@ -429,11 +430,13 @@ export default function GachaVault() {
 function RevealOverlay({
   phase,
   reduced,
+  buybackPct,
   onRetry,
   onClose,
 }: {
   phase: Exclude<Phase, { kind: 'machines' }>
   reduced: boolean
+  buybackPct: number | null | undefined
   onRetry: (memo: string) => void
   onClose: () => void
 }) {
@@ -566,7 +569,7 @@ function RevealOverlay({
 
       {/* Result — staged reveal */}
       {phase.kind === 'result' && (
-        <RevealResult result={phase.result} reduced={reduced} onClose={onClose} />
+        <RevealResult result={phase.result} reduced={reduced} buybackPct={buybackPct ?? null} onClose={onClose} />
       )}
     </motion.div>
   )
@@ -576,10 +579,12 @@ function RevealOverlay({
 function RevealResult({
   result,
   reduced,
+  buybackPct,
   onClose,
 }: {
   result: Extract<OpenPackResult, { pending: false }>
   reduced: boolean
+  buybackPct: number | null
   onClose: () => void
 }) {
   const rarityColor = RARITY_COLOR[result.rarity] ?? COLORS.muted
@@ -599,7 +604,7 @@ function RevealResult({
   useEffect(() => {
     if (reduced) return
     if (i >= steps.length - 1) return
-    const t = setTimeout(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1000)
+    const t = setTimeout(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1700)
     return () => clearTimeout(t)
   }, [i, steps.length, reduced])
 
@@ -657,7 +662,7 @@ function RevealResult({
     )
   }
 
-  // Card stage — full card UI
+  // Card stage — rich Card Details view
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -666,146 +671,415 @@ function RevealResult({
         animate={reduced ? undefined : { scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 280, damping: 22 }}
         style={{
+          maxWidth: 440,
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           background: COLORS.panel,
           border: `2px solid ${rarityColor}`,
-          borderRadius: 16,
-          padding: '32px 24px',
-          textAlign: 'center',
-          maxWidth: 380,
-          width: '100%',
+          borderRadius: 18,
           boxShadow: `${SHADOW.panel}, ${SHADOW.glow(rarityColor)}`,
         }}
       >
-        {/* Rarity badge */}
-        <div
-          style={{
-            display: 'inline-block',
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: '.1em',
-            textTransform: 'uppercase',
-            color: rarityColor,
-            border: `1px solid ${rarityColor}`,
-            borderRadius: 4,
-            padding: '3px 10px',
-            marginBottom: 18,
-            boxShadow: SHADOW.glow(rarityColor),
-          }}
-        >
-          {result.rarity}
-        </div>
-
-        {/* Card image */}
-        {result.image && (
-          <div style={{ marginBottom: 16 }}>
-            <img
-              src={result.image}
-              alt={result.name ?? undefined}
-              style={{
-                maxWidth: 220,
-                width: '100%',
-                borderRadius: 10,
-                border: `1px solid ${rarityColor}44`,
-                display: 'block',
-                margin: '0 auto',
-              }}
-            />
-          </div>
-        )}
-
-        {/* Card name */}
-        <div
-          style={{
-            fontFamily: FONTS.display,
-            fontWeight: 800,
-            fontSize: 20,
-            color: COLORS.text,
-            marginBottom: 8,
-          }}
-        >
-          {result.name}
-        </div>
-
-        {/* Year + grade chips (when present) */}
-        {(result.year || result.grade) && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: 8,
-              marginBottom: 12,
-              flexWrap: 'wrap',
-            }}
-          >
-            {result.year && (
-              <span
-                style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: 11,
-                  color: COLORS.muted,
-                  background: COLORS.panel2,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 4,
-                  padding: '2px 8px',
-                  letterSpacing: '.04em',
-                }}
-              >
-                {result.year}
-              </span>
-            )}
-            {result.grade && (
-              <span
-                style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: 11,
-                  color: COLORS.muted,
-                  background: COLORS.panel2,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 4,
-                  padding: '2px 8px',
-                  letterSpacing: '.04em',
-                }}
-              >
-                {result.grade}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* NFT address */}
-        <div
-          style={{
-            fontSize: 11,
-            color: COLORS.muted,
-            fontFamily: FONTS.mono,
-            wordBreak: 'break-all',
-            marginBottom: 22,
-          }}
-        >
-          {result.nft_address}
-        </div>
-
-        {/* Close */}
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%',
-            background: GRADIENT,
-            color: '#06120c',
-            border: 'none',
-            borderRadius: 10,
-            padding: '14px',
-            fontSize: 14,
-            fontWeight: 800,
-            cursor: 'pointer',
-            fontFamily: FONTS.display,
-            letterSpacing: '.03em',
-            boxShadow: SHADOW.glow(COLORS.green),
-          }}
-        >
-          Back to Vault
-        </button>
+        <CardDetailsView
+          result={result}
+          rarityColor={rarityColor}
+          buybackPct={buybackPct}
+          onClose={onClose}
+        />
       </motion.div>
     </AnimatePresence>
+  )
+}
+
+// ── Rich card details panel (inner — owns activeImg state) ────────────────────
+function CardDetailsView({
+  result,
+  rarityColor,
+  buybackPct,
+  onClose,
+}: {
+  result: Extract<OpenPackResult, { pending: false }>
+  rarityColor: string
+  buybackPct: number | null
+  onClose: () => void
+}) {
+  const [activeImg, setActiveImg] = useState(0)
+  const [copied, setCopied] = useState(false)
+
+  // Build image list: prefer result.images, fallback to result.image
+  const images: string[] = result.images.length > 0
+    ? result.images
+    : result.image
+      ? [result.image]
+      : []
+
+  const mainImgSrc = images[activeImg] ?? null
+
+  function handleCopy() {
+    void navigator.clipboard.writeText(result.nft_address).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
+
+  const shortAddr = `${result.nft_address.slice(0, 4)}…${result.nft_address.slice(-4)}`
+  const explorerUrl = `https://explorer.solana.com/address/${result.nft_address}?cluster=devnet`
+
+  const buybackOffer =
+    result.insured_value != null && buybackPct != null
+      ? result.insured_value * buybackPct / 100
+      : null
+
+  // Grading rows — only show present fields
+  const gradingRows: Array<{ label: string; value: string }> = []
+  if (result.grading_company) gradingRows.push({ label: 'Grading Company', value: result.grading_company })
+  if (result.grading_id) gradingRows.push({ label: 'Grading ID', value: result.grading_id })
+  if (result.grade) gradingRows.push({ label: 'Grade', value: result.grade })
+  if (result.year) gradingRows.push({ label: 'Year', value: result.year })
+  if (result.authenticated != null) gradingRows.push({ label: 'Authenticated', value: result.authenticated ? 'Yes' : 'No' })
+
+  return (
+    <div style={{ padding: '28px 24px 24px' }}>
+      {/* ── Authenticity line ────────────────────────────────────────────────── */}
+      {result.authenticated !== false && (
+        <div
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 11,
+            color: COLORS.green,
+            letterSpacing: '.06em',
+            marginBottom: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
+          <span style={{ fontSize: 13 }}>&#10003;</span>
+          GUARANTEED AUTHENTICITY
+        </div>
+      )}
+
+      {/* ── Card name + rarity badge ─────────────────────────────────────────── */}
+      <div
+        style={{
+          fontFamily: FONTS.display,
+          fontWeight: 900,
+          fontSize: 22,
+          color: COLORS.text,
+          marginBottom: 10,
+          lineHeight: 1.15,
+        }}
+      >
+        {result.name ?? 'Unknown Card'}
+      </div>
+      <div
+        style={{
+          display: 'inline-block',
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: '.1em',
+          textTransform: 'uppercase',
+          color: rarityColor,
+          border: `1px solid ${rarityColor}`,
+          borderRadius: 4,
+          padding: '3px 10px',
+          marginBottom: 20,
+          boxShadow: SHADOW.glow(rarityColor),
+        }}
+      >
+        {result.rarity}
+      </div>
+
+      {/* ── Image area ──────────────────────────────────────────────────────── */}
+      {mainImgSrc ? (
+        <div style={{ marginBottom: 16 }}>
+          <img
+            src={mainImgSrc}
+            alt={result.name ?? 'Card image'}
+            style={{
+              width: '100%',
+              maxHeight: 280,
+              objectFit: 'contain',
+              borderRadius: 10,
+              border: `1px solid ${rarityColor}44`,
+              display: 'block',
+            }}
+          />
+          {/* Thumbnails — only when multiple images */}
+          {images.length > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                justifyContent: 'center',
+                marginTop: 10,
+              }}
+            >
+              {images.map((src, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImg(idx)}
+                  style={{
+                    padding: 0,
+                    border: `2px solid ${idx === activeImg ? rarityColor : COLORS.border}`,
+                    borderRadius: 6,
+                    background: 'none',
+                    cursor: 'pointer',
+                    boxShadow: idx === activeImg ? SHADOW.glow(rarityColor) : 'none',
+                    transition: 'border-color 0.15s, box-shadow 0.15s',
+                    flexShrink: 0,
+                  }}
+                >
+                  <img
+                    src={src}
+                    alt={`View ${idx + 1}`}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      objectFit: 'cover',
+                      borderRadius: 4,
+                      display: 'block',
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          style={{
+            fontSize: 64,
+            textAlign: 'center',
+            marginBottom: 16,
+            lineHeight: 1,
+          }}
+        >
+          &#127183;
+        </div>
+      )}
+
+      {/* ── Value box ───────────────────────────────────────────────────────── */}
+      {(result.insured_value != null || buybackOffer != null) && (
+        <div
+          style={{
+            background: `linear-gradient(135deg, #1a1430 0%, #0f1a28 100%)`,
+            border: `1px solid ${COLORS.violet}44`,
+            borderRadius: 12,
+            padding: '16px 18px',
+            marginBottom: 16,
+            boxShadow: SHADOW.glow(COLORS.violet),
+          }}
+        >
+          {result.insured_value != null && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: buybackOffer != null ? 8 : 0,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 11,
+                  color: COLORS.muted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '.06em',
+                }}
+              >
+                Insured Value
+              </span>
+              <span
+                style={{
+                  fontFamily: FONTS.display,
+                  fontWeight: 800,
+                  fontSize: 18,
+                  color: COLORS.violet,
+                }}
+              >
+                {formatUsd(result.insured_value)}
+              </span>
+            </div>
+          )}
+          {buybackOffer != null && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 11,
+                  color: COLORS.muted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '.06em',
+                }}
+              >
+                Buyback Offer ({buybackPct}%)
+              </span>
+              <span
+                style={{
+                  fontFamily: FONTS.display,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  color: COLORS.green,
+                }}
+              >
+                {formatUsd(buybackOffer)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Token ID + explorer link ─────────────────────────────────────────── */}
+      <div
+        style={{
+          background: COLORS.panel2,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 10,
+          padding: '12px 14px',
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 10,
+              color: COLORS.muted,
+              textTransform: 'uppercase',
+              letterSpacing: '.07em',
+              marginBottom: 4,
+            }}
+          >
+            Token ID
+          </div>
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 13,
+              color: COLORS.text,
+            }}
+          >
+            {shortAddr}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+          <button
+            onClick={handleCopy}
+            title="Copy address"
+            style={{
+              background: copied ? COLORS.green + '22' : COLORS.panel,
+              border: `1px solid ${copied ? COLORS.green : COLORS.border}`,
+              borderRadius: 6,
+              padding: '5px 10px',
+              cursor: 'pointer',
+              color: copied ? COLORS.green : COLORS.muted,
+              fontFamily: FONTS.mono,
+              fontSize: 11,
+              transition: 'all 0.15s',
+            }}
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+          <a
+            href={explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 11,
+              color: COLORS.violet,
+              textDecoration: 'none',
+              border: `1px solid ${COLORS.violet}44`,
+              borderRadius: 6,
+              padding: '5px 10px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            View token &#8599;
+          </a>
+        </div>
+      </div>
+
+      {/* ── Grading section ─────────────────────────────────────────────────── */}
+      {gradingRows.length > 0 && (
+        <div
+          style={{
+            background: COLORS.panel2,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 10,
+            padding: '12px 14px',
+            marginBottom: 20,
+          }}
+        >
+          {gradingRows.map(({ label, value }) => (
+            <div
+              key={label}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                padding: '4px 0',
+                borderBottom: `1px solid ${COLORS.border}`,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 10,
+                  color: COLORS.muted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '.06em',
+                }}
+              >
+                {label}
+              </span>
+              <span
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 12,
+                  color: COLORS.text,
+                }}
+              >
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Back to Vault ────────────────────────────────────────────────────── */}
+      <button
+        onClick={onClose}
+        style={{
+          width: '100%',
+          background: GRADIENT,
+          color: '#06120c',
+          border: 'none',
+          borderRadius: 10,
+          padding: '14px',
+          fontSize: 14,
+          fontWeight: 800,
+          cursor: 'pointer',
+          fontFamily: FONTS.display,
+          letterSpacing: '.03em',
+          boxShadow: SHADOW.glow(COLORS.green),
+        }}
+      >
+        Back to Vault
+      </button>
+    </div>
   )
 }

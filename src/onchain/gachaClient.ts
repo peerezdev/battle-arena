@@ -31,7 +31,20 @@ export interface SubmitTxResponse {
 
 export type OpenPackResult =
   | { pending: true }
-  | { pending: false; nft_address: string; rarity: string; name: string | null; image: string | null; year: string | null; grade: string | null }
+  | {
+      pending: false
+      nft_address: string
+      rarity: string
+      name: string | null
+      image: string | null
+      year: string | null
+      grade: string | null
+      images: string[]
+      insured_value: number | null
+      grading_company: string | null
+      grading_id: string | null
+      authenticated: boolean | null
+    }
 
 export class GachaDisabledError extends Error {
   constructor() { super('gacha_disabled') }
