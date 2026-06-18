@@ -215,9 +215,7 @@ export default function GachaVault() {
   return (
     <div
       style={{
-        padding: '28px 22px 48px',
-        maxWidth: 1100,
-        margin: '0 auto',
+        padding: '24px 28px 48px',
         position: 'relative',
       }}
     >
@@ -387,20 +385,12 @@ export default function GachaVault() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 300px) 1fr',
+            gridTemplateColumns: '1fr minmax(320px, 400px)',
             gap: 24,
             alignItems: 'start',
           }}
         >
-          {/* LEFT — Pack detail */}
-          <MachineDetailPanel
-            machine={selected}
-            onOpen={() => void handleOpen()}
-            authed={!!identityToken}
-            usdc={usdc}
-          />
-
-          {/* RIGHT — Card pool */}
+          {/* LEFT — Card pool */}
           <CardPoolGrid
             cards={cards}
             loading={cardsLoading}
@@ -408,6 +398,16 @@ export default function GachaVault() {
             error={cardsError}
             machineCode={selected.code}
           />
+
+          {/* RIGHT — Pack detail (sticky so it stays while scrolling the pool) */}
+          <div style={{ position: 'sticky', top: 16 }}>
+            <MachineDetailPanel
+              machine={selected}
+              onOpen={() => void handleOpen()}
+              authed={!!identityToken}
+              usdc={usdc}
+            />
+          </div>
         </div>
       )}
 

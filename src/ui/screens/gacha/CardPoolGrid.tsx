@@ -134,8 +134,8 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
           animate="show"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: 12,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+            gap: 16,
           }}
         >
           {cards.map((card, i) => {
@@ -155,26 +155,27 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
                   transition: 'box-shadow 0.18s',
                 }}
               >
-                {/* Card image */}
+                {/* Card image — full card visible (contain) on a gradient slab */}
                 <div
                   style={{
                     width: '100%',
                     aspectRatio: '3/4',
-                    background: COLORS.panel2,
+                    background: `radial-gradient(circle at 50% 35%, ${accent}1f, ${COLORS.panel2})`,
                     overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    padding: 10,
                   }}
                 >
                   {card.image ? (
                     <img
                       src={card.image}
                       alt={card.name ?? undefined}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.45))' }}
                     />
                   ) : (
-                    <span style={{ fontSize: 32 }}>🃏</span>
+                    <span style={{ fontSize: 40 }}>🃏</span>
                   )}
                 </div>
 

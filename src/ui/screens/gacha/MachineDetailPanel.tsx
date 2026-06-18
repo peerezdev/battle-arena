@@ -230,44 +230,19 @@ export function MachineDetailPanel({ machine, onOpen, authed, usdc }: Props) {
         {buttonLabel}
       </motion.button>
 
-      {/* Balance / deposit hint (only when logged in) */}
-      {authed && (
+      {/* Buyback meta */}
+      {machine.instantBuyback != null && (
         <div
           style={{
-            marginTop: 10,
-            textAlign: 'center',
             fontFamily: FONTS.mono,
             fontSize: 11,
-            color: insufficient ? COLORS.red : COLORS.muted,
+            color: COLORS.muted,
+            letterSpacing: '.05em',
           }}
         >
-          {usdc == null
-            ? 'Checking balance…'
-            : insufficient
-              ? `Balance $${usdc.toFixed(2)} — deposit USDC to open`
-              : `Balance $${usdc.toFixed(2)}`}
+          INSTANT BUYBACK · {machine.instantBuyback}% OF VALUE
         </div>
       )}
-
-      {/* Contains + Buyback meta */}
-      <div
-        style={{
-          fontFamily: FONTS.mono,
-          fontSize: 11,
-          color: COLORS.muted,
-          letterSpacing: '.05em',
-          display: 'flex',
-          gap: 14,
-          flexWrap: 'wrap',
-        }}
-      >
-        {machine.contains != null && (
-          <span>CONTAINS {machine.contains}</span>
-        )}
-        {machine.instantBuyback != null && (
-          <span>BUYBACK {machine.instantBuyback}%</span>
-        )}
-      </div>
 
       {/* Odds bars */}
       {oddsEntries.length > 0 && (
