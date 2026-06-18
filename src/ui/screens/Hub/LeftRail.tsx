@@ -10,7 +10,7 @@ const ITEMS: { id: HubNav; icon: string; label: string }[] = [
   { id: 'ranks', icon: '🏆', label: 'Ranks' },
 ]
 
-export function LeftRail({ active, onSelect }: { active: HubNav; onSelect: (id: HubNav) => void }) {
+export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSelect: (id: HubNav) => void; onProfile?: () => void }) {
   return (
     <nav
       style={{
@@ -154,6 +154,7 @@ export function LeftRail({ active, onSelect }: { active: HubNav; onSelect: (id: 
           transition: 'color .12s, background .12s',
         }}
         title="Profile"
+        onClick={onProfile}
       >
         <span style={{ fontSize: 19 }}>🧙</span>
       </button>

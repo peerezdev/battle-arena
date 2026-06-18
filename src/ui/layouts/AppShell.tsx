@@ -64,7 +64,7 @@ export function AppShell() {
     >
       {/* ── LEFT RAIL (desktop/tablet) o BOTTOM NAV (móvil) ───────────────── */}
       {wideRail ? (
-        <LeftRail active={active} onSelect={onSelect} />
+        <LeftRail active={active} onSelect={onSelect} onProfile={() => navigate('/profile')} />
       ) : (
         <BottomNav active={active} onSelect={onSelect} />
       )}
