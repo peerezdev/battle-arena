@@ -1,10 +1,23 @@
 # Pack Battle — Implementation Design
 
 **Date:** 2026-06-17
-**Status:** approved-pending-review
+**Status:** approved · **custody model updated 2026-06-17** (deposit-by-transfer, no `altRecipient`)
 **Supersedes:** the "spec + mockups only, no product code until the CC API key" gate in
 `2026-06-10-pack-battle-design.md`. That document remains the conceptual/pitch design and
 the anti-cheat rationale; this one is the buildable implementation spec.
+
+> **Decision log (2026-06-17):**
+> - The CC gacha on **devnet is keyless** (no API key needed) — verified live. The provider
+>   gating is by `GACHA_BASE_URL` (kill-switch), not the key; the `x-api-key` header is sent
+>   only when a key is configured (mainnet).
+> - **Custody = deposit-by-transfer (no `altRecipient`).** The pull is delivered to the
+>   **pulling player's own wallet** (the default gacha behavior). To play Pack Battle the
+>   player then **transfers the card into the escrow vault** with a signed instruction. This
+>   supersedes the `altRecipient`→PDA model below (kept for historical context + as a future
+>   trustless upgrade). Trade-off accepted for now: the player sees their card before
+>   depositing → mild adverse selection (see Anti-cheat). The Phase-1 on-chain `deposit_card`
+>   (currently *verify-vault*) will switch to *transfer-from-player-into-vault* (mirroring the
+>   USDC escrow of Mana Duel) when Pack Battle is built end-to-end.
 
 ## Purpose
 
@@ -73,8 +86,9 @@ for the mock path. When the real key lands, it gains an optional check that the 
 `mint` came from that battle/wallet's gacha `memo` (via `openPack`).
 
 ### Backend — `backend/`
-- `GachaProvider` interface + `CollectorCryptGacha` (real) + `MockGacha`, selected by
-  `GACHA_API_KEY` presence. `generate_pack` gains an `alt_recipient` param.
+- `GachaProvider` interface + `CollectorCryptGacha` (real, **keyless on devnet**) + `MockGacha`
+  (test double). Provider enabled by `GACHA_BASE_URL` (kill-switch); `x-api-key` only sent when
+  a key is configured. (No `alt_recipient` param — deferred with the trustless upgrade.)
 - **Battle↔memo↔mint registry** (new table, e.g. `PackBattleEntry`): exactly **one memo per
   (battle, player)**; the recorded `memo` is the only one the oracle/settle will accept for
   that player → no pull-shopping. Reuses the existing `GachaPack` memo-ownership pattern.
@@ -90,23 +104,31 @@ for the mock path. When the real key lands, it gains an optional check that the 
   escrowed cards. Reuses `gachaClient.ts` and the existing reveal/clash visual language.
 - Pulls are signed from the **Privy embedded wallet** (already the app's wallet).
 
-## Custody model (load-bearing)
+## Custody model (current decision: deposit-by-transfer)
 
-The NFT **never touches the player's wallet**: the pull is delivered straight to the battle's
-**escrow PDA** via the gacha `altRecipient`. With **MockGacha** this is trivial (we mint
-directly to the PDA), so the trustless flow is fully demonstrable now. For real CC this is the
-assumption to validate with the key. Fallback if `altRecipient`→PDA is unsupported: open the
-pack to the embedded wallet, then transfer the NFT to the escrow in the **same Privy
-session-signer flow** (delegated signing, no per-action user prompt), documented as plan B.
+The pull is delivered to the **pulling player's own wallet** (standard gacha behavior, no
+`altRecipient`). To play Pack Battle, the player **transfers the card into the escrow vault**
+with a signed instruction; the on-chain `deposit_card` performs/verifies that transfer
+(mirroring how the Mana-Duel `initialize`/`join` move the USDC stake into escrow). Settlement
+out of the escrow stays trustless (PDA-signed CPI to the winner).
 
-## Anti-cheat (carried from the 2026-06-10 design)
-- **Can't keep the NFT**: you never hold it; it goes to the escrow PDA.
-- **No adverse selection**: you pay/sign the pull *before* the VRF result — randomness is the
-  commitment lock.
+**Future trustless upgrade (deferred):** delivering the pull straight to the **escrow PDA**
+via the gacha `altRecipient` would mean the player never holds the card (no adverse
+selection). Kept for later; fallback if `altRecipient`→PDA is unsupported by CC is the Privy
+**session-signer** transfer (delegated signing, no per-action prompt).
+
+## Anti-cheat
 - **No pull-shopping**: exactly one `memo` per (battle, player); only that memo's card counts.
-- **No value manipulation**: `insured_value` is set by CC (mock: by the provider), never the
-  player — same anti-manipulation principle as today's oracle.
+- **No value manipulation**: `insured_value` is set by CC, never the player — same
+  anti-manipulation principle as today's oracle.
 - **No info leak**: reveal is locked until **both** cards are in escrow.
+- **Adverse selection (accepted trade-off, current model)**: because the card lands in the
+  player's wallet first, a player *can* decline to deposit a bad pull. The deposit window has a
+  timeout (the opponent reclaims), but a player can abandon before depositing. Mitigations for
+  later: deliver via `altRecipient`→PDA (removes it entirely), or force the deposit in the same
+  signed session as the pull (session signer). For now this is acceptable.
+- **Can't run off with the escrowed card**: once deposited, the NFT is in the PDA vault and
+  only the on-chain settle/timeout (with destinations bound to the rightful owner) can move it.
 
 ## Game loop
 1. **Create** — A picks pack tier + mode → duel posted to the Pack Battle lobby.
