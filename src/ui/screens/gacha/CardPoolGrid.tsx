@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { COLORS, FONTS, RARITY, SHADOW, formatUsd } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import type { MachineCard } from '../../../onchain/gachaClient'
+import { CardDetailsModal } from './CardDetailsModal'
 
 interface Props {
   cards: MachineCard[]
@@ -20,6 +22,7 @@ const RARITY_COLOR: Record<string, string> = {
 
 export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: Props) {
   const reduced = useReducedMotion()
+  const [selected, setSelected] = useState<MachineCard | null>(null)
 
   const containerVariants = {
     hidden: {},
@@ -145,13 +148,17 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
               <motion.div
                 key={card.nft_address ?? i}
                 variants={itemVariants}
+                onClick={() => setSelected(card)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(card) } }}
                 whileHover={reduced ? undefined : { y: -4, boxShadow: SHADOW.glow(accent) }}
                 style={{
                   background: COLORS.panel,
                   border: `1px solid ${COLORS.border}`,
                   borderRadius: 10,
                   overflow: 'hidden',
-                  cursor: 'default',
+                  cursor: 'pointer',
                   transition: 'box-shadow 0.18s',
                 }}
               >
@@ -251,6 +258,7 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
           })}
         </motion.div>
       )}
+      {selected && <CardDetailsModal card={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }
