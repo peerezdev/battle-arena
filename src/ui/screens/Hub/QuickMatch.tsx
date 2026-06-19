@@ -1,5 +1,6 @@
 import { COLORS, GRADIENT, FONTS } from '../../theme'
 import { MOCK_STATS, STAKE_OPTIONS, type HubStat } from './hubMockData'
+import { useIsWide } from '../../useIsWide'
 
 interface Props {
   stakes?: number[]
@@ -18,6 +19,7 @@ export function QuickMatch({
   onCreate,
   stats = MOCK_STATS,
 }: Props) {
+  const wide = useIsWide('(min-width: 620px)')
   return (
     <div
       style={{
@@ -33,8 +35,9 @@ export function QuickMatch({
           background: 'radial-gradient(120% 140% at 0% 0%,#1a1838,#0e1320 60%)',
           padding: '26px 16px',
           display: 'flex',
-          alignItems: 'center',
-          gap: 28,
+          flexDirection: wide ? 'row' : 'column',
+          alignItems: wide ? 'center' : 'stretch',
+          gap: wide ? 28 : 18,
         }}
       >
         {/* Left: content */}
@@ -156,8 +159,11 @@ export function QuickMatch({
           style={{
             display: 'flex',
             gap: 22,
-            paddingLeft: 24,
-            borderLeft: `1px solid ${COLORS.border}`,
+            paddingLeft: wide ? 24 : 0,
+            paddingTop: wide ? undefined : 16,
+            borderLeft: wide ? `1px solid ${COLORS.border}` : 'none',
+            borderTop: wide ? undefined : `1px solid ${COLORS.border}`,
+            width: wide ? undefined : '100%',
           }}
         >
           {stats.map((s) => (
