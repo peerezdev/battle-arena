@@ -24,6 +24,7 @@ export function AppShell() {
   // Breakpoints copied verbatim from Hub.tsx
   const wideRail = useIsWide('(min-width: 760px)')
   const wideDock = useIsWide('(min-width: 1100px)')
+  const showBalance = useIsWide('(min-width: 480px)')
 
   const [depositOpen, setDepositOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
@@ -76,6 +77,8 @@ export function AppShell() {
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
+            rowGap: 8,
             gap: 14,
             padding: '10px 18px',
             borderBottom: `1px solid ${COLORS.border}`,
@@ -110,7 +113,7 @@ export function AppShell() {
           <div style={{ flex: 1 }} />
 
           {/* Balance + Deposit — solo con sesión */}
-          {authenticated && (
+          {authenticated && showBalance && (
             <>
               <div
                 style={{

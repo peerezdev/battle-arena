@@ -33,7 +33,7 @@ export function LiveBattles({ battles = MOCK_BATTLES, onSelectMode, onBattleActi
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
           gap: 12,
           marginBottom: 28,
         }}

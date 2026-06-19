@@ -31,7 +31,7 @@ export function QuickMatch({
         style={{
           borderRadius: 19,
           background: 'radial-gradient(120% 140% at 0% 0%,#1a1838,#0e1320 60%)',
-          padding: '26px 28px',
+          padding: '26px 16px',
           display: 'flex',
           alignItems: 'center',
           gap: 28,

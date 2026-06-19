@@ -26,7 +26,7 @@ export function Hub() {
           display: 'flex',
           alignItems: 'center',
           gap: 14,
-          padding: '16px 26px',
+          padding: '16px 16px',
           borderBottom: `1px solid ${COLORS.border}`,
         }}
       >
@@ -54,7 +54,7 @@ export function Hub() {
           </span>
         </div>
       </div>
-      <div style={{ padding: '24px 26px 40px' }}>
+      <div style={{ padding: '24px 16px 40px' }}>
         <QuickMatch
           selectedStake={stake}
           onStake={setStake}
