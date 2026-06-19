@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { COLORS, FONTS, formatUsd } from '../../theme'
+import { useIsWide } from '../../useIsWide'
 import { ccAssetUrl, type MachineCard } from '../../../onchain/gachaClient'
 
 function abbreviate(mint: string): string {
@@ -12,6 +13,8 @@ export function CardDetailsModal({ card, onClose }: { card: MachineCard; onClose
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
+
+  const wideModal = useIsWide('(min-width: 620px)')
 
   const mint = card.nft_address
   const big = gallery[active] ?? null
@@ -55,7 +58,7 @@ export function CardDetailsModal({ card, onClose }: { card: MachineCard; onClose
             style={{ background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.muted, borderRadius: 8, width: 30, height: 30, cursor: 'pointer' }}>✕</button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: wideModal ? '1fr 1fr' : '1fr', gap: wideModal ? 22 : 16 }}>
           {/* Left — gallery */}
           <div style={{ display: 'flex', gap: 12 }}>
             {gallery.length > 1 && (
@@ -69,7 +72,7 @@ export function CardDetailsModal({ card, onClose }: { card: MachineCard; onClose
                 ))}
               </div>
             )}
-            <div style={{ flex: 1, aspectRatio: '3/4', background: COLORS.panel2, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 12 }}>
+            <div style={{ flex: 1, aspectRatio: '3/4', maxHeight: wideModal ? undefined : '46vh', background: COLORS.panel2, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 12 }}>
               {big ? <img src={big} alt={card.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 48 }}>🃏</span>}
             </div>
           </div>

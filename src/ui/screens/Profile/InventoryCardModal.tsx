@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, formatUsd } from '../../theme'
+import { useIsWide } from '../../useIsWide'
 import type { OwnedCard } from '../../../inventory/useCollectorCryptNfts'
 import { useWallet } from '../../../wallet/useWallet'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
@@ -77,6 +78,8 @@ export function InventoryCardModal({ card, onClose, onSold }: {
     })
   }
 
+  const wideGrid = useIsWide('(min-width: 380px)')
+
   const explorerUrl = ccAssetUrl(card.mint)
   const label = { fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '0.12em', color: COLORS.muted } as const
   const value = { fontSize: 13, color: COLORS.text, fontWeight: 600 } as const
@@ -116,7 +119,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: wideGrid ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 12 }}>
           {card.grade && (<div><div style={label}>GRADE</div><div style={value}>{card.grade}</div></div>)}
           {card.year && (<div><div style={label}>YEAR</div><div style={value}>{card.year}</div></div>)}
           {card.gradingId && (<div><div style={label}>GRADING ID</div><div style={value}>{card.gradingId}</div></div>)}
