@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { COLORS, FONTS, RARITY, SHADOW, formatUsd } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
+import { useIsWide } from '../../useIsWide'
 import type { MachineCard } from '../../../onchain/gachaClient'
 import { CardDetailsModal } from './CardDetailsModal'
 
@@ -22,6 +23,7 @@ const RARITY_COLOR: Record<string, string> = {
 
 export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: Props) {
   const reduced = useReducedMotion()
+  const wideCols = useIsWide('(min-width: 560px)')
   const [selected, setSelected] = useState<MachineCard | null>(null)
 
   const containerVariants = {
@@ -137,8 +139,8 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
           animate="show"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
-            gap: 16,
+            gridTemplateColumns: `repeat(auto-fill, minmax(${wideCols ? 190 : 150}px, 1fr))`,
+            gap: wideCols ? 16 : 12,
           }}
         >
           {cards.map((card, i) => {

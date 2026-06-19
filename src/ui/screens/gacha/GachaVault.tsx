@@ -22,6 +22,7 @@ import {
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
 import { addDrop } from '../../drops/dropsStore'
 import { useReducedMotion } from '../../useReducedMotion'
+import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardPoolGrid } from './CardPoolGrid'
 
@@ -56,6 +57,7 @@ const STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
 
 export default function GachaVault() {
   const reduced = useReducedMotion()
+  const wideGacha = useIsWide('(min-width: 880px)')
   const { identityToken } = useIdentityToken()
   const { signTransactionBase64 } = useWallet()
   const { usdc } = useUsdcBalance()
@@ -216,7 +218,7 @@ export default function GachaVault() {
   return (
     <div
       style={{
-        padding: '24px 28px 48px',
+        padding: wideGacha ? '24px 28px 48px' : '16px 14px 40px',
         position: 'relative',
       }}
     >
@@ -381,17 +383,9 @@ export default function GachaVault() {
         </div>
       )}
 
-      {/* ── TWO-COLUMN BODY ─────────────────────────────────────────────────── */}
-      {selected && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr minmax(320px, 400px)',
-            gap: 24,
-            alignItems: 'start',
-          }}
-        >
-          {/* LEFT — Card pool */}
+      {/* ── BODY (two-column wide / stacked narrow, panel-first) ────────────── */}
+      {selected && (() => {
+        const poolEl = (
           <CardPoolGrid
             cards={cards}
             loading={cardsLoading}
@@ -399,9 +393,9 @@ export default function GachaVault() {
             error={cardsError}
             machineCode={selected.code}
           />
-
-          {/* RIGHT — Pack detail (sticky so it stays while scrolling the pool) */}
-          <div style={{ position: 'sticky', top: 16 }}>
+        )
+        const panelEl = (
+          <div style={wideGacha ? { position: 'sticky', top: 16 } : undefined}>
             <MachineDetailPanel
               machine={selected}
               onOpen={() => void handleOpen()}
@@ -409,8 +403,20 @@ export default function GachaVault() {
               usdc={usdc}
             />
           </div>
-        </div>
-      )}
+        )
+        return (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: wideGacha ? '1fr minmax(320px, 400px)' : '1fr',
+              gap: wideGacha ? 24 : 18,
+              alignItems: 'start',
+            }}
+          >
+            {wideGacha ? (<>{poolEl}{panelEl}</>) : (<>{panelEl}{poolEl}</>)}
+          </div>
+        )
+      })()}
 
       {/* ── OPEN ERROR BANNER ───────────────────────────────────────────────── */}
       {openError && phase.kind === 'machines' && (
