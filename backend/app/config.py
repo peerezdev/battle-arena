@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     gacha_api_key: str = ""  # opcional; devnet es keyless, solo necesario si el entorno lo exige (p.ej. mainnet)
     privy_app_id: str = ""
     privy_jwks_url: str = "https://auth.privy.io/api/v1/apps/{app_id}/jwks.json"
+    privy_app_secret: str = ""
+    privy_auth_key: str = ""
+    privy_solana_caip2: str = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"  # devnet default
 
 
 def get_settings() -> Settings:
