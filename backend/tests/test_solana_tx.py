@@ -85,6 +85,27 @@ class TestBuildNftTransferStructure:
         )
         assert dest_ata in default_tx.message.account_keys
 
+    def test_transfer_checked_account_order(self, default_tx):
+        """transfer_checked accounts MUST be [src_ata, mint, dest_ata, authority] in order —
+        a swapped src/dest would send the NFT to the wrong account yet pass presence checks."""
+        token_prog = Pubkey.from_string(TOKEN_PROGRAM)
+        keys = default_tx.message.account_keys
+        transfer_ix = next(
+            ix for ix in default_tx.message.instructions
+            if keys[ix.program_id_index] == token_prog
+        )
+        src_ata = get_associated_token_address(
+            Pubkey.from_string(ESCROW), Pubkey.from_string(MINT), token_prog
+        )
+        dest_ata = get_associated_token_address(
+            Pubkey.from_string(DEST), Pubkey.from_string(MINT), token_prog
+        )
+        accts = transfer_ix.accounts
+        assert keys[accts[0]] == src_ata               # source = escrow's ATA
+        assert keys[accts[1]] == Pubkey.from_string(MINT)
+        assert keys[accts[2]] == dest_ata              # destination = winner's ATA
+        assert keys[accts[3]] == Pubkey.from_string(ESCROW)  # authority
+
 
 # ---------------------------------------------------------------------------
 # Test 2: custom token_program (Token-2022)
