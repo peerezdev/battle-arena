@@ -37,3 +37,17 @@ def test_pack_battle_models_persist(session):
     got = session.get(PackBattle, "b1")
     assert got.status == "lobby" and got.max_players == 3 and got.winner is None
     assert session.query(BattlePull).filter_by(battle_id="b1").one().memo == "m1"
+
+
+def test_battle_player_wallet_id_persists(session):
+    """BattlePlayer.wallet_id is nullable; when provided it round-trips correctly."""
+    from app.models import PackBattle, BattlePlayer
+    b = PackBattle(id="b2", mode="pack", machine_code="pokemon_50", price=50, max_players=2, status="lobby")
+    session.add(b)
+    p1 = BattlePlayer(battle_id="b2", player_wallet="W1", wallet_id="privy-wallet-id-abc")
+    p2 = BattlePlayer(battle_id="b2", player_wallet="W2")  # wallet_id=None by default
+    session.add_all([p1, p2])
+    session.commit()
+    rows = {r.player_wallet: r for r in session.query(BattlePlayer).filter_by(battle_id="b2").all()}
+    assert rows["W1"].wallet_id == "privy-wallet-id-abc"
+    assert rows["W2"].wallet_id is None
