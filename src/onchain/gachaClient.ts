@@ -51,7 +51,10 @@ export class GachaDisabledError extends Error {
 }
 
 async function gachaFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const resp = await fetch(`${config.backendUrl}${path}`, options)
+  const resp = await fetch(`${config.backendUrl}${path}`, {
+    ...options,
+    headers: { ...(options?.headers as Record<string, string> | undefined), 'ngrok-skip-browser-warning': 'true' },
+  })
   if (resp.status === 503) throw new GachaDisabledError()
   if (!resp.ok) {
     let detail: string | undefined

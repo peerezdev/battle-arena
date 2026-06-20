@@ -22,7 +22,7 @@ export function OverviewTab() {
   useEffect(() => {
     if (!address) return
     let cancelled = false
-    fetch(`${config.backendUrl}/users/${encodeURIComponent(address)}/history`)
+    fetch(`${config.backendUrl}/users/${encodeURIComponent(address)}/history`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
       .then((r) => (r.ok ? r.json() : []))
       .then((rows) => {
         if (!cancelled && Array.isArray(rows)) setWl(countResults(rows))

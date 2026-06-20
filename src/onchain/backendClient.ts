@@ -41,7 +41,10 @@ async function apiFetch<T>(
   url: string,
   options?: RequestInit,
 ): Promise<T> {
-  const resp = await fetch(url, options)
+  const resp = await fetch(url, {
+    ...options,
+    headers: { ...(options?.headers as Record<string, string> | undefined), 'ngrok-skip-browser-warning': 'true' },
+  })
   if (!resp.ok) throw new Error(`Backend error ${resp.status}: ${url}`)
   return resp.json() as Promise<T>
 }

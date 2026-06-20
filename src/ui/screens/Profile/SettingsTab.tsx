@@ -32,7 +32,7 @@ export function SettingsTab() {
     try {
       const resp = await fetch(`${config.backendUrl}/users/me/alias`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${identityToken}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${identityToken}`, 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ alias: value }),
       })
       if (resp.status === 409) {

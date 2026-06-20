@@ -22,7 +22,7 @@ export function useProfile(): ProfileData & { loading: boolean; refresh: () => v
     }
     let cancelled = false
     setLoading(true)
-    fetch(`${config.backendUrl}/users/${encodeURIComponent(address)}`)
+    fetch(`${config.backendUrl}/users/${encodeURIComponent(address)}`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => {
         if (cancelled || !u) return
