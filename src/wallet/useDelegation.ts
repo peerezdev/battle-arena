@@ -1,4 +1,9 @@
-import { usePrivy, useHeadlessDelegatedActions } from '@privy-io/react-auth'
+import { usePrivy, useSigners } from '@privy-io/react-auth'
+
+// Las embedded de esta app son TEE wallets → el acceso server-side se provisiona
+// con session signers (useSigners().addSigners), NO con delegated-actions (que es
+// solo on-device). El signerId es el id del key quorum registrado en el dashboard.
+const SIGNER_ID = import.meta.env.VITE_PRIVY_SIGNER_ID as string | undefined
 
 interface AccountLike {
   type?: string; chainType?: string; walletClientType?: string; connectorType?: string
@@ -15,7 +20,7 @@ export function isSolanaDelegated(accounts: AccountLike[]): boolean {
 
 export function useDelegation(): { delegated: boolean; enable: () => Promise<void> } {
   const { user } = usePrivy()
-  const { delegateWallet } = useHeadlessDelegatedActions()
+  const { addSigners } = useSigners()
   const accounts = (user?.linkedAccounts ?? []) as unknown as AccountLike[]
   const delegated = isSolanaDelegated(accounts)
   const embedded = accounts.find(
@@ -23,8 +28,9 @@ export function useDelegation(): { delegated: boolean; enable: () => Promise<voi
       (a.walletClientType === 'privy' || a.connectorType === 'embedded') && a.address,
   )
   async function enable() {
-    if (!embedded?.address) return
-    await delegateWallet({ address: embedded.address, chainType: 'solana' })
+    if (!embedded?.address) throw new Error('No embedded Solana wallet found')
+    if (!SIGNER_ID) throw new Error('VITE_PRIVY_SIGNER_ID no configurado')
+    await addSigners({ address: embedded.address, signers: [{ signerId: SIGNER_ID }] })
   }
   return { delegated, enable }
 }
