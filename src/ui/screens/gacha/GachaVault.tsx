@@ -1221,7 +1221,7 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
   onAdvance: () => void
   onSkipAll: () => void
 }) {
-  const [skip, setSkip] = useState(0)
+  const [skippedAt, setSkippedAt] = useState<number | null>(null)
   const result = results[index]
   return (
     <motion.div key="yolo-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1230,9 +1230,9 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
       {result.auto_sold && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.green }}>⚡ Auto-sold {formatUsd((result.buyback_amount ?? 0) / 1e6)}</div>
       )}
-      <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skip} onClose={onAdvance} />
+      <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} onClose={onAdvance} />
       <div style={{ display: 'flex', gap: 10 }}>
-        <button onClick={() => setSkip((s) => s + 1)}
+        <button onClick={() => setSkippedAt(index)}
           style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip pack ⏭</button>
         <button onClick={onSkipAll}
           style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
