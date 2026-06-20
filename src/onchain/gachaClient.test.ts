@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { pollOpenPack, defaultDelayMs, type OpenPackResult } from './gachaClient'
 import { fetchBuybackAvailable, requestBuyback } from './gachaClient'
+import { generateYoloPacks, yoloTotalCost, clampCount } from './gachaClient'
 import { config } from './config'
 import { ccAssetUrl } from './gachaClient'
 
@@ -9,7 +10,7 @@ describe('pollOpenPack', () => {
     const attempts: OpenPackResult[] = [
       { pending: true },
       { pending: true },
-      { pending: false, nft_address: 'M1', rarity: 'Rare', name: 'Pika', image: null, year: null, grade: null, images: [], insured_value: null, grading_company: null, grading_id: null, authenticated: null },
+      { pending: false, nft_address: 'M1', rarity: 'Rare', name: 'Pika', image: null, year: null, grade: null, images: [], insured_value: null, grading_company: null, grading_id: null, authenticated: null, auto_sold: false, buyback_amount: null },
     ]
     let i = 0
     const open = vi.fn(async () => attempts[i++])
@@ -71,5 +72,33 @@ describe('ccAssetUrl', () => {
   it('apunta a la página del asset en CollectorCrypt', () => {
     expect(ccAssetUrl('7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH'))
       .toBe('https://collectorcrypt.com/assets/solana/7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH')
+  })
+})
+
+describe('yoloTotalCost / clampCount', () => {
+  it('coste total = precio * count', () => {
+    expect(yoloTotalCost(50, 3)).toBe(150)
+    expect(yoloTotalCost(1000, 10)).toBe(10000)
+  })
+  it('clampCount fija a [1,10] y entero', () => {
+    expect(clampCount(0)).toBe(1)
+    expect(clampCount(11)).toBe(10)
+    expect(clampCount(3.7)).toBe(3)
+  })
+})
+
+describe('generateYoloPacks', () => {
+  it('POST /gacha/yolo con Bearer + body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({
+      yolo_id: 'y', count: 2, transactions: [{ memo: 'a', transaction: 'TX' }] }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await generateYoloPacks('TOKEN', 'pokemon_50', 2, true)
+    expect(out.transactions[0]).toEqual({ memo: 'a', transaction: 'TX' })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${config.backendUrl}/gacha/yolo`)
+    expect(init.method).toBe('POST')
+    expect(init.headers.Authorization).toBe('Bearer TOKEN')
+    expect(JSON.parse(init.body)).toEqual({ pack_type: 'pokemon_50', count: 2, turbo: true })
+    vi.unstubAllGlobals()
   })
 })

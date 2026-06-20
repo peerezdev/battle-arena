@@ -44,6 +44,8 @@ export type OpenPackResult =
       grading_company: string | null
       grading_id: string | null
       authenticated: boolean | null
+      auto_sold: boolean
+      buyback_amount: number | null
     }
 
 export class GachaDisabledError extends Error {
@@ -171,4 +173,22 @@ export async function pollOpenPack(
 /** Public CollectorCrypt asset page for a Solana NFT mint. */
 export function ccAssetUrl(mint: string): string {
   return `https://collectorcrypt.com/assets/solana/${mint}`
+}
+
+export interface YoloTx { memo: string; transaction: string }
+export interface YoloPacksResponse { yolo_id: string | null; count: number; transactions: YoloTx[] }
+
+export function generateYoloPacks(token: string, packType: string, count: number, turbo: boolean): Promise<YoloPacksResponse> {
+  return gachaFetch<YoloPacksResponse>('/gacha/yolo', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ pack_type: packType, count, turbo }),
+  })
+}
+
+export function yoloTotalCost(price: number, count: number): number {
+  return price * count
+}
+
+export function clampCount(n: number): number {
+  return Math.max(1, Math.min(10, Math.floor(n)))
 }
