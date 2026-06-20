@@ -45,31 +45,37 @@ async def usdc_balance_base_units(
     - The account does not exist (RPC returns an error or null value).
     - Any network or parse error occurs.
     """
-    try:
-        owner_pk = Pubkey.from_string(owner_address)
-        mint_pk = Pubkey.from_string(usdc_mint)
-        prog_pk = Pubkey.from_string(token_program)
-        ata = get_associated_token_address(owner_pk, mint_pk, prog_pk)
-        ata_str = str(ata)
+    # Derive the ATA outside the try: a malformed address/mint is a data/programming
+    # error that should surface, not be silently masked as a zero balance.
+    owner_pk = Pubkey.from_string(owner_address)
+    mint_pk = Pubkey.from_string(usdc_mint)
+    prog_pk = Pubkey.from_string(token_program)
+    ata_str = str(get_associated_token_address(owner_pk, mint_pk, prog_pk))
 
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getTokenAccountBalance",
-            "params": [ata_str, {"commitment": "confirmed"}],
-        }
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getTokenAccountBalance",
+        "params": [ata_str, {"commitment": "confirmed"}],
+    }
+    # Network/RPC errors → treat as unknown balance (0). Conservative: the player is
+    # gated out and the battle voids without charging anyone.
+    try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(rpc_url, json=payload)
             resp.raise_for_status()
             data = resp.json()
+    except httpx.HTTPError:
+        return 0
 
-        if "error" in data:
-            return 0
-        value = (data.get("result") or {}).get("value")
-        if value is None:
-            return 0
+    if "error" in data:           # RPC error (e.g. ATA does not exist)
+        return 0
+    value = (data.get("result") or {}).get("value")
+    if value is None:             # null value (missing account)
+        return 0
+    try:
         return int(value["amount"])
-    except Exception:
+    except (KeyError, ValueError, TypeError):
         return 0
 
 
