@@ -79,6 +79,7 @@ class BattlePlayer(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     battle_id: Mapped[str] = mapped_column(String, index=True)
     player_wallet: Mapped[str] = mapped_column(String, index=True)
+    wallet_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
