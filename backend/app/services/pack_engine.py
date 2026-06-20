@@ -2,7 +2,7 @@
 injected so the orchestration is unit-testable without live calls."""
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Optional
 
 
 @dataclass
@@ -51,7 +51,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             outcomes.append(PullOutcome(w, pack["memo"], res["nft_address"],
                                         res.get("insured_value") or 0, res.get("grade")))
         except Exception:
-            await _void_return(session, battle, signer, esc, outcomes, build_transfer_tx, resolve_wallet_id)
+            await _void_return(signer, esc, outcomes, build_transfer_tx)
             battle.status = "voided"; session.commit(); return "voided"
 
     # Winner + settle: all escrow NFTs → winner (sponsored).
@@ -64,7 +64,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     return "settled"
 
 
-async def _void_return(session, battle, signer, esc, outcomes, build_transfer_tx, resolve_wallet_id):
+async def _void_return(signer, esc, outcomes, build_transfer_tx):
     # Return each already-pulled NFT to its original puller (nobody robbed).
     for o in outcomes:
         tx = build_transfer_tx(esc["address"], o.player_wallet, o.nft_address)

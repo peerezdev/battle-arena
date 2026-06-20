@@ -62,6 +62,9 @@ async def test_run_battle_settles_to_winner(session):
     # all pulls sponsored, plus the settle transfers (escrow→winner), all sponsored
     assert all(s[2] is True for s in signer.sent)
     assert ("esc-id", "xfer-nA->B", True) in signer.sent and ("esc-id", "xfer-nB->B", True) in signer.sent
+    assert session.query(BattlePull).filter_by(battle_id="b1").count() == 2
+    pull_wallets = {s[0] for s in signer.sent}
+    assert "A-id" in pull_wallets and "B-id" in pull_wallets
 
 
 @pytest.mark.asyncio
@@ -78,3 +81,5 @@ async def test_run_battle_voids_when_player_cannot_play(session):
                            build_transfer_tx=lambda esc, win, nft: "x",
                            can_play=lambda w: w != "B", now_fn=lambda: __import__("datetime").datetime(2026,6,21))
     assert out == "voided" and b.status == "voided" and b.winner is None
+    assert b.escrow_address is None
+    assert signer.sent == []
