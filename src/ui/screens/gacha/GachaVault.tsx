@@ -10,6 +10,7 @@ import {
   fetchMachines,
   fetchMachineCards,
   generatePack,
+  generateYoloPacks,
   submitTx,
   openPack,
   pollOpenPack,
@@ -18,6 +19,7 @@ import {
   type GachaMachine,
   type MachineCard,
   type OpenPackResult,
+  type YoloPacksResponse,
 } from '../../../onchain/gachaClient'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
 import { addDrop } from '../../drops/dropsStore'
@@ -43,11 +45,15 @@ const RARITY_COLOR: Record<string, string> = {
   Epic: RARITY.epic, Rare: RARITY.rare, Uncommon: RARITY.uncommon, Common: RARITY.common,
 }
 
+type YoloResult = Extract<OpenPackResult, { pending: false }>
+
 type Phase =
   | { kind: 'machines' }
   | { kind: 'opening'; step: 'firmando' | 'enviando' | 'abriendo' }
-  | { kind: 'result'; result: Extract<OpenPackResult, { pending: false }> }
+  | { kind: 'result'; result: YoloResult }
   | { kind: 'pending'; memo: string }
+  | { kind: 'yolo'; step: 'firmando' | 'enviando' | 'abriendo'; done: number; total: number }
+  | { kind: 'yolo-summary'; results: YoloResult[] }
 
 const STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
   firmando: 'Sign the transaction in your wallet…',
@@ -175,6 +181,53 @@ export default function GachaVault() {
       setOpenError(e instanceof Error ? e.message : String(e))
       setPhase({ kind: 'pending', memo })
     }
+  }
+
+  async function handleYolo(count: number, turbo: boolean) {
+    if (!selected || !identityToken) return
+    const total = (selected.price ?? 0) * count
+    if (usdc != null && usdc < total) {
+      setOpenError(`Insufficient USDC — ${count} packs cost $${total}. Deposit and try again.`)
+      return
+    }
+    setOpenError(null)
+    let resp: YoloPacksResponse
+    try {
+      setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count })
+      resp = await generateYoloPacks(identityToken, selected.code, count, turbo)
+    } catch (e) {
+      setOpenError(`Couldn't start YOLO: ${e instanceof Error ? e.message : String(e)}.`)
+      setPhase({ kind: 'machines' })
+      return
+    }
+    const txs = resp.transactions
+    const submitted: string[] = []
+    for (let i = 0; i < txs.length; i++) {
+      try {
+        setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length })
+        const signed = await signTransactionBase64(txs[i].transaction)
+        setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length })
+        await submitTx(identityToken, signed)
+        submitted.push(txs[i].memo)
+      } catch {
+        break
+      }
+    }
+    if (submitted.length === 0) {
+      setOpenError('No packs were opened.')
+      setPhase({ kind: 'machines' })
+      return
+    }
+    const results: YoloResult[] = []
+    for (let i = 0; i < submitted.length; i++) {
+      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: submitted.length })
+      try {
+        const r = await pollOpenPack(() => openPack(identityToken, submitted[i]))
+        if (!r.pending) { results.push(r); recordDrop(r) }
+      } catch { /* skip */ }
+    }
+    if (results.length === 0) { setPhase({ kind: 'pending', memo: submitted[0] }); return }
+    setPhase({ kind: 'yolo-summary', results })
   }
 
   // ── Disabled state ──────────────────────────────────────────────────────────
@@ -401,6 +454,7 @@ export default function GachaVault() {
               onOpen={() => void handleOpen()}
               authed={!!identityToken}
               usdc={usdc}
+              onYolo={(c, t) => void handleYolo(c, t)}
             />
           </div>
         )
@@ -437,7 +491,7 @@ export default function GachaVault() {
 
       {/* ── REVEAL OVERLAY ──────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {phase.kind !== 'machines' && (
+        {(phase.kind === 'opening' || phase.kind === 'pending' || phase.kind === 'result') && (
           <RevealOverlay
             phase={phase}
             reduced={reduced}
@@ -445,6 +499,10 @@ export default function GachaVault() {
             onRetry={(memo) => void retryOpen(memo)}
             onClose={() => setPhase({ kind: 'machines' })}
           />
+        )}
+        {phase.kind === 'yolo' && <YoloProgressOverlay phase={phase} reduced={reduced} />}
+        {phase.kind === 'yolo-summary' && (
+          <YoloSummaryOverlay results={phase.results} onClose={() => setPhase({ kind: 'machines' })} />
         )}
       </AnimatePresence>
     </div>
@@ -459,7 +517,7 @@ function RevealOverlay({
   onRetry,
   onClose,
 }: {
-  phase: Exclude<Phase, { kind: 'machines' }>
+  phase: Extract<Phase, { kind: 'opening' | 'pending' | 'result' }>
   reduced: boolean
   buybackPct: number | null | undefined
   onRetry: (memo: string) => void
@@ -1111,5 +1169,63 @@ function CardDetailsView({
         Back to Vault
       </button>
     </div>
+  )
+}
+
+const YOLO_STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
+  firmando: 'Sign each pack in your wallet…',
+  enviando: 'Sending to Solana…',
+  abriendo: 'Opening packs…',
+}
+
+function YoloProgressOverlay({ phase, reduced }: { phase: Extract<Phase, { kind: 'yolo' }>; reduced: boolean }) {
+  return (
+    <motion.div key="yolo-progress" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(11,14,20,0.88)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: '44px 32px', textAlign: 'center', maxWidth: 360, width: '100%', boxShadow: SHADOW.panel }}>
+        <motion.div animate={reduced ? undefined : { opacity: [1, 0.35, 1] }} transition={{ repeat: Infinity, duration: 1.4 }} style={{ fontSize: 52, marginBottom: 20 }}>🎰</motion.div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.text, fontFamily: FONTS.body, marginBottom: 8 }}>{YOLO_STEP_LABEL[phase.step]}</div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>{phase.step} · {Math.min(phase.done + 1, phase.total)}/{phase.total}</div>
+      </div>
+    </motion.div>
+  )
+}
+
+function YoloSummaryOverlay({ results, onClose }: { results: YoloResult[]; onClose: () => void }) {
+  const totalValue = results.reduce((s, r) => s + (r.insured_value ?? 0), 0)
+  const sold = results.filter((r) => r.auto_sold)
+  const soldUsd = sold.reduce((s, r) => s + (r.buyback_amount ?? 0), 0) / 1e6
+  return (
+    <motion.div key="yolo-summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(11,14,20,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 22, maxWidth: 760, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: SHADOW.panel }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontFamily: FONTS.display, fontWeight: 900, fontSize: 20, color: COLORS.text }}>You opened {results.length} packs</span>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.muted, borderRadius: 8, width: 30, height: 30, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div><div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>TOTAL VALUE</div><div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: COLORS.green }}>{formatUsd(totalValue)}</div></div>
+          {sold.length > 0 && (<div><div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>AUTO-SOLD</div><div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: COLORS.text }}>{sold.length} · {formatUsd(soldUsd)}</div></div>)}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+          {results.map((r, i) => {
+            const accent = RARITY_COLOR[r.rarity] ?? COLORS.muted
+            return (
+              <div key={r.nft_address ?? i} style={{ background: COLORS.panel2, border: `1px solid ${accent}55`, borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 }}>
+                  {r.image ? <img src={r.image} alt={r.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 32 }}>🃏</span>}
+                </div>
+                <div style={{ padding: '8px 9px 10px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name ?? '—'}</div>
+                  {r.auto_sold
+                    ? <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>Auto-sold {formatUsd((r.buyback_amount ?? 0) / 1e6)}</div>
+                    : r.insured_value != null && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green, fontWeight: 700 }}>{formatUsd(r.insured_value)}</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </motion.div>
   )
 }
