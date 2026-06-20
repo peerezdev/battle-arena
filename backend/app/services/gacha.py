@@ -21,7 +21,7 @@ class GachaUpstreamError(Exception):
 
 _MACHINE_FIELDS = ("code", "name", "price", "odds", "stock", "ev", "image",
                    "shortName", "thumbnailUrl", "instantBuyback", "contains",
-                   "videoSrc", "videoHevc")
+                   "videoSrc", "videoHevc", "turboMode")
 _NFT_FIELDS = ("nft_address", "name", "image", "rarity", "insured_value")
 _CACHE_TTL = 60.0
 

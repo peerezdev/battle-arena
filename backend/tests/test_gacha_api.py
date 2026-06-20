@@ -45,12 +45,13 @@ def _hdrs(priv, wallet):
 def test_machines_keyless_ok():
     respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
         {"code": "pokemon_50", "name": "P50", "price": 50, "odds": {}, "stock": {},
-         "ev": 1.0, "image": None}]}))
+         "ev": 1.0, "image": None, "turboMode": True}]}))
     respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     c, _ = _client(api_key="")
     r = c.get("/gacha/machines")
     assert r.status_code == 200
     assert r.json()[0]["code"] == "pokemon_50"
+    assert r.json()[0]["turboMode"] is True
 
 
 def test_503_when_base_url_empty():
