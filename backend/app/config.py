@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     privy_app_secret: str = ""
     privy_auth_key: str = ""
     privy_solana_caip2: str = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"  # devnet default
+    privy_quorum_id: str = ""
 
 
 def get_settings() -> Settings:
