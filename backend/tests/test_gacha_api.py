@@ -345,3 +345,27 @@ def test_open_pack_not_auto_sold_by_default():
     r = c.post("/gacha/open-pack", json={"memo": "m-x"}, headers=_hdrs(priv, WALLET_A))
     assert r.json()["auto_sold"] is False
     assert r.json()["buyback_amount"] is None
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_generate_pack_forwards_alt_player_address():
+    from app.services.gacha import GachaService
+    route = respx.post(f"{BASE}/api/generatePack").mock(
+        return_value=Response(200, json={"memo": "m", "transaction": "T"}))
+    svc = GachaService(base_url=BASE, api_key="")
+    await svc.generate_pack(player_address="P", pack_type="pokemon_50", alt_player_address="ESCROW")
+    sent = json.loads(route.calls.last.request.content)
+    assert sent == {"playerAddress": "P", "packType": "pokemon_50", "altPlayerAddress": "ESCROW"}
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_generate_pack_omits_alt_when_none():
+    from app.services.gacha import GachaService
+    route = respx.post(f"{BASE}/api/generatePack").mock(
+        return_value=Response(200, json={"memo": "m", "transaction": "T"}))
+    svc = GachaService(base_url=BASE, api_key="")
+    await svc.generate_pack(player_address="P", pack_type="pokemon_50")
+    sent = json.loads(route.calls.last.request.content)
+    assert "altPlayerAddress" not in sent
