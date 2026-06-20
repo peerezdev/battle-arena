@@ -4,7 +4,6 @@ PRIVY_AUTH_KEY (P-256 PEM) lives only in backend/.env. Never log tx bytes/keys/s
 """
 from __future__ import annotations
 import base64, json
-from typing import Any, Callable, Optional
 import httpx
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec

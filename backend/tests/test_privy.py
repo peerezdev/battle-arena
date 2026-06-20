@@ -118,3 +118,42 @@ def test_embedded_solana_wallet_rejects_tampered():
     tok = _make_id_token(priv, "app123", [_solana_embedded("x")])
     with pytest.raises(PrivyAuthError):
         v.embedded_solana_wallet(tok)
+
+
+def _solana_embedded_with_id(addr, wallet_id):
+    """Embedded Solana wallet con campo `id` (shape moderno del identity token de Privy)."""
+    acc = _solana_embedded(addr)
+    acc["id"] = wallet_id
+    return acc
+
+
+def test_embedded_solana_wallet_id_returns_id():
+    priv = _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
+    tok = _make_id_token(priv, "app123", [
+        {"type": "email", "address": "a@b.c"},
+        _solana_embedded_with_id("So1anaAddr111111111111111111111111111111111", "wallet-xyz"),
+    ])
+    assert v.embedded_solana_wallet_id(tok) == "wallet-xyz"
+
+
+def test_embedded_solana_wallet_id_raises_without_id_field():
+    """Token con embedded Solana wallet pero sin campo `id` (shape antiguo)."""
+    priv = _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
+    tok = _make_id_token(priv, "app123", [
+        _solana_embedded("So1anaAddr111111111111111111111111111111111"),
+    ])
+    with pytest.raises(PrivyAuthError):
+        v.embedded_solana_wallet_id(tok)
+
+
+def test_embedded_solana_wallet_id_raises_without_embedded_account():
+    """Token sin ninguna embedded Solana wallet."""
+    priv = _es256()
+    v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
+    tok = _make_id_token(priv, "app123", [
+        _solana_external("PhantomExternalAddr2222222222222222222222222"),
+    ])
+    with pytest.raises(PrivyAuthError):
+        v.embedded_solana_wallet_id(tok)

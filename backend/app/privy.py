@@ -56,7 +56,9 @@ class PrivyVerifier:
         except jwt.PyJWTError as e:
             raise PrivyAuthError(f"token inválido: {type(e).__name__}")
 
-    def embedded_solana_wallet(self, token: str) -> str:
+    def _embedded_solana_account(self, token: str) -> dict:
+        """Verifica el token y devuelve el dict de la embedded Solana wallet de Privy,
+        o lanza PrivyAuthError si no existe."""
         claims = self.verify(token)
         raw = claims.get("linked_accounts")
         try:
@@ -75,5 +77,19 @@ class PrivyVerifier:
                     and (acc.get("wallet_client_type") == "privy"
                          or acc.get("connector_type") == "embedded")
                     and acc.get("address")):
-                return acc["address"]
+                return acc
         raise PrivyAuthError("sin embedded Solana wallet")
+
+    def embedded_solana_wallet(self, token: str) -> str:
+        return self._embedded_solana_account(token)["address"]
+
+    def embedded_solana_wallet_id(self, token: str) -> str:
+        """Devuelve el `id` (wallet id) de la embedded Solana wallet de Privy.
+        El wallet id es el valor que necesita la RPC de wallets de Privy para firmar.
+        Si la cuenta no trae `id` (shape antiguo), lanza PrivyAuthError para que el
+        llamador pueda hacer fallback a la API de usuarios de Privy."""
+        acc = self._embedded_solana_account(token)
+        wallet_id = acc.get("id")
+        if not wallet_id:
+            raise PrivyAuthError("embedded Solana wallet sin id (token antiguo)")
+        return wallet_id
