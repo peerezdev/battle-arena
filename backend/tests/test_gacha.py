@@ -75,6 +75,7 @@ async def test_machines_maps_and_caches():
         "shortName": "Poke50", "thumbnailUrl": f"{BASE}/pokemon_50.png",
         "videoSrc": f"{BASE}/pokemon_50.webm", "videoHevc": f"{BASE}/pokemon_50.hevc.mp4",
         "instantBuyback": 80, "contains": 1,
+        "turboMode": None,
         "available": True,
     }]
     assert "tierRanges" not in out[0]
