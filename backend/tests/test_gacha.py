@@ -149,7 +149,8 @@ async def test_open_pack_success_whitelists_fields():
                    "images": ["https://x/c.png"],
                    "grade": None, "year": None,
                    "grading_company": None, "grading_id": None,
-                   "authenticated": None, "insured_value": None}
+                   "authenticated": None, "insured_value": None,
+                   "auto_sold": False, "buyback_amount": None}
 
 
 @respx.mock

@@ -113,6 +113,21 @@ class GachaService:
                                   json={"playerAddress": player_address, "packType": pack_type})
         return {"memo": raw.get("memo"), "transaction": raw.get("transaction")}
 
+    async def generate_yolo_packs(self, player_address: str, pack_type: str,
+                                  count: int, turbo: bool) -> dict:
+        raw = await self._request("POST", "/api/generateYoloPacks", json={
+            "playerAddress": player_address, "packType": pack_type,
+            "count": count, "turbo": turbo,
+        })
+        txs = raw.get("transactions") if isinstance(raw, dict) else None
+        out = []
+        for t in txs or []:
+            if isinstance(t, dict) and t.get("memo") and t.get("transaction"):
+                out.append({"memo": t["memo"], "transaction": t["transaction"]})
+        return {"yolo_id": raw.get("yoloId") if isinstance(raw, dict) else None,
+                "count": raw.get("count") if isinstance(raw, dict) else None,
+                "transactions": out}
+
     async def submit_tx(self, signed_transaction: str) -> dict:
         raw = await self._request("POST", "/api/submitTransaction",
                                   json={"signedTransaction": signed_transaction})
@@ -166,6 +181,9 @@ class GachaService:
         authed = attr.get("Authenticated")
         authenticated = (str(authed).strip().lower() == "true") if authed is not None else None
 
+        auto_sold = raw.get("code") == "TURBO_MODE_BUYBACK"
+        buyback_amount = raw.get("buybackAmount") if auto_sold else None
+
         return {
             "pending": False,
             "nft_address": raw.get("nft_address"),
@@ -179,6 +197,8 @@ class GachaService:
             "grading_id": attr.get("Grading ID"),
             "authenticated": authenticated,
             "insured_value": insured,
+            "auto_sold": auto_sold,
+            "buyback_amount": buyback_amount,
         }
 
     @staticmethod

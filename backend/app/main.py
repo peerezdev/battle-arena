@@ -49,6 +49,12 @@ class OpenPackBody(BaseModel):
     memo: str = Field(min_length=1, max_length=128)
 
 
+class YoloBody(BaseModel):
+    pack_type: str = Field(min_length=1, max_length=32, pattern=r"^[a-z0-9_]+$")
+    count: int = Field(ge=1, le=10)
+    turbo: bool = False
+
+
 class BuybackBody(BaseModel):
     nft_address: str
 
@@ -277,6 +283,32 @@ def create_app(session_factory, chain: ChainSource,
             pack.opened_at = datetime.now(timezone.utc)
             pack.nft_address = out["nft_address"]
             s.commit()
+        return out
+
+    @app.post("/gacha/yolo")
+    async def gacha_yolo(body: YoloBody,
+                         wallet: str = Depends(current_user),
+                         s: Session = Depends(db)):
+        svc = _gacha_or_503()
+        _gacha_throttle(wallet)
+        try:
+            out = await svc.generate_yolo_packs(player_address=wallet, pack_type=body.pack_type,
+                                                count=body.count, turbo=body.turbo)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+        if not out.get("transactions"):
+            raise HTTPException(502, "gacha upstream no disponible")
+        for tx in out["transactions"]:
+            memo = tx["memo"]
+            existing = s.get(GachaPack, memo)
+            if existing is not None:
+                if existing.wallet != wallet:
+                    raise HTTPException(502, "gacha upstream no disponible")
+            else:
+                s.add(GachaPack(memo=memo, wallet=wallet, pack_type=body.pack_type))
+        s.commit()
         return out
 
     @app.get("/auth/privy/me")

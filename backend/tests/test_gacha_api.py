@@ -118,7 +118,8 @@ def test_open_pack_ok_marca_abierto():
                         "images": ["https://x/p.png"],
                         "grade": None, "year": None,
                         "grading_company": None, "grading_id": None,
-                        "authenticated": None, "insured_value": None}
+                        "authenticated": None, "insured_value": None,
+                        "auto_sold": False, "buyback_amount": None}
 
 
 @respx.mock
@@ -281,3 +282,65 @@ def test_machine_cards_enriched():
     assert card["authenticated"] is True
     assert card["year"] == "1999"
     assert card["grade"] == "PSA MINT 9"  # existing composed field unchanged
+
+
+@respx.mock
+def test_yolo_generates_and_stores_memos():
+    route = respx.post(f"{BASE}/api/generateYoloPacks").mock(return_value=Response(200, json={
+        "yoloId": "y-1", "count": 2, "extra": "drop-me",
+        "transactions": [
+            {"memo": "ym-1", "transaction": "TX1", "junk": 1},
+            {"memo": "ym-2", "transaction": "TX2"},
+        ],
+    }))
+    c, priv = _client(api_key="")
+    r = c.post("/gacha/yolo", json={"pack_type": "pokemon_50", "count": 2, "turbo": True},
+               headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 200
+    assert r.json() == {"yolo_id": "y-1", "count": 2,
+                        "transactions": [{"memo": "ym-1", "transaction": "TX1"},
+                                         {"memo": "ym-2", "transaction": "TX2"}]}
+    sent = json.loads(route.calls.last.request.content)
+    assert sent == {"playerAddress": WALLET_A, "packType": "pokemon_50", "count": 2, "turbo": True}
+
+
+def test_yolo_count_bounds():
+    c, priv = _client()
+    assert c.post("/gacha/yolo", json={"pack_type": "pokemon_50", "count": 0},
+                  headers=_hdrs(priv, WALLET_A)).status_code == 422
+    assert c.post("/gacha/yolo", json={"pack_type": "pokemon_50", "count": 11},
+                  headers=_hdrs(priv, WALLET_A)).status_code == 422
+
+
+def test_yolo_requires_auth():
+    c, _ = _client()
+    assert c.post("/gacha/yolo", json={"pack_type": "pokemon_50", "count": 2}).status_code == 401
+
+
+@respx.mock
+def test_yolo_open_pack_owns_memo():
+    respx.post(f"{BASE}/api/generateYoloPacks").mock(return_value=Response(200, json={
+        "yoloId": "y-2", "count": 1, "transactions": [{"memo": "ym-own", "transaction": "TX"}]}))
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "nft_address": "MINT", "rarity": "Common", "code": "TURBO_MODE_BUYBACK",
+        "buybackAmount": 42500000, "nftWon": {"content": {"metadata": {"name": "C"}}}}))
+    c, priv = _client(api_key="")
+    c.post("/gacha/yolo", json={"pack_type": "pokemon_50", "count": 1, "turbo": True},
+           headers=_hdrs(priv, WALLET_A))
+    r = c.post("/gacha/open-pack", json={"memo": "ym-own"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["auto_sold"] is True
+    assert body["buyback_amount"] == 42500000
+
+
+@respx.mock
+def test_open_pack_not_auto_sold_by_default():
+    respx.post(f"{BASE}/api/generatePack").mock(return_value=Response(200, json={"memo": "m-x", "transaction": "T"}))
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "nft_address": "MINT", "rarity": "Rare", "nftWon": {"content": {"metadata": {"name": "R"}}}}))
+    c, priv = _client(api_key="")
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=_hdrs(priv, WALLET_A))
+    r = c.post("/gacha/open-pack", json={"memo": "m-x"}, headers=_hdrs(priv, WALLET_A))
+    assert r.json()["auto_sold"] is False
+    assert r.json()["buyback_amount"] is None
