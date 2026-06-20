@@ -53,6 +53,7 @@ type Phase =
   | { kind: 'result'; result: YoloResult }
   | { kind: 'pending'; memo: string }
   | { kind: 'yolo'; step: 'firmando' | 'enviando' | 'abriendo'; done: number; total: number }
+  | { kind: 'yolo-reveal'; results: YoloResult[]; index: number }
   | { kind: 'yolo-summary'; results: YoloResult[] }
 
 const STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
@@ -227,7 +228,7 @@ export default function GachaVault() {
       } catch { /* skip */ }
     }
     if (results.length === 0) { setPhase({ kind: 'pending', memo: submitted[0] }); return }
-    setPhase({ kind: 'yolo-summary', results })
+    setPhase({ kind: 'yolo-reveal', results, index: 0 })
   }
 
   // ── Disabled state ──────────────────────────────────────────────────────────
@@ -501,6 +502,21 @@ export default function GachaVault() {
           />
         )}
         {phase.kind === 'yolo' && <YoloProgressOverlay phase={phase} reduced={reduced} />}
+        {phase.kind === 'yolo-reveal' && (
+          <YoloRevealOverlay
+            results={phase.results}
+            index={phase.index}
+            reduced={reduced}
+            buybackPct={selected?.instantBuyback ?? null}
+            onAdvance={() => setPhase((p) =>
+              p.kind === 'yolo-reveal'
+                ? (p.index + 1 < p.results.length
+                    ? { kind: 'yolo-reveal', results: p.results, index: p.index + 1 }
+                    : { kind: 'yolo-summary', results: p.results })
+                : p)}
+            onSkipAll={() => setPhase((p) => p.kind === 'yolo-reveal' ? { kind: 'yolo-summary', results: p.results } : p)}
+          />
+        )}
         {phase.kind === 'yolo-summary' && (
           <YoloSummaryOverlay results={phase.results} onClose={() => setPhase({ kind: 'machines' })} />
         )}
@@ -663,11 +679,13 @@ function RevealResult({
   result,
   reduced,
   buybackPct,
+  skipToCard,
   onClose,
 }: {
   result: Extract<OpenPackResult, { pending: false }>
   reduced: boolean
   buybackPct: number | null
+  skipToCard?: number
   onClose: () => void
 }) {
   const rarityColor = RARITY_COLOR[result.rarity] ?? COLORS.muted
@@ -690,6 +708,10 @@ function RevealResult({
     const t = setTimeout(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1700)
     return () => clearTimeout(t)
   }, [i, steps.length, reduced])
+
+  useEffect(() => {
+    if (skipToCard) setI(steps.length - 1)
+  }, [skipToCard, steps.length])
 
   const step = steps[i]
 
@@ -1186,6 +1208,34 @@ function YoloProgressOverlay({ phase, reduced }: { phase: Extract<Phase, { kind:
         <motion.div animate={reduced ? undefined : { opacity: [1, 0.35, 1] }} transition={{ repeat: Infinity, duration: 1.4 }} style={{ fontSize: 52, marginBottom: 20 }}>🎰</motion.div>
         <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.text, fontFamily: FONTS.body, marginBottom: 8 }}>{YOLO_STEP_LABEL[phase.step]}</div>
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>{phase.step} · {Math.min(phase.done + 1, phase.total)}/{phase.total}</div>
+      </div>
+    </motion.div>
+  )
+}
+
+function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onSkipAll }: {
+  results: YoloResult[]
+  index: number
+  reduced: boolean
+  buybackPct: number | null
+  onAdvance: () => void
+  onSkipAll: () => void
+}) {
+  const [skip, setSkip] = useState(0)
+  const result = results[index]
+  return (
+    <motion.div key="yolo-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(11,14,20,0.9)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, gap: 14 }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, letterSpacing: '.1em' }}>PACK {index + 1} / {results.length}</div>
+      {result.auto_sold && (
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.green }}>⚡ Auto-sold {formatUsd((result.buyback_amount ?? 0) / 1e6)}</div>
+      )}
+      <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skip} onClose={onAdvance} />
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={() => setSkip((s) => s + 1)}
+          style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip pack ⏭</button>
+        <button onClick={onSkipAll}
+          style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
       </div>
     </motion.div>
   )
