@@ -394,7 +394,8 @@ def build_default_app() -> FastAPI:
     gacha = GachaService(base_url=s.gacha_base_url, api_key=s.gacha_api_key)
     privy = PrivyVerifier(app_id=s.privy_app_id, jwks_url=s.privy_jwks_url.format(app_id=s.privy_app_id)) if s.privy_app_id else None
     privy_signer = PrivySigner(app_id=s.privy_app_id, app_secret=s.privy_app_secret,
-                               auth_key_pem=s.privy_auth_key, cluster_caip2=s.privy_solana_caip2) if s.privy_app_id else None
+                               auth_key_pem=s.privy_auth_key, cluster_caip2=s.privy_solana_caip2,
+                               quorum_id=s.privy_quorum_id) if s.privy_app_id else None
     return create_app(session_factory, chain, elo_start=s.elo_start, elo_k=s.elo_k,
                       cors_origins=s.cors_origins, gacha=gacha, privy=privy,
                       privy_signer=privy_signer)

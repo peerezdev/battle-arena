@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, Integer, Boolean, DateTime, Index, func
+from sqlalchemy import String, Integer, Boolean, DateTime, Index, func, Float
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -57,3 +57,38 @@ class GachaPack(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     nft_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+
+class PackBattle(Base):
+    __tablename__ = "pack_battles"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    mode: Mapped[str] = mapped_column(String)  # pack|royale
+    machine_code: Mapped[str] = mapped_column(String)
+    price: Mapped[int] = mapped_column(Integer)  # USDC base units
+    max_players: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String, default="lobby", index=True)  # lobby|running|settled|voided
+    winner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    escrow_wallet_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    escrow_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class BattlePlayer(Base):
+    __tablename__ = "battle_players"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    battle_id: Mapped[str] = mapped_column(String, index=True)
+    player_wallet: Mapped[str] = mapped_column(String, index=True)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BattlePull(Base):
+    __tablename__ = "battle_pulls"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    battle_id: Mapped[str] = mapped_column(String, index=True)
+    player_wallet: Mapped[str] = mapped_column(String, index=True)
+    memo: Mapped[str] = mapped_column(String)
+    nft_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    grade: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    rarity: Mapped[Optional[str]] = mapped_column(String, nullable=True)

@@ -108,9 +108,12 @@ class GachaService:
         self._machines_cache = (now, out)
         return out
 
-    async def generate_pack(self, player_address: str, pack_type: str) -> dict:
-        raw = await self._request("POST", "/api/generatePack",
-                                  json={"playerAddress": player_address, "packType": pack_type})
+    async def generate_pack(self, player_address: str, pack_type: str,
+                            alt_player_address: str | None = None) -> dict:
+        body = {"playerAddress": player_address, "packType": pack_type}
+        if alt_player_address:
+            body["altPlayerAddress"] = alt_player_address
+        raw = await self._request("POST", "/api/generatePack", json=body)
         return {"memo": raw.get("memo"), "transaction": raw.get("transaction")}
 
     async def generate_yolo_packs(self, player_address: str, pack_type: str,
