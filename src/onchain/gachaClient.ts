@@ -17,6 +17,7 @@ export interface GachaMachine {
   videoSrc?: string | null
   videoHevc?: string | null
   available?: boolean | null
+  turboMode?: boolean | null
 }
 
 export interface GeneratePackResponse {
