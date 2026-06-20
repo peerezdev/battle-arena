@@ -59,15 +59,34 @@ async def test_run_battle_settles_to_winner(session):
     assert out == "settled"
     assert b.winner == "B" and b.status == "settled" and b.escrow_address == "ESC"
     assert gacha.alt == "ESC"                       # pulls delivered to escrow
-    # all pulls sponsored, plus the settle transfers (escrow→winner), all sponsored
-    assert all(s[2] is True for s in signer.sent)
-    assert ("esc-id", "xfer-nA->B", True) in signer.sent and ("esc-id", "xfer-nB->B", True) in signer.sent
+    # default is user-pays (sponsor=False): every broadcast carries sponsor=False
+    assert all(s[2] is False for s in signer.sent)
+    assert ("esc-id", "xfer-nA->B", False) in signer.sent and ("esc-id", "xfer-nB->B", False) in signer.sent
     assert session.query(BattlePull).filter_by(battle_id="b1").count() == 2
     pull_wallets = {s[0] for s in signer.sent}
     assert "A-id" in pull_wallets and "B-id" in pull_wallets
     rows = {r.player_wallet: r for r in session.query(BattlePull).filter_by(battle_id="b1").all()}
     assert rows["A"].nft_address == "nA" and rows["A"].insured_value == 100 and rows["A"].grade == 9
     assert rows["B"].nft_address == "nB" and rows["B"].insured_value == 300
+
+
+@pytest.mark.asyncio
+async def test_run_battle_sponsor_flag_propagates(session):
+    b = PackBattle(id="b3", mode="pack", machine_code="pokemon_50", price=50, max_players=2, status="running")
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="b3", player_wallet="A"),
+                     BattlePlayer(battle_id="b3", player_wallet="B")])
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
+                    "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
+    signer = _Signer()
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=lambda esc, win, nft: f"xfer-{nft}->{win}",
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21),
+                           sponsor=True)
+    assert out == "settled"
+    assert signer.sent and all(s[2] is True for s in signer.sent)
 
 
 @pytest.mark.asyncio
