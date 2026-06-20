@@ -51,6 +51,12 @@ def test_disabled_without_auth_key():
     s = PrivySigner(app_id="a", app_secret="s", auth_key_pem="", cluster_caip2="solana:dev")
     assert s.enabled is False
 
+@pytest.mark.asyncio
+async def test_create_solana_wallet_raises_when_disabled():
+    s = PrivySigner(app_id="a", app_secret="s", auth_key_pem="", cluster_caip2="solana:dev")
+    with pytest.raises(PrivySignerError, match="privy signer disabled"):
+        await s.create_solana_wallet()
+
 @respx.mock
 @pytest.mark.asyncio
 async def test_sign_and_send_sponsor_flag():

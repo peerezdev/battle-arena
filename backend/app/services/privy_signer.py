@@ -86,6 +86,8 @@ class PrivySigner:
         return h
 
     async def create_solana_wallet(self) -> dict:
+        if not self.enabled:
+            raise PrivySignerError("privy signer disabled (PRIVY_AUTH_KEY unset)")
         url = f"{self._base}/v1/wallets"
         body = {"chain_type": "solana", "owner_id": self._quorum_id}
         data = await self._post_rpc_raw(url, body)

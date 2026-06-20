@@ -1,8 +1,11 @@
 """Operator-orchestrated Pack Battle / Battle Royale engine. All on-chain I/O is
 injected so the orchestration is unit-testable without live calls."""
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -42,12 +45,17 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
         try:
             pack = await gacha.generate_pack(player_address=w, pack_type=battle.machine_code,
                                              alt_player_address=esc["address"])
-            session.add(BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"]))
-            session.commit()
+            pull = BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"])
+            session.add(pull); session.commit()
             await signer.sign_and_send_solana(resolve_wallet_id(w), pack["transaction"], sponsor=True)
             res = await gacha.open_pack(pack["memo"])
             if res.get("pending") or not res.get("nft_address"):
                 raise RuntimeError("pull did not resolve")
+            pull.nft_address = res["nft_address"]
+            pull.insured_value = res.get("insured_value") or 0
+            pull.grade = res.get("grade")
+            pull.rarity = res.get("rarity")
+            session.commit()
             outcomes.append(PullOutcome(w, pack["memo"], res["nft_address"],
                                         res.get("insured_value") or 0, res.get("grade")))
         except Exception:
@@ -71,4 +79,5 @@ async def _void_return(signer, esc, outcomes, build_transfer_tx):
         try:
             await signer.sign_and_send_solana(esc["id"], tx, sponsor=True)
         except Exception:
-            pass  # best-effort; logged by the caller/ops
+            logger.warning("void-return transfer failed: battle escrow=%s nft=%s player=%s",
+                           esc.get("id"), o.nft_address, o.player_wallet)

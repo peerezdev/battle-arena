@@ -65,6 +65,9 @@ async def test_run_battle_settles_to_winner(session):
     assert session.query(BattlePull).filter_by(battle_id="b1").count() == 2
     pull_wallets = {s[0] for s in signer.sent}
     assert "A-id" in pull_wallets and "B-id" in pull_wallets
+    rows = {r.player_wallet: r for r in session.query(BattlePull).filter_by(battle_id="b1").all()}
+    assert rows["A"].nft_address == "nA" and rows["A"].insured_value == 100 and rows["A"].grade == 9
+    assert rows["B"].nft_address == "nB" and rows["B"].insured_value == 300
 
 
 @pytest.mark.asyncio
