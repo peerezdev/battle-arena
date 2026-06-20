@@ -4,6 +4,7 @@ import { useProfile } from '../../../hooks/useProfile'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import { config } from '../../../onchain/config'
 import { countResults } from '../../../profile/stats'
+import { DelegationPanel } from './DelegationPanel'
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -47,6 +48,7 @@ export function OverviewTab() {
         <StatCard label="LOSSES" value={wl.losses} />
         <StatCard label="DRAWS" value={wl.draws} />
       </div>
+      <DelegationPanel />
     </div>
   )
 }
