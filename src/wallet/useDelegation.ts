@@ -1,4 +1,4 @@
-import { usePrivy, useDelegatedActions } from '@privy-io/react-auth'
+import { usePrivy, useHeadlessDelegatedActions } from '@privy-io/react-auth'
 
 interface AccountLike {
   type?: string; chainType?: string; walletClientType?: string; connectorType?: string
@@ -15,7 +15,7 @@ export function isSolanaDelegated(accounts: AccountLike[]): boolean {
 
 export function useDelegation(): { delegated: boolean; enable: () => Promise<void> } {
   const { user } = usePrivy()
-  const { delegateWallet } = useDelegatedActions()
+  const { delegateWallet } = useHeadlessDelegatedActions()
   const accounts = (user?.linkedAccounts ?? []) as unknown as AccountLike[]
   const delegated = isSolanaDelegated(accounts)
   const embedded = accounts.find(
