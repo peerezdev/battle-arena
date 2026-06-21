@@ -96,6 +96,9 @@ class _Gacha:
         wallet = memo[len("m-"):]
         return {"pending": False, **self.opens[wallet]}
 
+    async def submit_tx(self, signed_transaction):
+        return {"signature": "ccsig", "confirmation_status": "confirmed"}
+
 
 class _Signer:
     """Fake signer: create_solana_wallet returns a REAL base58 address (ESCROW_ADDRESS)
@@ -103,9 +106,13 @@ class _Signer:
 
     def __init__(self):
         self.sent: list[tuple] = []
+        self.signed: list[tuple] = []
 
     async def create_solana_wallet(self) -> dict:
         return {"id": ESCROW_WALLET_ID, "address": ESCROW_ADDRESS}
+
+    async def sign_solana(self, wallet_id: str, tx: str) -> str:
+        self.signed.append((wallet_id, tx)); return f"signed-{tx}"
 
     async def sign_and_send_solana(self, wallet_id: str, tx: str, sponsor: bool = False) -> str:
         self.sent.append((wallet_id, tx, sponsor))
@@ -266,8 +273,8 @@ async def test_run_pack_battle_live_happy_path(session):
     # sponsor=False on every sign_and_send call
     assert all(s[2] is False for s in signer.sent)
 
-    # resolve_wallet_id maps wallets to their privy wallet IDs from DB
-    privy_ids_used = {s[0] for s in signer.sent}
+    # resolve_wallet_id maps wallets to their privy wallet IDs from DB (pulls use sign_solana)
+    privy_ids_used = {s[0] for s in signer.signed}
     assert WALLET_ID_A in privy_ids_used
     assert WALLET_ID_B in privy_ids_used
 

@@ -85,6 +85,21 @@ class PrivySigner:
             raise PrivySignerError("privy rpc: no hash in response")
         return h
 
+    async def sign_solana(self, wallet_id: str, tx_base64: str) -> str:
+        if not self.enabled:
+            raise PrivySignerError("privy signer disabled (PRIVY_AUTH_KEY unset)")
+        url = f"{self._base}/v1/wallets/{wallet_id}/rpc"
+        body = {"method": "signTransaction",
+                "params": {"transaction": tx_base64, "encoding": "base64"}}
+        # NOTE: signTransaction (sign-only) does NOT take a caip2 key — unlike signAndSendTransaction.
+        # Privy routes sign-only requests without cluster disambiguation.
+        response = await self._post_rpc_raw(url, body)
+        data = response.get("data") or {}
+        signed = data.get("signed_transaction") or data.get("signedTransaction")
+        if not signed:
+            raise PrivySignerError("privy rpc: no signed_transaction in response")
+        return signed
+
     async def create_solana_wallet(self) -> dict:
         if not self.enabled:
             raise PrivySignerError("privy signer disabled (PRIVY_AUTH_KEY unset)")
