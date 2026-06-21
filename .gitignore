@@ -10,3 +10,6 @@ onchain/test-ledger/
 .env
 .env.*
 !.env.example
+
+# local/test sqlite db
+*.db
