@@ -45,6 +45,11 @@ USDC_MINT = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 # A valid base58 blockhash (32-byte hash, base58-encoded)
 BLOCKHASH = "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi"
 
+# Operator wallet (valid base58 pubkey)
+OPERATOR_ADDRESS = "So11111111111111111111111111111111111111111"
+OPERATOR_WALLET_ID = "privy-operator-id"
+SEED_LAMPORTS = 10_000_000
+
 # Pre-computed ATAs for WALLET_A and WALLET_B against USDC_MINT
 # (solders.token.associated.get_associated_token_address(owner, USDC_MINT, TOKEN_PROGRAM))
 # These are used by the side_effect handler to route per-owner balance responses.
@@ -227,7 +232,7 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
     import app.services.pack_orchestration as po
 
     # Stub build_transfer and submit_signed_tx in the pack_orchestration module
-    calls = {"build": [], "submit": []}
+    calls = {"build": [], "submit": [], "seed": []}
 
     async def fake_build(rpc, esc, dest, mint, bh):
         calls["build"].append((esc, dest, mint))
@@ -240,9 +245,15 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
     async def fake_nft_in_owner(rpc, owner, mint):
         return True
 
+    async def fake_seed_escrow(rpc_url, signer, operator_wallet_id, operator_address,
+                               escrow_address, lamports, blockhash):
+        calls["seed"].append(escrow_address)
+        return "seed-sig"
+
     monkeypatch.setattr(po, "build_transfer", fake_build)
     monkeypatch.setattr(po, "submit_signed_tx", fake_submit)
     monkeypatch.setattr(po, "nft_in_owner", fake_nft_in_owner)
+    monkeypatch.setattr(po, "seed_escrow", fake_seed_escrow)
 
     b = PackBattle(id="b-live-1", mode="pack", machine_code="pokemon_50",
                    price=50, max_players=2, status="running")
@@ -276,6 +287,9 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
             min_usdc_base_units=1_000_000,
             token_program=TOKEN_PROGRAM,
             sponsor=False,
+            operator_wallet_id=OPERATOR_WALLET_ID,
+            operator_address=OPERATOR_ADDRESS,
+            seed_lamports=SEED_LAMPORTS,
         )
 
     assert result == "settled"
@@ -305,15 +319,26 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
     for sub in calls["submit"]:
         assert sub.startswith("signed-tx-")
 
+    # seed_escrow was called with the escrow address
+    assert calls["seed"] == [ESCROW_ADDRESS]
+
 
 # ---------------------------------------------------------------------------
 # Test 4: run_pack_battle_live — void path (one player under-funded)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_run_pack_battle_live_void_when_player_underfunded(session):
+async def test_run_pack_battle_live_void_when_player_underfunded(session, monkeypatch):
     """WALLET_B has 0 USDC balance → can_play(WALLET_B) == False →
     run_battle voids immediately, no escrow created, no sign calls."""
+    import app.services.pack_orchestration as po
+
+    async def fake_seed_escrow(rpc_url, signer, operator_wallet_id, operator_address,
+                               escrow_address, lamports, blockhash):
+        return "seed-sig"
+
+    monkeypatch.setattr(po, "seed_escrow", fake_seed_escrow)
+
     b = PackBattle(id="b-live-void", mode="pack", machine_code="pokemon_50",
                    price=50, max_players=2, status="running")
     session.add(b)
@@ -347,6 +372,9 @@ async def test_run_pack_battle_live_void_when_player_underfunded(session):
             min_usdc_base_units=1_000_000,  # WALLET_B has 0, fails
             token_program=TOKEN_PROGRAM,
             sponsor=False,
+            operator_wallet_id=OPERATOR_WALLET_ID,
+            operator_address=OPERATOR_ADDRESS,
+            seed_lamports=SEED_LAMPORTS,
         )
 
     assert result == "voided"

@@ -41,7 +41,8 @@ async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_
 
 
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
-                     submit_tx, confirm_in_escrow, can_play, now_fn, sponsor: bool = False,
+                     submit_tx, prepare_escrow, confirm_in_escrow, can_play, now_fn,
+                     sponsor: bool = False,
                      open_max_attempts: int = 20, open_delay: float = 3.0,
                      escrow_max_attempts: int = 20, escrow_delay: float = 3.0,
                      sleep_fn=None) -> str:
@@ -62,6 +63,12 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     esc = await signer.create_solana_wallet()
     battle.escrow_wallet_id = esc["id"]; battle.escrow_address = esc["address"]
     battle.status = "running"; session.commit()
+
+    try:
+        await prepare_escrow(esc["address"])
+    except Exception as exc:
+        logger.warning("escrow seed failed for battle %s: %s — voiding", battle.id, exc)
+        battle.status = "voided"; session.commit(); return "voided"
 
     # Pull each player → escrow. On any failure → void + return already-pulled NFTs.
     outcomes: list[PullOutcome] = []
