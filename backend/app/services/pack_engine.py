@@ -25,9 +25,20 @@ def determine_winner(pulls: list[PullOutcome], join_order: list[str]) -> str:
     return max(pulls, key=key).player_wallet
 
 
+async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_fn, max_attempts, delay):
+    """Poll until the NFT is confirmed in the escrow on-chain; raise if it never appears."""
+    for _ in range(max_attempts):
+        if await confirm_in_escrow(escrow_address, nft_address):
+            return
+        await sleep_fn(delay)
+    raise RuntimeError(f"nft {nft_address} not confirmed in escrow")
+
+
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
-                     submit_tx, can_play, now_fn, sponsor: bool = False,
-                     open_max_attempts: int = 20, open_delay: float = 3.0, sleep_fn=None) -> str:
+                     submit_tx, confirm_in_escrow, can_play, now_fn, sponsor: bool = False,
+                     open_max_attempts: int = 20, open_delay: float = 3.0,
+                     escrow_max_attempts: int = 20, escrow_delay: float = 3.0,
+                     sleep_fn=None) -> str:
     # sponsor=False → user-pays (the fee-payer wallet needs SOL). sponsor=True requires
     # Privy "App pays" gas sponsorship to be enabled for the cluster.
     # NOTE: sponsor is no longer used in settle (transfers go via our-RPC submit_tx);
@@ -88,6 +99,8 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     try:
         winner = determine_winner(outcomes, players)
         for o in outcomes:
+            await _wait_in_escrow(confirm_in_escrow, esc["address"], o.nft_address,
+                                  sleep_fn, escrow_max_attempts, escrow_delay)
             tx = await build_transfer_tx(esc["address"], winner, o.nft_address)
             signed = await signer.sign_solana(esc["id"], tx)
             await submit_tx(signed)

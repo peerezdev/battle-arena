@@ -237,8 +237,12 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
         calls["submit"].append(signed)
         return "sig"
 
+    async def fake_nft_in_owner(rpc, owner, mint):
+        return True
+
     monkeypatch.setattr(po, "build_transfer", fake_build)
     monkeypatch.setattr(po, "submit_signed_tx", fake_submit)
+    monkeypatch.setattr(po, "nft_in_owner", fake_nft_in_owner)
 
     b = PackBattle(id="b-live-1", mode="pack", machine_code="pokemon_50",
                    price=50, max_players=2, status="running")

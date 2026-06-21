@@ -61,9 +61,11 @@ async def test_run_battle_settles_to_winner(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
                            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "settled"
     assert b.winner == "B" and b.status == "settled" and b.escrow_address == "ESC"
@@ -94,9 +96,11 @@ async def test_run_battle_settles_with_async_transfer(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
                            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "settled" and b.winner == "B"
     assert ("ESC", "B", "nA") in built and ("ESC", "B", "nB") in built   # both → winner from escrow addr
@@ -112,9 +116,11 @@ async def test_run_battle_voids_on_unsupported_standard(session):
     signer = _Signer()
     async def build_transfer_tx(esc, dest, mint): raise UnsupportedNftStandard("cnft")
     async def submit_tx(signed): return "x"
+    async def confirm_in_escrow(esc, nft): return True
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
                            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "voided" and b.winner is None
 
@@ -135,9 +141,11 @@ async def test_run_battle_sponsor_flag_propagates(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
                            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
                            sponsor=True)
     assert out == "settled"
@@ -157,9 +165,11 @@ async def test_run_battle_voids_when_player_cannot_play(session):
     signer = _Signer()
     async def build_transfer_tx(esc, dest, mint): return "x"
     async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
                            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
                            can_play=lambda w: w != "B", now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "voided" and b.status == "voided" and b.winner is None
     assert b.escrow_address is None
@@ -192,9 +202,11 @@ async def test_run_battle_polls_open_pack_while_pending(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
                            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
                            sleep_fn=no_sleep)
     assert out == "settled" and b.winner == "A"
@@ -217,9 +229,70 @@ async def test_run_battle_voids_if_open_pack_never_resolves(session):
     async def no_sleep(d): pass
     async def build_transfer_tx(esc, dest, mint): return "x"
     async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
                            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
                            open_max_attempts=3, sleep_fn=no_sleep)
     assert out == "voided"
+
+
+@pytest.mark.asyncio
+async def test_run_battle_waits_for_nft_in_escrow(session):
+    """confirm_in_escrow returning False twice then True → settles after polling."""
+    b = PackBattle(id="b6", mode="pack", machine_code="pokemon_50", price=50, max_players=1, status="running")
+    session.add(b)
+    session.add(BattlePlayer(battle_id="b6", player_wallet="A"))
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9}})
+    signer = _Signer()
+    built, submits = [], []
+    async def build_transfer_tx(esc, dest, mint):
+        built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed):
+        submits.append(signed); return "ccsig"
+
+    poll_count = {"n": 0}
+    async def confirm_in_escrow(esc, nft):
+        poll_count["n"] += 1
+        return poll_count["n"] >= 3  # False, False, True
+
+    slept = []
+    async def no_sleep(d): slept.append(d)
+
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
+                           sleep_fn=no_sleep)
+    assert out == "settled"
+    assert poll_count["n"] == 3       # polled 3 times (2 False + 1 True)
+    assert len(slept) == 2            # slept between polls (2 failures before success)
+
+
+@pytest.mark.asyncio
+async def test_run_battle_voids_if_nft_never_in_escrow(session):
+    """confirm_in_escrow always False → RuntimeError → settle voids."""
+    b = PackBattle(id="b7", mode="pack", machine_code="pokemon_50", price=50, max_players=1, status="running")
+    session.add(b)
+    session.add(BattlePlayer(battle_id="b7", player_wallet="A"))
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9}})
+    signer = _Signer()
+    async def build_transfer_tx(esc, dest, mint): return "x"
+    async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return False
+    async def no_sleep(d): pass
+
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
+                           escrow_max_attempts=3, sleep_fn=no_sleep)
+    assert out == "voided"
+    assert b.status == "voided"
+    assert b.winner is None

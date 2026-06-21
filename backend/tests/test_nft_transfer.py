@@ -210,3 +210,27 @@ async def test_submit_signed_tx_raises_on_rpc_error():
         200, json={"jsonrpc": "2.0", "id": 1, "error": {"code": -32002, "message": "bad tx"}}))
     with pytest.raises(RuntimeError, match="sendTransaction failed"):
         await submit_signed_tx(RPC, "TX")
+
+
+# --- nft_in_owner tests ---
+
+from app.services.nft_transfer import nft_in_owner
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_nft_in_owner_returns_true_when_holding():
+    """Returns True when a token account holds amount >= 1."""
+    def handler(request):
+        return Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"value": [
+            {"account": {"data": {"parsed": {"info": {"tokenAmount": {"uiAmountString": "1"}}}}}}
+        ]}})
+    respx.post(RPC).mock(side_effect=handler)
+    assert await nft_in_owner(RPC, ESCROW, MINTS) is True
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_nft_in_owner_returns_false_when_empty():
+    """Returns False when the value list is empty (no token accounts found)."""
+    respx.post(RPC).mock(return_value=Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"value": []}}))
+    assert await nft_in_owner(RPC, ESCROW, MINTS) is False
