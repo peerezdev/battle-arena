@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+import logging
 import time as _time
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,8 +24,16 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
-from .models import GachaPack
+from .models import GachaPack, PackBattle
 from .chat import ConnectionManager, ChatBuffer, abbreviate
+from .services.pack_lobby import (
+    create_battle, join_battle,
+    list_open as lobby_list_open,
+    get_battle, LobbyError,
+)
+from .services.pack_orchestration import run_pack_battle_live, usdc_balance_base_units
+
+logger = logging.getLogger(__name__)
 
 
 class AliasBody(BaseModel):
@@ -73,13 +83,23 @@ class CreateMatchBody(BaseModel):
         return self
 
 
+class CreateBattleBody(BaseModel):
+    machine_code: str
+    max_players: int
+
+
 def create_app(session_factory, chain: ChainSource,
                elo_start: int = 1200, elo_k: int = 32,
                cors_origins: list[str] | None = None,
                gacha: GachaService | None = None,
                gacha_rate_limit: int = 10,
                privy: PrivyVerifier | None = None,
-               privy_signer: PrivySigner | None = None) -> FastAPI:
+               privy_signer: PrivySigner | None = None,
+               solana_rpc_url: str = "",
+               cc_usdc_mint: str = "",
+               privy_operator_wallet_id: str = "",
+               privy_operator_address: str = "",
+               escrow_seed_lamports: int = 10_000_000) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
 
     if cors_origins:
@@ -325,6 +345,81 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(401, "token Privy inválido")
         return {"sub": claims.get("sub")}
 
+    # ── Pack Battle lobby endpoints ───────────────────────────────────────────
+
+    def current_user_id(authorization: Optional[str] = Header(None)) -> str:
+        if privy is None:
+            raise HTTPException(503, "privy no configurado")
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(401, "falta token")
+        try:
+            return privy.embedded_solana_wallet_id(authorization[len("Bearer "):])
+        except PrivyAuthError:
+            raise HTTPException(401, "identity token inválido")
+
+    async def _require_funds(wallet: str, price: int):
+        bal = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
+        if bal < price:
+            raise HTTPException(402, "USDC insuficiente")
+
+    async def _machine_price(machine_code: str) -> int:
+        machines = await gacha.machines()
+        m = next((x for x in machines if x.get("code") == machine_code), None)
+        if not m or not m.get("available", True):
+            raise HTTPException(409, "máquina no disponible")
+        return int(m["price"]) * 1_000_000   # USDC base units
+
+    async def _run_bg(battle_id: str):
+        s2 = session_factory()
+        try:
+            b = s2.get(PackBattle, battle_id)
+            await run_pack_battle_live(s2, b, gacha=gacha, signer=privy_signer,
+                rpc_url=solana_rpc_url, usdc_mint=cc_usdc_mint,
+                min_usdc_base_units=b.price, operator_wallet_id=privy_operator_wallet_id,
+                operator_address=privy_operator_address, seed_lamports=escrow_seed_lamports)
+        except Exception:
+            logger.warning("background run failed for %s", battle_id)
+        finally:
+            s2.close()
+
+    @app.post("/pack-battles")
+    async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),
+                                 wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        price = await _machine_price(body.machine_code)
+        await _require_funds(wallet, price)
+        try:
+            b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
+                              max_players=body.max_players)
+        except LobbyError as e:
+            raise HTTPException(409, str(e))
+        return get_battle(s, b.id)
+
+    @app.post("/pack-battles/{battle_id}/join")
+    async def join_pack_battle(battle_id: str, wallet: str = Depends(current_user),
+                               wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        b = s.get(PackBattle, battle_id)
+        if b is None:
+            raise HTTPException(404, "no existe")
+        await _require_funds(wallet, b.price)
+        try:
+            b, filled = join_battle(s, battle_id, wallet, wallet_id)
+        except LobbyError as e:
+            raise HTTPException(409, str(e))
+        if filled:
+            asyncio.create_task(_run_bg(battle_id))
+        return get_battle(s, battle_id)
+
+    @app.get("/pack-battles/open")
+    async def open_pack_battles(s: Session = Depends(db)):
+        return lobby_list_open(s)
+
+    @app.get("/pack-battles/{battle_id}")
+    async def get_pack_battle(battle_id: str, s: Session = Depends(db)):
+        try:
+            return get_battle(s, battle_id)
+        except LobbyError:
+            raise HTTPException(404, "no existe")
+
     # ── Chat de lobby por WebSocket ───────────────────────────────────────────
     _chat_mgr = ConnectionManager()
     _chat_buf = ChatBuffer()
@@ -398,7 +493,11 @@ def build_default_app() -> FastAPI:
                                quorum_id=s.privy_quorum_id) if s.privy_app_id else None
     return create_app(session_factory, chain, elo_start=s.elo_start, elo_k=s.elo_k,
                       cors_origins=s.cors_origins, gacha=gacha, privy=privy,
-                      privy_signer=privy_signer)
+                      privy_signer=privy_signer,
+                      solana_rpc_url=s.solana_rpc_url, cc_usdc_mint=s.cc_usdc_mint,
+                      privy_operator_wallet_id=s.privy_operator_wallet_id,
+                      privy_operator_address=s.privy_operator_address,
+                      escrow_seed_lamports=s.escrow_seed_lamports)
 
 
 app = build_default_app()

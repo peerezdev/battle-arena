@@ -6,6 +6,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from app.services.provably_fair import pick_index, client_seed_from_nfts
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,11 +20,15 @@ class PullOutcome:
     grade: Optional[int]
 
 
-def determine_winner(pulls: list[PullOutcome], join_order: list[str]) -> str:
-    def key(p: PullOutcome):
-        # higher value, then higher grade, then earliest join (smaller index)
-        return (p.insured_value or 0, p.grade or 0, -join_order.index(p.player_wallet))
-    return max(pulls, key=key).player_wallet
+def determine_winner(pulls: list[PullOutcome], *, server_seed: str, client_seed: str) -> tuple[str, Optional[int]]:
+    maxv = max((p.insured_value or 0) for p in pulls)
+    candidates = sorted([p.player_wallet for p in pulls if (p.insured_value or 0) == maxv])
+    if len(candidates) == 1:
+        return candidates[0], None
+    if not server_seed:   # a tie needs the Provably-Fair seed (set at lobby creation)
+        raise ValueError("server_seed must be set before a tie-break draw")
+    idx = pick_index(server_seed, client_seed, len(candidates))
+    return candidates[idx], idx
 
 
 async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_fn, max_attempts, delay):
@@ -35,7 +41,8 @@ async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_
 
 
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
-                     submit_tx, confirm_in_escrow, can_play, now_fn, sponsor: bool = False,
+                     submit_tx, prepare_escrow, confirm_in_escrow, can_play, now_fn,
+                     sponsor: bool = False,
                      open_max_attempts: int = 20, open_delay: float = 3.0,
                      escrow_max_attempts: int = 20, escrow_delay: float = 3.0,
                      sleep_fn=None) -> str:
@@ -56,6 +63,12 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     esc = await signer.create_solana_wallet()
     battle.escrow_wallet_id = esc["id"]; battle.escrow_address = esc["address"]
     battle.status = "running"; session.commit()
+
+    try:
+        await prepare_escrow(esc["address"])
+    except Exception as exc:
+        logger.warning("escrow seed failed for battle %s: %s — voiding", battle.id, exc)
+        battle.status = "voided"; session.commit(); return "voided"
 
     # Pull each player → escrow. On any failure → void + return already-pulled NFTs.
     outcomes: list[PullOutcome] = []
@@ -97,7 +110,10 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     # Winner + settle: all escrow NFTs → winner.
     # Any failure mid-settle (e.g. UnsupportedNftStandard) voids the battle and returns NFTs to players.
     try:
-        winner = determine_winner(outcomes, players)
+        client_seed = client_seed_from_nfts([o.nft_address for o in outcomes])
+        winner, tie_idx = determine_winner(outcomes, server_seed=battle.server_seed, client_seed=client_seed)
+        battle.client_seed = client_seed
+        battle.tie_break_index = tie_idx
         for o in outcomes:
             await _wait_in_escrow(confirm_in_escrow, esc["address"], o.nft_address,
                                   sleep_fn, escrow_max_attempts, escrow_delay)

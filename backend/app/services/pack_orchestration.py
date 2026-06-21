@@ -7,6 +7,7 @@ now_fn) never block the event loop.
 """
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
 
 import httpx
@@ -14,7 +15,11 @@ import httpx
 from app.services.pack_engine import run_battle
 from app.services.solana_tx import TOKEN_PROGRAM
 from app.services.nft_transfer import build_transfer, submit_signed_tx, nft_in_owner
+from solders.hash import Hash
+from solders.message import Message
+from solders.system_program import transfer, TransferParams
 from solders.token.associated import get_associated_token_address
+from solders.transaction import Transaction
 from solders.pubkey import Pubkey
 
 
@@ -80,6 +85,31 @@ async def usdc_balance_base_units(
         return 0
 
 
+async def seed_escrow(
+    rpc_url: str,
+    signer,
+    operator_wallet_id: str,
+    operator_address: str,
+    escrow_address: str,
+    lamports: int,
+    blockhash: str,
+) -> str:
+    """Build and submit a SOL transfer from the operator wallet to the escrow wallet.
+
+    Uses Privy sign-only so the operator funds the escrow with gas lamports,
+    then submits the signed transaction via our RPC node.
+    """
+    ix = transfer(TransferParams(
+        from_pubkey=Pubkey.from_string(operator_address),
+        to_pubkey=Pubkey.from_string(escrow_address),
+        lamports=lamports,
+    ))
+    msg = Message.new_with_blockhash([ix], Pubkey.from_string(operator_address), Hash.from_string(blockhash))
+    tx_b64 = base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
+    signed = await signer.sign_solana(operator_wallet_id, tx_b64)
+    return await submit_signed_tx(rpc_url, signed)
+
+
 async def run_pack_battle_live(
     session,
     battle,
@@ -91,6 +121,9 @@ async def run_pack_battle_live(
     min_usdc_base_units: int,
     token_program: str = TOKEN_PROGRAM,
     sponsor: bool = False,
+    operator_wallet_id: str = "",
+    operator_address: str = "",
+    seed_lamports: int = 10_000_000,
 ) -> str:
     """Assemble live on-chain state and run the pack battle engine.
 
@@ -132,6 +165,9 @@ async def run_pack_battle_live(
     build_transfer_tx = lambda esc, dest, mint: build_transfer(rpc_url, esc, dest, mint, blockhash)  # noqa: E731
     submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
+    prepare_escrow = lambda esc_addr: seed_escrow(  # noqa: E731
+        rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, blockhash
+    )
 
     def can_play(wallet: str) -> bool:
         return wallet in playable
@@ -147,6 +183,7 @@ async def run_pack_battle_live(
         resolve_wallet_id=resolve_wallet_id,
         build_transfer_tx=build_transfer_tx,
         submit_tx=submit_tx,
+        prepare_escrow=prepare_escrow,
         confirm_in_escrow=confirm_in_escrow,
         can_play=can_play,
         now_fn=now_fn,
