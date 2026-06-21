@@ -27,3 +27,7 @@ def client_seed_from_nfts(nft_addresses: list[str]) -> str:
 def pick_index(server_seed: str, client_seed: str, n: int) -> int:
     digest = hmac.new(server_seed.encode(), client_seed.encode(), hashlib.sha256).digest()
     return int.from_bytes(digest[:8], "big") % n
+
+
+def client_seed_round(round_number: int, nft_addresses: list[str]) -> str:
+    return hashlib.sha256((f"{round_number}:" + ":".join(sorted(nft_addresses))).encode()).hexdigest()

@@ -23,3 +23,10 @@ def test_pick_index_deterministic_and_bounded():
     assert i1 == i2 and 0 <= i1 < 3
     # golden: anchors the HMAC draw formula (changing it breaks Provably-Fair verification)
     assert pick_index("ab" * 32, "00" * 32, 5) == 2
+
+
+def test_client_seed_round_order_independent_and_round_sensitive():
+    from app.services.provably_fair import client_seed_round
+    a = client_seed_round(2, ["m2", "m1"]); b = client_seed_round(2, ["m1", "m2"])
+    assert a == b
+    assert client_seed_round(1, ["m1", "m2"]) != client_seed_round(2, ["m1", "m2"])

@@ -85,6 +85,8 @@ class BattlePlayer(Base):
     player_wallet: Mapped[str] = mapped_column(String, index=True)
     wallet_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    eliminated_round: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    accumulated_value: Mapped[float] = mapped_column(Float, default=0.0)
 
 
 class BattlePull(Base):
@@ -97,3 +99,14 @@ class BattlePull(Base):
     insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     grade: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     rarity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    round_number: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class BattleRound(Base):
+    __tablename__ = "battle_rounds"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    battle_id: Mapped[str] = mapped_column(String, index=True)
+    round_number: Mapped[int] = mapped_column(Integer)
+    client_seed: Mapped[str] = mapped_column(String)
+    eliminated_wallet: Mapped[str] = mapped_column(String)
+    tie_break_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
