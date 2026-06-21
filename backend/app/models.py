@@ -70,6 +70,10 @@ class PackBattle(Base):
     winner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     escrow_wallet_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     escrow_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    server_seed: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    server_seed_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    client_seed: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tie_break_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 

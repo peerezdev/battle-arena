@@ -18,11 +18,14 @@ class PullOutcome:
     grade: Optional[int]
 
 
-def determine_winner(pulls: list[PullOutcome], join_order: list[str]) -> str:
-    def key(p: PullOutcome):
-        # higher value, then higher grade, then earliest join (smaller index)
-        return (p.insured_value or 0, p.grade or 0, -join_order.index(p.player_wallet))
-    return max(pulls, key=key).player_wallet
+def determine_winner(pulls: list[PullOutcome], *, server_seed: str, client_seed: str) -> tuple[str, Optional[int]]:
+    from app.services.provably_fair import pick_index
+    maxv = max((p.insured_value or 0) for p in pulls)
+    candidates = sorted([p.player_wallet for p in pulls if (p.insured_value or 0) == maxv])
+    if len(candidates) == 1:
+        return candidates[0], None
+    idx = pick_index(server_seed, client_seed, len(candidates))
+    return candidates[idx], idx
 
 
 async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_fn, max_attempts, delay):
@@ -97,7 +100,11 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     # Winner + settle: all escrow NFTs → winner.
     # Any failure mid-settle (e.g. UnsupportedNftStandard) voids the battle and returns NFTs to players.
     try:
-        winner = determine_winner(outcomes, players)
+        from app.services.provably_fair import client_seed_from_nfts
+        client_seed = client_seed_from_nfts([o.nft_address for o in outcomes])
+        winner, tie_idx = determine_winner(outcomes, server_seed=battle.server_seed, client_seed=client_seed)
+        battle.client_seed = client_seed
+        battle.tie_break_index = tie_idx
         for o in outcomes:
             await _wait_in_escrow(confirm_in_escrow, esc["address"], o.nft_address,
                                   sleep_fn, escrow_max_attempts, escrow_delay)
