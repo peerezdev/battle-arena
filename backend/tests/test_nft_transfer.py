@@ -50,5 +50,7 @@ def test_build_pnft_transfer_accounts_and_data():
     assert a[5] == "6oLXjYugRV1zMUK7pV3HmnMjbdhY4nzC9tSwW1oNL9Qz" # metadata
     assert a[6] == "6NacVi5reTpcSU9nhGDcvxUkvm8FGMUsjY3YfoPjyEBM" # edition
     assert a[7] == "CcPSaXEbBSAZzjnAvB93Hsz7VUR8pbg5tgzKjtsf1Hi4" # escrow token record
+    win_ata_pk = get_associated_token_address(Pubkey.from_string(WINNER), mint)
+    assert a[8] == str(token_record_pda(mint, win_ata_pk))        # winner token record (derived from winner ATA)
     assert a[9] == ESCROW and a[10] == ESCROW                     # authority + payer
     assert a[16] == RULESET                                       # ruleset

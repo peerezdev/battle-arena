@@ -1,9 +1,15 @@
 """Multi-standard NFT transfer (escrow→winner). Pure builders + async resolvers.
 v1: pNFT (Metaplex Transfer) + Standard (SPL). cNFT/MPL Core raise UnsupportedNftStandard."""
 from __future__ import annotations
+import base64
 import struct
 from typing import Optional
 from solders.pubkey import Pubkey
+from solders.hash import Hash
+from solders.instruction import Instruction, AccountMeta
+from solders.message import Message
+from solders.transaction import Transaction
+from solders.token.associated import get_associated_token_address
 
 METADATA_PROGRAM = Pubkey.from_string("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s")
 _META = bytes(METADATA_PROGRAM)
@@ -21,13 +27,6 @@ def token_record_pda(mint: Pubkey, ata: Pubkey) -> Pubkey:
     return Pubkey.find_program_address(
         [b"metadata", _META, bytes(mint), b"token_record", bytes(ata)], METADATA_PROGRAM)[0]
 
-
-import base64
-from solders.hash import Hash
-from solders.instruction import Instruction, AccountMeta
-from solders.message import Message
-from solders.transaction import Transaction
-from solders.token.associated import get_associated_token_address
 
 TOKEN_PROGRAM = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
 ATA_PROGRAM = Pubkey.from_string("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")
