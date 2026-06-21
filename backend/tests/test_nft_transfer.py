@@ -54,3 +54,154 @@ def test_build_pnft_transfer_accounts_and_data():
     assert a[8] == str(token_record_pda(mint, win_ata_pk))        # winner token record (derived from winner ATA)
     assert a[9] == ESCROW and a[10] == ESCROW                     # authority + payer
     assert a[16] == RULESET                                       # ruleset
+
+
+# ---------------------------------------------------------------------------
+# Task 3: detect_standard, build_transfer, submit_signed_tx
+# ---------------------------------------------------------------------------
+import json, pytest, respx
+from httpx import Response
+from app.services.nft_transfer import (
+    detect_standard, build_transfer, submit_signed_tx,
+    UnsupportedNftStandard, _token_standard)
+
+RPC = "https://rpc.test"
+MPL_CORE = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+
+# Load fixture bytes once for mocking pNFT metadata
+_PNFT_B64 = _FIXT.read_text().strip()
+
+
+def _acct_info(value):
+    return Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"value": value}})
+
+
+# --- _token_standard unit test (against live fixture) ---
+
+def test_token_standard_fixture():
+    """_token_standard returns 4 (ProgrammableNonFungible) for the live pNFT metadata fixture."""
+    import base64 as _b
+    raw = _b.b64decode(_FIXT.read_text())
+    assert _token_standard(raw) == 4
+
+
+# --- detect_standard tests ---
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_detect_standard_pnft():
+    """Mint owned by TOKEN_PROGRAM + metadata with token_standard=4 → 'pnft'."""
+    def handler(request):
+        body = json.loads(request.content)
+        if body["method"] == "getAccountInfo":
+            acct = body["params"][0]
+            if acct == MINTS:
+                return _acct_info({"owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                                   "data": ["", "base64"]})
+            # metadata PDA → return the real pNFT fixture bytes so _token_standard returns 4
+            return _acct_info({"owner": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+                               "data": [_PNFT_B64, "base64"]})
+        return _acct_info(None)
+    respx.post(RPC).mock(side_effect=handler)
+    assert await detect_standard(RPC, MINTS) == "pnft"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_detect_standard_standard():
+    """Mint owned by TOKEN_PROGRAM + no metadata account → 'standard'."""
+    def handler(request):
+        body = json.loads(request.content)
+        acct = body["params"][0]
+        if acct == MINTS:
+            return _acct_info({"owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                               "data": ["", "base64"]})
+        return _acct_info(None)  # metadata missing → standard
+    respx.post(RPC).mock(side_effect=handler)
+    assert await detect_standard(RPC, MINTS) == "standard"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_detect_standard_cnft():
+    """No mint account → 'cnft'."""
+    respx.post(RPC).mock(return_value=_acct_info(None))
+    assert await detect_standard(RPC, MINTS) == "cnft"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_detect_standard_core():
+    """Mint owned by MPL Core program → 'core'."""
+    respx.post(RPC).mock(return_value=_acct_info({"owner": MPL_CORE, "data": ["", "base64"]}))
+    assert await detect_standard(RPC, MINTS) == "core"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_detect_standard_unknown():
+    """Mint owned by unrecognised program → 'unknown'."""
+    respx.post(RPC).mock(return_value=_acct_info({"owner": "SomeUnknownProgramXXXXXXXXXXXXXXXXXXXXXXXXX",
+                                                   "data": ["", "base64"]}))
+    assert await detect_standard(RPC, MINTS) == "unknown"
+
+
+# --- build_transfer tests ---
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_build_transfer_pnft_returns_base64():
+    """build_transfer for pNFT calls build_pnft_transfer and returns a b64 tx."""
+    import base64 as _b
+    def handler(request):
+        body = json.loads(request.content)
+        if body["method"] == "getAccountInfo":
+            acct = body["params"][0]
+            if acct == MINTS:
+                return _acct_info({"owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                                   "data": ["", "base64"]})
+            return _acct_info({"owner": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
+                               "data": [_PNFT_B64, "base64"]})
+        return _acct_info(None)
+    respx.post(RPC).mock(side_effect=handler)
+    result = await build_transfer(RPC, ESCROW, WINNER, MINTS, BLOCKHASH)
+    _b.b64decode(result)  # must be valid base64
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_build_transfer_raises_for_core():
+    """build_transfer raises UnsupportedNftStandard for MPL Core NFTs."""
+    respx.post(RPC).mock(return_value=_acct_info({"owner": MPL_CORE, "data": ["", "base64"]}))
+    with pytest.raises(UnsupportedNftStandard):
+        await build_transfer(RPC, ESCROW, WINNER, MINTS, BLOCKHASH)
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_build_transfer_raises_for_cnft():
+    """build_transfer raises UnsupportedNftStandard for compressed NFTs."""
+    respx.post(RPC).mock(return_value=_acct_info(None))
+    with pytest.raises(UnsupportedNftStandard):
+        await build_transfer(RPC, ESCROW, WINNER, MINTS, BLOCKHASH)
+
+
+# --- submit_signed_tx tests ---
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_submit_signed_tx_returns_signature():
+    """submit_signed_tx returns the transaction signature on success."""
+    respx.post(RPC).mock(return_value=Response(
+        200, json={"jsonrpc": "2.0", "id": 1, "result": "SIG"}))
+    assert await submit_signed_tx(RPC, "TX") == "SIG"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_submit_signed_tx_raises_on_rpc_error():
+    """submit_signed_tx raises RuntimeError when the RPC returns an error field."""
+    respx.post(RPC).mock(return_value=Response(
+        200, json={"jsonrpc": "2.0", "id": 1, "error": {"code": -32002, "message": "bad tx"}}))
+    with pytest.raises(RuntimeError, match="sendTransaction failed"):
+        await submit_signed_tx(RPC, "TX")
