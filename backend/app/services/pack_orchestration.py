@@ -12,7 +12,8 @@ from datetime import datetime, timezone
 import httpx
 
 from app.services.pack_engine import run_battle
-from app.services.solana_tx import build_nft_transfer, TOKEN_PROGRAM
+from app.services.solana_tx import TOKEN_PROGRAM
+from app.services.nft_transfer import build_transfer, submit_signed_tx
 from solders.token.associated import get_associated_token_address
 from solders.pubkey import Pubkey
 
@@ -128,8 +129,8 @@ async def run_pack_battle_live(
     def resolve_wallet_id(wallet: str):
         return wallet_to_privy_id.get(wallet)
 
-    def build_transfer_tx(esc: str, dest: str, mint: str) -> str:
-        return build_nft_transfer(esc, dest, mint, blockhash, token_program)
+    build_transfer_tx = lambda esc, dest, mint: build_transfer(rpc_url, esc, dest, mint, blockhash)  # noqa: E731
+    submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
 
     def can_play(wallet: str) -> bool:
         return wallet in playable
@@ -144,6 +145,7 @@ async def run_pack_battle_live(
         signer=signer,
         resolve_wallet_id=resolve_wallet_id,
         build_transfer_tx=build_transfer_tx,
+        submit_tx=submit_tx,
         can_play=can_play,
         now_fn=now_fn,
         sponsor=sponsor,
