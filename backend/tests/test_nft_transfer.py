@@ -18,6 +18,11 @@ def test_read_pnft_ruleset_from_live_metadata():
     assert str(rs) == "eBJLFYPxJmMGKuFwpDWkzxZeUrad92kZRC5BJLpzyT9"
 
 
+def test_read_pnft_ruleset_returns_none_on_truncated():
+    # A truncated/old-format buffer must yield None (caller voids), not raise.
+    assert read_pnft_ruleset(b"\x04" + b"\x00" * 12) is None
+
+
 import base64 as _b64
 from solders.transaction import Transaction
 from solders.token.associated import get_associated_token_address
