@@ -3,6 +3,7 @@ v1: pNFT (Metaplex Transfer) + Standard (SPL). cNFT/MPL Core raise UnsupportedNf
 from __future__ import annotations
 import base64
 import struct
+import httpx
 from typing import Optional
 from solders.pubkey import Pubkey
 from solders.hash import Hash
@@ -102,10 +103,8 @@ def read_pnft_ruleset(data: bytes) -> Optional[Pubkey]:
 
 
 # ---------------------------------------------------------------------------
-# Task 3: detection + dispatcher + submit
+# Detection + dispatcher + submit
 # ---------------------------------------------------------------------------
-import httpx
-
 MPL_CORE_PROGRAM = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
 
 
