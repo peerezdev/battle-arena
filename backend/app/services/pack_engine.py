@@ -49,7 +49,11 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                                              alt_player_address=esc["address"])
             pull = BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"])
             session.add(pull); session.commit()
-            await signer.sign_and_send_solana(resolve_wallet_id(w), pack["transaction"], sponsor=sponsor)
+            # CC broadcasts the pull on its own RPC (Privy signAndSend fails — different RPC, blockhash not found)
+            signed = await signer.sign_solana(resolve_wallet_id(w), pack["transaction"])
+            sub = await gacha.submit_tx(signed)
+            if not sub.get("signature"):
+                raise RuntimeError("pull submit returned no signature")
             res = await gacha.open_pack(pack["memo"])
             if res.get("pending") or not res.get("nft_address"):
                 raise RuntimeError("pull did not resolve")

@@ -79,3 +79,32 @@ async def test_create_solana_wallet():
     assert out == {"id": "wid", "address": "ADDR"}
     sent = json.loads(route.calls.last.request.content)
     assert sent["chain_type"] == "solana" and sent["owner_id"] == "kq1"
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_sign_solana_returns_signed_tx():
+    pem, _ = _p256_pem()
+    route = respx.post("https://api.privy.io/v1/wallets/w1/rpc").mock(
+        return_value=Response(200, json={"data": {"signed_transaction": "SIGNED"}}))
+    s = PrivySigner(app_id="a", app_secret="s", auth_key_pem=pem, cluster_caip2="solana:dev")
+    out = await s.sign_solana("w1", "TX")
+    assert out == "SIGNED"
+    sent = json.loads(route.calls.last.request.content)
+    assert sent["method"] == "signTransaction"
+    assert "caip2" not in sent
+
+@pytest.mark.asyncio
+async def test_sign_solana_disabled_raises():
+    s = PrivySigner(app_id="a", app_secret="s", auth_key_pem="", cluster_caip2="solana:dev")
+    with pytest.raises(PrivySignerError, match="privy signer disabled"):
+        await s.sign_solana("w1", "TX")
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_sign_solana_returns_signed_tx_camelcase():
+    pem, _ = _p256_pem()
+    route = respx.post("https://api.privy.io/v1/wallets/w1/rpc").mock(
+        return_value=Response(200, json={"data": {"signedTransaction": "SIGNED_CAMEL"}}))
+    s = PrivySigner(app_id="a", app_secret="s", auth_key_pem=pem, cluster_caip2="solana:dev")
+    out = await s.sign_solana("w1", "TX")
+    assert out == "SIGNED_CAMEL"

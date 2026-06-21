@@ -33,11 +33,15 @@ class _Gacha:
     async def open_pack(self, memo):
         w = memo.split("m-")[1]
         return {"pending": False, **self.opens[w]}
+    async def submit_tx(self, signed_transaction):
+        return {"signature": "ccsig", "confirmation_status": "confirmed"}
 
 
 class _Signer:
-    def __init__(self): self.sent = []
+    def __init__(self): self.sent = []; self.signed = []
     async def create_solana_wallet(self): return {"id": "esc-id", "address": "ESC"}
+    async def sign_solana(self, wallet_id, tx):
+        self.signed.append((wallet_id, tx)); return f"signed-{tx}"
     async def sign_and_send_solana(self, wallet_id, tx, sponsor=False):
         self.sent.append((wallet_id, tx, sponsor)); return f"sig-{len(self.sent)}"
 
@@ -63,7 +67,7 @@ async def test_run_battle_settles_to_winner(session):
     assert all(s[2] is False for s in signer.sent)
     assert ("esc-id", "xfer-nA->B", False) in signer.sent and ("esc-id", "xfer-nB->B", False) in signer.sent
     assert session.query(BattlePull).filter_by(battle_id="b1").count() == 2
-    pull_wallets = {s[0] for s in signer.sent}
+    pull_wallets = {s[0] for s in signer.signed}
     assert "A-id" in pull_wallets and "B-id" in pull_wallets
     rows = {r.player_wallet: r for r in session.query(BattlePull).filter_by(battle_id="b1").all()}
     assert rows["A"].nft_address == "nA" and rows["A"].insured_value == 100 and rows["A"].grade == 9
@@ -86,6 +90,8 @@ async def test_run_battle_sponsor_flag_propagates(session):
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21),
                            sponsor=True)
     assert out == "settled"
+    # signer.sent contains only escrow→winner transfers (sponsor=True propagated).
+    # Pull TXs go through sign_solana (sign-only) + gacha.submit_tx — no sponsor param by design.
     assert signer.sent and all(s[2] is True for s in signer.sent)
 
 
