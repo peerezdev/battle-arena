@@ -177,6 +177,19 @@ async def build_transfer(rpc_url: str, escrow: str, winner: str, mint: str, bloc
     raise UnsupportedNftStandard(f"standard={std!r} is not supported")
 
 
+async def nft_in_owner(rpc_url: str, owner: str, mint: str) -> bool:
+    """True iff `owner` holds >=1 of `mint` (any token program) on-chain."""
+    async with httpx.AsyncClient() as c:
+        r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
+                                        "params": [owner, {"mint": mint}, {"encoding": "jsonParsed"}]}, timeout=20)
+        r.raise_for_status()
+        for a in (r.json().get("result") or {}).get("value", []):
+            amt = a["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmountString"]
+            if amt and float(amt) >= 1:
+                return True
+    return False
+
+
 async def submit_signed_tx(rpc_url: str, signed_tx_b64: str) -> str:
     """POST sendTransaction; raise on RPC error; return the transaction signature."""
     async with httpx.AsyncClient() as c:
