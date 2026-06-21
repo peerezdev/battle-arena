@@ -22,6 +22,86 @@ ATA_PROGRAM   = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"   # associated-to
 SYS_PROGRAM   = "11111111111111111111111111111111"
 
 
+def build_token_transfer(
+    source_address: str,
+    dest_address: str,
+    mint: str,
+    recent_blockhash: str,
+    *,
+    amount: int = 1,
+    decimals: int = 0,
+    fee_payer: str = None,
+    token_program: str = TOKEN_PROGRAM,
+) -> str:
+    """
+    Return an unsigned legacy Solana transaction (base64-encoded) that transfers
+    `amount` units of `mint` from the source's ATA to the destination's ATA,
+    creating the destination ATA idempotently if needed.
+
+    Fee payer = fee_payer if given, else source.  When fee_payer != source,
+    both are marked is_signer=True (2-signer tx).
+
+    Args:
+        source_address:   Base58 pubkey of the source (token authority) account.
+        dest_address:     Base58 pubkey of the destination wallet.
+        mint:             Base58 pubkey of the token mint.
+        recent_blockhash: Base58 blockhash string (e.g. from getLatestBlockhash).
+        amount:           Number of base units to transfer (default=1 for NFTs).
+        decimals:         Mint decimals for transfer_checked (default=0 for NFTs).
+        fee_payer:        Fee payer pubkey (default=source).
+        token_program:    Token program id (default = classic SPL Token).
+
+    Returns:
+        Base64-encoded bytes of the unsigned transaction.
+    """
+    src_pk         = Pubkey.from_string(source_address)
+    dest_pk        = Pubkey.from_string(dest_address)
+    mint_pk        = Pubkey.from_string(mint)
+    token_prog_pk  = Pubkey.from_string(token_program)
+    ata_prog_pk    = Pubkey.from_string(ATA_PROGRAM)
+    sys_prog_pk    = Pubkey.from_string(SYS_PROGRAM)
+    payer_pk       = Pubkey.from_string(fee_payer) if fee_payer else src_pk
+    blockhash      = Hash.from_string(recent_blockhash)
+
+    # -- Derive ATAs --
+    src_ata  = get_associated_token_address(src_pk,  mint_pk, token_prog_pk)
+    dest_ata = get_associated_token_address(dest_pk, mint_pk, token_prog_pk)
+
+    # -- Instruction 1: CreateIdempotent ATA for destination --
+    # discriminator 1 = CreateIdempotent (0 = Create, raises if already exists)
+    create_ix = Instruction(
+        ata_prog_pk,
+        bytes([1]),
+        [
+            AccountMeta(payer_pk,      is_signer=True,  is_writable=True),   # payer
+            AccountMeta(dest_ata,      is_signer=False, is_writable=True),   # ATA being created
+            AccountMeta(dest_pk,       is_signer=False, is_writable=False),  # ATA owner
+            AccountMeta(mint_pk,       is_signer=False, is_writable=False),
+            AccountMeta(sys_prog_pk,   is_signer=False, is_writable=False),
+            AccountMeta(token_prog_pk, is_signer=False, is_writable=False),
+        ],
+    )
+
+    # -- Instruction 2: transfer_checked (discriminator 12) --
+    # data: [12] + amount(u64 LE) + decimals(u8)
+    transfer_data = bytes([12]) + amount.to_bytes(8, "little") + bytes([decimals])
+    transfer_ix = Instruction(
+        token_prog_pk,
+        transfer_data,
+        [
+            AccountMeta(src_ata,  is_signer=False, is_writable=True),   # source ATA
+            AccountMeta(mint_pk,  is_signer=False, is_writable=False),
+            AccountMeta(dest_ata, is_signer=False, is_writable=True),
+            AccountMeta(src_pk,   is_signer=True,  is_writable=False),  # source owner = transfer authority
+        ],
+    )
+
+    # -- Assemble transaction --
+    message = Message.new_with_blockhash([create_ix, transfer_ix], payer_pk, blockhash)
+    tx = Transaction.new_unsigned(message)
+    return base64.b64encode(bytes(tx)).decode()
+
+
 def build_nft_transfer(
     escrow_address: str,
     dest_address: str,
@@ -30,67 +110,10 @@ def build_nft_transfer(
     token_program: str = TOKEN_PROGRAM,
 ) -> str:
     """
-    Return an unsigned legacy Solana transaction (base64-encoded) that transfers
-    1 unit of `mint` (a non-fungible SPL token) from the escrow's ATA to the
-    destination's ATA, creating the destination ATA idempotently if needed.
-
-    Fee payer = escrow.  The escrow is the only required signer (fee payer,
-    ATA-create payer, and transfer authority).
-
-    Args:
-        escrow_address:   Base58 pubkey of the escrow account.
-        dest_address:     Base58 pubkey of the winner / destination wallet.
-        mint:             Base58 pubkey of the NFT mint.
-        recent_blockhash: Base58 blockhash string (e.g. from getLatestBlockhash).
-        token_program:    Token program id (default = classic SPL Token).
-                          Pass Token-2022 id for Token-2022 NFTs.
-
-    Returns:
-        Base64-encoded bytes of the unsigned transaction.
+    Thin wrapper around build_token_transfer for NFT (amount=1, decimals=0).
+    Fee payer = escrow.
     """
-    # -- Pubkeys --
-    escrow_pk      = Pubkey.from_string(escrow_address)
-    dest_pk        = Pubkey.from_string(dest_address)
-    mint_pk        = Pubkey.from_string(mint)
-    token_prog_pk  = Pubkey.from_string(token_program)
-    ata_prog_pk    = Pubkey.from_string(ATA_PROGRAM)
-    sys_prog_pk    = Pubkey.from_string(SYS_PROGRAM)
-    blockhash      = Hash.from_string(recent_blockhash)
-
-    # -- Derive ATAs --
-    src_ata  = get_associated_token_address(escrow_pk, mint_pk, token_prog_pk)
-    dest_ata = get_associated_token_address(dest_pk,   mint_pk, token_prog_pk)
-
-    # -- Instruction 1: CreateIdempotent ATA for destination --
-    # discriminator 1 = CreateIdempotent (0 = Create, raises if already exists)
-    create_ix = Instruction(
-        ata_prog_pk,
-        bytes([1]),
-        [
-            AccountMeta(escrow_pk,    is_signer=True,  is_writable=True),   # payer
-            AccountMeta(dest_ata,     is_signer=False, is_writable=True),   # ATA being created
-            AccountMeta(dest_pk,      is_signer=False, is_writable=False),  # ATA owner
-            AccountMeta(mint_pk,      is_signer=False, is_writable=False),
-            AccountMeta(sys_prog_pk,  is_signer=False, is_writable=False),
-            AccountMeta(token_prog_pk, is_signer=False, is_writable=False),
-        ],
+    return build_token_transfer(
+        escrow_address, dest_address, mint, recent_blockhash,
+        amount=1, decimals=0, token_program=token_program,
     )
-
-    # -- Instruction 2: transfer_checked (discriminator 12) --
-    # data: [12] + amount(u64 LE) + decimals(u8)
-    transfer_data = bytes([12]) + (1).to_bytes(8, "little") + bytes([0])
-    transfer_ix = Instruction(
-        token_prog_pk,
-        transfer_data,
-        [
-            AccountMeta(src_ata,      is_signer=False, is_writable=True),   # source = escrow's ATA
-            AccountMeta(mint_pk,      is_signer=False, is_writable=False),
-            AccountMeta(dest_ata,     is_signer=False, is_writable=True),
-            AccountMeta(escrow_pk,    is_signer=True,  is_writable=False),  # transfer authority
-        ],
-    )
-
-    # -- Assemble transaction --
-    message = Message.new_with_blockhash([create_ix, transfer_ix], escrow_pk, blockhash)
-    tx = Transaction.new_unsigned(message)
-    return base64.b64encode(bytes(tx)).decode()
