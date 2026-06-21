@@ -26,10 +26,12 @@ def determine_winner(pulls: list[PullOutcome], join_order: list[str]) -> str:
 
 
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
-                     can_play, now_fn, sponsor: bool = False,
+                     submit_tx, can_play, now_fn, sponsor: bool = False,
                      open_max_attempts: int = 20, open_delay: float = 3.0, sleep_fn=None) -> str:
     # sponsor=False → user-pays (the fee-payer wallet needs SOL). sponsor=True requires
     # Privy "App pays" gas sponsorship to be enabled for the cluster.
+    # NOTE: sponsor is no longer used in settle (transfers go via our-RPC submit_tx);
+    # kept in signature for API stability.
     sleep_fn = sleep_fn or asyncio.sleep
     from app.models import BattlePlayer, BattlePull
     players = [p.player_wallet for p in
@@ -78,25 +80,34 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             # A transient failure here may have consumed the player's CC pack memo — log it so the
             # void is traceable (no secrets: wallet + battle id + error only).
             logger.warning("pull failed for %s in battle %s: %s — voiding", w, battle.id, exc)
-            await _void_return(signer, esc, outcomes, build_transfer_tx, sponsor)
+            await _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx)
             battle.status = "voided"; session.commit(); return "voided"
 
     # Winner + settle: all escrow NFTs → winner.
-    winner = determine_winner(outcomes, players)
-    for o in outcomes:
-        tx = build_transfer_tx(esc["address"], winner, o.nft_address)
-        await signer.sign_and_send_solana(esc["id"], tx, sponsor=sponsor)
+    # Any failure mid-settle (e.g. UnsupportedNftStandard) voids the battle and returns NFTs to players.
+    try:
+        winner = determine_winner(outcomes, players)
+        for o in outcomes:
+            tx = await build_transfer_tx(esc["address"], winner, o.nft_address)
+            signed = await signer.sign_solana(esc["id"], tx)
+            await submit_tx(signed)
+    except Exception as exc:
+        logger.warning("settle failed in battle %s: %s — voiding", battle.id, exc)
+        await _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx)
+        battle.status = "voided"; session.commit(); return "voided"
+
     battle.winner = winner; battle.status = "settled"; battle.settled_at = now_fn()
     session.commit()
     return "settled"
 
 
-async def _void_return(signer, esc, outcomes, build_transfer_tx, sponsor):
+async def _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx):
     # Return each already-pulled NFT to its original puller (nobody robbed).
     for o in outcomes:
-        tx = build_transfer_tx(esc["address"], o.player_wallet, o.nft_address)
         try:
-            await signer.sign_and_send_solana(esc["id"], tx, sponsor=sponsor)
+            tx = await build_transfer_tx(esc["address"], o.player_wallet, o.nft_address)
+            signed = await signer.sign_solana(esc["id"], tx)
+            await submit_tx(signed)
         except Exception:
-            logger.warning("void-return transfer failed: battle escrow=%s nft=%s player=%s",
+            logger.warning("void-return transfer failed: escrow=%s nft=%s player=%s",
                            esc.get("id"), o.nft_address, o.player_wallet)
