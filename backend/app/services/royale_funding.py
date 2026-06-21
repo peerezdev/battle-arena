@@ -1,7 +1,6 @@
 """Battle Royale USDC funding: buy-in math + pool distribute/collect/confirm. Pulls themselves are
 paid by each player's wallet (funded just-in-time from the pool)."""
 from __future__ import annotations
-import math
 import httpx
 from solders.pubkey import Pubkey
 from solders.token.associated import get_associated_token_address
@@ -14,15 +13,21 @@ def total_pulls(n: int) -> int:
 
 
 def royale_buyin(n: int, price_base: int) -> int:
-    return math.ceil(total_pulls(n) * price_base / n)
+    # integer ceiling (no float): round up so the pool always covers the pulls; remainder → winner
+    total = total_pulls(n) * price_base
+    return (total + n - 1) // n
 
 
 async def confirm_usdc(rpc_url: str, owner: str, usdc_mint: str, min_base_units: int) -> bool:
     ata = str(get_associated_token_address(Pubkey.from_string(owner), Pubkey.from_string(usdc_mint)))
-    async with httpx.AsyncClient() as c:
-        r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getTokenAccountBalance",
-                                        "params": [ata, {"commitment": "confirmed"}]}, timeout=20)
-        r.raise_for_status(); d = r.json()
+    # Network/RPC errors → treat as "not confirmed yet" (False), never crash the polling gate.
+    try:
+        async with httpx.AsyncClient() as c:
+            r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getTokenAccountBalance",
+                                            "params": [ata, {"commitment": "confirmed"}]}, timeout=20)
+            r.raise_for_status(); d = r.json()
+    except httpx.HTTPError:
+        return False
     if "error" in d:
         return False
     v = (d.get("result") or {}).get("value")
