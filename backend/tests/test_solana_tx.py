@@ -143,3 +143,25 @@ class TestBuildNftTransferToken2022:
         out = build_nft_transfer(ESCROW, DEST, MINT, BLOCKHASH, token_program=TOKEN_2022)
         tx = Transaction.from_bytes(base64.b64decode(out))
         assert tx.message.account_keys[0] == Pubkey.from_string(ESCROW)
+
+
+# ---------------------------------------------------------------------------
+# Test 3: generalised build_token_transfer
+# ---------------------------------------------------------------------------
+def test_build_token_transfer_usdc_amount_decimals_and_feepayer():
+    from app.services.solana_tx import build_token_transfer, TOKEN_PROGRAM
+    import base64
+    from solders.transaction import Transaction
+    from solders.pubkey import Pubkey
+    ESCROW="9oZgd4eviozqaYu7KwCTctAYgsRTWtF3McJARaztPsRQ"
+    PLAYER="8QDBKx8P3pxkRhiqyXFtYcPPf2CM1F5NiE5A8yjkgtm6"
+    OP="A4ahkivAG4NoZAE8Sy4qv8nn2DU9yoXRQcttuCeGtTJv"
+    USDC="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+    out = build_token_transfer(PLAYER, ESCROW, USDC, "11111111111111111111111111111111",
+                               amount=50_000_000, decimals=6, fee_payer=OP)
+    tx = Transaction.from_bytes(base64.b64decode(out))
+    keys = tx.message.account_keys
+    assert keys[0] == Pubkey.from_string(OP)   # fee payer = operator
+    tok = Pubkey.from_string(TOKEN_PROGRAM)
+    ix = next(i for i in tx.message.instructions if keys[i.program_id_index] == tok)
+    assert bytes(ix.data) == bytes([12]) + (50_000_000).to_bytes(8,"little") + bytes([6])

@@ -51,3 +51,14 @@ def test_battle_player_wallet_id_persists(session):
     rows = {r.player_wallet: r for r in session.query(BattlePlayer).filter_by(battle_id="b2").all()}
     assert rows["W1"].wallet_id == "privy-wallet-id-abc"
     assert rows["W2"].wallet_id is None
+
+
+def test_royale_model_columns(session):
+    from app.models import PackBattle, BattlePlayer, BattlePull, BattleRound
+    session.add(PackBattle(id="r1", mode="royale", machine_code="pokemon_50", price=50_000_000, max_players=4, status="lobby"))
+    session.add(BattlePlayer(battle_id="r1", player_wallet="A", eliminated_round=1, accumulated_value=10.0))
+    session.add(BattlePull(battle_id="r1", player_wallet="A", memo="m", round_number=2))
+    session.add(BattleRound(battle_id="r1", round_number=1, client_seed="cs", eliminated_wallet="A", tie_break_index=None))
+    session.commit()
+    assert session.query(BattleRound).filter_by(battle_id="r1").one().eliminated_wallet == "A"
+    assert session.get(BattlePlayer, session.query(BattlePlayer).filter_by(battle_id="r1").one().id).accumulated_value == 10.0

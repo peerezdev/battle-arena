@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 import httpx
 
 from app.services.pack_engine import run_battle
+from app.services.royale_engine import run_royale
+from app.services.royale_funding import distribute_usdc, confirm_usdc
 from app.services.solana_tx import TOKEN_PROGRAM
 from app.services.nft_transfer import build_transfer, submit_signed_tx, nft_in_owner
 from solders.hash import Hash
@@ -147,9 +149,7 @@ async def run_pack_battle_live(
     }
     player_wallets: list[str] = [p.player_wallet for p in players]
 
-    # Pre-fetch on-chain state (both async, done before entering the sync engine)
-    blockhash = await fetch_latest_blockhash(rpc_url)
-
+    # Pre-fetch on-chain state: per-player USDC balances (blockhash not needed here)
     balances: dict[str, int] = {}
     for wallet in player_wallets:
         balances[wallet] = await usdc_balance_base_units(
@@ -162,12 +162,18 @@ async def run_pack_battle_live(
     def resolve_wallet_id(wallet: str):
         return wallet_to_privy_id.get(wallet)
 
-    build_transfer_tx = lambda esc, dest, mint: build_transfer(rpc_url, esc, dest, mint, blockhash)  # noqa: E731
+    async def build_transfer_tx(esc, dest, nft):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await build_transfer(rpc_url, esc, dest, nft, bh)
+
     submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
-    prepare_escrow = lambda esc_addr: seed_escrow(  # noqa: E731
-        rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, blockhash
-    )
+
+    async def prepare_escrow(esc_addr):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await seed_escrow(
+            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, bh
+        )
 
     def can_play(wallet: str) -> bool:
         return wallet in playable
@@ -188,4 +194,90 @@ async def run_pack_battle_live(
         can_play=can_play,
         now_fn=now_fn,
         sponsor=sponsor,
+    )
+
+
+async def run_royale_live(
+    session,
+    battle,
+    *,
+    gacha,
+    signer,
+    rpc_url: str,
+    usdc_mint: str,
+    operator_wallet_id: str = "",
+    operator_address: str = "",
+    seed_lamports: int = 10_000_000,
+    price_base: int,
+) -> str:
+    """Assemble live on-chain state and run the royale engine.
+
+    Unlike run_pack_battle_live, the escrow wallet is pre-created at lobby-create
+    time so buy-ins can be collected before the battle starts.  This function
+    therefore does NOT call signer.create_solana_wallet(); it uses the
+    battle.escrow_wallet_id / battle.escrow_address that were set at create time.
+
+    All async I/O (blockhash, distribute, confirm) is pre-built as closures so
+    the royale engine can call them without awareness of RPC details.
+    """
+    from app.models import BattlePlayer
+
+    players = (
+        session.query(BattlePlayer)
+        .filter_by(battle_id=battle.id)
+        .order_by(BattlePlayer.joined_at)
+        .all()
+    )
+
+    wallet_to_privy_id: dict = {p.player_wallet: p.wallet_id for p in players}
+
+    def resolve_wallet_id(wallet: str):
+        return wallet_to_privy_id.get(wallet)
+
+    # distribute: fund a player from the escrow wallet just-in-time for their pull.
+    # Fetches a fresh blockhash per call — royale spans multiple rounds/minutes.
+    async def distribute(esc_addr: str, player_addr: str, amt: int) -> str:
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await distribute_usdc(
+            rpc_url, signer,
+            battle.escrow_wallet_id, esc_addr,
+            player_addr, usdc_mint, amt, bh,
+        )
+
+    # confirm_usdc: poll until player's ATA has at least `min_base_units`.
+    async def confirm_usdc_cb(player_addr: str, min_base_units: int) -> bool:
+        return await confirm_usdc(rpc_url, player_addr, usdc_mint, min_base_units)
+
+    # Reuse the same closures as pack wiring for NFT transfer mechanics.
+    # Each fetches a fresh blockhash to avoid stale-blockhash failures.
+    async def build_transfer_tx(esc, dest, mint):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await build_transfer(rpc_url, esc, dest, mint, bh)
+
+    submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
+    confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
+
+    async def prepare_escrow(esc_addr):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await seed_escrow(
+            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, bh
+        )
+
+    def now_fn():
+        return datetime.now(timezone.utc)
+
+    return await run_royale(
+        session,
+        battle,
+        gacha=gacha,
+        signer=signer,
+        resolve_wallet_id=resolve_wallet_id,
+        distribute=distribute,
+        confirm_usdc=confirm_usdc_cb,
+        confirm_in_escrow=confirm_in_escrow,
+        build_transfer_tx=build_transfer_tx,
+        submit_tx=submit_tx,
+        prepare_escrow=prepare_escrow,
+        price_base=price_base,
+        now_fn=now_fn,
     )
