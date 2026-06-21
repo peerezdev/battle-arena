@@ -31,11 +31,14 @@ async def run_royale(
         .all()
     ]
 
-    # Create escrow wallet
-    esc = await signer.create_solana_wallet()
-    battle.escrow_wallet_id = esc["id"]
-    battle.escrow_address = esc["address"]
-    session.commit()
+    # Create escrow wallet (reuse pre-created one if it already exists)
+    if battle.escrow_wallet_id and battle.escrow_address:
+        esc = {"id": battle.escrow_wallet_id, "address": battle.escrow_address}
+    else:
+        esc = await signer.create_solana_wallet()
+        battle.escrow_wallet_id = esc["id"]
+        battle.escrow_address = esc["address"]
+        session.commit()
 
     # Seed escrow — if this fails, void immediately (no funds moved yet)
     try:

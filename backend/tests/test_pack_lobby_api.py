@@ -316,11 +316,19 @@ def test_royale_create_returns_200_with_buyin_and_escrow(client_priv, monkeypatc
     async def _machines():
         return [{"code": "pokemon_50", "price": 50, "available": True}]
 
+    async def _fake_collect_buyin(*args, **kwargs):
+        return "fake-sig"
+
+    async def _fake_blockhash(rpc_url: str) -> str:
+        return "FakeBH444444444444444444444444444444444444444"
+
     escrow_created = []
     c2, priv2 = _make_royale_app(escrow_created_list=escrow_created)
 
     monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
     monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.collect_buyin", _fake_collect_buyin)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _fake_blockhash)
 
     hdrs = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
     r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 4, "mode": "royale"}, headers=hdrs)
@@ -364,11 +372,48 @@ def test_royale_join_collects_buyin(client_priv, monkeypatch):
     assert r.status_code == 200, r.text
     battle_id = r.json()["id"]
 
-    # Player B joins — collect_buyin should be called
+    # Player B joins — collect_buyin should be called again (once for creator at create, once for joiner B)
     hdrs_b = _auth_headers(priv2, WALLET_B, WALLET_ID_B)
     r2 = c2.post(f"/pack-battles/{battle_id}/join", headers=hdrs_b)
     assert r2.status_code == 200, r2.text
-    assert len(buyin_calls) == 1, f"collect_buyin called {len(buyin_calls)} times, expected 1"
+    assert len(buyin_calls) == 2, f"collect_buyin called {len(buyin_calls)} times, expected 2 (1 for creator at create + 1 for joiner B)"
+
+
+def test_royale_creator_buyin_collected_at_create(client_priv, monkeypatch):
+    """POST /pack-battles with mode=royale → collect_buyin is called for the creator immediately."""
+    async def _high_balance(*args, **kwargs):
+        return 200_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    buyin_calls: list = []
+
+    async def _fake_collect_buyin(*args, **kwargs):
+        buyin_calls.append(args)
+        return "fake-sig"
+
+    async def _fake_blockhash(rpc_url: str) -> str:
+        return "FakeBH333333333333333333333333333333333333333"
+
+    c2, priv2 = _make_royale_app()
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.collect_buyin", _fake_collect_buyin)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _fake_blockhash)
+
+    # Player A creates royale battle
+    hdrs_a = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 3, "mode": "royale"}, headers=hdrs_a)
+    assert r.status_code == 200, r.text
+
+    # collect_buyin should have been called once (for the creator) right at create time
+    assert len(buyin_calls) == 1, f"collect_buyin called {len(buyin_calls)} times, expected 1 for creator"
+    # The creator's wallet (WALLET_A) and wallet_id (WALLET_ID_A) must be in the call args
+    creator_call_args = buyin_calls[0]
+    assert WALLET_ID_A in creator_call_args, f"WALLET_ID_A not in collect_buyin args: {creator_call_args}"
+    assert WALLET_A in creator_call_args, f"WALLET_A not in collect_buyin args: {creator_call_args}"
 
 
 def test_royale_fill_schedules_run_royale_live(client_priv, monkeypatch):

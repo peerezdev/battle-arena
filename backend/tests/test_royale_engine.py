@@ -354,3 +354,57 @@ async def test_royale_voids_when_prepare_escrow_raises(session):
     assert out == "voided"
     battle = session.get(PackBattle, "r5")
     assert battle.status == "voided"
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Test 6: pre-created escrow is REUSED — create_solana_wallet must NOT be called
+# ════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_royale_reuses_pre_created_escrow(session):
+    """If escrow_wallet_id and escrow_address are already set on the battle,
+    run_royale must NOT call signer.create_solana_wallet() and must keep
+    the original escrow fields unchanged."""
+    values = {
+        ("A", 1): 10,
+        ("B", 1): 20,
+    }
+    _mk(session, "r6", ["A", "B"])
+
+    # Set pre-created escrow fields on the battle
+    battle = session.get(PackBattle, "r6")
+    battle.escrow_wallet_id = "pre-esc-id"
+    battle.escrow_address = "PRE_ESC"
+    session.commit()
+
+    class _NoCreateSigner:
+        """Signer that raises if create_solana_wallet is ever called."""
+        async def create_solana_wallet(self):
+            raise AssertionError("should not be called")
+
+        async def sign_solana(self, wallet_id, tx):
+            return f"sig-{tx}"
+
+    gacha = _Gacha(values)
+    signer = _NoCreateSigner()
+    fakes = _std_fakes()
+
+    out = await run_royale(
+        session, session.get(PackBattle, "r6"),
+        gacha=gacha, signer=signer,
+        resolve_wallet_id=lambda w: f"{w}-id",
+        distribute=fakes["distribute"],
+        confirm_usdc=fakes["confirm_usdc"],
+        confirm_in_escrow=fakes["confirm_in_escrow"],
+        build_transfer_tx=fakes["build_transfer_tx"],
+        submit_tx=fakes["submit_tx"],
+        prepare_escrow=fakes["prepare_escrow"],
+        price_base=50_000_000,
+        now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
+        sleep_fn=_noop,
+    )
+
+    assert out == "settled"
+    battle = session.get(PackBattle, "r6")
+    assert battle.escrow_wallet_id == "pre-esc-id", "escrow_wallet_id was overwritten"
+    assert battle.escrow_address == "PRE_ESC", "escrow_address was overwritten"

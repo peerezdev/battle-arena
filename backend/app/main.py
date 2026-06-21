@@ -430,6 +430,14 @@ def create_app(session_factory, chain: ChainSource,
             b.escrow_wallet_id = esc["id"]
             b.escrow_address = esc["address"]
             s.commit()
+            # Collect the creator's buy-in immediately (creator is the first player)
+            blockhash = await fetch_latest_blockhash(solana_rpc_url)
+            await collect_buyin(
+                solana_rpc_url, privy_signer,
+                wallet_id, wallet,
+                privy_operator_wallet_id, privy_operator_address,
+                b.escrow_address, cc_usdc_mint, buyin, blockhash,
+            )
             resp = get_battle(s, b.id)
             resp["buyin"] = buyin
             resp["escrow_address"] = b.escrow_address
