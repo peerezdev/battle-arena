@@ -56,16 +56,21 @@ async def test_run_battle_settles_to_winner(session):
     gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
                     "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
     signer = _Signer()
+    built, submits = [], []
+    async def build_transfer_tx(esc, dest, mint):
+        built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed):
+        submits.append(signed); return "ccsig"
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=lambda esc, win, nft: f"xfer-{nft}->{win}",
-                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21))
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "settled"
     assert b.winner == "B" and b.status == "settled" and b.escrow_address == "ESC"
     assert gacha.alt == "ESC"                       # pulls delivered to escrow
-    # default is user-pays (sponsor=False): every broadcast carries sponsor=False
-    assert all(s[2] is False for s in signer.sent)
-    assert ("esc-id", "xfer-nA->B", False) in signer.sent and ("esc-id", "xfer-nB->B", False) in signer.sent
+    # Transfers now go via async build_transfer_tx + sign_solana + submit_tx (not sign_and_send_solana)
+    assert ("ESC", "B", "nA") in built and ("ESC", "B", "nB") in built
+    assert "signed-xfer-nA->B" in submits and "signed-xfer-nB->B" in submits
     assert session.query(BattlePull).filter_by(battle_id="b1").count() == 2
     pull_wallets = {s[0] for s in signer.signed}
     assert "A-id" in pull_wallets and "B-id" in pull_wallets
@@ -75,7 +80,48 @@ async def test_run_battle_settles_to_winner(session):
 
 
 @pytest.mark.asyncio
+async def test_run_battle_settles_with_async_transfer(session):
+    b = PackBattle(id="b8", mode="pack", machine_code="pokemon_50", price=50, max_players=2, status="running")
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="b8", player_wallet="A"),
+                     BattlePlayer(battle_id="b8", player_wallet="B")])
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
+                    "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
+    signer = _Signer()
+    built, submits = [], []
+    async def build_transfer_tx(esc, dest, mint):
+        built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed):
+        submits.append(signed); return "ccsig"
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+    assert out == "settled" and b.winner == "B"
+    assert ("ESC", "B", "nA") in built and ("ESC", "B", "nB") in built   # both → winner from escrow addr
+    assert {s for s in submits} == {"signed-xfer-nA->B", "signed-xfer-nB->B"}  # sign_solana then submit
+
+
+@pytest.mark.asyncio
+async def test_run_battle_voids_on_unsupported_standard(session):
+    from app.services.nft_transfer import UnsupportedNftStandard
+    b = PackBattle(id="b9", mode="pack", machine_code="pokemon_50", price=50, max_players=1, status="running")
+    session.add(b); session.add(BattlePlayer(battle_id="b9", player_wallet="A")); session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9}})
+    signer = _Signer()
+    async def build_transfer_tx(esc, dest, mint): raise UnsupportedNftStandard("cnft")
+    async def submit_tx(signed): return "x"
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+    assert out == "voided" and b.winner is None
+
+
+@pytest.mark.asyncio
 async def test_run_battle_sponsor_flag_propagates(session):
+    """sponsor param is kept in signature for API stability but no longer drives transfer logic."""
     b = PackBattle(id="b3", mode="pack", machine_code="pokemon_50", price=50, max_players=2, status="running")
     session.add(b)
     session.add_all([BattlePlayer(battle_id="b3", player_wallet="A"),
@@ -84,15 +130,20 @@ async def test_run_battle_sponsor_flag_propagates(session):
     gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
                     "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
     signer = _Signer()
+    built, submits = [], []
+    async def build_transfer_tx(esc, dest, mint):
+        built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed):
+        submits.append(signed); return "ccsig"
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=lambda esc, win, nft: f"xfer-{nft}->{win}",
-                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21),
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
                            sponsor=True)
     assert out == "settled"
-    # signer.sent contains only escrow→winner transfers (sponsor=True propagated).
-    # Pull TXs go through sign_solana (sign-only) + gacha.submit_tx — no sponsor param by design.
-    assert signer.sent and all(s[2] is True for s in signer.sent)
+    # Transfers go via submit_tx (not sign_and_send_solana), so signer.sent is empty.
+    assert signer.sent == []
+    assert len(submits) == 2  # both NFTs transferred via submit_tx
 
 
 @pytest.mark.asyncio
@@ -104,10 +155,12 @@ async def test_run_battle_voids_when_player_cannot_play(session):
     session.commit()
     gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9}})
     signer = _Signer()
+    async def build_transfer_tx(esc, dest, mint): return "x"
+    async def submit_tx(signed): return "ccsig"
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=lambda esc, win, nft: "x",
-                           can_play=lambda w: w != "B", now_fn=lambda: __import__("datetime").datetime(2026,6,21))
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           can_play=lambda w: w != "B", now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "voided" and b.status == "voided" and b.winner is None
     assert b.escrow_address is None
     assert signer.sent == []
@@ -134,10 +187,15 @@ async def test_run_battle_polls_open_pack_while_pending(session):
     signer = _Signer()
     slept = []
     async def no_sleep(d): slept.append(d)
+    built, submits = [], []
+    async def build_transfer_tx(esc, dest, mint):
+        built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed):
+        submits.append(signed); return "ccsig"
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=lambda esc, win, nft: f"xfer-{nft}->{win}",
-                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21),
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
                            sleep_fn=no_sleep)
     assert out == "settled" and b.winner == "A"
     assert len(slept) == 2          # polled past the 2 pending responses
@@ -157,9 +215,11 @@ async def test_run_battle_voids_if_open_pack_never_resolves(session):
     gacha = _AlwaysPending({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9}})
     signer = _Signer()
     async def no_sleep(d): pass
+    async def build_transfer_tx(esc, dest, mint): return "x"
+    async def submit_tx(signed): return "ccsig"
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=lambda esc, win, nft: "x",
-                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21),
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
                            open_max_attempts=3, sleep_fn=no_sleep)
     assert out == "voided"

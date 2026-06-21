@@ -4,13 +4,11 @@ Uses respx to mock the Solana JSON-RPC endpoint and in-memory SQLite for the DB.
 The fake _Gacha and _Signer are minimal copies of the style used in test_pack_engine.py,
 but _Signer uses real base58 pubkeys so build_nft_transfer can derive ATAs.
 """
-import base64
 import json
 
 import pytest
 import respx
 import httpx
-from solders.transaction import Transaction
 
 from app.db import Base, make_engine, make_session_factory, init_db
 from app.models import PackBattle, BattlePlayer
@@ -222,10 +220,26 @@ async def test_usdc_balance_base_units_returns_zero_on_null_value():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_run_pack_battle_live_happy_path(session):
+async def test_run_pack_battle_live_happy_path(session, monkeypatch):
     """Both players have sufficient USDC → battle settles, escrow NFTs transferred
-    to winner, resulting tx bytes are valid Solana transactions with 2 instructions
-    and fee-payer == ESCROW_ADDRESS."""
+    to winner via the async transfer dispatcher (build_transfer / submit_signed_tx
+    are monkeypatched so no real RPC calls are needed for settle)."""
+    import app.services.pack_orchestration as po
+
+    # Stub build_transfer and submit_signed_tx in the pack_orchestration module
+    calls = {"build": [], "submit": []}
+
+    async def fake_build(rpc, esc, dest, mint, bh):
+        calls["build"].append((esc, dest, mint))
+        return f"tx-{mint}"
+
+    async def fake_submit(rpc, signed):
+        calls["submit"].append(signed)
+        return "sig"
+
+    monkeypatch.setattr(po, "build_transfer", fake_build)
+    monkeypatch.setattr(po, "submit_signed_tx", fake_submit)
+
     b = PackBattle(id="b-live-1", mode="pack", machine_code="pokemon_50",
                    price=50, max_players=2, status="running")
     session.add(b)
@@ -270,25 +284,22 @@ async def test_run_pack_battle_live_happy_path(session):
     # Gacha received escrow address as alt_player_address
     assert gacha.alt == ESCROW_ADDRESS
 
-    # sponsor=False on every sign_and_send call
-    assert all(s[2] is False for s in signer.sent)
-
     # resolve_wallet_id maps wallets to their privy wallet IDs from DB (pulls use sign_solana)
     privy_ids_used = {s[0] for s in signer.signed}
     assert WALLET_ID_A in privy_ids_used
     assert WALLET_ID_B in privy_ids_used
 
-    # The settle transfers (escrow -> winner) use the escrow wallet id
-    settle_calls = [s for s in signer.sent if s[0] == ESCROW_WALLET_ID]
-    assert len(settle_calls) == 2  # one per NFT (nft_A and nft_B both go to winner)
+    # The transfer dispatcher was called once per NFT (both NFTs → winner WALLET_B)
+    assert len(calls["build"]) == 2
+    build_mints = {t[2] for t in calls["build"]}
+    assert NFT_A in build_mints
+    assert NFT_B in build_mints
 
-    # Each settle tx is a valid Solana transaction with 2 instructions
-    # and fee_payer == ESCROW_ADDRESS
-    for _, tx_b64, _ in settle_calls:
-        raw = base64.b64decode(tx_b64)
-        tx = Transaction.from_bytes(raw)
-        assert len(tx.message.instructions) == 2
-        assert str(tx.message.account_keys[0]) == ESCROW_ADDRESS
+    # submit_signed_tx was called once per settle transfer
+    assert len(calls["submit"]) == 2
+    # Each submit receives "signed-tx-<mint>" (signer.sign_solana returns f"signed-{tx}")
+    for sub in calls["submit"]:
+        assert sub.startswith("signed-tx-")
 
 
 # ---------------------------------------------------------------------------
