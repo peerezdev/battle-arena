@@ -111,3 +111,55 @@ async def test_run_battle_voids_when_player_cannot_play(session):
     assert out == "voided" and b.status == "voided" and b.winner is None
     assert b.escrow_address is None
     assert signer.sent == []
+
+
+@pytest.mark.asyncio
+async def test_run_battle_polls_open_pack_while_pending(session):
+    b = PackBattle(id="b4", mode="pack", machine_code="pokemon_50", price=50, max_players=1, status="running")
+    session.add(b)
+    session.add(BattlePlayer(battle_id="b4", player_wallet="A"))
+    session.commit()
+
+    class _PendingGacha(_Gacha):
+        def __init__(self, opens, pending_times):
+            super().__init__(opens); self._left = pending_times
+        async def open_pack(self, memo):
+            w = memo.split("m-")[1]
+            if self._left > 0:
+                self._left -= 1
+                return {"pending": True}
+            return {"pending": False, **self.opens[w]}
+
+    gacha = _PendingGacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9}}, pending_times=2)
+    signer = _Signer()
+    slept = []
+    async def no_sleep(d): slept.append(d)
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=lambda esc, win, nft: f"xfer-{nft}->{win}",
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21),
+                           sleep_fn=no_sleep)
+    assert out == "settled" and b.winner == "A"
+    assert len(slept) == 2          # polled past the 2 pending responses
+
+
+@pytest.mark.asyncio
+async def test_run_battle_voids_if_open_pack_never_resolves(session):
+    b = PackBattle(id="b5", mode="pack", machine_code="pokemon_50", price=50, max_players=1, status="running")
+    session.add(b)
+    session.add(BattlePlayer(battle_id="b5", player_wallet="A"))
+    session.commit()
+
+    class _AlwaysPending(_Gacha):
+        async def open_pack(self, memo):
+            return {"pending": True}
+
+    gacha = _AlwaysPending({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9}})
+    signer = _Signer()
+    async def no_sleep(d): pass
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=lambda esc, win, nft: "x",
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026,6,21),
+                           open_max_attempts=3, sleep_fn=no_sleep)
+    assert out == "voided"

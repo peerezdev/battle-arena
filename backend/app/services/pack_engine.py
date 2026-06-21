@@ -1,6 +1,7 @@
 """Operator-orchestrated Pack Battle / Battle Royale engine. All on-chain I/O is
 injected so the orchestration is unit-testable without live calls."""
 from __future__ import annotations
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Optional
@@ -25,9 +26,11 @@ def determine_winner(pulls: list[PullOutcome], join_order: list[str]) -> str:
 
 
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
-                     can_play, now_fn, sponsor: bool = False) -> str:
+                     can_play, now_fn, sponsor: bool = False,
+                     open_max_attempts: int = 20, open_delay: float = 3.0, sleep_fn=None) -> str:
     # sponsor=False → user-pays (the fee-payer wallet needs SOL). sponsor=True requires
     # Privy "App pays" gas sponsorship to be enabled for the cluster.
+    sleep_fn = sleep_fn or asyncio.sleep
     from app.models import BattlePlayer, BattlePull
     players = [p.player_wallet for p in
                session.query(BattlePlayer).filter_by(battle_id=battle.id).order_by(BattlePlayer.joined_at).all()]
@@ -54,7 +57,13 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             sub = await gacha.submit_tx(signed)
             if not sub.get("signature"):
                 raise RuntimeError("pull submit returned no signature")
+            # CC opens via webhook → poll while pending (don't void on a not-yet-ready pull).
             res = await gacha.open_pack(pack["memo"])
+            attempts = 0
+            while res.get("pending") and attempts < open_max_attempts:
+                await sleep_fn(open_delay)
+                res = await gacha.open_pack(pack["memo"])
+                attempts += 1
             if res.get("pending") or not res.get("nft_address"):
                 raise RuntimeError("pull did not resolve")
             pull.nft_address = res["nft_address"]
