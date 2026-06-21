@@ -21,5 +21,5 @@ def test_pick_index_deterministic_and_bounded():
     i1 = pick_index(seed, cs, 3)
     i2 = pick_index(seed, cs, 3)
     assert i1 == i2 and 0 <= i1 < 3
-    # golden: stable across runs (lock the value once known)
-    assert pick_index("ab" * 32, "00" * 32, 5) == pick_index("ab" * 32, "00" * 32, 5)
+    # golden: anchors the HMAC draw formula (changing it breaks Provably-Fair verification)
+    assert pick_index("ab" * 32, "00" * 32, 5) == 2
