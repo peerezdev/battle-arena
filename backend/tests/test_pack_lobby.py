@@ -35,3 +35,10 @@ def test_join_rejects_duplicate_and_full(session):
     join_battle(session, b.id, "WB", "wid-b")            # fills
     with pytest.raises(LobbyError):
         join_battle(session, b.id, "WX", "wid-x")        # not lobby anymore
+
+
+def test_get_battle_hides_server_seed_until_settled(session):
+    # commit-reveal gate: server_seed must NOT leak while not settled (only the hash is public).
+    b = create_battle(session, "WC", "wid-c", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    view = get_battle(session, b.id)
+    assert view["server_seed_hash"] and "server_seed" not in view

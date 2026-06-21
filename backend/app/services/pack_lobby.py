@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from sqlalchemy import update
 from app.models import PackBattle, BattlePlayer
-from app.services.provably_fair import gen_server_seed, seed_hash, verify_commit
+from app.services.provably_fair import gen_server_seed, verify_commit
 
 
 class LobbyError(Exception):
