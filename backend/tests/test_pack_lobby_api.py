@@ -266,3 +266,155 @@ def test_join_insufficient_usdc_returns_402(client_priv, monkeypatch):
     hdrs_b = _auth_headers(priv, WALLET_B, WALLET_ID_B)
     r_join = c.post(f"/pack-battles/{battle_id}/join", headers=hdrs_b)
     assert r_join.status_code == 402, r_join.text
+
+
+# ── Royale mode tests ─────────────────────────────────────────────────────────
+
+def _make_royale_app(escrow_created_list=None, escrow_address="So1anaESCROWXXXXXXXXXXXXXXXXXXXXXXXXXXX1"):
+    """Build a fresh TestClient+priv pair with a fake signer that records escrow creation."""
+    from app.db import make_session_factory, init_db
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+    from app.main import create_app
+    from app.privy import PrivyVerifier
+    from app.chain.mock import MockChainSource
+    from app.services.gacha import GachaService
+    from fastapi.testclient import TestClient
+
+    counter = [0]
+
+    class FakeSigner:
+        async def create_solana_wallet(self):
+            counter[0] += 1
+            if escrow_created_list is not None:
+                escrow_created_list.append(True)
+            return {"id": f"escrow-wid-{counter[0]}", "address": escrow_address}
+
+    engine2 = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    init_db(engine2)
+    sf2 = make_session_factory(engine2)
+    priv2 = _make_es256()
+    privy2 = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv2.public_key())
+    gacha2 = GachaService(base_url="https://dev-gacha.example.com", api_key="")
+
+    app2 = create_app(
+        sf2, MockChainSource(), gacha=gacha2, privy=privy2,
+        privy_signer=FakeSigner(),
+        solana_rpc_url=DUMMY_RPC, cc_usdc_mint=DUMMY_MINT,
+        privy_operator_wallet_id="op-wallet-id",
+        privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
+        escrow_seed_lamports=10_000_000,
+    )
+    return TestClient(app2, raise_server_exceptions=True), priv2
+
+
+def test_royale_create_returns_200_with_buyin_and_escrow(client_priv, monkeypatch):
+    """POST /pack-battles with mode=royale → 200; body has buyin and escrow_address; escrow is pre-created."""
+    async def _high_balance(*args, **kwargs):
+        return 200_000_000  # well above any buyin
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    escrow_created = []
+    c2, priv2 = _make_royale_app(escrow_created_list=escrow_created)
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+    hdrs = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 4, "mode": "royale"}, headers=hdrs)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body.get("mode") == "royale"
+    assert "buyin" in body, f"buyin not in response: {body}"
+    assert body["buyin"] > 0
+    # escrow must be pre-created (create_solana_wallet was called)
+    assert escrow_created, "signer.create_solana_wallet was not called at royale create time"
+    assert body.get("escrow_address"), "escrow_address not in response"
+
+
+def test_royale_join_collects_buyin(client_priv, monkeypatch):
+    """Joining a royale battle calls collect_buyin once per new player."""
+    async def _high_balance(*args, **kwargs):
+        return 200_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    buyin_calls: list = []
+
+    async def _fake_collect_buyin(*args, **kwargs):
+        buyin_calls.append(args)
+        return "fake-sig"
+
+    async def _fake_blockhash(rpc_url: str) -> str:
+        return "FakeBH111111111111111111111111111111111111111"
+
+    c2, priv2 = _make_royale_app()
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.collect_buyin", _fake_collect_buyin)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _fake_blockhash)
+
+    # Player A creates royale battle
+    hdrs_a = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 3, "mode": "royale"}, headers=hdrs_a)
+    assert r.status_code == 200, r.text
+    battle_id = r.json()["id"]
+
+    # Player B joins — collect_buyin should be called
+    hdrs_b = _auth_headers(priv2, WALLET_B, WALLET_ID_B)
+    r2 = c2.post(f"/pack-battles/{battle_id}/join", headers=hdrs_b)
+    assert r2.status_code == 200, r2.text
+    assert len(buyin_calls) == 1, f"collect_buyin called {len(buyin_calls)} times, expected 1"
+
+
+def test_royale_fill_schedules_run_royale_live(client_priv, monkeypatch):
+    """When a royale lobby fills, run_royale_live (not run_pack_battle_live) is scheduled."""
+    async def _high_balance(*args, **kwargs):
+        return 200_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _fake_collect_buyin(*args, **kwargs):
+        return "fake-sig"
+
+    async def _fake_blockhash(rpc_url: str) -> str:
+        return "FakeBH222222222222222222222222222222222222222"
+
+    royale_scheduled: list = []
+
+    async def _fake_run_royale_live(session, battle, **kwargs):
+        royale_scheduled.append(battle.id)
+
+    pack_scheduled: list = []
+
+    async def _fake_run_pack_live(session, battle, **kwargs):
+        pack_scheduled.append(battle.id)
+
+    c2, priv2 = _make_royale_app()
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.collect_buyin", _fake_collect_buyin)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _fake_blockhash)
+    monkeypatch.setattr("app.main.run_royale_live", _fake_run_royale_live)
+    monkeypatch.setattr("app.main.run_pack_battle_live", _fake_run_pack_live)
+
+    hdrs_a = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2, "mode": "royale"}, headers=hdrs_a)
+    assert r.status_code == 200, r.text
+    battle_id = r.json()["id"]
+
+    hdrs_b = _auth_headers(priv2, WALLET_B, WALLET_ID_B)
+    r2 = c2.post(f"/pack-battles/{battle_id}/join", headers=hdrs_b)
+    assert r2.status_code == 200, r2.text
+
+    # Drain the event loop so the task fires
+    asyncio.get_event_loop().run_until_complete(asyncio.sleep(0))
+
+    assert royale_scheduled, "run_royale_live was not scheduled after royale lobby filled"
+    assert not pack_scheduled, "run_pack_battle_live should NOT be called for royale mode"

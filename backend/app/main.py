@@ -31,7 +31,10 @@ from .services.pack_lobby import (
     list_open as lobby_list_open,
     get_battle, LobbyError,
 )
-from .services.pack_orchestration import run_pack_battle_live, usdc_balance_base_units
+from .services.pack_orchestration import (
+    run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
+)
+from .services.royale_funding import royale_buyin, collect_buyin
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +89,7 @@ class CreateMatchBody(BaseModel):
 class CreateBattleBody(BaseModel):
     machine_code: str
     max_players: int
+    mode: str = "pack"
 
 
 def create_app(session_factory, chain: ChainSource,
@@ -370,6 +374,7 @@ def create_app(session_factory, chain: ChainSource,
         return int(m["price"]) * 1_000_000   # USDC base units
 
     async def _run_bg(battle_id: str):
+        """Background task for pack battles."""
         s2 = session_factory()
         try:
             b = s2.get(PackBattle, battle_id)
@@ -382,14 +387,59 @@ def create_app(session_factory, chain: ChainSource,
         finally:
             s2.close()
 
+    async def _run_royale_bg(battle_id: str):
+        """Background task for royale battles.
+
+        Diverges from _run_bg: calls run_royale_live with price_base=battle.price.
+        The escrow wallet was already created at lobby-creation time (escrow-at-create),
+        so run_royale_live does not create a new escrow — it uses the pre-created one.
+        """
+        s2 = session_factory()
+        try:
+            b = s2.get(PackBattle, battle_id)
+            await run_royale_live(s2, b, gacha=gacha, signer=privy_signer,
+                rpc_url=solana_rpc_url, usdc_mint=cc_usdc_mint,
+                operator_wallet_id=privy_operator_wallet_id,
+                operator_address=privy_operator_address,
+                seed_lamports=escrow_seed_lamports,
+                price_base=b.price)
+        except Exception:
+            logger.warning("background royale run failed for %s", battle_id)
+        finally:
+            s2.close()
+
     @app.post("/pack-battles")
     async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),
                                  wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
         price = await _machine_price(body.machine_code)
+        mode = body.mode
+
+        if mode == "royale":
+            # For royale, the funds check is against the buy-in, not just the pack price.
+            buyin = royale_buyin(body.max_players, price)
+            await _require_funds(wallet, buyin)
+            try:
+                b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
+                                  max_players=body.max_players, mode="royale")
+            except LobbyError as e:
+                raise HTTPException(409, str(e))
+            # Pre-create the escrow wallet at lobby-creation time so buy-ins can be
+            # collected immediately when players join (before the battle starts).
+            # Pack battles create the escrow lazily inside run_battle; royale diverges here.
+            esc = await privy_signer.create_solana_wallet()
+            b.escrow_wallet_id = esc["id"]
+            b.escrow_address = esc["address"]
+            s.commit()
+            resp = get_battle(s, b.id)
+            resp["buyin"] = buyin
+            resp["escrow_address"] = b.escrow_address
+            return resp
+
+        # Default: pack mode
         await _require_funds(wallet, price)
         try:
             b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
-                              max_players=body.max_players)
+                              max_players=body.max_players, mode=mode)
         except LobbyError as e:
             raise HTTPException(409, str(e))
         return get_battle(s, b.id)
@@ -400,6 +450,28 @@ def create_app(session_factory, chain: ChainSource,
         b = s.get(PackBattle, battle_id)
         if b is None:
             raise HTTPException(404, "no existe")
+
+        if b.mode == "royale":
+            # For royale, check that the player can cover the buy-in.
+            buyin = royale_buyin(b.max_players, b.price)
+            await _require_funds(wallet, buyin)
+            try:
+                b, filled = join_battle(s, battle_id, wallet, wallet_id)
+            except LobbyError as e:
+                raise HTTPException(409, str(e))
+            # Collect the buy-in from the joining player into the pre-created escrow.
+            blockhash = await fetch_latest_blockhash(solana_rpc_url)
+            await collect_buyin(
+                solana_rpc_url, privy_signer,
+                wallet_id, wallet,
+                privy_operator_wallet_id, privy_operator_address,
+                b.escrow_address, cc_usdc_mint, buyin, blockhash,
+            )
+            if filled:
+                asyncio.create_task(_run_royale_bg(battle_id))
+            return get_battle(s, battle_id)
+
+        # Default: pack mode
         await _require_funds(wallet, b.price)
         try:
             b, filled = join_battle(s, battle_id, wallet, wallet_id)

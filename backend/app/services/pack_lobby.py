@@ -16,12 +16,12 @@ class ModeNotSupported(LobbyError):
 
 
 def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, price, max_players, mode="pack"):
-    if mode != "pack":
-        raise ModeNotSupported("Battle Royale próximamente")
+    if mode not in ("pack", "royale"):
+        raise ModeNotSupported(f"Modo '{mode}' no soportado")
     if not (2 <= max_players <= 10):
         raise LobbyError("max_players debe estar entre 2 y 10")
     seed, h = gen_server_seed()
-    b = PackBattle(id=uuid.uuid4().hex, mode="pack", machine_code=machine_code, price=price,
+    b = PackBattle(id=uuid.uuid4().hex, mode=mode, machine_code=machine_code, price=price,
                    max_players=max_players, status="lobby", server_seed=seed, server_seed_hash=h)
     session.add(b)
     session.add(BattlePlayer(battle_id=b.id, player_wallet=creator_wallet, wallet_id=creator_wallet_id))

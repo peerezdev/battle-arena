@@ -15,8 +15,18 @@ def test_create_battle_commits_seed_and_creator(session):
     assert session.query(BattlePlayer).filter_by(battle_id=b.id).count() == 1
 
 def test_create_rejects_royale(session):
+    # This test is SUPERSEDED by test_create_royale_allowed_and_sets_mode below.
+    # royale is now an accepted mode; only truly unknown modes are rejected.
     with pytest.raises(ModeNotSupported):
-        create_battle(session, "WC", "wid", machine_code="pokemon_50", price=50_000_000, max_players=2, mode="royale")
+        create_battle(session, "WC", "wid", machine_code="pokemon_50", price=50_000_000, max_players=2, mode="tournament")
+
+
+def test_create_royale_allowed_and_sets_mode(session):
+    b = create_battle(session, "WC", "wid-c", machine_code="pokemon_50",
+                      price=50_000_000, max_players=4, mode="royale")
+    assert b.mode == "royale" and b.status == "lobby"
+    # seed must be generated (used for PF tie-break in royale rounds)
+    assert b.server_seed and b.server_seed_hash
 
 def test_create_rejects_bad_max_players(session):
     with pytest.raises(LobbyError):
