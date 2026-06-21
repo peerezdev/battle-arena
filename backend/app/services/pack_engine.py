@@ -52,7 +52,8 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                                              alt_player_address=esc["address"])
             pull = BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"])
             session.add(pull); session.commit()
-            # CC broadcasts the pull on its own RPC (Privy signAndSend fails — different RPC, blockhash not found)
+            # CC broadcasts the pull on its own RPC (Privy signAndSend fails — different RPC, blockhash not
+            # found). CC owns the pull tx fee, so `sponsor` does NOT apply to pulls — only escrow transfers.
             signed = await signer.sign_solana(resolve_wallet_id(w), pack["transaction"])
             sub = await gacha.submit_tx(signed)
             if not sub.get("signature"):
@@ -73,7 +74,10 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             session.commit()
             outcomes.append(PullOutcome(w, pack["memo"], res["nft_address"],
                                         res.get("insured_value") or 0, res.get("grade")))
-        except Exception:
+        except Exception as exc:
+            # A transient failure here may have consumed the player's CC pack memo — log it so the
+            # void is traceable (no secrets: wallet + battle id + error only).
+            logger.warning("pull failed for %s in battle %s: %s — voiding", w, battle.id, exc)
             await _void_return(signer, esc, outcomes, build_transfer_tx, sponsor)
             battle.status = "voided"; session.commit(); return "voided"
 
