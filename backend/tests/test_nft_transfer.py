@@ -175,11 +175,11 @@ async def test_build_transfer_pnft_returns_base64():
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_build_transfer_raises_for_core():
-    """build_transfer raises UnsupportedNftStandard for MPL Core NFTs."""
+async def test_build_transfer_core_returns_base64():
+    """build_transfer for MPL Core NFTs calls build_core_transfer and returns a b64 tx."""
     respx.post(RPC).mock(return_value=_acct_info({"owner": MPL_CORE, "data": ["", "base64"]}))
-    with pytest.raises(UnsupportedNftStandard):
-        await build_transfer(RPC, ESCROW, WINNER, MINTS, BLOCKHASH)
+    result = await build_transfer(RPC, ESCROW, WINNER, MINTS, BLOCKHASH)
+    _b64.b64decode(result)  # must be valid base64
 
 
 @respx.mock
