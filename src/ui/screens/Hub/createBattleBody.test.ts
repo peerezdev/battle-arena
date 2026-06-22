@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { buildCreateBody } from './createBattleBody'
 
 describe('buildCreateBody', () => {
-  it('forces max_players=2 for pack regardless of the royale count', () => {
-    expect(buildCreateBody('pack', 'pokemon_50', 8)).toEqual({
-      machine_code: 'pokemon_50', max_players: 2, mode: 'pack',
+  it('uses the chosen player count for pack (2-10 supported by the backend)', () => {
+    expect(buildCreateBody('pack', 'pokemon_50', 5)).toEqual({
+      machine_code: 'pokemon_50', max_players: 5, mode: 'pack',
     })
   })
 

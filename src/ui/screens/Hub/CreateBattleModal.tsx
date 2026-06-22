@@ -7,7 +7,7 @@ import { buildCreateBody } from './createBattleBody'
 import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 
-const ROYALE_COUNTS = [3, 4, 5, 6, 8, 10]
+const PLAYER_COUNTS = [2, 3, 4, 5, 6, 8, 10]
 
 export function CreateBattleModal({ onClose, onCreated }: {
   onClose: () => void; onCreated: (battleId: string) => void
@@ -83,12 +83,11 @@ export function CreateBattleModal({ onClose, onCreated }: {
           ))}
         </select>
 
-        {/* Royale player count */}
-        {mode === 'royale' && (
-          <div style={{ marginBottom: 14 }}>
+        {/* Player count */}
+        <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, color: COLORS.muted }}>Jugadores</label>
             <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-              {ROYALE_COUNTS.map((n) => (
+              {PLAYER_COUNTS.map((n) => (
                 <button key={n} onClick={() => setPlayers(n)}
                   style={{ width: 44, padding: '8px 0', borderRadius: 9, cursor: 'pointer',
                     background: players === n ? COLORS.green : '#0c1019',
@@ -99,7 +98,6 @@ export function CreateBattleModal({ onClose, onCreated }: {
               ))}
             </div>
           </div>
-        )}
 
         {error && (
           <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, marginBottom: 12, wordBreak: 'break-word' }}>
