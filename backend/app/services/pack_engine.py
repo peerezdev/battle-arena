@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from app.services.provably_fair import pick_index, client_seed_from_nfts
+from app.services.nft_transfer import UnsupportedNftStandard
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,50 @@ async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_
             return
         await sleep_fn(delay)
     raise RuntimeError(f"nft {nft_address} not confirmed in escrow")
+
+
+async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_address, winner,
+                                 build_transfer_tx, submit_tx, signer, confirm_in_escrow,
+                                 build_usdc_sweep_tx, sleep_fn, wait_max_attempts, wait_delay,
+                                 retries=3) -> None:
+    """Resilient settle (call ONLY after the winner is decided — never voids):
+    transfer each non-auto-sold escrow NFT to the winner with bounded retries (set transferred=True
+    on success; on UnsupportedNftStandard or exhausted retries leave transferred=False and continue),
+    then sweep the escrow USDC to the winner. Never raises."""
+    from app.models import BattlePull
+    pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
+    for p in pulls:
+        if p.auto_sold or not p.nft_address:
+            continue
+        for _ in range(retries):
+            try:
+                await _wait_in_escrow(confirm_in_escrow, escrow_address, p.nft_address,
+                                      sleep_fn, wait_max_attempts, wait_delay)
+                tx = await build_transfer_tx(escrow_address, winner, p.nft_address)
+                signed = await signer.sign_solana(escrow_wallet_id, tx)
+                await submit_tx(signed)
+                p.transferred = True
+                session.commit()
+                break
+            except UnsupportedNftStandard as exc:
+                logger.warning("settle: unsupported nft %s in battle %s: %s — flagging",
+                               p.nft_address, battle.id, exc)
+                break
+            except Exception as exc:
+                logger.warning("settle transfer retry for %s in battle %s: %s",
+                               p.nft_address, battle.id, exc)
+                await sleep_fn(wait_delay)
+    if build_usdc_sweep_tx is not None:
+        for _ in range(retries):
+            try:
+                sweep = await build_usdc_sweep_tx(escrow_address, winner)
+                if sweep:
+                    signed = await signer.sign_solana(escrow_wallet_id, sweep)
+                    await submit_tx(signed)
+                break
+            except Exception as exc:
+                logger.warning("settle usdc sweep retry in battle %s: %s", battle.id, exc)
+                await sleep_fn(wait_delay)
 
 
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
