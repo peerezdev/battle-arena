@@ -1,6 +1,9 @@
 import type { OpenBattle } from '../../../onchain/packBattleClient'
 import type { LiveBattle } from './hubMockData'
 
+// buyin arrives from the backend in USDC base units (1 USD = 1_000_000 units).
+const BASE_UNITS = 1e6
+
 const MAX_AVATARS = 4
 
 // Maps a real open lobby to the presentational LiveBattle row shape.
@@ -19,7 +22,7 @@ export function openBattleToLive(b: OpenBattle): LiveBattle {
     extra,
     cards: b.mode === 'royale' ? ['🎴'] : ['🔥', '💧'],
     costLabel: b.mode === 'royale' ? 'ENTRY' : 'BUY-IN',
-    costValue: b.buyin,
+    costValue: b.buyin / BASE_UNITS, // convert base units → USD for display
     action: b.players < b.max_players ? 'join' : 'watch',
   }
 }

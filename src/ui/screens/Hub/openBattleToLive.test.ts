@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { openBattleToLive } from './openBattleToLive'
 import type { OpenBattle } from '../../../onchain/packBattleClient'
 
+// Fixtures use realistic backend magnitudes: buyin is in USDC base units (1 USD = 1_000_000).
 const base: OpenBattle = {
   id: 'b1', mode: 'pack', machine_code: 'pokemon_50',
-  price: 50, max_players: 2, players: 1, buyin: 50,
+  price: 50_000_000, max_players: 2, players: 1, buyin: 50_000_000,
 }
 
 describe('openBattleToLive', () => {
@@ -15,23 +16,24 @@ describe('openBattleToLive', () => {
     expect(r.title).toBe('pokemon_50')
     expect(r.sub).toBe('1/2 joined')
     expect(r.costLabel).toBe('BUY-IN')
-    expect(r.costValue).toBe(50)
+    expect(r.costValue).toBe(50)   // base units / 1e6 → USD
     expect(r.action).toBe('join')
     expect(r.players).toHaveLength(1)
     expect(r.live).toBe(false)
   })
 
   it('marks a full lobby as watch and uses royale ENTRY label + buyin', () => {
-    const r = openBattleToLive({ ...base, mode: 'royale', max_players: 4, players: 4, buyin: 113 })
+    const r = openBattleToLive({ ...base, mode: 'royale', max_players: 4, players: 4, buyin: 113_000_000 })
     expect(r.action).toBe('watch')
     expect(r.costLabel).toBe('ENTRY')
-    expect(r.costValue).toBe(113)
+    expect(r.costValue).toBe(113)  // base units / 1e6 → USD
     expect(r.sub).toBe('4/4 joined')
   })
 
   it('caps avatars and shows +N for large player count', () => {
-    const r = openBattleToLive({ ...base, mode: 'royale', max_players: 10, players: 7, buyin: 200 })
+    const r = openBattleToLive({ ...base, mode: 'royale', max_players: 10, players: 7, buyin: 200_000_000 })
     expect(r.players).toHaveLength(4)
     expect(r.extra).toBe('+3')
+    expect(r.costValue).toBe(200)  // base units / 1e6 → USD
   })
 })

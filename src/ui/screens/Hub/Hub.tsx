@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../../theme'
-import type { HubNav } from './hubMockData'
+import type { HubNav, LiveBattle } from './hubMockData'
 import { STAKE_OPTIONS } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
@@ -33,7 +33,7 @@ export function Hub() {
     if (id === 'gacha')  return navigate('/play/gacha')
   }
 
-  function onBattleAction(b: { id: string; action: 'watch' | 'join' }) {
+  function onBattleAction(b: LiveBattle) {
     setActionError(null)
     if (b.action === 'watch') { setWaitingId(b.id); return }
     if (!identityToken) { setActionError('Inicia sesión para unirte.'); return }
