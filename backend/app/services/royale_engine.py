@@ -105,6 +105,7 @@ async def run_royale(
                 pull.grade = res.get("grade")
                 pull.rarity = res.get("rarity")
                 pull.auto_sold = bool(res.get("auto_sold"))
+                pull.buyback_amount = res.get("buyback_amount")
                 session.commit()
 
                 accumulated[w] += res.get("insured_value") or 0

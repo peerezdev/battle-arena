@@ -92,3 +92,17 @@ def test_reservation_defaults_and_packbattle_creator_wallet():
                        creator_wallet="W")
         s.add(b); s.commit()
         assert s.get(PackBattle, "b1").creator_wallet == "W"
+
+
+def test_battle_pull_buyback_amount_defaults_none():
+    from app.db import make_engine, make_session_factory, init_db
+    from app.models import BattlePull
+    engine = make_engine("sqlite:///:memory:"); init_db(engine)
+    Session = make_session_factory(engine)
+    with Session() as s:
+        p = BattlePull(battle_id="b1", player_wallet="A", memo="m1")
+        s.add(p); s.commit()
+        row = s.query(BattlePull).first()
+        assert row.buyback_amount is None
+        row.buyback_amount = 42_500_000; s.commit()
+        assert s.query(BattlePull).first().buyback_amount == 42_500_000

@@ -102,6 +102,7 @@ class BattlePull(Base):
     rarity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     auto_sold: Mapped[bool] = mapped_column(Boolean, default=False)
     transferred: Mapped[bool] = mapped_column(Boolean, default=False)
+    buyback_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     round_number: Mapped[int] = mapped_column(Integer, default=1)
 
 

@@ -148,6 +148,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             pull.grade = res.get("grade")
             pull.rarity = res.get("rarity")
             pull.auto_sold = bool(res.get("auto_sold"))
+            pull.buyback_amount = res.get("buyback_amount")
             session.commit()
             outcomes.append(PullOutcome(w, pack["memo"], res["nft_address"],
                                         res.get("insured_value") or 0, res.get("grade"),
