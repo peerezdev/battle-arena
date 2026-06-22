@@ -79,9 +79,14 @@ def test_generate_pack_requiere_auth():
 
 
 @respx.mock
-def test_generate_pack_fija_player_y_guarda_memo():
+def test_generate_pack_fija_player_y_guarda_memo(monkeypatch):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     route = respx.post(f"{BASE}/api/generatePack").mock(
         return_value=Response(200, json={"memo": "slug-m1", "transaction": "dA=="}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
     c, priv = _client()
     hdrs = _hdrs(priv, WALLET_A)
     r = c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
@@ -91,9 +96,14 @@ def test_generate_pack_fija_player_y_guarda_memo():
 
 
 @respx.mock
-def test_open_pack_memo_ajeno_403():
+def test_open_pack_memo_ajeno_403(monkeypatch):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     respx.post(f"{BASE}/api/generatePack").mock(
         return_value=Response(200, json={"memo": "slug-m2", "transaction": "dA=="}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
     c, priv = _client()
     hdrs_a = _hdrs(priv, WALLET_A)
     c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs_a)
@@ -103,12 +113,17 @@ def test_open_pack_memo_ajeno_403():
 
 
 @respx.mock
-def test_open_pack_ok_marca_abierto():
+def test_open_pack_ok_marca_abierto(monkeypatch):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     respx.post(f"{BASE}/api/generatePack").mock(
         return_value=Response(200, json={"memo": "slug-m3", "transaction": "dA=="}))
     respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
         "success": True, "nft_address": "Mint" + "1" * 40, "rarity": "Rare",
         "nftWon": {"content": {"metadata": {"name": "Pika"}}, "image": "https://x/p.png"}}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
     c, priv = _client()
     hdrs = _hdrs(priv, WALLET_A)
     c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
@@ -124,11 +139,16 @@ def test_open_pack_ok_marca_abierto():
 
 
 @respx.mock
-def test_open_pack_pendiente():
+def test_open_pack_pendiente(monkeypatch):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     respx.post(f"{BASE}/api/generatePack").mock(
         return_value=Response(200, json={"memo": "slug-m4", "transaction": "dA=="}))
     respx.post(f"{BASE}/api/openPack").mock(
         return_value=Response(200, json={"code": "WAITING_FOR_WEBHOOK"}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
     c, priv = _client()
     hdrs = _hdrs(priv, WALLET_A)
     c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
@@ -157,9 +177,14 @@ def test_upstream_caido_502():
 
 
 @respx.mock
-def test_rate_limit_429():
+def test_rate_limit_429(monkeypatch):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     respx.post(f"{BASE}/api/generatePack").mock(
         return_value=Response(200, json={"memo": None, "transaction": None}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
     c, priv = _client(rate_limit=2)
     hdrs = _hdrs(priv, WALLET_A)
     codes = [c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs).status_code
@@ -189,8 +214,13 @@ def test_machine_cards_503_when_base_url_empty():
 
 
 @respx.mock
-def test_generate_pack_502_detail_carries_reason():
+def test_generate_pack_502_detail_carries_reason(monkeypatch):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_25", "price": 25, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     respx.post(f"{BASE}/api/generatePack").mock(return_value=Response(500, json={"details": "Machine is off"}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
     c, priv = _client(api_key="")
     r = c.post("/gacha/generate-pack", json={"pack_type": "pokemon_25"}, headers=_hdrs(priv, WALLET_A))
     assert r.status_code == 502
@@ -336,10 +366,15 @@ def test_yolo_open_pack_owns_memo():
 
 
 @respx.mock
-def test_open_pack_not_auto_sold_by_default():
+def test_open_pack_not_auto_sold_by_default(monkeypatch):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
     respx.post(f"{BASE}/api/generatePack").mock(return_value=Response(200, json={"memo": "m-x", "transaction": "T"}))
     respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
         "nft_address": "MINT", "rarity": "Rare", "nftWon": {"content": {"metadata": {"name": "R"}}}}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
     c, priv = _client(api_key="")
     c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=_hdrs(priv, WALLET_A))
     r = c.post("/gacha/open-pack", json={"memo": "m-x"}, headers=_hdrs(priv, WALLET_A))

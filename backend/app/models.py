@@ -68,6 +68,7 @@ class PackBattle(Base):
     max_players: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String, default="lobby", index=True)  # lobby|running|settled|voided
     winner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    creator_wallet: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     escrow_wallet_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     escrow_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     server_seed: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -112,3 +113,14 @@ class BattleRound(Base):
     client_seed: Mapped[str] = mapped_column(String)
     eliminated_wallet: Mapped[str] = mapped_column(String)
     tie_break_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
+class Reservation(Base):
+    __tablename__ = "reservations"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    wallet: Mapped[str] = mapped_column(String, index=True)
+    battle_id: Mapped[str] = mapped_column(String, index=True)
+    amount: Mapped[int] = mapped_column(Integer)   # USDC base units
+    status: Mapped[str] = mapped_column(String, default="active", index=True)  # active|released
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

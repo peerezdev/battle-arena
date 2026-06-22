@@ -24,17 +24,18 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
-from .models import GachaPack, PackBattle
+from .models import GachaPack, PackBattle, BattlePlayer
 from .chat import ConnectionManager, ChatBuffer, abbreviate
 from .services.pack_lobby import (
     create_battle, join_battle,
     list_open as lobby_list_open,
-    get_battle, LobbyError,
+    get_battle, cancel_battle, LobbyError,
 )
 from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
-from .services.royale_funding import royale_buyin, collect_buyin
+from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc
+from .services.reservations import reserve, reserved_total, release_reservations
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +241,8 @@ def create_app(session_factory, chain: ChainSource,
                              s: Session = Depends(db)):
         svc = _gacha_or_503()
         _gacha_throttle(wallet)
+        price = await _machine_price(body.pack_type)
+        await _require_available(wallet, price, s)
         try:
             out = await svc.generate_pack(player_address=wallet, pack_type=body.pack_type)
         except GachaDisabled:
@@ -361,10 +364,11 @@ def create_app(session_factory, chain: ChainSource,
         except PrivyAuthError:
             raise HTTPException(401, "identity token inválido")
 
-    async def _require_funds(wallet: str, price: int):
+    async def _require_available(wallet: str, amount: int, s: Session):
         bal = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
-        if bal < price:
-            raise HTTPException(402, "USDC insuficiente")
+        avail = bal - reserved_total(s, wallet)
+        if avail < amount:
+            raise HTTPException(402, "USDC disponible insuficiente")
 
     async def _machine_price(machine_code: str) -> int:
         machines = await gacha.machines()
@@ -385,6 +389,7 @@ def create_app(session_factory, chain: ChainSource,
         except Exception:
             logger.warning("background run failed for %s", battle_id)
         finally:
+            release_reservations(s2, battle_id)
             s2.close()
 
     async def _run_royale_bg(battle_id: str):
@@ -406,6 +411,7 @@ def create_app(session_factory, chain: ChainSource,
         except Exception:
             logger.warning("background royale run failed for %s", battle_id)
         finally:
+            release_reservations(s2, battle_id)
             s2.close()
 
     @app.post("/pack-battles")
@@ -417,7 +423,7 @@ def create_app(session_factory, chain: ChainSource,
         if mode == "royale":
             # For royale, the funds check is against the buy-in, not just the pack price.
             buyin = royale_buyin(body.max_players, price)
-            await _require_funds(wallet, buyin)
+            await _require_available(wallet, buyin, s)
             try:
                 b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
                                   max_players=body.max_players, mode="royale")
@@ -444,12 +450,13 @@ def create_app(session_factory, chain: ChainSource,
             return resp
 
         # Default: pack mode
-        await _require_funds(wallet, price)
+        await _require_available(wallet, price, s)
         try:
             b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
                               max_players=body.max_players, mode=mode)
         except LobbyError as e:
             raise HTTPException(409, str(e))
+        reserve(s, wallet, b.id, price)
         return get_battle(s, b.id)
 
     @app.post("/pack-battles/{battle_id}/join")
@@ -462,7 +469,7 @@ def create_app(session_factory, chain: ChainSource,
         if b.mode == "royale":
             # For royale, check that the player can cover the buy-in.
             buyin = royale_buyin(b.max_players, b.price)
-            await _require_funds(wallet, buyin)
+            await _require_available(wallet, buyin, s)
             try:
                 b, filled = join_battle(s, battle_id, wallet, wallet_id)
             except LobbyError as e:
@@ -480,13 +487,46 @@ def create_app(session_factory, chain: ChainSource,
             return get_battle(s, battle_id)
 
         # Default: pack mode
-        await _require_funds(wallet, b.price)
+        await _require_available(wallet, b.price, s)
         try:
             b, filled = join_battle(s, battle_id, wallet, wallet_id)
         except LobbyError as e:
             raise HTTPException(409, str(e))
+        reserve(s, wallet, battle_id, b.price)
         if filled:
             asyncio.create_task(_run_bg(battle_id))
+        return get_battle(s, battle_id)
+
+    @app.post("/pack-battles/{battle_id}/cancel")
+    async def cancel_pack_battle(battle_id: str, wallet: str = Depends(current_user),
+                                 s: Session = Depends(db)):
+        b = s.get(PackBattle, battle_id)
+        if b is None:
+            raise HTTPException(404, "no existe")
+        is_royale = b.mode == "royale"
+        players = [p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()]
+        escrow_wallet_id = b.escrow_wallet_id
+        escrow_address = b.escrow_address
+        try:
+            cancel_battle(s, battle_id, wallet)   # validates creator + lobby, sets cancelled
+        except LobbyError as e:
+            raise HTTPException(409, str(e))
+        if is_royale:
+            # Refund each joined player their buy-in from the escrow (best-effort, bounded retries).
+            buyin = royale_buyin(b.max_players, b.price)
+            for pw in players:
+                for _ in range(3):
+                    try:
+                        bh = await fetch_latest_blockhash(solana_rpc_url)
+                        await distribute_usdc(solana_rpc_url, privy_signer, escrow_wallet_id,
+                                              escrow_address, pw, cc_usdc_mint, buyin, bh)
+                        break
+                    except Exception as exc:
+                        logger.warning("royale cancel refund retry for %s in %s: %s", pw, battle_id, exc)
+                else:
+                    logger.error("royale cancel refund FAILED after retries for %s in %s", pw, battle_id)
+        else:
+            release_reservations(s, battle_id)
         return get_battle(s, battle_id)
 
     @app.get("/pack-battles/open")
