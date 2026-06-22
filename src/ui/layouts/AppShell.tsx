@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { usePrivy } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd } from '../theme'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
+import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalance'
 import { useReducedMotion } from '../useReducedMotion'
 import { useIsWide } from '../useIsWide'
 import { AuthButtons } from '../components/AuthButtons'
@@ -19,6 +20,7 @@ export function AppShell() {
   const { pathname } = useLocation()
   const reducedMotion = useReducedMotion()
   const { usdc } = useUsdcBalance()
+  const { reserved } = useReservedBalance()
   const { authenticated } = usePrivy()
 
   // Breakpoints copied verbatim from Hub.tsx
@@ -128,8 +130,13 @@ export function AppShell() {
               >
                 <span style={{ fontSize: 9, color: COLORS.muted, letterSpacing: '.1em' }}>BALANCE</span>
                 <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
-                  {usdc != null ? formatUsd(usdc) : '—'}
+                  {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
                 </span>
+                {reserved != null && reserved > 0 && (
+                  <span style={{ fontSize: 9, color: COLORS.muted }}>
+                    · {formatUsd(reserved)} reservado
+                  </span>
+                )}
               </div>
             </>
           )}
