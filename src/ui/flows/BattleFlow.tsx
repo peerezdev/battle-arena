@@ -80,7 +80,7 @@ export function BattleFlow() {
       {vm.mode === 'royale'
         ? <RoyaleReveal vm={vm} reducedMotion={!!reduced} />
         : <PackReveal vm={vm} reducedMotion={!!reduced} />}
-      {battle.status === 'settled' && <BattleResult vm={vm} onExit={exit} />}
+      {battle.status === 'settled' && <BattleResult vm={vm} battleId={battle.id} onExit={exit} />}
     </div>
   )
 }
