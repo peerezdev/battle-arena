@@ -314,11 +314,12 @@ def test_available_balance_blocks_overcommit(client_priv, monkeypatch):
 
 
 def test_reservations_released_after_run(client_priv, monkeypatch):
-    """Filling a lobby runs it (stubbed) and the wiring releases the battle's reservations."""
+    """After a filled lobby runs (stubbed), the wiring releases its reservations — proven by the
+    creator being able to create a SECOND battle while holding funds for only ONE price."""
     c, priv = client_priv
 
-    async def _high(*args, **kwargs):
-        return 1_000_000_000
+    async def _one_price(*args, **kwargs):
+        return 50_000_000   # exactly one $50 price → only affordable if the first reservation freed
 
     async def _machines():
         return [{"code": "pokemon_50", "price": 50, "available": True}]
@@ -326,29 +327,19 @@ def test_reservations_released_after_run(client_priv, monkeypatch):
     async def _fake_run(session, battle, *, gacha, signer, **kwargs):
         return "settled"
 
-    monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _one_price)
     monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
     monkeypatch.setattr("app.main.run_pack_battle_live", _fake_run)
 
-    import app.services.reservations as resv
+    import asyncio
     hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
     bid = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a).json()["id"]
     hdrs_b = _auth_headers(priv, WALLET_B, WALLET_ID_B)
-    c.post(f"/pack-battles/{bid}/join", headers=hdrs_b)
+    c.post(f"/pack-battles/{bid}/join", headers=hdrs_b)   # fills → schedules _run_bg (stubbed) → release
 
-    import asyncio
-    asyncio.get_event_loop().run_until_complete(asyncio.sleep(0))
+    asyncio.get_event_loop().run_until_complete(asyncio.sleep(0.1))   # let _run_bg + its finally run
 
-    # After the (stubbed) run, both players' reservations for this battle are released.
-    from app.db import make_session_factory
-    # Reuse the app's session factory via a fresh session on the same engine:
-    # the test client shares one in-memory engine (StaticPool), so a new session sees the rows.
-    # Assert via the public open-list staying consistent + reserved_total == 0 for both.
-    # (Use the app's DB session through a direct query.)
-    from sqlalchemy import select, func
-    from app.models import Reservation
-    # Pull a session from the app dependency override is complex; instead assert through a new request:
-    # create another battle for WALLET_A must now succeed (its prior reservation was released).
+    # A's reservation for the finished battle was released → a second create now succeeds.
     r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a)
     assert r.status_code == 200, r.text
 ```
