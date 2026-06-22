@@ -117,3 +117,37 @@ def build_nft_transfer(
         escrow_address, dest_address, mint, recent_blockhash,
         amount=1, decimals=0, token_program=token_program,
     )
+
+
+def build_create_ata(
+    owner_address: str,
+    mint: str,
+    recent_blockhash: str,
+    *,
+    payer: str = None,
+    token_program: str = TOKEN_PROGRAM,
+) -> str:
+    """Unsigned legacy tx with a single CreateIdempotent ATA instruction for
+    owner_address's associated token account of `mint`. Fee payer = payer if given else owner.
+    Used to pre-create the escrow's USDC ATA so CC's turbo auto-buyback payout does not revert."""
+    owner_pk      = Pubkey.from_string(owner_address)
+    mint_pk       = Pubkey.from_string(mint)
+    token_prog_pk = Pubkey.from_string(token_program)
+    ata_prog_pk   = Pubkey.from_string(ATA_PROGRAM)
+    sys_prog_pk   = Pubkey.from_string(SYS_PROGRAM)
+    payer_pk      = Pubkey.from_string(payer) if payer else owner_pk
+    ata = get_associated_token_address(owner_pk, mint_pk, token_prog_pk)
+    create_ix = Instruction(
+        ata_prog_pk,
+        bytes([1]),  # CreateIdempotent
+        [
+            AccountMeta(payer_pk,      is_signer=True,  is_writable=True),
+            AccountMeta(ata,           is_signer=False, is_writable=True),
+            AccountMeta(owner_pk,      is_signer=False, is_writable=False),
+            AccountMeta(mint_pk,       is_signer=False, is_writable=False),
+            AccountMeta(sys_prog_pk,   is_signer=False, is_writable=False),
+            AccountMeta(token_prog_pk, is_signer=False, is_writable=False),
+        ],
+    )
+    message = Message.new_with_blockhash([create_ix], payer_pk, Hash.from_string(recent_blockhash))
+    return base64.b64encode(bytes(Transaction.new_unsigned(message))).decode()
