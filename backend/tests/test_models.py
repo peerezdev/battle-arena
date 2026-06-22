@@ -76,3 +76,19 @@ def test_battle_pull_auto_sold_and_transferred_defaults():
         assert row.auto_sold is False and row.transferred is False
         row.auto_sold = True; row.transferred = True; s.commit()
         assert s.query(BattlePull).first().auto_sold is True
+
+
+def test_reservation_defaults_and_packbattle_creator_wallet():
+    from app.db import make_engine, make_session_factory, init_db
+    from app.models import Reservation, PackBattle
+    engine = make_engine("sqlite:///:memory:"); init_db(engine)
+    Session = make_session_factory(engine)
+    with Session() as s:
+        r = Reservation(wallet="W", battle_id="b1", amount=50_000_000)
+        s.add(r); s.commit()
+        row = s.query(Reservation).first()
+        assert row.status == "active" and row.amount == 50_000_000 and row.released_at is None
+        b = PackBattle(id="b1", mode="pack", machine_code="m", price=50, max_players=2,
+                       creator_wallet="W")
+        s.add(b); s.commit()
+        assert s.get(PackBattle, "b1").creator_wallet == "W"
