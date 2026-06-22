@@ -19,6 +19,7 @@ class PullOutcome:
     nft_address: str
     insured_value: float
     grade: Optional[int]
+    auto_sold: bool = False
 
 
 def determine_winner(pulls: list[PullOutcome], *, server_seed: str, client_seed: str) -> tuple[str, Optional[int]]:
@@ -94,7 +95,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                      sponsor: bool = False,
                      open_max_attempts: int = 20, open_delay: float = 3.0,
                      escrow_max_attempts: int = 20, escrow_delay: float = 3.0,
-                     sleep_fn=None) -> str:
+                     sleep_fn=None, build_usdc_sweep_tx=None) -> str:
     # sponsor=False → user-pays (the fee-payer wallet needs SOL). sponsor=True requires
     # Privy "App pays" gas sponsorship to be enabled for the cluster.
     # NOTE: sponsor is no longer used in settle (transfers go via our-RPC submit_tx);
@@ -124,7 +125,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     for w in players:
         try:
             pack = await gacha.generate_pack(player_address=w, pack_type=battle.machine_code,
-                                             alt_player_address=esc["address"])
+                                             alt_player_address=esc["address"], turbo=True)
             pull = BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"])
             session.add(pull); session.commit()
             # CC broadcasts the pull on its own RPC (Privy signAndSend fails — different RPC, blockhash not
@@ -146,9 +147,11 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             pull.insured_value = res.get("insured_value") or 0
             pull.grade = res.get("grade")
             pull.rarity = res.get("rarity")
+            pull.auto_sold = bool(res.get("auto_sold"))
             session.commit()
             outcomes.append(PullOutcome(w, pack["memo"], res["nft_address"],
-                                        res.get("insured_value") or 0, res.get("grade")))
+                                        res.get("insured_value") or 0, res.get("grade"),
+                                        auto_sold=bool(res.get("auto_sold"))))
         except Exception as exc:
             # A transient failure here may have consumed the player's CC pack memo — log it so the
             # void is traceable (no secrets: wallet + battle id + error only).
@@ -156,23 +159,25 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             await _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx)
             battle.status = "voided"; session.commit(); return "voided"
 
-    # Winner + settle: all escrow NFTs → winner.
-    # Any failure mid-settle (e.g. UnsupportedNftStandard) voids the battle and returns NFTs to players.
+    # Winner determination can still void (e.g. tie with no server_seed). Settle itself is resilient.
     try:
         client_seed = client_seed_from_nfts([o.nft_address for o in outcomes])
         winner, tie_idx = determine_winner(outcomes, server_seed=battle.server_seed, client_seed=client_seed)
-        battle.client_seed = client_seed
-        battle.tie_break_index = tie_idx
-        for o in outcomes:
-            await _wait_in_escrow(confirm_in_escrow, esc["address"], o.nft_address,
-                                  sleep_fn, escrow_max_attempts, escrow_delay)
-            tx = await build_transfer_tx(esc["address"], winner, o.nft_address)
-            signed = await signer.sign_solana(esc["id"], tx)
-            await submit_tx(signed)
     except Exception as exc:
-        logger.warning("settle failed in battle %s: %s — voiding", battle.id, exc)
+        logger.warning("winner determination failed in battle %s: %s — voiding", battle.id, exc)
         await _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx)
         battle.status = "voided"; session.commit(); return "voided"
+
+    battle.client_seed = client_seed
+    battle.tie_break_index = tie_idx
+    session.commit()
+
+    await settle_cards_to_winner(
+        session, battle, escrow_wallet_id=esc["id"], escrow_address=esc["address"], winner=winner,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
+        confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
+        sleep_fn=sleep_fn, wait_max_attempts=escrow_max_attempts, wait_delay=escrow_delay,
+    )
 
     battle.winner = winner; battle.status = "settled"; battle.settled_at = now_fn()
     session.commit()
@@ -181,7 +186,10 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
 
 async def _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx):
     # Return each already-pulled NFT to its original puller (nobody robbed).
+    # Auto-sold commons have no NFT to return (their USDC is in the escrow; refund is #3c).
     for o in outcomes:
+        if o.auto_sold or not o.nft_address:
+            continue
         try:
             tx = await build_transfer_tx(esc["address"], o.player_wallet, o.nft_address)
             signed = await signer.sign_solana(esc["id"], tx)

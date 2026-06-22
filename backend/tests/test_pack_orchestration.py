@@ -90,7 +90,7 @@ class _Gacha:
         self.pulled: list[str] = []
 
     async def generate_pack(self, player_address: str, pack_type: str,
-                            alt_player_address=None) -> dict:
+                            alt_player_address=None, turbo=False) -> dict:
         self.alt = alt_player_address
         self.pulled.append(player_address)
         return {"memo": f"m-{player_address}", "transaction": f"tx-{player_address}"}
