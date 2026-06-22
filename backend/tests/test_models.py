@@ -62,3 +62,17 @@ def test_royale_model_columns(session):
     session.commit()
     assert session.query(BattleRound).filter_by(battle_id="r1").one().eliminated_wallet == "A"
     assert session.get(BattlePlayer, session.query(BattlePlayer).filter_by(battle_id="r1").one().id).accumulated_value == 10.0
+
+
+def test_battle_pull_auto_sold_and_transferred_defaults():
+    from app.db import make_engine, make_session_factory, init_db
+    from app.models import BattlePull
+    engine = make_engine("sqlite:///:memory:"); init_db(engine)
+    Session = make_session_factory(engine)
+    with Session() as s:
+        p = BattlePull(battle_id="b1", player_wallet="A", memo="m1")
+        s.add(p); s.commit()
+        row = s.query(BattlePull).first()
+        assert row.auto_sold is False and row.transferred is False
+        row.auto_sold = True; row.transferred = True; s.commit()
+        assert s.query(BattlePull).first().auto_sold is True
