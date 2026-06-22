@@ -110,10 +110,11 @@ def get_battle(session, battle_id):
            "creator_wallet": b.creator_wallet,
            "players": _player_states(session, battle_id),
            "rounds": _rounds(session, battle_id),
-           "server_seed_hash": b.server_seed_hash}
-    if b.status == "settled":   # reveal + recap only after settle (secrecy)
+           "server_seed_hash": b.server_seed_hash,
+           "pulls": _pull_recap(session, battle_id)}   # card recap is live (safe; the seed is not)
+    if b.status == "settled":   # PF seed reveal ONLY post-settle (predicting future rounds must stay impossible)
         out.update(server_seed=b.server_seed, client_seed=b.client_seed,
-                   tie_break_index=b.tie_break_index, pulls=_pull_recap(session, battle_id))
+                   tie_break_index=b.tie_break_index)
     return out
 
 

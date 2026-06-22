@@ -68,8 +68,8 @@ def test_create_sets_creator_wallet_and_cancel_rules(session):
         cancel_battle(session, b.id, "CREATOR")
 
 
-def test_get_battle_royale_live_state_no_cards(session):
-    from app.models import BattleRound
+def test_get_battle_running_reveals_pulls_but_not_seed(session):
+    from app.models import BattleRound, BattlePull
     b = PackBattle(id="rv", mode="royale", machine_code="m", price=50, max_players=3,
                    status="running", server_seed="ab" * 32, server_seed_hash="h", creator_wallet="A")
     session.add(b)
@@ -79,15 +79,22 @@ def test_get_battle_royale_live_state_no_cards(session):
     ])
     session.add(BattleRound(battle_id="rv", round_number=1, client_seed="cs1",
                             eliminated_wallet="B", tie_break_index=None))
+    # one resolved pull + one still "pending" (nft_address is None)
+    session.add_all([
+        BattlePull(battle_id="rv", player_wallet="A", memo="m1", round_number=1,
+                   nft_address="nftA", rarity="Epic", insured_value=120.0, auto_sold=False),
+        BattlePull(battle_id="rv", player_wallet="B", memo="m2", round_number=2, nft_address=None),
+    ])
     session.commit()
     v = get_battle(session, "rv")
     assert v["creator_wallet"] == "A"
-    pa = next(p for p in v["players"] if p["wallet"] == "A")
-    pb = next(p for p in v["players"] if p["wallet"] == "B")
-    assert pa["eliminated_round"] is None and pa["accumulated_value"] == 120.0
-    assert pb["eliminated_round"] == 1
     assert v["rounds"] == [{"round_number": 1, "eliminated_wallet": "B", "tie_break_index": None}]
-    assert "pulls" not in v and "server_seed" not in v   # running → no recap, no reveal
+    # pulls ARE exposed during running (live reveal)
+    assert {p["player_wallet"] for p in v["pulls"]} == {"A", "B"}
+    pending = next(p for p in v["pulls"] if p["player_wallet"] == "B")
+    assert pending["nft_address"] is None
+    # ...but the PF seed is NOT revealed pre-settle
+    assert "server_seed" not in v and "client_seed" not in v and "tie_break_index" not in v
 
 
 def test_get_battle_postsettle_pull_recap(session):
