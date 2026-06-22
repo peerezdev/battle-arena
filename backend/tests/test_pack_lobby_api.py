@@ -520,13 +520,13 @@ def test_reservations_released_after_run(client_priv, monkeypatch):
 def test_pack_cancel_releases_reservation_creator_only(client_priv, monkeypatch):
     c, priv = client_priv
 
-    async def _high(*args, **kwargs):
-        return 1_000_000_000
+    async def _exact_one_price(*args, **kwargs):
+        return 50_000_000
 
     async def _machines():
         return [{"code": "pokemon_50", "price": 50, "available": True}]
 
-    monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _exact_one_price)
     monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
 
     hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
@@ -540,6 +540,10 @@ def test_pack_cancel_releases_reservation_creator_only(client_priv, monkeypatch)
     r = c.post(f"/pack-battles/{bid}/cancel", headers=hdrs_a)
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "cancelled"
+
+    # Reservation was released: a new battle with the same wallet must succeed (available = price again)
+    r2 = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a)
+    assert r2.status_code == 200, f"second create failed ({r2.status_code}) — reservation not released"
 
 
 class _FakeSigner:

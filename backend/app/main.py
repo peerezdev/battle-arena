@@ -364,11 +364,6 @@ def create_app(session_factory, chain: ChainSource,
         except PrivyAuthError:
             raise HTTPException(401, "identity token inválido")
 
-    async def _require_funds(wallet: str, price: int):
-        bal = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
-        if bal < price:
-            raise HTTPException(402, "USDC insuficiente")
-
     async def _require_available(wallet: str, amount: int, s: Session):
         bal = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
         avail = bal - reserved_total(s, wallet)
@@ -510,6 +505,8 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(404, "no existe")
         is_royale = b.mode == "royale"
         players = [p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()]
+        escrow_wallet_id = b.escrow_wallet_id
+        escrow_address = b.escrow_address
         try:
             cancel_battle(s, battle_id, wallet)   # validates creator + lobby, sets cancelled
         except LobbyError as e:
@@ -521,11 +518,13 @@ def create_app(session_factory, chain: ChainSource,
                 for _ in range(3):
                     try:
                         bh = await fetch_latest_blockhash(solana_rpc_url)
-                        await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
-                                              b.escrow_address, pw, cc_usdc_mint, buyin, bh)
+                        await distribute_usdc(solana_rpc_url, privy_signer, escrow_wallet_id,
+                                              escrow_address, pw, cc_usdc_mint, buyin, bh)
                         break
                     except Exception as exc:
                         logger.warning("royale cancel refund retry for %s in %s: %s", pw, battle_id, exc)
+                else:
+                    logger.error("royale cancel refund FAILED after retries for %s in %s", pw, battle_id)
         else:
             release_reservations(s, battle_id)
         return get_battle(s, battle_id)
