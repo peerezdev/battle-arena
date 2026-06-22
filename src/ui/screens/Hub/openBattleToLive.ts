@@ -8,7 +8,7 @@ const MAX_AVATARS = 4
 
 // Maps a real open lobby to the presentational LiveBattle row shape.
 // NOTE: secrecy — rows carry NO real NFTs; `cards` is a static teaser.
-export function openBattleToLive(b: OpenBattle): LiveBattle {
+export function openBattleToLive(b: OpenBattle, meWallet: string | null = null): LiveBattle {
   const shown = Math.min(b.players, MAX_AVATARS)
   const players = Array.from({ length: shown }, (_, i) => ({ violet: i % 2 === 1 }))
   const extra = b.players > MAX_AVATARS ? `+${b.players - MAX_AVATARS}` : undefined
@@ -24,5 +24,6 @@ export function openBattleToLive(b: OpenBattle): LiveBattle {
     costLabel: b.mode === 'royale' ? 'ENTRY' : 'BUY-IN',
     costValue: b.buyin / BASE_UNITS, // convert base units → USD for display
     action: b.players < b.max_players ? 'join' : 'watch',
+    canCancel: !!meWallet && b.creator_wallet === meWallet,
   }
 }

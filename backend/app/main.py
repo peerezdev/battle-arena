@@ -150,6 +150,10 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(409, "username_taken")
         return {"wallet": wallet, "alias": body.alias}
 
+    @app.get("/users/me/balance")
+    async def me_balance(wallet: str = Depends(current_user), s: Session = Depends(db)):
+        return {"reserved": reserved_total(s, wallet)}
+
     @app.get("/users/{wallet}")
     async def get_user(wallet: str, s: Session = Depends(db)):
         return read_user_view(s, wallet, elo_start)

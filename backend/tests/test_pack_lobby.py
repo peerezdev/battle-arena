@@ -159,4 +159,12 @@ def test_list_open_includes_mode_and_buyin(session):
     assert by_mode["royale"]["buyin"] == royale_buyin(4, 50_000_000)
     # base shape preserved
     assert set(by_mode["pack"]) == {
-        "id", "mode", "machine_code", "price", "max_players", "players", "buyin"}
+        "id", "mode", "machine_code", "price", "max_players", "players", "buyin", "creator_wallet"}
+
+
+def test_list_open_includes_creator_wallet(session):
+    create_battle(session, "WC", "wid-c", machine_code="pokemon_50",
+                  price=50_000_000, max_players=2, mode="pack")
+    row = list_open(session)[0]
+    assert row["creator_wallet"] == "WC"
+    assert "creator_wallet" in row

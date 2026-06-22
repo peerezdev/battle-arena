@@ -5,7 +5,7 @@ import type { OpenBattle } from '../../../onchain/packBattleClient'
 // Fixtures use realistic backend magnitudes: buyin is in USDC base units (1 USD = 1_000_000).
 const base: OpenBattle = {
   id: 'b1', mode: 'pack', machine_code: 'pokemon_50',
-  price: 50_000_000, max_players: 2, players: 1, buyin: 50_000_000,
+  price: 50_000_000, max_players: 2, players: 1, buyin: 50_000_000, creator_wallet: null,
 }
 
 describe('openBattleToLive', () => {
@@ -35,5 +35,12 @@ describe('openBattleToLive', () => {
     expect(r.players).toHaveLength(4)
     expect(r.extra).toBe('+3')
     expect(r.costValue).toBe(200)  // base units / 1e6 → USD
+  })
+
+  it('sets canCancel only when meWallet matches the creator', () => {
+    const mine = { ...base, creator_wallet: 'ME' }
+    expect(openBattleToLive(mine, 'ME').canCancel).toBe(true)
+    expect(openBattleToLive(mine, 'OTHER').canCancel).toBe(false)
+    expect(openBattleToLive(mine, null).canCancel).toBe(false)
   })
 })

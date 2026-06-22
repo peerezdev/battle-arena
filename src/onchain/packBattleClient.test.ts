@@ -49,4 +49,13 @@ describe('packBattleClient', () => {
     const f = mockFetch({ detail: 'USDC disponible insuficiente' }, false, 402); vi.stubGlobal('fetch', f)
     await expect(client.getBattle('b1')).rejects.toThrow('USDC disponible insuficiente')
   })
+
+  it('fetchReservedBalance GETs the authed balance endpoint', async () => {
+    const f = mockFetch({ reserved: 50_000_000 }); vi.stubGlobal('fetch', f)
+    const out = await client.fetchReservedBalance('tok')
+    expect(out).toEqual({ reserved: 50_000_000 })
+    const [url, opts] = f.mock.calls[0]
+    expect(url).toBe(`${config.backendUrl}/users/me/balance`)
+    expect(opts.headers.Authorization).toBe('Bearer tok')
+  })
 })

@@ -22,7 +22,7 @@ export interface Battle {
 
 export interface OpenBattle {
   id: string; mode: BattleMode; machine_code: string; price: number
-  max_players: number; players: number; buyin: number
+  max_players: number; players: number; buyin: number; creator_wallet: string | null
 }
 
 export interface VerifyRound { round_number: number; client_seed: string; eliminated_wallet: string; tie_break_index: number | null }
@@ -80,4 +80,8 @@ export function getBattle(id: string): Promise<Battle> {
 
 export function verifyBattle(id: string): Promise<Verification> {
   return battleFetch<Verification>(`/pack-battles/${encodeURIComponent(id)}/verify`)
+}
+
+export function fetchReservedBalance(token: string): Promise<{ reserved: number }> {
+  return battleFetch<{ reserved: number }>('/users/me/balance', { headers: authHeaders(token) })
 }

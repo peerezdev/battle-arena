@@ -22,9 +22,10 @@ interface Props {
   battles: LiveBattle[]
   onSelectMode: (mode: 'pack' | 'royale' | 'gacha' | 'mana') => void
   onBattleAction: (b: LiveBattle) => void
+  onCancel?: (b: LiveBattle) => void
 }
 
-export function LiveBattles({ battles, onSelectMode, onBattleAction }: Props) {
+export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
 
   return (
@@ -195,13 +196,13 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction }: Props) {
 
       {/* (d) Battle rows */}
       {battles.map((b) => (
-        <BattleRow key={b.id} battle={b} onAction={onBattleAction} />
+        <BattleRow key={b.id} battle={b} onAction={onBattleAction} onCancel={onCancel} />
       ))}
     </div>
   )
 }
 
-function BattleRow({ battle: b, onAction }: { battle: LiveBattle; onAction: (b: LiveBattle) => void }) {
+function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void }) {
   return (
     <div
       style={{
@@ -337,6 +338,23 @@ function BattleRow({ battle: b, onAction }: { battle: LiveBattle; onAction: (b: 
             }}
           >
             Join
+          </button>
+        )}
+        {b.canCancel && onCancel && (
+          <button
+            onClick={() => onCancel(b)}
+            style={{
+              border: `1px solid ${COLORS.red}55`,
+              background: 'transparent',
+              color: COLORS.red,
+              borderRadius: 11,
+              padding: '11px 16px',
+              fontWeight: 700,
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            Cancelar
           </button>
         )}
       </div>
