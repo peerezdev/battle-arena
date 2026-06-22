@@ -22,7 +22,8 @@ def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, p
         raise LobbyError("max_players debe estar entre 2 y 10")
     seed, h = gen_server_seed()
     b = PackBattle(id=uuid.uuid4().hex, mode=mode, machine_code=machine_code, price=price,
-                   max_players=max_players, status="lobby", server_seed=seed, server_seed_hash=h)
+                   max_players=max_players, status="lobby", server_seed=seed, server_seed_hash=h,
+                   creator_wallet=creator_wallet)
     session.add(b)
     session.add(BattlePlayer(battle_id=b.id, player_wallet=creator_wallet, wallet_id=creator_wallet_id))
     session.commit()
@@ -51,6 +52,19 @@ def join_battle(session, battle_id, player_wallet, player_wallet_id):
         filled = res.rowcount == 1
         session.refresh(b)
     return b, filled
+
+
+def cancel_battle(session, battle_id, wallet) -> PackBattle:
+    b = session.get(PackBattle, battle_id)
+    if b is None:
+        raise LobbyError("no existe")
+    if b.creator_wallet != wallet:
+        raise LobbyError("solo el creador puede cancelar")
+    if b.status != "lobby":
+        raise LobbyError("solo se puede cancelar un lobby no iniciado")
+    b.status = "cancelled"
+    session.commit()
+    return b
 
 
 def _players(session, battle_id):

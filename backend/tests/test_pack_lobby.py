@@ -52,3 +52,17 @@ def test_get_battle_hides_server_seed_until_settled(session):
     b = create_battle(session, "WC", "wid-c", machine_code="pokemon_50", price=50_000_000, max_players=2)
     view = get_battle(session, b.id)
     assert view["server_seed_hash"] and "server_seed" not in view
+
+def test_create_sets_creator_wallet_and_cancel_rules(session):
+    from app.services.pack_lobby import cancel_battle
+    b = create_battle(session, "CREATOR", "wid", machine_code="m", price=50, max_players=2)
+    assert b.creator_wallet == "CREATOR"
+    # non-creator cannot cancel
+    with pytest.raises(LobbyError):
+        cancel_battle(session, b.id, "SOMEONE_ELSE")
+    # creator cancels a lobby → cancelled
+    out = cancel_battle(session, b.id, "CREATOR")
+    assert out.status == "cancelled"
+    # cannot cancel again (not in lobby anymore)
+    with pytest.raises(LobbyError):
+        cancel_battle(session, b.id, "CREATOR")
