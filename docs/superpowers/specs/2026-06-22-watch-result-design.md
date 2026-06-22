@@ -19,11 +19,13 @@ Also folds in a small #4b-2 correction: the create modal currently forces pack t
 - **Backend** (`backend/app/`):
   - `pack_lobby.get_battle(session, id)` returns `{id, mode, machine_code, price, max_players, status, winner, creator_wallet, players, rounds, server_seed_hash}` and, **only when `status == "settled"`**, adds `server_seed, client_seed, tie_break_index, pulls` (the recap). `players` = `_player_states` (`{wallet, eliminated_round, accumulated_value}`); `rounds` = `_rounds` (`{round_number, eliminated_wallet, tie_break_index}`, royale audit; `[]` for pack); `pulls` = `_pull_recap` (`{round_number, player_wallet, nft_address, rarity, insured_value, auto_sold}`, ordered by `round_number, id`).
   - **Royale engine** (`services/royale_engine.py`) persists each `BattlePull` incrementally: a "pending" row (`round_number`, no `nft_address`) is committed when the pull starts, then `nft_address/insured_value/rarity/auto_sold` are filled and committed when the pack opens. `BattleRound` (the elimination) is committed at the end of each round. So during `running`, completed pulls and rounds appear in the DB progressively.
-  - **Pack engine** (`services/pack_engine.py`) does one pull per player (`for w in players`), `determine_winner` = highest `insured_value` (PF tie-break). `BattlePull` rows here are created **without** `round_number` (defaults to `None`). No `BattleRound` rows (pack `rounds == []`). Supports 2–10 players (`create_battle` validates `2 <= max_players <= 10`).
+  - **Pack engine** (`services/pack_engine.py`) does one pull per player (`for w in players`), `determine_winner` = highest `insured_value` (PF tie-break). `BattlePull` rows here are created without an explicit `round_number`, so it **defaults to `1`** (the model column default). No `BattleRound` rows (pack `rounds == []`). Supports 2–10 players (`create_battle` validates `2 <= max_players <= 10`).
+  - `BattlePull` has **no `image` column**; the card image is NOT persisted. `gacha.open_pack`'s result does carry `image`, but the pull recap does not — so the image is sourced client-side (below).
   - Existing secrecy tests: `test_get_battle_royale_live_state_no_cards` (`tests/test_pack_lobby.py`) asserts running → `"pulls" not in v and "server_seed" not in v`; `test_get_battle_hides_server_seed_until_settled`; `test_get_battle_postsettle_pull_recap`.
 - **Frontend data layer (#4b-1)**: `src/onchain/packBattleClient.ts` — `Battle` type with `players: BattlePlayerState[]` (`{wallet, eliminated_round, accumulated_value}`), `rounds: BattleRoundInfo[]`, `pulls?: BattlePullInfo[]` (`{round_number, player_wallet, nft_address, rarity, insured_value, auto_sold}`), `winner`, `status`. `src/onchain/useBattle.ts` — polls `getBattle(id)` every `intervalMs` (default 2000), stops at terminal status, leak-free.
 - **Hub (#4b-2)**: after create/join, the Hub opens a `BattleWaiting` **modal** (`src/ui/screens/Hub/BattleWaiting.tsx`) and polls with `useBattle`, showing a placeholder once status leaves `lobby`. `CreateBattleModal` + `buildCreateBody` (`src/ui/screens/Hub/`) force pack to `max_players = 2`.
-- **Helpers to reuse**: `gachaClient.ccAssetUrl(mint): string` (CollectorCrypt asset image URL by mint), `theme.RARITY` (rarity color tokens), `theme.COLORS/FONTS/formatUsd`, `useEmbeddedSolanaAddress(): string | null` (`src/wallet/embedded.ts`, the user's embedded Solana address — used to mark "me"), `useReducedMotion`, `framer-motion` (already used by the local royale).
+- **Helpers to reuse**: `theme.RARITY` (rarity color tokens, keys `common|uncommon|rare|epic`), `theme.COLORS/FONTS/formatUsd`, `useEmbeddedSolanaAddress(): string | null` (`src/wallet/embedded.ts`, the user's embedded Solana address — used to mark "me"), `useReducedMotion`, `framer-motion` (already used by the local royale). `gachaClient.ccAssetUrl(mint): string` returns a CollectorCrypt **page** URL (used as an `<a href>` "View ↗" link, NOT an `<img src>`).
+- **Card image source (CollectorCrypt direct, by mint)**: CC serves card images by mint with no auth (https://docs.collectorcrypt.com/metadata). `GET {base}/front/{mint}` **302-redirects to the front image** and falls back to a CC placeholder server-side if the card has no image — so it works **directly as an `<img src>`** with no fetch, no DAS, no metadata parsing. Devnet base: `https://nft-dev.collectorcrypt.com` (prod: `https://nft.collectorcrypt.com`); this app is on devnet. This design adds a tiny helper `ccCardImageUrl(mint): string` to `src/onchain/gachaClient.ts` (mirrors the existing `ccAssetUrl`) returning `https://nft-dev.collectorcrypt.com/front/${mint}`. No backend image persistence, no DAS dependency.
 - **Local royale sim** (`src/ui/flows/RoyaleFlow.tsx`, `RoyaleBoard`, `RoyaleResultScreen`): kept as-is (local practice vs bots). The online watch is **new** components (decision: "todo nuevo") — the local components are coupled to "human = seat 0" and to per-round local card pulls.
 
 ## Backend change (scoped, secrecy-safe)
@@ -63,14 +65,14 @@ RevealVM = {
   mode, status, winner: string | null, meWallet: string | null,
   players: { wallet, isMe, accumulatedValue, eliminatedRound }[],   // from battle.players
   rounds: {                                                          // grouped from battle.pulls by round_number
-    roundNumber: number | null,                                     // pack pulls have null round_number → one group
+    roundNumber: number,                                            // pack pulls default to round_number 1 → one group
     eliminatedWallet: string | null,                                // from battle.rounds (royale); null for pack/not-yet
     cards: { wallet, isMe, nftAddress: string | null, rarity, insuredValue, autoSold }[],
   }[],
   potValue: number,                                                 // sum of resolved insured_value across pulls
 }
 ```
-- Groups `battle.pulls` by `round_number` (stable order). For pack (all `round_number == null`) → a single group. For royale → one group per round (ascending).
+- Groups `battle.pulls` by `round_number` (ascending). For pack (all `round_number == 1`) → a single group `{ roundNumber: 1, ... }`. For royale → one group per round.
 - Cross-references `battle.rounds` to set each group's `eliminatedWallet` (royale). A round still being pulled has no matching `rounds` entry yet → `eliminatedWallet: null` (cards shown, no elimination yet).
 - `isMe` = `wallet === meWallet`. `nftAddress == null` → still opening (face-down). `potValue` ignores nulls.
 - Pure function; no React. Unit-tested.
@@ -78,7 +80,7 @@ RevealVM = {
 ### `RevealCard` (`src/ui/screens/battle/RevealCard.tsx`)
 Gacha-style card tile. Props: `{ nftAddress: string | null, rarity, insuredValue, autoSold, isMe, reducedMotion }`.
 - `nftAddress == null` → face-down "opening…" state (shimmer; respect `reducedMotion`).
-- resolved → flip to show the image via `ccAssetUrl(nftAddress)`, a rarity-colored border (`theme.RARITY`), the `formatUsd(insuredValue)`, and an "auto-sold" badge when `autoSold`.
+- resolved → flip to a rarity-colored card (`theme.RARITY`, keying on `rarity?.toLowerCase()` since the backend sends `"Epic"`/`"common"` etc.; unknown → `COLORS.muted`), showing the image directly as `<img src={ccCardImageUrl(nftAddress)} onError={…}>` (the CC `/front/{mint}` endpoint 302-redirects to the image and falls back to a placeholder server-side; an `onError` swaps to a 🃏 fallback, matching `InventoryCardModal`), the `formatUsd(insuredValue)`, an "auto-sold" badge when `autoSold`, and an optional `<a href={ccAssetUrl(nftAddress)}>` "View ↗".
 
 ### `RoyaleReveal` (`src/ui/screens/battle/RoyaleReveal.tsx`)
 Props: `{ vm: RevealVM, reducedMotion }`. Renders the rounds from `vm.rounds` in order; per round a row/grid of `RevealCard` (one per player who pulled that round), labeled by player (truncated wallet, "tú" if `isMe`). When the round has an `eliminatedWallet`, mark that player eliminated and show the per-player `accumulatedValue`. The latest round (cards still resolving) is the focus; earlier rounds collapse to a compact summary. Driven entirely by the polled `vm` (new rounds/cards appear as `useBattle` re-polls) — no client timers needed for correctness; framer-motion only for the flip/eliminate flourish.
@@ -116,6 +118,8 @@ Small inline components (or one `BattleStatusBanner`) for `lobby` (waiting X/Y) 
 - **Frontend** (`npm test`):
   - `battleToReveal`: royale pulls across 2 rounds → grouped by round with correct `eliminatedWallet` from `rounds`, a pending card (`nftAddress null`), `isMe` marking, `potValue` excluding nulls; pack pulls (`round_number null`) → single group, winner set; empty pulls → empty rounds.
   - `BattleFlow`: mock `useBattle` → `lobby` shows waiting; `running` royale shows `RoyaleReveal`; `settled` shows `BattleResult`; `voided` shows the anulada message. (Mock `useParams`/`useEmbeddedSolanaAddress`.)
+  - `ccCardImageUrl`: returns `https://nft-dev.collectorcrypt.com/front/${mint}` for a mint.
+  - `RevealCard`: pending (`nftAddress null`) → face-down (no `<img>`); resolved → an `<img>` whose `src` is `ccCardImageUrl(mint)`, rarity color keyed case-insensitively (`"Epic"` → epic token), auto-sold badge when `autoSold`.
   - `RoyaleReveal`: a round with one pending + one resolved card renders a face-down and a flipped card; an eliminated wallet is marked.
   - `PackReveal`: all cards render; on settle the winner is highlighted.
   - `buildCreateBody`: pack with chosen count N → `max_players === N` (both modes use the count).
