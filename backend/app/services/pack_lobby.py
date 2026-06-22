@@ -3,7 +3,7 @@ checks live in the endpoint layer (they need RPC/Privy). Generates the Provably-
 from __future__ import annotations
 import uuid
 from sqlalchemy import update
-from app.models import PackBattle, BattlePlayer
+from app.models import PackBattle, BattlePlayer, BattleRound, BattlePull
 from app.services.provably_fair import gen_server_seed, verify_commit
 
 
@@ -67,9 +67,26 @@ def cancel_battle(session, battle_id, wallet) -> PackBattle:
     return b
 
 
-def _players(session, battle_id):
-    return [p.player_wallet for p in session.query(BattlePlayer)
-            .filter_by(battle_id=battle_id).order_by(BattlePlayer.joined_at).all()]
+def _player_states(session, battle_id):
+    return [{"wallet": p.player_wallet, "eliminated_round": p.eliminated_round,
+             "accumulated_value": p.accumulated_value}
+            for p in session.query(BattlePlayer).filter_by(battle_id=battle_id)
+            .order_by(BattlePlayer.joined_at).all()]
+
+
+def _rounds(session, battle_id):
+    return [{"round_number": r.round_number, "eliminated_wallet": r.eliminated_wallet,
+             "tie_break_index": r.tie_break_index}
+            for r in session.query(BattleRound).filter_by(battle_id=battle_id)
+            .order_by(BattleRound.round_number).all()]
+
+
+def _pull_recap(session, battle_id):
+    return [{"round_number": p.round_number, "player_wallet": p.player_wallet,
+             "nft_address": p.nft_address, "rarity": p.rarity,
+             "insured_value": p.insured_value, "auto_sold": p.auto_sold}
+            for p in session.query(BattlePull).filter_by(battle_id=battle_id)
+            .order_by(BattlePull.round_number, BattlePull.id).all()]
 
 
 def list_open(session):
@@ -84,9 +101,13 @@ def get_battle(session, battle_id):
         raise LobbyError("no existe")
     out = {"id": b.id, "mode": b.mode, "machine_code": b.machine_code, "price": b.price,
            "max_players": b.max_players, "status": b.status, "winner": b.winner,
-           "players": _players(session, battle_id), "server_seed_hash": b.server_seed_hash}
-    if b.status == "settled":   # reveal only after settle
-        out.update(server_seed=b.server_seed, client_seed=b.client_seed, tie_break_index=b.tie_break_index)
+           "creator_wallet": b.creator_wallet,
+           "players": _player_states(session, battle_id),
+           "rounds": _rounds(session, battle_id),
+           "server_seed_hash": b.server_seed_hash}
+    if b.status == "settled":   # reveal + recap only after settle (secrecy)
+        out.update(server_seed=b.server_seed, client_seed=b.client_seed,
+                   tie_break_index=b.tie_break_index, pulls=_pull_recap(session, battle_id))
     return out
 
 
