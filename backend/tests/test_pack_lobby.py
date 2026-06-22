@@ -138,3 +138,18 @@ def test_verification_pack_tiebreak(session):
     v = verification(session, b)
     assert v["mode"] == "pack" and v["client_seed"] == "cs" and v["tie_break_index"] == 1
     assert v["commit_ok"] is True
+
+
+def test_list_open_includes_mode_and_buyin(session):
+    from app.services.royale_funding import royale_buyin
+    create_battle(session, "WA", "wid-a", machine_code="pokemon_50",
+                  price=50_000_000, max_players=2, mode="pack")
+    create_battle(session, "WB", "wid-b", machine_code="pokemon_50",
+                  price=50_000_000, max_players=4, mode="royale")
+    rows = list_open(session)
+    by_mode = {r["mode"]: r for r in rows}
+    assert by_mode["pack"]["buyin"] == 50_000_000
+    assert by_mode["royale"]["buyin"] == royale_buyin(4, 50_000_000)
+    # base shape preserved
+    assert set(by_mode["pack"]) == {
+        "id", "mode", "machine_code", "price", "max_players", "players", "buyin"}
