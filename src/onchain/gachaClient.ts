@@ -176,6 +176,12 @@ export function ccAssetUrl(mint: string): string {
   return `https://collectorcrypt.com/assets/solana/${mint}`
 }
 
+// CollectorCrypt serves the card front image by mint (302 → CDN image; placeholder if missing).
+// Devnet base; usable directly as an <img src>. https://docs.collectorcrypt.com/metadata
+export function ccCardImageUrl(mint: string): string {
+  return `https://nft-dev.collectorcrypt.com/front/${mint}`
+}
+
 export interface YoloTx { memo: string; transaction: string }
 export interface YoloPacksResponse { yolo_id: string | null; count: number; transactions: YoloTx[] }
 

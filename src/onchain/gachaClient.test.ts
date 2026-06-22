@@ -3,7 +3,7 @@ import { pollOpenPack, defaultDelayMs, type OpenPackResult } from './gachaClient
 import { fetchBuybackAvailable, requestBuyback } from './gachaClient'
 import { generateYoloPacks, yoloTotalCost, clampCount } from './gachaClient'
 import { config } from './config'
-import { ccAssetUrl } from './gachaClient'
+import { ccAssetUrl, ccCardImageUrl } from './gachaClient'
 
 describe('pollOpenPack', () => {
   it('devuelve el resultado en cuanto deja de estar pendiente', async () => {
@@ -72,6 +72,13 @@ describe('ccAssetUrl', () => {
   it('apunta a la página del asset en CollectorCrypt', () => {
     expect(ccAssetUrl('7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH'))
       .toBe('https://collectorcrypt.com/assets/solana/7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH')
+  })
+})
+
+describe('ccCardImageUrl', () => {
+  it('returns the CC devnet front-image endpoint for a mint', () => {
+    expect(ccCardImageUrl('7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH'))
+      .toBe('https://nft-dev.collectorcrypt.com/front/7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH')
   })
 })
 
