@@ -12,7 +12,6 @@ import { joinBattle } from '../../../onchain/packBattleClient'
 import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 import { CreateBattleModal } from './CreateBattleModal'
-import { BattleWaiting } from './BattleWaiting'
 
 export function Hub() {
   const navigate = useNavigate()
@@ -20,7 +19,6 @@ export function Hub() {
   const [stake, setStake] = useState<number>(STAKE_OPTIONS[1])
   const { battles } = useOpenBattles()
   const gate = useDelegationGate()
-  const [waitingId, setWaitingId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -35,12 +33,12 @@ export function Hub() {
 
   function onBattleAction(b: LiveBattle) {
     setActionError(null)
-    if (b.action === 'watch') { setWaitingId(b.id); return }
+    if (b.action === 'watch') { navigate('/play/battle/' + b.id); return }
     if (!identityToken) { setActionError('Inicia sesión para unirte.'); return }
     gate.requireDelegation(async () => {
       try {
         await joinBattle(identityToken, b.id)
-        setWaitingId(b.id)
+        navigate('/play/battle/' + b.id)
       } catch (e) {
         setActionError(e instanceof Error ? e.message : String(e))
       }
@@ -78,10 +76,9 @@ export function Hub() {
       {createOpen && (
         <CreateBattleModal
           onClose={() => setCreateOpen(false)}
-          onCreated={(id) => { setCreateOpen(false); setWaitingId(id) }}
+          onCreated={(id) => { setCreateOpen(false); navigate('/play/battle/' + id) }}
         />
       )}
-      {waitingId && <BattleWaiting battleId={waitingId} onClose={() => setWaitingId(null)} />}
     </div>
   )
 }
