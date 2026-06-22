@@ -610,3 +610,48 @@ def test_verify_endpoint_pre_settle_and_404(client_priv, monkeypatch):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["server_seed_hash"] and body["server_seed"] is None   # pre-settle
+
+
+def test_me_balance_returns_reserved(client_priv, monkeypatch):
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+
+    # no reservations yet
+    r0 = c.get("/users/me/balance", headers=hdrs)
+    assert r0.status_code == 200 and r0.json() == {"reserved": 0}
+
+    # creating a pack battle reserves the price (50 * 1e6 base units)
+    c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
+    r1 = c.get("/users/me/balance", headers=hdrs)
+    assert r1.json() == {"reserved": 50_000_000}
+
+
+def test_me_balance_requires_auth(client_priv):
+    c, _ = client_priv
+    assert c.get("/users/me/balance").status_code == 401
+
+
+def test_open_battles_include_creator_wallet(client_priv, monkeypatch):
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
+    row = c.get("/pack-battles/open").json()[0]
+    assert row["creator_wallet"] == WALLET_A
