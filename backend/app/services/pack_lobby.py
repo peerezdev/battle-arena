@@ -111,7 +111,22 @@ def get_battle(session, battle_id):
     return out
 
 
-def verification(b):
-    return {"server_seed_hash": b.server_seed_hash, "server_seed": b.server_seed if b.status == "settled" else None,
-            "client_seed": b.client_seed, "tie_break_index": b.tie_break_index,
-            "commit_ok": verify_commit(b.server_seed, b.server_seed_hash) if b.server_seed else None}
+def verification(session, battle):
+    """Commit-reveal proof. server_seed/commit_ok revealed only post-settle. Per-round for royale."""
+    settled = battle.status == "settled"
+    out = {
+        "mode": battle.mode,
+        "server_seed_hash": battle.server_seed_hash,
+        "server_seed": battle.server_seed if settled else None,
+        "commit_ok": (verify_commit(battle.server_seed, battle.server_seed_hash)
+                      if settled and battle.server_seed else None),
+    }
+    if battle.mode == "royale":
+        out["rounds"] = [{"round_number": r.round_number, "client_seed": r.client_seed,
+                          "eliminated_wallet": r.eliminated_wallet, "tie_break_index": r.tie_break_index}
+                         for r in session.query(BattleRound).filter_by(battle_id=battle.id)
+                         .order_by(BattleRound.round_number).all()]
+    else:
+        out["client_seed"] = battle.client_seed
+        out["tie_break_index"] = battle.tie_break_index
+    return out

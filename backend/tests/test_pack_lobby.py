@@ -103,3 +103,38 @@ def test_get_battle_postsettle_pull_recap(session):
     assert v["server_seed"] == "ab" * 32                 # revealed post-settle
     assert v["pulls"] == [{"round_number": 1, "player_wallet": "A", "nft_address": "nftA",
                            "rarity": "Epic", "insured_value": 500.0, "auto_sold": False}]
+
+
+def test_verification_royale_rounds_and_reveal_gate(session):
+    from app.models import PackBattle, BattleRound
+    from app.services.pack_lobby import verification
+    from app.services.provably_fair import gen_server_seed
+    seed, h = gen_server_seed()
+    b = PackBattle(id="vr", mode="royale", machine_code="m", price=50, max_players=3,
+                   status="running", server_seed=seed, server_seed_hash=h)
+    session.add(b)
+    session.add(BattleRound(battle_id="vr", round_number=1, client_seed="cs1",
+                            eliminated_wallet="B", tie_break_index=2))
+    session.commit()
+    v = verification(session, b)
+    assert v["mode"] == "royale" and v["server_seed_hash"] == h
+    assert v["server_seed"] is None and v["commit_ok"] is None     # not settled → seed hidden
+    assert v["rounds"] == [{"round_number": 1, "client_seed": "cs1",
+                            "eliminated_wallet": "B", "tie_break_index": 2}]
+    b.status = "settled"; session.commit()
+    v2 = verification(session, b)
+    assert v2["server_seed"] == seed and v2["commit_ok"] is True    # post-settle → revealed + verified
+
+
+def test_verification_pack_tiebreak(session):
+    from app.models import PackBattle
+    from app.services.pack_lobby import verification
+    from app.services.provably_fair import gen_server_seed
+    seed, h = gen_server_seed()
+    b = PackBattle(id="vp", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="settled", server_seed=seed, server_seed_hash=h,
+                   client_seed="cs", tie_break_index=1)
+    session.add(b); session.commit()
+    v = verification(session, b)
+    assert v["mode"] == "pack" and v["client_seed"] == "cs" and v["tie_break_index"] == 1
+    assert v["commit_ok"] is True

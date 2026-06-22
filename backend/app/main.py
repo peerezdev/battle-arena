@@ -29,7 +29,7 @@ from .chat import ConnectionManager, ChatBuffer, abbreviate
 from .services.pack_lobby import (
     create_battle, join_battle,
     list_open as lobby_list_open,
-    get_battle, cancel_battle, LobbyError,
+    get_battle, cancel_battle, verification, LobbyError,
 )
 from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
@@ -539,6 +539,13 @@ def create_app(session_factory, chain: ChainSource,
             return get_battle(s, battle_id)
         except LobbyError:
             raise HTTPException(404, "no existe")
+
+    @app.get("/pack-battles/{battle_id}/verify")
+    async def verify_pack_battle(battle_id: str, s: Session = Depends(db)):
+        b = s.get(PackBattle, battle_id)
+        if b is None:
+            raise HTTPException(404, "no existe")
+        return verification(s, b)
 
     # ── Chat de lobby por WebSocket ───────────────────────────────────────────
     _chat_mgr = ConnectionManager()
