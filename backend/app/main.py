@@ -87,10 +87,15 @@ class CreateMatchBody(BaseModel):
         return self
 
 
-class CreateBattleBody(BaseModel):
+class PackSel(BaseModel):
     machine_code: str
+    count: int
+
+class CreateBattleBody(BaseModel):
+    machine_code: Optional[str] = None     # legacy single-pack / royale
     max_players: int
     mode: str = "pack"
+    packs: Optional[list[PackSel]] = None  # multi-pack bundle (pack mode only)
 
 
 def create_app(session_factory, chain: ChainSource,
@@ -421,7 +426,7 @@ def create_app(session_factory, chain: ChainSource,
     @app.post("/pack-battles")
     async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),
                                  wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
-        price = await _machine_price(body.machine_code)
+        price = await _machine_price(body.machine_code) if body.machine_code else 0
         mode = body.mode
 
         if mode == "royale":
@@ -453,14 +458,29 @@ def create_app(session_factory, chain: ChainSource,
             resp["escrow_address"] = b.escrow_address
             return resp
 
-        # Default: pack mode
-        await _require_available(wallet, price, s)
+        # Default: pack mode — build the bundle (1..10 boxes), reserve the total
+        if body.packs:
+            for sel in body.packs:
+                if sel.count < 1:
+                    raise HTTPException(422, "cada count debe ser >= 1")
+            bundle: list[tuple[str, int]] = []
+            for sel in body.packs:
+                ppx = await _machine_price(sel.machine_code)   # 409 if unavailable
+                bundle += [(sel.machine_code, ppx)] * sel.count
+        else:
+            if not body.machine_code:
+                raise HTTPException(422, "machine_code o packs requerido")
+            bundle = [(body.machine_code, await _machine_price(body.machine_code))]
+        if not (1 <= len(bundle) <= 10):
+            raise HTTPException(422, "el bundle debe tener entre 1 y 10 cajas")
+        total = sum(pr for _, pr in bundle)
+        await _require_available(wallet, total, s)
         try:
-            b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
-                              max_players=body.max_players, mode=mode)
+            b = create_battle(s, wallet, wallet_id, machine_code=bundle[0][0], price=total,
+                              max_players=body.max_players, mode=mode, packs=bundle)
         except LobbyError as e:
             raise HTTPException(409, str(e))
-        reserve(s, wallet, b.id, price)
+        reserve(s, wallet, b.id, total)
         return get_battle(s, b.id)
 
     @app.post("/pack-battles/{battle_id}/join")

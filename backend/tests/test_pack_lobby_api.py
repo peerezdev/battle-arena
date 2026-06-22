@@ -655,3 +655,67 @@ def test_open_battles_include_creator_wallet(client_priv, monkeypatch):
     c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
     row = c.get("/pack-battles/open").json()[0]
     assert row["creator_wallet"] == WALLET_A
+
+
+def test_create_multipack_bundle(client_priv, monkeypatch):
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 1_000_000_000
+
+    async def _machines():
+        return [{"code": "m25", "price": 25, "available": True},
+                {"code": "m50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+
+    r = c.post("/pack-battles", json={"max_players": 2,
+               "packs": [{"machine_code": "m25", "count": 1}, {"machine_code": "m50", "count": 2}]},
+               headers=hdrs)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["price"] == 125_000_000   # 25 + 50 + 50, base units
+    assert body["packs"] == [
+        {"machine_code": "m25", "sequence": 1, "price": 25_000_000},
+        {"machine_code": "m50", "sequence": 2, "price": 50_000_000},
+        {"machine_code": "m50", "sequence": 3, "price": 50_000_000}]
+    # the creator reserved the total
+    assert c.get("/users/me/balance", headers=hdrs).json() == {"reserved": 125_000_000}
+
+
+def test_create_multipack_rejects_over_ten_boxes(client_priv, monkeypatch):
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 1_000_000_000
+
+    async def _machines():
+        return [{"code": "m25", "price": 25, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/pack-battles", json={"max_players": 2, "packs": [{"machine_code": "m25", "count": 11}]},
+               headers=hdrs)
+    assert r.status_code == 422, r.text
+
+
+def test_create_legacy_single_machine_still_works(client_priv, monkeypatch):
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 1_000_000_000
+
+    async def _machines():
+        return [{"code": "m50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/pack-battles", json={"machine_code": "m50", "max_players": 2}, headers=hdrs)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["price"] == 50_000_000
+    assert body["packs"] == [{"machine_code": "m50", "sequence": 1, "price": 50_000_000}]

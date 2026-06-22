@@ -106,6 +106,15 @@ class BattlePull(Base):
     round_number: Mapped[int] = mapped_column(Integer, default=1)
 
 
+class BattlePack(Base):
+    __tablename__ = "battle_packs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    battle_id: Mapped[str] = mapped_column(String, index=True)
+    machine_code: Mapped[str] = mapped_column(String)
+    price: Mapped[int] = mapped_column(Integer)   # USDC base units, per box
+    sequence: Mapped[int] = mapped_column(Integer)  # 1..N order within the bundle
+
+
 class BattleRound(Base):
     __tablename__ = "battle_rounds"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

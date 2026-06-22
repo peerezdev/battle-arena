@@ -3,7 +3,7 @@ checks live in the endpoint layer (they need RPC/Privy). Generates the Provably-
 from __future__ import annotations
 import uuid
 from sqlalchemy import update
-from app.models import PackBattle, BattlePlayer, BattleRound, BattlePull
+from app.models import PackBattle, BattlePlayer, BattleRound, BattlePull, BattlePack
 from app.services.provably_fair import gen_server_seed, verify_commit
 from app.services.royale_funding import royale_buyin
 
@@ -16,7 +16,8 @@ class ModeNotSupported(LobbyError):
     pass
 
 
-def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, price, max_players, mode="pack"):
+def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, price, max_players,
+                  mode="pack", packs: list[tuple[str, int]] | None = None):
     if mode not in ("pack", "royale"):
         raise ModeNotSupported(f"Modo '{mode}' no soportado")
     if not (2 <= max_players <= 10):
@@ -27,6 +28,9 @@ def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, p
                    creator_wallet=creator_wallet)
     session.add(b)
     session.add(BattlePlayer(battle_id=b.id, player_wallet=creator_wallet, wallet_id=creator_wallet_id))
+    if mode == "pack":   # the bundle is a pack-mode concept; royale opens its machine per round
+        for i, (mc, pr) in enumerate(packs or [(machine_code, price)], start=1):
+            session.add(BattlePack(battle_id=b.id, machine_code=mc, price=pr, sequence=i))
     session.commit()
     return b
 
@@ -90,6 +94,12 @@ def _pull_recap(session, battle_id):
             .order_by(BattlePull.round_number, BattlePull.id).all()]
 
 
+def _packs(session, battle_id):
+    return [{"machine_code": p.machine_code, "sequence": p.sequence, "price": p.price}
+            for p in session.query(BattlePack).filter_by(battle_id=battle_id)
+            .order_by(BattlePack.sequence).all()]
+
+
 def list_open(session):
     out = []
     for b in session.query(PackBattle).filter_by(status="lobby").all():
@@ -112,7 +122,8 @@ def get_battle(session, battle_id):
            "players": _player_states(session, battle_id),
            "rounds": _rounds(session, battle_id),
            "server_seed_hash": b.server_seed_hash,
-           "pulls": _pull_recap(session, battle_id)}   # card recap is live (safe; the seed is not)
+           "pulls": _pull_recap(session, battle_id),
+           "packs": _packs(session, battle_id)}   # card recap is live (safe; the seed is not)
     if b.status == "settled":   # PF seed reveal ONLY post-settle (predicting future rounds must stay impossible)
         out.update(server_seed=b.server_seed, client_seed=b.client_seed,
                    tie_break_index=b.tie_break_index)
