@@ -109,10 +109,12 @@ class GachaService:
         return out
 
     async def generate_pack(self, player_address: str, pack_type: str,
-                            alt_player_address: str | None = None) -> dict:
+                            alt_player_address: str | None = None, turbo: bool = False) -> dict:
         body = {"playerAddress": player_address, "packType": pack_type}
         if alt_player_address:
             body["altPlayerAddress"] = alt_player_address
+        if turbo:
+            body["turbo"] = True
         raw = await self._request("POST", "/api/generatePack", json=body)
         return {"memo": raw.get("memo"), "transaction": raw.get("transaction")}
 

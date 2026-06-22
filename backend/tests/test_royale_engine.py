@@ -38,7 +38,7 @@ class _Gacha:
         self.values = values
         self.pull_counts: dict[str, int] = {}  # wallet -> how many times pulled
 
-    async def generate_pack(self, player_address, pack_type, alt_player_address=None):
+    async def generate_pack(self, player_address, pack_type, alt_player_address=None, turbo=False):
         return {"memo": f"m-{player_address}", "transaction": f"tx-{player_address}"}
 
     async def open_pack(self, memo):
@@ -195,9 +195,9 @@ async def test_royale_distribute_before_pull(session):
     call_log = []
 
     class _LogGacha(_Gacha):
-        async def generate_pack(self, player_address, pack_type, alt_player_address=None):
+        async def generate_pack(self, player_address, pack_type, alt_player_address=None, turbo=False):
             call_log.append(("generate", player_address))
-            return await super().generate_pack(player_address, pack_type, alt_player_address)
+            return await super().generate_pack(player_address, pack_type, alt_player_address, turbo=turbo)
 
     async def distribute(esc, p, amt):
         call_log.append(("distribute", p))
@@ -408,3 +408,81 @@ async def test_royale_reuses_pre_created_escrow(session):
     battle = session.get(PackBattle, "r6")
     assert battle.escrow_wallet_id == "pre-esc-id", "escrow_wallet_id was overwritten"
     assert battle.escrow_address == "PRE_ESC", "escrow_address was overwritten"
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Fakes for Task 7 test
+# ════════════════════════════════════════════════════════════════════════════
+
+class _RoyaleGacha:
+    """Fake gacha for turbo+rarity test: generate_pack records turbo kwarg."""
+    def __init__(self, opens: dict):
+        self.opens = opens
+        self.turbo = None
+
+    async def generate_pack(self, player_address, pack_type, alt_player_address=None, turbo=False):
+        self.turbo = turbo
+        return {"memo": f"m-{player_address}", "transaction": f"tx-{player_address}"}
+
+    async def open_pack(self, memo):
+        wallet = memo.split("m-", 1)[1]
+        return {"pending": False, **self.opens[wallet]}
+
+    async def submit_tx(self, signed):
+        return {"signature": "ccsig"}
+
+
+class _RoyaleSigner:
+    async def create_solana_wallet(self):
+        return {"id": "esc-id", "address": "ESC"}
+
+    async def sign_solana(self, wallet_id, tx):
+        return f"sig-{tx}"
+
+
+async def _ok():
+    return "ccsig"
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Test 7: turbo pulls + rarity/auto_sold persisted + resilient settle
+# ════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_run_royale_turbo_persists_rarity_and_resilient_settle(session):
+    # Minimal 2-player royale: round 1, A pulls common (auto-sold), B pulls epic → A eliminated, B wins.
+    b = PackBattle(id="r1", mode="royale", machine_code="pokemon_50", price=50, max_players=2,
+                   status="running", server_seed="ab" * 32,
+                   escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="r1", player_wallet="A"),
+                     BattlePlayer(battle_id="r1", player_wallet="B")])
+    session.commit()
+
+    opens = {
+        "A": {"nft_address": "nftA", "insured_value": 50, "grade": None, "rarity": "Common", "auto_sold": True},
+        "B": {"nft_address": "nftB", "insured_value": 500, "grade": 9, "rarity": "Epic", "auto_sold": False},
+    }
+    gacha = _RoyaleGacha(opens)          # existing fake in this test module
+    signer = _RoyaleSigner()
+    transfers, sweeps = [], []
+    async def btx(esc, dest, nft): transfers.append((dest, nft)); return f"tx-{nft}"
+    async def sweep(esc, winner): sweeps.append(winner); return "sweep-tx"
+    async def distribute(esc, w, amt): return "dsig"
+    async def confirm_usdc(w, amt): return True
+    async def ce(esc, nft): return True
+    async def prep(esc): return "ok"
+    async def noslp(_): return None
+
+    out = await run_royale(session, b, gacha=gacha, signer=signer,
+        resolve_wallet_id=lambda w: f"id-{w}", distribute=distribute, confirm_usdc=confirm_usdc,
+        confirm_in_escrow=ce, build_transfer_tx=btx, submit_tx=lambda s: _ok(), prepare_escrow=prep,
+        price_base=50, now_fn=lambda: __import__("datetime").datetime.now(),
+        sleep_fn=noslp, build_usdc_sweep_tx=sweep)
+
+    assert out == "settled" and b.winner == "B"
+    assert gacha.turbo is True
+    assert transfers == [("B", "nftB")]      # only the kept epic
+    assert sweeps == ["B"]
+    a_pull = session.query(BattlePull).filter_by(battle_id="r1", player_wallet="A").first()
+    assert a_pull.rarity == "Common" and a_pull.auto_sold is True

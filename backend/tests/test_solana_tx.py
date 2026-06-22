@@ -165,3 +165,27 @@ def test_build_token_transfer_usdc_amount_decimals_and_feepayer():
     tok = Pubkey.from_string(TOKEN_PROGRAM)
     ix = next(i for i in tx.message.instructions if keys[i.program_id_index] == tok)
     assert bytes(ix.data) == bytes([12]) + (50_000_000).to_bytes(8,"little") + bytes([6])
+
+
+def test_build_create_ata_single_idempotent_ix_operator_payer():
+    from app.services.solana_tx import build_create_ata, ATA_PROGRAM, TOKEN_PROGRAM
+    import base64
+    from solders.transaction import Transaction
+    from solders.pubkey import Pubkey
+    from solders.token.associated import get_associated_token_address
+    OWNER = "9oZgd4eviozqaYu7KwCTctAYgsRTWtF3McJARaztPsRQ"
+    OP    = "A4ahkivAG4NoZAE8Sy4qv8nn2DU9yoXRQcttuCeGtTJv"
+    USDC  = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+    out = build_create_ata(OWNER, USDC, "11111111111111111111111111111111", payer=OP)
+    tx = Transaction.from_bytes(base64.b64decode(out))
+    keys = tx.message.account_keys
+    assert keys[0] == Pubkey.from_string(OP)               # fee payer = operator
+    assert len(tx.message.instructions) == 1
+    ix = tx.message.instructions[0]
+    assert keys[ix.program_id_index] == Pubkey.from_string(ATA_PROGRAM)
+    assert bytes(ix.data) == bytes([1])                    # CreateIdempotent
+    ata = get_associated_token_address(Pubkey.from_string(OWNER),
+                                       Pubkey.from_string(USDC),
+                                       Pubkey.from_string(TOKEN_PROGRAM))
+    a = [str(keys[i]) for i in ix.accounts]
+    assert a[1] == str(ata) and a[2] == OWNER              # ATA + its owner

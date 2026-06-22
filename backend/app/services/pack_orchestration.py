@@ -15,7 +15,7 @@ import httpx
 from app.services.pack_engine import run_battle
 from app.services.royale_engine import run_royale
 from app.services.royale_funding import distribute_usdc, confirm_usdc
-from app.services.solana_tx import TOKEN_PROGRAM
+from app.services.solana_tx import TOKEN_PROGRAM, build_token_transfer, build_create_ata
 from app.services.nft_transfer import build_transfer, submit_signed_tx, nft_in_owner
 from solders.hash import Hash
 from solders.message import Message
@@ -171,9 +171,22 @@ async def run_pack_battle_live(
 
     async def prepare_escrow(esc_addr):
         bh = await fetch_latest_blockhash(rpc_url)
-        return await seed_escrow(
+        await seed_escrow(
             rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, bh
         )
+        # Pre-create the escrow's USDC ATA (operator pays) so CC's turbo auto-buyback payout
+        # does not revert (CreateIdempotent would otherwise exhaust the payout tx's CU budget).
+        bh2 = await fetch_latest_blockhash(rpc_url)
+        ata_tx = build_create_ata(esc_addr, usdc_mint, bh2, payer=operator_address)
+        signed = await signer.sign_solana(operator_wallet_id, ata_tx)
+        return await submit_signed_tx(rpc_url, signed)
+
+    async def build_usdc_sweep_tx(esc_addr, winner_addr):
+        bal = await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint, token_program)
+        if bal <= 0:
+            return None
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(esc_addr, winner_addr, usdc_mint, bh, amount=bal, decimals=6)
 
     def can_play(wallet: str) -> bool:
         return wallet in playable
@@ -194,6 +207,7 @@ async def run_pack_battle_live(
         can_play=can_play,
         now_fn=now_fn,
         sponsor=sponsor,
+        build_usdc_sweep_tx=build_usdc_sweep_tx,
     )
 
 
@@ -263,6 +277,13 @@ async def run_royale_live(
             rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, bh
         )
 
+    async def build_usdc_sweep_tx(esc_addr, winner_addr):
+        bal = await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
+        if bal <= 0:
+            return None
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(esc_addr, winner_addr, usdc_mint, bh, amount=bal, decimals=6)
+
     def now_fn():
         return datetime.now(timezone.utc)
 
@@ -280,4 +301,5 @@ async def run_royale_live(
         prepare_escrow=prepare_escrow,
         price_base=price_base,
         now_fn=now_fn,
+        build_usdc_sweep_tx=build_usdc_sweep_tx,
     )

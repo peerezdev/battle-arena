@@ -7,7 +7,7 @@ import logging
 
 from app.models import BattlePlayer, BattlePull, BattleRound
 from app.services.provably_fair import client_seed_round, pick_index
-from app.services.pack_engine import _wait_in_escrow   # reuse the escrow-confirm poll
+from app.services.pack_engine import _wait_in_escrow, settle_cards_to_winner
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ async def run_royale(
     distribute, confirm_usdc, confirm_in_escrow,
     build_transfer_tx, submit_tx, prepare_escrow,
     price_base, now_fn,
-    sleep_fn=None, max_attempts=20, delay=3.0,
+    sleep_fn=None, max_attempts=20, delay=3.0, build_usdc_sweep_tx=None,
 ) -> str:
     """Run the royale loop; return 'settled' or 'voided'."""
     sleep_fn = sleep_fn or asyncio.sleep
@@ -73,6 +73,7 @@ async def run_royale(
                     player_address=w,
                     pack_type=battle.machine_code,
                     alt_player_address=esc["address"],
+                    turbo=True,
                 )
                 pull = BattlePull(
                     battle_id=battle.id,
@@ -102,6 +103,8 @@ async def run_royale(
                 pull.nft_address = res["nft_address"]
                 pull.insured_value = res.get("insured_value") or 0
                 pull.grade = res.get("grade")
+                pull.rarity = res.get("rarity")
+                pull.auto_sold = bool(res.get("auto_sold"))
                 session.commit()
 
                 accumulated[w] += res.get("insured_value") or 0
@@ -141,20 +144,14 @@ async def run_royale(
             ))
             session.commit()
 
-        # Settle: transfer all escrow NFTs to winner
+        # Settle: transfer all non-auto-sold escrow NFTs + the escrow USDC to the winner (resilient).
         winner = remaining[0]
-        nfts = [
-            p.nft_address
-            for p in session.query(BattlePull).filter_by(battle_id=battle.id).all()
-            if p.nft_address
-        ]
-        for nft in nfts:
-            await _wait_in_escrow(
-                confirm_in_escrow, esc["address"], nft, sleep_fn, max_attempts, delay
-            )
-            tx = await build_transfer_tx(esc["address"], winner, nft)
-            signed = await signer.sign_solana(esc["id"], tx)
-            await submit_tx(signed)
+        await settle_cards_to_winner(
+            session, battle, escrow_wallet_id=esc["id"], escrow_address=esc["address"], winner=winner,
+            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
+            confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
+            sleep_fn=sleep_fn, wait_max_attempts=max_attempts, wait_delay=delay,
+        )
 
         battle.winner = winner
         battle.status = "settled"

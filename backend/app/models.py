@@ -99,6 +99,8 @@ class BattlePull(Base):
     insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     grade: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     rarity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    auto_sold: Mapped[bool] = mapped_column(Boolean, default=False)
+    transferred: Mapped[bool] = mapped_column(Boolean, default=False)
     round_number: Mapped[int] = mapped_column(Integer, default=1)
 
 

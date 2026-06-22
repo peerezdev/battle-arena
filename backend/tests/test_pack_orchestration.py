@@ -90,7 +90,7 @@ class _Gacha:
         self.pulled: list[str] = []
 
     async def generate_pack(self, player_address: str, pack_type: str,
-                            alt_player_address=None) -> dict:
+                            alt_player_address=None, turbo=False) -> dict:
         self.alt = alt_player_address
         self.pulled.append(player_address)
         return {"memo": f"m-{player_address}", "transaction": f"tx-{player_address}"}
@@ -313,11 +313,12 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
     assert NFT_A in build_mints
     assert NFT_B in build_mints
 
-    # submit_signed_tx was called once per settle transfer
-    assert len(calls["submit"]) == 2
-    # Each submit receives "signed-tx-<mint>" (signer.sign_solana returns f"signed-{tx}")
-    for sub in calls["submit"]:
-        assert sub.startswith("signed-tx-")
+    # submit_signed_tx was called once for the escrow USDC ATA pre-create
+    # (operator-signed) and once per NFT settle transfer — 3 total.
+    assert len(calls["submit"]) == 3
+    # The two NFT-settle submits receive "signed-tx-<mint>"
+    nft_submits = [s for s in calls["submit"] if s.startswith("signed-tx-")]
+    assert len(nft_submits) == 2
 
     # seed_escrow was called with the escrow address
     assert calls["seed"] == [ESCROW_ADDRESS]
@@ -382,3 +383,63 @@ async def test_run_pack_battle_live_void_when_player_underfunded(session, monkey
     assert b.winner is None
     assert b.escrow_address is None
     assert signer.sent == []
+
+
+# ---------------------------------------------------------------------------
+# Lightweight fakes for USDC-sweep tests (no DB, no RPC)
+# ---------------------------------------------------------------------------
+
+class _FakeBattle:
+    id = "b1"; mode = "pack"; machine_code = "pokemon_50"; price = 50
+    escrow_wallet_id = "eid"; escrow_address = "ESC"; status = "lobby"
+
+class _FakeSession:
+    def __init__(self, players): self._players = players
+    def query(self, *a, **k): return self
+    def filter_by(self, **k): return self
+    def order_by(self, *a, **k): return self
+    def all(self): return self._players
+
+
+# ---------------------------------------------------------------------------
+# Test 5: build_usdc_sweep_tx — zero balance returns None
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_build_usdc_sweep_tx_zero_balance_returns_none(monkeypatch):
+    import app.services.pack_orchestration as po
+    captured = {}
+    async def fake_run_battle(session, battle, **kw):
+        captured["sweep"] = kw["build_usdc_sweep_tx"]; return "settled"
+    monkeypatch.setattr(po, "run_battle", fake_run_battle)
+    async def zero_bal(rpc, owner, mint, tp=None): return 0
+    monkeypatch.setattr(po, "usdc_balance_base_units", zero_bal)
+
+    await po.run_pack_battle_live(_FakeSession([]), _FakeBattle(), gacha=None, signer=None,
+        rpc_url="http://x", usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr",
+        min_usdc_base_units=0)
+    assert await captured["sweep"]("ESC", "WIN") is None     # 0 balance → None
+
+
+# ---------------------------------------------------------------------------
+# Test 6: build_usdc_sweep_tx — positive balance builds a tx
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_build_usdc_sweep_tx_positive_balance_builds_tx(monkeypatch):
+    import app.services.pack_orchestration as po
+    captured = {}
+    async def fake_run_battle(session, battle, **kw):
+        captured["sweep"] = kw["build_usdc_sweep_tx"]; return "settled"
+    monkeypatch.setattr(po, "run_battle", fake_run_battle)
+    async def bal(rpc, owner, mint, tp=None): return 42_500_000
+    async def bh(rpc): return "11111111111111111111111111111111"
+    monkeypatch.setattr(po, "usdc_balance_base_units", bal)
+    monkeypatch.setattr(po, "fetch_latest_blockhash", bh)
+
+    await po.run_pack_battle_live(_FakeSession([]), _FakeBattle(), gacha=None, signer=None,
+        rpc_url="http://x", usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr",
+        min_usdc_base_units=0)
+    out = await captured["sweep"]("9oZgd4eviozqaYu7KwCTctAYgsRTWtF3McJARaztPsRQ",
+                                  "8QDBKx8P3pxkRhiqyXFtYcPPf2CM1F5NiE5A8yjkgtm6")
+    assert isinstance(out, str) and len(out) > 0             # built a tx

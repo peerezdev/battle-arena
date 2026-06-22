@@ -110,6 +110,39 @@ def read_pnft_ruleset(data: bytes) -> Optional[Pubkey]:
 # Detection + dispatcher + submit
 # ---------------------------------------------------------------------------
 MPL_CORE_PROGRAM = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
+_MPL_CORE_PK = Pubkey.from_string(MPL_CORE_PROGRAM)
+
+
+def read_core_collection(data: bytes) -> Optional[Pubkey]:
+    """MPL Core AssetV1: key(1) + owner(32) + update_authority enum.
+    Variant 2 == Collection → next 32 bytes are the collection pubkey; variants 0/1 → None.
+    Returns None on any truncated buffer (caller transfers without a collection)."""
+    try:
+        o = 1 + 32  # key + owner
+        if data[o] == 2:  # Collection
+            return Pubkey.from_bytes(data[o + 1:o + 1 + 32])
+        return None
+    except (IndexError, ValueError):
+        return None
+
+
+def build_core_transfer(escrow: str, winner: str, mint: str, recent_blockhash: str,
+                        *, collection: Optional[str]) -> str:
+    esc = Pubkey.from_string(escrow); win = Pubkey.from_string(winner); asset = Pubkey.from_string(mint)
+    coll = Pubkey.from_string(collection) if collection else _MPL_CORE_PK  # None → program id
+    metas = [
+        AccountMeta(asset,    is_signer=False, is_writable=True),                       # 0 asset
+        AccountMeta(coll,     is_signer=False, is_writable=(collection is not None)),   # 1 collection|None
+        AccountMeta(esc,      is_signer=True,  is_writable=True),                       # 2 payer
+        AccountMeta(esc,      is_signer=True,  is_writable=False),                      # 3 authority (owner)
+        AccountMeta(win,      is_signer=False, is_writable=False),                      # 4 new_owner
+        AccountMeta(SYS_PROGRAM, is_signer=False, is_writable=False),                   # 5 system_program
+        AccountMeta(_MPL_CORE_PK, is_signer=False, is_writable=False),                  # 6 log_wrapper (None)
+    ]
+    transfer_ix = Instruction(_MPL_CORE_PK, bytes([14, 0]), metas)  # TransferV1, compression_proof None
+    cu_ix = Instruction(COMPUTE_BUDGET, bytes([2]) + (100000).to_bytes(4, "little"), [])
+    msg = Message.new_with_blockhash([cu_ix, transfer_ix], esc, Hash.from_string(recent_blockhash))
+    return base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
 
 
 class UnsupportedNftStandard(Exception):
@@ -174,6 +207,11 @@ async def build_transfer(rpc_url: str, escrow: str, winner: str, mint: str, bloc
     if std == "standard":
         from app.services.solana_tx import build_nft_transfer
         return build_nft_transfer(escrow, winner, mint, blockhash)
+    if std == "core":
+        info = await _get_account(rpc_url, mint)
+        coll = read_core_collection(base64.b64decode(info["data"][0])) if info else None
+        return build_core_transfer(escrow, winner, mint, blockhash,
+                                   collection=str(coll) if coll else None)
     raise UnsupportedNftStandard(f"standard={std!r} is not supported")
 
 

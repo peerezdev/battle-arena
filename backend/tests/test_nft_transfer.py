@@ -175,11 +175,23 @@ async def test_build_transfer_pnft_returns_base64():
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_build_transfer_raises_for_core():
-    """build_transfer raises UnsupportedNftStandard for MPL Core NFTs."""
-    respx.post(RPC).mock(return_value=_acct_info({"owner": MPL_CORE, "data": ["", "base64"]}))
-    with pytest.raises(UnsupportedNftStandard):
-        await build_transfer(RPC, ESCROW, WINNER, MINTS, BLOCKHASH)
+async def test_build_transfer_core_returns_base64():
+    """build_transfer for MPL Core NFTs calls build_core_transfer and returns a b64 tx.
+    Also tests that the dispatcher threads the on-chain collection through to the transfer."""
+    from app.services.nft_transfer import MPL_CORE_PROGRAM as MPL_CORE_PROG
+    COLLECTION = "CCryptUfeFSZ3Fgc9FLeKrhLVAP67FSqi1GuVoj9CRac"
+    # Build variant-2 AssetV1 with a collection (key + owner + update_authority variant 2 + collection pubkey)
+    asset_bytes = bytes([1]) + bytes(32) + bytes([2]) + bytes(Pubkey.from_string(COLLECTION))
+    data_b64 = _b64.b64encode(asset_bytes).decode()
+    respx.post(RPC).mock(return_value=_acct_info({"owner": MPL_CORE, "data": [data_b64, "base64"]}))
+    result = await build_transfer(RPC, ESCROW, WINNER, MINTS, BLOCKHASH)
+    tx = Transaction.from_bytes(_b64.b64decode(result))
+    keys = tx.message.account_keys
+    core_prog = Pubkey.from_string(MPL_CORE_PROG)
+    ix = next(i for i in tx.message.instructions if keys[i.program_id_index] == core_prog)
+    # Assert the collection was threaded through: account index 1 in the transfer instruction
+    assert str(keys[ix.accounts[1]]) == COLLECTION
+    _b64.b64decode(result)  # must be valid base64
 
 
 @respx.mock
