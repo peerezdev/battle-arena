@@ -38,7 +38,7 @@ describe('VerifyPanel', () => {
   })
 
   it('shows an error when verifyBattle rejects', async () => {
-    mockVerify.mockRejectedValue(new Error('boom'))
+    mockVerify.mockRejectedValueOnce(new Error('boom'))
     render(<VerifyPanel battleId="b1" onClose={() => {}} />)
     expect(await screen.findByText(/no se pudo cargar/i)).toBeTruthy()
   })

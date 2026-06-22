@@ -22,9 +22,14 @@ export function VerifyPanel({ battleId, onClose }: { battleId: string; onClose: 
 
   useEffect(() => {
     let cancelled = false
-    verifyBattle(battleId)
-      .then((res) => { if (!cancelled) setV(res) })
-      .catch(() => { if (!cancelled) setError(true) })
+    ;(async () => {
+      try {
+        const res = await verifyBattle(battleId)
+        if (!cancelled) setV(res)
+      } catch {
+        if (!cancelled) setError(true)
+      }
+    })()
     return () => { cancelled = true }
   }, [battleId])
 
