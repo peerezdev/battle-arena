@@ -106,7 +106,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     # NOTE: sponsor is no longer used in settle (transfers go via our-RPC submit_tx);
     # kept in signature for API stability.
     sleep_fn = sleep_fn or asyncio.sleep
-    from app.models import BattlePlayer, BattlePull
+    from app.models import BattlePlayer, BattlePull, BattlePack
     players = [p.player_wallet for p in
                session.query(BattlePlayer).filter_by(battle_id=battle.id).order_by(BattlePlayer.joined_at).all()]
 
@@ -125,44 +125,49 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
         logger.warning("escrow seed failed for battle %s: %s — voiding", battle.id, exc)
         battle.status = "voided"; session.commit(); return "voided"
 
-    # Pull each player → escrow. On any failure → void + return already-pulled NFTs.
+    # Bundle: ordered BattlePack rows (legacy battles → a 1-box bundle of machine_code)
+    packs = session.query(BattlePack).filter_by(battle_id=battle.id).order_by(BattlePack.sequence).all()
+    bundle = [p.machine_code for p in packs] or [battle.machine_code]
+
+    # Pull each player round-by-round over the bundle → escrow. On any failure → void.
     outcomes: list[PullOutcome] = []
-    for w in players:
-        try:
-            pack = await gacha.generate_pack(player_address=w, pack_type=battle.machine_code,
-                                             alt_player_address=esc["address"], turbo=True)
-            pull = BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"])
-            session.add(pull); session.commit()
-            # CC broadcasts the pull on its own RPC (Privy signAndSend fails — different RPC, blockhash not
-            # found). CC owns the pull tx fee, so `sponsor` does NOT apply to pulls — only escrow transfers.
-            signed = await signer.sign_solana(resolve_wallet_id(w), pack["transaction"])
-            sub = await gacha.submit_tx(signed)
-            if not sub.get("signature"):
-                raise RuntimeError("pull submit returned no signature")
-            # CC opens via webhook → poll while pending (don't void on a not-yet-ready pull).
-            res = await gacha.open_pack(pack["memo"])
-            attempts = 0
-            while res.get("pending") and attempts < open_max_attempts:
-                await sleep_fn(open_delay)
+    for k, machine_code in enumerate(bundle, start=1):
+        for w in players:
+            try:
+                pack = await gacha.generate_pack(player_address=w, pack_type=machine_code,
+                                                 alt_player_address=esc["address"], turbo=True)
+                pull = BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"], round_number=k)
+                session.add(pull); session.commit()
+                # CC broadcasts the pull on its own RPC (Privy signAndSend fails — different RPC, blockhash not
+                # found). CC owns the pull tx fee, so `sponsor` does NOT apply to pulls — only escrow transfers.
+                signed = await signer.sign_solana(resolve_wallet_id(w), pack["transaction"])
+                sub = await gacha.submit_tx(signed)
+                if not sub.get("signature"):
+                    raise RuntimeError("pull submit returned no signature")
+                # CC opens via webhook → poll while pending (don't void on a not-yet-ready pull).
                 res = await gacha.open_pack(pack["memo"])
-                attempts += 1
-            if res.get("pending") or not res.get("nft_address"):
-                raise RuntimeError("pull did not resolve")
-            pull.nft_address = res["nft_address"]
-            pull.insured_value = res.get("insured_value") or 0
-            pull.grade = res.get("grade")
-            pull.rarity = res.get("rarity")
-            pull.auto_sold = bool(res.get("auto_sold"))
-            pull.buyback_amount = res.get("buyback_amount")
-            session.commit()
-            outcomes.append(PullOutcome(w, pack["memo"], res["nft_address"],
-                                        res.get("insured_value") or 0, res.get("grade"),
-                                        auto_sold=bool(res.get("auto_sold"))))
-        except Exception as exc:
-            # A transient failure here may have consumed the player's CC pack memo — log it so the
-            # void is traceable (no secrets: wallet + battle id + error only).
-            logger.warning("pull failed for %s in battle %s: %s — voiding", w, battle.id, exc)
-            battle.status = "voided"; session.commit(); return "voided"
+                attempts = 0
+                while res.get("pending") and attempts < open_max_attempts:
+                    await sleep_fn(open_delay)
+                    res = await gacha.open_pack(pack["memo"])
+                    attempts += 1
+                if res.get("pending") or not res.get("nft_address"):
+                    raise RuntimeError("pull did not resolve")
+                pull.nft_address = res["nft_address"]
+                pull.insured_value = res.get("insured_value") or 0
+                pull.grade = res.get("grade")
+                pull.rarity = res.get("rarity")
+                pull.auto_sold = bool(res.get("auto_sold"))
+                pull.buyback_amount = res.get("buyback_amount")
+                session.commit()
+                outcomes.append(PullOutcome(w, pack["memo"], res["nft_address"],
+                                            res.get("insured_value") or 0, res.get("grade"),
+                                            auto_sold=bool(res.get("auto_sold"))))
+            except Exception as exc:
+                # A transient failure here may have consumed the player's CC pack memo — log it so the
+                # void is traceable (no secrets: wallet + battle id + error only).
+                logger.warning("pull failed for %s in battle %s: %s — voiding", w, battle.id, exc)
+                battle.status = "voided"; session.commit(); return "voided"
 
     # Winner determination can still void (e.g. tie with no server_seed). Settle itself is resilient.
     try:

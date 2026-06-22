@@ -386,6 +386,64 @@ async def test_run_battle_voids_if_escrow_seed_fails(session):
     assert out == "voided"
 
 
+class _MultiGacha:
+    """opens: {(wallet, round): {nft_address, insured_value, grade}}. memo encodes wallet+round."""
+    def __init__(self, opens):
+        self.opens = opens; self.counts = {}; self.alt = None
+    async def generate_pack(self, player_address, pack_type, alt_player_address=None, turbo=False):
+        self.alt = alt_player_address
+        k = self.counts.get(player_address, 0) + 1
+        self.counts[player_address] = k
+        memo = f"m-{player_address}-{k}"
+        return {"memo": memo, "transaction": f"tx-{memo}"}
+    async def open_pack(self, memo):
+        _, w, k = memo.split("-")
+        return {"pending": False, **self.opens[(w, int(k))]}
+    async def submit_tx(self, signed_transaction):
+        return {"signature": "ccsig", "confirmation_status": "confirmed"}
+
+
+@pytest.mark.asyncio
+async def test_run_battle_multipack_winner_by_total(session):
+    from app.models import BattlePack
+    b = PackBattle(id="mp", mode="pack", machine_code="m25", price=125_000_000, max_players=2,
+                   status="running", server_seed="ab"*32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="mp", player_wallet="A"),
+                     BattlePlayer(battle_id="mp", player_wallet="B")])
+    session.add_all([BattlePack(battle_id="mp", machine_code="m25", price=25_000_000, sequence=1),
+                     BattlePack(battle_id="mp", machine_code="m50", price=50_000_000, sequence=2),
+                     BattlePack(battle_id="mp", machine_code="m50", price=50_000_000, sequence=3)])
+    session.commit()
+    # A: 50+50+50 = 150 ; B: 300+10+10 = 320 → B wins on the total
+    gacha = _MultiGacha({
+        ("A", 1): {"nft_address": "nA1", "insured_value": 50, "grade": 9},
+        ("A", 2): {"nft_address": "nA2", "insured_value": 50, "grade": 9},
+        ("A", 3): {"nft_address": "nA3", "insured_value": 50, "grade": 9},
+        ("B", 1): {"nft_address": "nB1", "insured_value": 300, "grade": 8},
+        ("B", 2): {"nft_address": "nB2", "insured_value": 10, "grade": 8},
+        ("B", 3): {"nft_address": "nB3", "insured_value": 10, "grade": 8}})
+    built = []
+    async def build_transfer_tx(esc, dest, mint):
+        built.append((dest, mint)); return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
+    async def prepare_escrow(addr): return None
+    out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow, prepare_escrow=prepare_escrow,
+                           can_play=lambda w: True,
+                           now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+    assert out == "settled" and b.winner == "B"
+    rows = session.query(BattlePull).filter_by(battle_id="mp").all()
+    assert len(rows) == 6
+    assert sorted(r.round_number for r in rows) == [1, 1, 2, 2, 3, 3]
+    # all six NFTs settled to the winner B
+    assert {m for _, m in built} == {"nA1", "nA2", "nA3", "nB1", "nB2", "nB3"}
+    assert all(d == "B" for d, _ in built)
+
+
 @pytest.mark.asyncio
 async def test_run_battle_turbo_autosold_common_not_transferred(session):
     # A pulls a common CC auto-sells (no NFT to transfer); B pulls an epic kept in escrow → B wins.
