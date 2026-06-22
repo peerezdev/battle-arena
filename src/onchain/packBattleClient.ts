@@ -20,7 +20,10 @@ export interface Battle {
   buyin?: number; escrow_address?: string
 }
 
-export interface OpenBattle { id: string; machine_code: string; price: number; max_players: number; players: number }
+export interface OpenBattle {
+  id: string; mode: BattleMode; machine_code: string; price: number
+  max_players: number; players: number; buyin: number
+}
 
 export interface VerifyRound { round_number: number; client_seed: string; eliminated_wallet: string; tie_break_index: number | null }
 export interface Verification {
