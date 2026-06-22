@@ -443,3 +443,58 @@ async def test_build_usdc_sweep_tx_positive_balance_builds_tx(monkeypatch):
     out = await captured["sweep"]("9oZgd4eviozqaYu7KwCTctAYgsRTWtF3McJARaztPsRQ",
                                   "8QDBKx8P3pxkRhiqyXFtYcPPf2CM1F5NiE5A8yjkgtm6")
     assert isinstance(out, str) and len(out) > 0             # built a tx
+
+
+# ---------------------------------------------------------------------------
+# Test 7: run_pack_battle_live — void result triggers refund_pack_void
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_run_pack_battle_live_invokes_refund_on_void(session, monkeypatch):
+    """A 'voided' result from run_battle triggers refund_pack_void with the live closures."""
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePlayer
+    b = PackBattle(id="b-void-refund", mode="pack", machine_code="pokemon_50", price=50,
+                   max_players=2, status="lobby", escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="b-void-refund", player_wallet=WALLET_A, wallet_id=WALLET_ID_A),
+                     BattlePlayer(battle_id="b-void-refund", player_wallet=WALLET_B, wallet_id=WALLET_ID_B)])
+    session.commit()
+
+    called = {}
+    async def _fake_run(session, battle, **kwargs):
+        return "voided"
+    async def _fake_refund(session, battle, **kwargs):
+        called["escrow_address"] = kwargs.get("escrow_address")
+        called["has_usdc_closure"] = kwargs.get("build_usdc_transfer_tx") is not None
+    monkeypatch.setattr(po, "run_battle", _fake_run)
+    monkeypatch.setattr(po, "refund_pack_void", _fake_refund)
+    async def _bal(*a, **k): return 0
+    monkeypatch.setattr(po, "usdc_balance_base_units", _bal)
+
+    out = await po.run_pack_battle_live(session, b, gacha=None, signer=None, rpc_url="x",
+        usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr", min_usdc_base_units=0)
+    assert out == "voided"
+    assert called.get("escrow_address") == "ESC"
+    assert called.get("has_usdc_closure") is True
+
+
+@pytest.mark.asyncio
+async def test_run_pack_battle_live_no_refund_on_settled(session, monkeypatch):
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePlayer
+    b = PackBattle(id="b-settled", mode="pack", machine_code="pokemon_50", price=50,
+                   max_players=2, status="lobby")
+    session.add(b)
+    session.add(BattlePlayer(battle_id="b-settled", player_wallet=WALLET_A, wallet_id=WALLET_ID_A))
+    session.commit()
+    refunded = []
+    async def _fake_run(session, battle, **kwargs): return "settled"
+    async def _fake_refund(session, battle, **kwargs): refunded.append(battle.id)
+    monkeypatch.setattr(po, "run_battle", _fake_run)
+    monkeypatch.setattr(po, "refund_pack_void", _fake_refund)
+    async def _bal(*a, **k): return 0
+    monkeypatch.setattr(po, "usdc_balance_base_units", _bal)
+    out = await po.run_pack_battle_live(session, b, gacha=None, signer=None, rpc_url="x",
+        usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr", min_usdc_base_units=0)
+    assert out == "settled" and refunded == []   # no refund on settle

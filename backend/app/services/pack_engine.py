@@ -157,7 +157,6 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
             # A transient failure here may have consumed the player's CC pack memo — log it so the
             # void is traceable (no secrets: wallet + battle id + error only).
             logger.warning("pull failed for %s in battle %s: %s — voiding", w, battle.id, exc)
-            await _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx)
             battle.status = "voided"; session.commit(); return "voided"
 
     # Winner determination can still void (e.g. tie with no server_seed). Settle itself is resilient.
@@ -166,7 +165,6 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
         winner, tie_idx = determine_winner(outcomes, server_seed=battle.server_seed, client_seed=client_seed)
     except Exception as exc:
         logger.warning("winner determination failed in battle %s: %s — voiding", battle.id, exc)
-        await _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx)
         battle.status = "voided"; session.commit(); return "voided"
 
     battle.client_seed = client_seed
@@ -183,18 +181,3 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     battle.winner = winner; battle.status = "settled"; battle.settled_at = now_fn()
     session.commit()
     return "settled"
-
-
-async def _void_return(signer, esc, outcomes, build_transfer_tx, submit_tx):
-    # Return each already-pulled NFT to its original puller (nobody robbed).
-    # Auto-sold commons have no NFT to return (their USDC is in the escrow; refund is #3c).
-    for o in outcomes:
-        if o.auto_sold or not o.nft_address:
-            continue
-        try:
-            tx = await build_transfer_tx(esc["address"], o.player_wallet, o.nft_address)
-            signed = await signer.sign_solana(esc["id"], tx)
-            await submit_tx(signed)
-        except Exception:
-            logger.warning("void-return transfer failed: escrow=%s nft=%s player=%s",
-                           esc.get("id"), o.nft_address, o.player_wallet)
