@@ -34,6 +34,25 @@ def test_determine_winner_tie_uses_provably_fair_draw():
     assert idx == expect_idx and w == cands[expect_idx]
 
 
+def test_determine_winner_by_total_across_multiple_pulls():
+    from app.services.pack_engine import determine_winner
+    # A: 50+50+50 = 150 ; B: 300+10+10 = 320 → B wins on the TOTAL (not the single max)
+    pulls = [_po("A", 50, 9), _po("A", 50, 9), _po("A", 50, 9),
+             _po("B", 300, 8), _po("B", 10, 8), _po("B", 10, 8)]
+    w, idx = determine_winner(pulls, server_seed="ab"*32, client_seed="00"*32)
+    assert w == "B" and idx is None
+
+
+def test_determine_winner_tie_on_total_uses_pf_draw():
+    from app.services.pack_engine import determine_winner
+    from app.services.provably_fair import pick_index
+    # A: 100+100 = 200 ; B: 150+50 = 200 → tie on the total → PF among ["A","B"]
+    pulls = [_po("A", 100, 9), _po("A", 100, 9), _po("B", 150, 8), _po("B", 50, 8)]
+    expect_idx = pick_index("ab"*32, "00"*32, 2)
+    w, idx = determine_winner(pulls, server_seed="ab"*32, client_seed="00"*32)
+    assert idx == expect_idx and w == sorted(["A", "B"])[expect_idx]
+
+
 class _Gacha:
     def __init__(self, opens):  # opens: wallet -> open result dict
         self.opens = opens; self.alt = None; self.turbo = None; self.pulled = []

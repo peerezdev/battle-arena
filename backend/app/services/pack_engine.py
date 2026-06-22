@@ -23,8 +23,13 @@ class PullOutcome:
 
 
 def determine_winner(pulls: list[PullOutcome], *, server_seed: str, client_seed: str) -> tuple[str, Optional[int]]:
-    maxv = max((p.insured_value or 0) for p in pulls)
-    candidates = sorted([p.player_wallet for p in pulls if (p.insured_value or 0) == maxv])
+    # Sum insured_value per player; highest TOTAL wins. (Single-box battles have one pull
+    # per player, so the total == that pull's value — identical to the prior behavior.)
+    totals: dict[str, float] = {}
+    for p in pulls:
+        totals[p.player_wallet] = totals.get(p.player_wallet, 0.0) + (p.insured_value or 0)
+    maxv = max(totals.values())
+    candidates = sorted([w for w, t in totals.items() if t == maxv])
     if len(candidates) == 1:
         return candidates[0], None
     if not server_seed:   # a tie needs the Provably-Fair seed (set at lobby creation)
