@@ -14,6 +14,7 @@ import httpx
 
 from app.services.pack_engine import run_battle
 from app.services.royale_engine import run_royale
+from app.services.refund import refund_pack_void, refund_royale_void
 from app.services.royale_funding import distribute_usdc, confirm_usdc
 from app.services.solana_tx import TOKEN_PROGRAM, build_token_transfer, build_create_ata
 from app.services.nft_transfer import build_transfer, submit_signed_tx, nft_in_owner
@@ -188,27 +189,29 @@ async def run_pack_battle_live(
         bh = await fetch_latest_blockhash(rpc_url)
         return build_token_transfer(esc_addr, winner_addr, usdc_mint, bh, amount=bal, decimals=6)
 
+    async def build_usdc_transfer_tx(src, dest, amount):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(src, dest, usdc_mint, bh, amount=amount, decimals=6)
+
     def can_play(wallet: str) -> bool:
         return wallet in playable
 
     def now_fn() -> datetime:
         return datetime.now(timezone.utc)
 
-    return await run_battle(
-        session,
-        battle,
-        gacha=gacha,
-        signer=signer,
-        resolve_wallet_id=resolve_wallet_id,
-        build_transfer_tx=build_transfer_tx,
-        submit_tx=submit_tx,
-        prepare_escrow=prepare_escrow,
-        confirm_in_escrow=confirm_in_escrow,
-        can_play=can_play,
-        now_fn=now_fn,
-        sponsor=sponsor,
+    result = await run_battle(
+        session, battle, gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
+        confirm_in_escrow=confirm_in_escrow, can_play=can_play, now_fn=now_fn, sponsor=sponsor,
         build_usdc_sweep_tx=build_usdc_sweep_tx,
     )
+    if result == "voided":
+        await refund_pack_void(
+            session, battle, escrow_wallet_id=battle.escrow_wallet_id, escrow_address=battle.escrow_address,
+            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
+            build_usdc_transfer_tx=build_usdc_transfer_tx, confirm_in_escrow=confirm_in_escrow,
+        )
+    return result
 
 
 async def run_royale_live(
@@ -284,22 +287,35 @@ async def run_royale_live(
         bh = await fetch_latest_blockhash(rpc_url)
         return build_token_transfer(esc_addr, winner_addr, usdc_mint, bh, amount=bal, decimals=6)
 
+    async def build_usdc_transfer_tx(src, dest, amount):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(src, dest, usdc_mint, bh, amount=amount, decimals=6)
+
+    async def buyback_to_escrow(nft):
+        bb = await gacha.buyback(battle.escrow_address, nft)
+        txb = bb.get("serialized_transaction")
+        if not txb:
+            return
+        signed = await signer.sign_solana(battle.escrow_wallet_id, txb)
+        await gacha.submit_tx(signed)   # CC is fee-payer + co-signer → submit via CC
+
+    async def escrow_usdc_balance(esc_addr):
+        return await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
+
     def now_fn():
         return datetime.now(timezone.utc)
 
-    return await run_royale(
-        session,
-        battle,
-        gacha=gacha,
-        signer=signer,
-        resolve_wallet_id=resolve_wallet_id,
-        distribute=distribute,
-        confirm_usdc=confirm_usdc_cb,
-        confirm_in_escrow=confirm_in_escrow,
-        build_transfer_tx=build_transfer_tx,
-        submit_tx=submit_tx,
-        prepare_escrow=prepare_escrow,
-        price_base=price_base,
-        now_fn=now_fn,
-        build_usdc_sweep_tx=build_usdc_sweep_tx,
+    result = await run_royale(
+        session, battle, gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+        distribute=distribute, confirm_usdc=confirm_usdc_cb, confirm_in_escrow=confirm_in_escrow,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
+        price_base=price_base, now_fn=now_fn, build_usdc_sweep_tx=build_usdc_sweep_tx,
     )
+    if result == "voided":
+        await refund_royale_void(
+            session, battle, escrow_wallet_id=battle.escrow_wallet_id, escrow_address=battle.escrow_address,
+            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
+            build_usdc_transfer_tx=build_usdc_transfer_tx, buyback_to_escrow=buyback_to_escrow,
+            escrow_usdc_balance=escrow_usdc_balance, confirm_in_escrow=confirm_in_escrow,
+        )
+    return result

@@ -378,7 +378,7 @@ async def test_run_battle_turbo_autosold_common_not_transferred(session):
     session.commit()
 
     gacha = _Gacha({
-        "A": {"nft_address": "nftA", "insured_value": 50, "grade": None, "rarity": "Common", "auto_sold": True},
+        "A": {"nft_address": "nftA", "insured_value": 50, "grade": None, "rarity": "Common", "auto_sold": True, "buyback_amount": 42_500_000},
         "B": {"nft_address": "nftB", "insured_value": 500, "grade": 9, "rarity": "Epic", "auto_sold": False},
     })
     signer = _Signer()
@@ -398,3 +398,4 @@ async def test_run_battle_turbo_autosold_common_not_transferred(session):
     assert sweeps == ["B"]                              # USDC swept to winner
     a_pull = session.query(BattlePull).filter_by(battle_id="bt", player_wallet="A").first()
     assert a_pull.auto_sold is True and a_pull.transferred is False
+    assert a_pull.buyback_amount == 42_500_000
