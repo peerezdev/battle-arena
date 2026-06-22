@@ -68,7 +68,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
                 background: mode === m ? 'linear-gradient(90deg,#9945FF33,#14F19522)' : '#0c1019',
                 color: mode === m ? COLORS.text : COLORS.muted,
                 border: `1px solid ${mode === m ? '#9945FF44' : COLORS.border}` }}>
-              {m === 'pack' ? 'Pack · 1v1' : 'Royale'}
+              {m === 'pack' ? 'Pack' : 'Royale'}
             </button>
           ))}
         </div>

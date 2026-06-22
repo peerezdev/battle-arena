@@ -41,4 +41,11 @@ describe('BattleFlow', () => {
     render(<BattleFlow />)
     expect(screen.getByText(/anulad/i)).toBeTruthy()
   })
+
+  it('shows error message and Volver button when battle cannot load', () => {
+    mockUseBattle.mockReturnValue({ battle: null, error: 'no existe', loading: false })
+    render(<BattleFlow />)
+    expect(screen.getByText(/No se pudo cargar la batalla/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /volver/i })).toBeTruthy()
+  })
 })

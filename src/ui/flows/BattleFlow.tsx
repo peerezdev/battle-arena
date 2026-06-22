@@ -29,8 +29,9 @@ export function BattleFlow() {
   if (!battle) {
     return <Centered>
       <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
-        {error ? 'reconectando…' : 'Cargando batalla…'}
+        {error ? 'No se pudo cargar la batalla' : 'Cargando batalla…'}
       </div>
+      {error && <button onClick={exit} style={backBtn}>Volver</button>}
     </Centered>
   }
 
