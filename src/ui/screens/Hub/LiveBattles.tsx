@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
-import { MOCK_BATTLES, type LiveBattle, type BattleMode } from './hubMockData'
+import type { LiveBattle, BattleMode } from './hubMockData'
 
 type ModeTile = { mode: 'pack' | 'royale' | 'gacha' | 'mana'; icon: string; name: string; sub: string }
 const MODE_TILES: ModeTile[] = [
@@ -19,12 +19,12 @@ const MODE_LABEL: Record<BattleMode, string> = {
 const FILTERS = ['All', 'Ready to join', 'Mine', 'Recent']
 
 interface Props {
-  battles?: LiveBattle[]
+  battles: LiveBattle[]
   onSelectMode: (mode: 'pack' | 'royale' | 'gacha' | 'mana') => void
   onBattleAction: (b: LiveBattle) => void
 }
 
-export function LiveBattles({ battles = MOCK_BATTLES, onSelectMode, onBattleAction }: Props) {
+export function LiveBattles({ battles, onSelectMode, onBattleAction }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
 
   return (

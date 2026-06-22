@@ -25,14 +25,8 @@ export const MOCK_CHAT: ChatMsg[] = [
   { id: 'm4', user: 'kappa', color: '#b78cff', ts: '15:52', text: 'anyone up for a royale?' },
 ]
 
-export const MOCK_BATTLES: LiveBattle[] = [
-  { id: 'b1', mode: 'pack', live: true, title: 'Elite Pokémon', sub: 'Mixed · direct', players: [{ violet: false }, { violet: true }], cards: ['🔥', '💧'], costLabel: 'POT', costValue: 250, action: 'watch' },
-  { id: 'b2', mode: 'royale', live: false, title: '8-player royale', sub: '$50 tier · 5/8 joined', players: [{ violet: false }, { violet: true }, { violet: false }], extra: '+5', cards: ['🎴'], costLabel: 'ENTRY', costValue: 50, action: 'join' },
-  { id: 'b3', mode: 'mana', live: false, title: 'Best of 3', sub: 'skill · +edge by value', players: [{ violet: false }, { violet: true }], cards: ['🐉'], costLabel: 'STAKE', costValue: 30, action: 'join' },
-]
-
 export const MOCK_STATS: HubStat[] = [
-  { value: '3', label: 'Live battles', gradient: true },
+  { value: '—', label: 'Live battles', gradient: true },
   { value: '$2.4k', label: 'Biggest pull today' },
   { value: '312', label: 'Packs opened 24h' },
 ]

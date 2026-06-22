@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import update
 from app.models import PackBattle, BattlePlayer, BattleRound, BattlePull
 from app.services.provably_fair import gen_server_seed, verify_commit
+from app.services.royale_funding import royale_buyin
 
 
 class LobbyError(Exception):
@@ -90,9 +91,14 @@ def _pull_recap(session, battle_id):
 
 
 def list_open(session):
-    return [{"id": b.id, "machine_code": b.machine_code, "price": b.price, "max_players": b.max_players,
-             "players": session.query(BattlePlayer).filter_by(battle_id=b.id).count()}
-            for b in session.query(PackBattle).filter_by(status="lobby").all()]
+    out = []
+    for b in session.query(PackBattle).filter_by(status="lobby").all():
+        players = session.query(BattlePlayer).filter_by(battle_id=b.id).count()
+        buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
+        out.append({"id": b.id, "mode": b.mode, "machine_code": b.machine_code,
+                    "price": b.price, "max_players": b.max_players,
+                    "players": players, "buyin": buyin})
+    return out
 
 
 def get_battle(session, battle_id):
