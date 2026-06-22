@@ -51,7 +51,7 @@ function authHeaders(token: string): Record<string, string> {
 
 export function createBattle(
   token: string,
-  body: { machine_code: string; max_players: number; mode?: BattleMode },
+  body: { machine_code?: string; max_players: number; mode?: BattleMode; packs?: { machine_code: string; count: number }[] },
 ): Promise<Battle> {
   return battleFetch<Battle>('/pack-battles', {
     method: 'POST', headers: authHeaders(token), body: JSON.stringify(body),
