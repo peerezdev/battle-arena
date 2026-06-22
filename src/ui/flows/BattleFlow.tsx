@@ -1,7 +1,9 @@
-import { type ReactNode, type CSSProperties } from 'react'
+import { type ReactNode, type CSSProperties, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../theme'
 import { useBattle } from '../../onchain/useBattle'
+import { cancelBattle } from '../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
 import { useReducedMotion } from '../useReducedMotion'
 import { battleToReveal } from '../screens/battle/battleReveal'
@@ -24,7 +26,17 @@ export function BattleFlow() {
   const meWallet = useEmbeddedSolanaAddress()
   const reduced = useReducedMotion()
   const { battle, error } = useBattle(battleId ?? null, 1500)
+  const { identityToken } = useIdentityToken()
+  const [cancelError, setCancelError] = useState<string | null>(null)
   const exit = () => navigate('/app')
+
+  function onCancelLobby() {
+    if (!battle || !identityToken) return
+    setCancelError(null)
+    cancelBattle(identityToken, battle.id).catch((e) => {
+      setCancelError(e instanceof Error ? e.message : String(e))
+    })
+  }
 
   if (!battle) {
     return <Centered>
@@ -36,11 +48,18 @@ export function BattleFlow() {
   }
 
   if (battle.status === 'lobby') {
+    const isCreator = !!meWallet && battle.creator_wallet === meWallet
     return <Centered>
       <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 18 }}>Esperando jugadores</div>
       <div style={{ fontFamily: FONTS.mono, fontSize: 24, color: COLORS.green }}>
         {battle.players.length}/{battle.max_players}
       </div>
+      {isCreator && (
+        <button onClick={onCancelLobby} style={{ ...backBtn, borderColor: `${COLORS.red}55`, color: COLORS.red }}>
+          Cancelar lobby
+        </button>
+      )}
+      {cancelError && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>{cancelError}</div>}
       <button onClick={exit} style={backBtn}>Volver</button>
     </Centered>
   }

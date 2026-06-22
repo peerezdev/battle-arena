@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('../../onchain/useBattle', () => ({ useBattle: vi.fn() }))
 vi.mock('../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'A' }))
 vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => vi.fn() }))
+vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
+vi.mock('../../onchain/packBattleClient', async (orig) => ({
+  ...(await orig<typeof import('../../onchain/packBattleClient')>()),
+  cancelBattle: vi.fn().mockResolvedValue({}),
+}))
+import { cancelBattle } from '../../onchain/packBattleClient'
 import { useBattle } from '../../onchain/useBattle'
 import { BattleFlow } from './BattleFlow'
 
@@ -47,5 +53,25 @@ describe('BattleFlow', () => {
     render(<BattleFlow />)
     expect(screen.getByText(/No se pudo cargar la batalla/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /volver/i })).toBeTruthy()
+  })
+
+  it('lets the creator cancel from the lobby waiting room', () => {
+    mockUseBattle.mockReturnValue({
+      battle: { ...royaleRunning, status: 'lobby', creator_wallet: 'A', pulls: [] },
+      loading: false, error: null,
+    })
+    render(<BattleFlow />)
+    const btn = screen.getByText(/cancelar lobby/i)
+    fireEvent.click(btn)
+    expect(cancelBattle).toHaveBeenCalledWith('tok', 'b1')
+  })
+
+  it('does not show cancel to a non-creator', () => {
+    mockUseBattle.mockReturnValue({
+      battle: { ...royaleRunning, status: 'lobby', creator_wallet: 'SOMEONE_ELSE', pulls: [] },
+      loading: false, error: null,
+    })
+    render(<BattleFlow />)
+    expect(screen.queryByText(/cancelar lobby/i)).toBeNull()
   })
 })
