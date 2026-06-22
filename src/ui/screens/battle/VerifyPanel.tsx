@@ -39,9 +39,9 @@ export function VerifyPanel({ battleId, onClose }: { battleId: string; onClose: 
     if (!v.server_seed) { setCommit('unrevealed'); return }
     let cancelled = false
     setCommit('pending')
-    verifyCommit(v.server_seed, v.server_seed_hash).then((ok) => {
-      if (!cancelled) setCommit(ok ? 'ok' : 'mismatch')
-    })
+    verifyCommit(v.server_seed, v.server_seed_hash)
+      .then((ok) => { if (!cancelled) setCommit(ok ? 'ok' : 'mismatch') })
+      .catch(() => { if (!cancelled) setCommit('na') })
     return () => { cancelled = true }
   }, [v])
 
