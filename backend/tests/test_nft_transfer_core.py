@@ -30,6 +30,7 @@ def test_build_core_transfer_with_collection():
 
 def test_build_core_transfer_no_collection_uses_program_id():
     tx, keys, ix = _core_ix(build_core_transfer(ESCROW, WINNER, ASSET, BLOCKHASH, collection=None))
+    assert len(ix.accounts) == 7
     a = [str(keys[i]) for i in ix.accounts]
     assert a[1] == MPL_CORE_PROGRAM                         # None → CoRE program id
 
