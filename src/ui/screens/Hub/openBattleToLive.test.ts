@@ -5,7 +5,7 @@ import type { OpenBattle } from '../../../onchain/packBattleClient'
 // Fixtures use realistic backend magnitudes: buyin is in USDC base units (1 USD = 1_000_000).
 const base: OpenBattle = {
   id: 'b1', mode: 'pack', machine_code: 'pokemon_50',
-  price: 50_000_000, max_players: 2, players: 1, buyin: 50_000_000,
+  price: 50_000_000, max_players: 2, players: 1, buyin: 50_000_000, creator_wallet: null,
 }
 
 describe('openBattleToLive', () => {
