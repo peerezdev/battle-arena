@@ -463,3 +463,54 @@ def test_royale_fill_schedules_run_royale_live(client_priv, monkeypatch):
 
     assert royale_scheduled, "run_royale_live was not scheduled after royale lobby filled"
     assert not pack_scheduled, "run_pack_battle_live should NOT be called for royale mode"
+
+
+def test_available_balance_blocks_overcommit(client_priv, monkeypatch):
+    """With on-chain funds for exactly ONE price, a second Pack Battle create is 402."""
+    c, priv = client_priv
+
+    async def _one_price_balance(*args, **kwargs):
+        return 50_000_000  # exactly $50 — one pack price
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _one_price_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r1 = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
+    assert r1.status_code == 200, r1.text            # first reserves $50 → available now 0
+    r2 = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
+    assert r2.status_code == 402, r2.text            # over-commit blocked
+
+
+def test_reservations_released_after_run(client_priv, monkeypatch):
+    """After a filled lobby runs (stubbed), the wiring releases its reservations — proven by the
+    creator being able to create a SECOND battle while holding funds for only ONE price."""
+    c, priv = client_priv
+
+    async def _one_price(*args, **kwargs):
+        return 50_000_000   # exactly one $50 price → only affordable if the first reservation freed
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _fake_run(session, battle, *, gacha, signer, **kwargs):
+        return "settled"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _one_price)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.run_pack_battle_live", _fake_run)
+
+    import asyncio
+    hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    bid = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a).json()["id"]
+    hdrs_b = _auth_headers(priv, WALLET_B, WALLET_ID_B)
+    c.post(f"/pack-battles/{bid}/join", headers=hdrs_b)   # fills → schedules _run_bg (stubbed) → release
+
+    asyncio.get_event_loop().run_until_complete(asyncio.sleep(0.1))   # let _run_bg + its finally run
+
+    # A's reservation for the finished battle was released → a second create now succeeds.
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a)
+    assert r.status_code == 200, r.text

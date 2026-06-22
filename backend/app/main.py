@@ -35,6 +35,7 @@ from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
 from .services.royale_funding import royale_buyin, collect_buyin
+from .services.reservations import reserve, reserved_total, release_reservations
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +241,8 @@ def create_app(session_factory, chain: ChainSource,
                              s: Session = Depends(db)):
         svc = _gacha_or_503()
         _gacha_throttle(wallet)
+        price = await _machine_price(body.pack_type)
+        await _require_available(wallet, price, s)
         try:
             out = await svc.generate_pack(player_address=wallet, pack_type=body.pack_type)
         except GachaDisabled:
@@ -366,6 +369,12 @@ def create_app(session_factory, chain: ChainSource,
         if bal < price:
             raise HTTPException(402, "USDC insuficiente")
 
+    async def _require_available(wallet: str, amount: int, s: Session):
+        bal = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
+        avail = bal - reserved_total(s, wallet)
+        if avail < amount:
+            raise HTTPException(402, "USDC disponible insuficiente")
+
     async def _machine_price(machine_code: str) -> int:
         machines = await gacha.machines()
         m = next((x for x in machines if x.get("code") == machine_code), None)
@@ -385,6 +394,7 @@ def create_app(session_factory, chain: ChainSource,
         except Exception:
             logger.warning("background run failed for %s", battle_id)
         finally:
+            release_reservations(s2, battle_id)
             s2.close()
 
     async def _run_royale_bg(battle_id: str):
@@ -406,6 +416,7 @@ def create_app(session_factory, chain: ChainSource,
         except Exception:
             logger.warning("background royale run failed for %s", battle_id)
         finally:
+            release_reservations(s2, battle_id)
             s2.close()
 
     @app.post("/pack-battles")
@@ -417,7 +428,7 @@ def create_app(session_factory, chain: ChainSource,
         if mode == "royale":
             # For royale, the funds check is against the buy-in, not just the pack price.
             buyin = royale_buyin(body.max_players, price)
-            await _require_funds(wallet, buyin)
+            await _require_available(wallet, buyin, s)
             try:
                 b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
                                   max_players=body.max_players, mode="royale")
@@ -444,12 +455,13 @@ def create_app(session_factory, chain: ChainSource,
             return resp
 
         # Default: pack mode
-        await _require_funds(wallet, price)
+        await _require_available(wallet, price, s)
         try:
             b = create_battle(s, wallet, wallet_id, machine_code=body.machine_code, price=price,
                               max_players=body.max_players, mode=mode)
         except LobbyError as e:
             raise HTTPException(409, str(e))
+        reserve(s, wallet, b.id, price)
         return get_battle(s, b.id)
 
     @app.post("/pack-battles/{battle_id}/join")
@@ -462,7 +474,7 @@ def create_app(session_factory, chain: ChainSource,
         if b.mode == "royale":
             # For royale, check that the player can cover the buy-in.
             buyin = royale_buyin(b.max_players, b.price)
-            await _require_funds(wallet, buyin)
+            await _require_available(wallet, buyin, s)
             try:
                 b, filled = join_battle(s, battle_id, wallet, wallet_id)
             except LobbyError as e:
@@ -480,11 +492,12 @@ def create_app(session_factory, chain: ChainSource,
             return get_battle(s, battle_id)
 
         # Default: pack mode
-        await _require_funds(wallet, b.price)
+        await _require_available(wallet, b.price, s)
         try:
             b, filled = join_battle(s, battle_id, wallet, wallet_id)
         except LobbyError as e:
             raise HTTPException(409, str(e))
+        reserve(s, wallet, battle_id, b.price)
         if filled:
             asyncio.create_task(_run_bg(battle_id))
         return get_battle(s, battle_id)
