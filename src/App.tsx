@@ -7,6 +7,7 @@ import { AppShell } from './ui/layouts/AppShell'
 import { ManaDuelFlow } from './ui/flows/ManaDuelFlow'
 import { RoyaleFlow } from './ui/flows/RoyaleFlow'
 import { OnchainFlow } from './ui/flows/OnchainFlow'
+import { BattleFlow } from './ui/flows/BattleFlow'
 import { ProfilePage } from './ui/screens/Profile/ProfilePage'
 
 const GachaVault = lazy(() => import('./ui/screens/gacha/GachaVault'))
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/play/mana" element={<ManaDuelFlow />} />
           <Route path="/play/royale" element={<RoyaleFlow />} />
           <Route path="/play/arena" element={<OnchainFlow />} />
+          <Route path="/play/battle/:battleId" element={<BattleFlow />} />
           <Route
             path="/play/gacha"
             element={
