@@ -8,7 +8,8 @@ import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
 import { useOpenBattles } from '../../../onchain/useOpenBattles'
 import { openBattleToLive } from './openBattleToLive'
-import { joinBattle } from '../../../onchain/packBattleClient'
+import { joinBattle, cancelBattle } from '../../../onchain/packBattleClient'
+import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 import { CreateBattleModal } from './CreateBattleModal'
@@ -16,19 +17,29 @@ import { CreateBattleModal } from './CreateBattleModal'
 export function Hub() {
   const navigate = useNavigate()
   const { identityToken } = useIdentityToken()
+  const meWallet = useEmbeddedSolanaAddress()
   const [stake, setStake] = useState<number>(STAKE_OPTIONS[1])
   const { battles } = useOpenBattles()
   const gate = useDelegationGate()
   const [createOpen, setCreateOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const liveBattles = battles.map(openBattleToLive)
+  const liveBattles = battles.map((b) => openBattleToLive(b, meWallet))
 
   function go(id: HubNav) {
     if (id === 'mana')   return navigate('/play/mana')
     if (id === 'royale') return navigate('/play/royale')
     if (id === 'pack')   return navigate('/play/arena')
     if (id === 'gacha')  return navigate('/play/gacha')
+  }
+
+  function onCancel(b: LiveBattle) {
+    setActionError(null)
+    if (!identityToken) { setActionError('Inicia sesión para cancelar.'); return }
+    cancelBattle(identityToken, b.id).catch((e) => {
+      setActionError(e instanceof Error ? e.message : String(e))
+    })
+    // the open list + reserved refresh on their next poll
   }
 
   function onBattleAction(b: LiveBattle) {
@@ -69,7 +80,7 @@ export function Hub() {
             {actionError}
           </div>
         )}
-        <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} />
+        <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} onCancel={onCancel} />
       </div>
 
       <DelegationGate gate={gate} />

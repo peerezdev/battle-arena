@@ -9,6 +9,7 @@ export interface LiveBattle {
   id: string; mode: BattleMode; live: boolean; title: string; sub: string
   players: { violet: boolean }[]; extra?: string; cards: string[]
   costLabel: string; costValue: number; action: 'watch' | 'join'
+  canCancel?: boolean
 }
 export interface HubStat { value: string; label: string; gradient?: boolean }
 

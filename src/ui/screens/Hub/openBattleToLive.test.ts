@@ -36,4 +36,11 @@ describe('openBattleToLive', () => {
     expect(r.extra).toBe('+3')
     expect(r.costValue).toBe(200)  // base units / 1e6 → USD
   })
+
+  it('sets canCancel only when meWallet matches the creator', () => {
+    const mine = { ...base, creator_wallet: 'ME' }
+    expect(openBattleToLive(mine, 'ME').canCancel).toBe(true)
+    expect(openBattleToLive(mine, 'OTHER').canCancel).toBe(false)
+    expect(openBattleToLive(mine, null).canCancel).toBe(false)
+  })
 })
