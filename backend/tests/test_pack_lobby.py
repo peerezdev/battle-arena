@@ -168,3 +168,25 @@ def test_list_open_includes_creator_wallet(session):
     row = list_open(session)[0]
     assert row["creator_wallet"] == "WC"
     assert "creator_wallet" in row
+
+
+def test_create_battle_with_bundle_persists_packs_and_total(session):
+    from app.models import BattlePack
+    b = create_battle(session, "WC", "wid-c", machine_code="m25", price=125_000_000,
+                      max_players=2, mode="pack",
+                      packs=[("m25", 25_000_000), ("m50", 50_000_000), ("m50", 50_000_000)])
+    rows = session.query(BattlePack).filter_by(battle_id=b.id).order_by(BattlePack.sequence).all()
+    assert [(r.machine_code, r.price, r.sequence) for r in rows] == [
+        ("m25", 25_000_000, 1), ("m50", 50_000_000, 2), ("m50", 50_000_000, 3)]
+    view = get_battle(session, b.id)
+    assert view["packs"] == [
+        {"machine_code": "m25", "sequence": 1, "price": 25_000_000},
+        {"machine_code": "m50", "sequence": 2, "price": 50_000_000},
+        {"machine_code": "m50", "sequence": 3, "price": 50_000_000}]
+
+
+def test_create_battle_without_packs_is_single_box_bundle(session):
+    from app.models import BattlePack
+    b = create_battle(session, "WC", "wid-c", machine_code="m50", price=50_000_000, max_players=2)
+    rows = session.query(BattlePack).filter_by(battle_id=b.id).all()
+    assert [(r.machine_code, r.price, r.sequence) for r in rows] == [("m50", 50_000_000, 1)]
