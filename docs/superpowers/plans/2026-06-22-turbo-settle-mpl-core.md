@@ -64,9 +64,6 @@ def test_build_core_transfer_with_collection():
     assert len(ix.accounts) == 7
     a = [str(keys[i]) for i in ix.accounts]
     assert a == [ASSET, COLLECTION, ESCROW, ESCROW, WINNER, str(SYS_PROGRAM), MPL_CORE_PROGRAM]
-    # collection writable, asset writable, payer writable+signer, authority signer
-    flags = [(keys[i], ix.accounts) for i in ix.accounts]   # touch to ensure indices valid
-    assert ix.accounts is not None
 
 
 def test_build_core_transfer_no_collection_uses_program_id():
