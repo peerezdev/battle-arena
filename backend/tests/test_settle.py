@@ -73,6 +73,6 @@ async def test_settle_retries_transient_then_flags(session):
     async def sweep(esc, winner): return None
     await settle_cards_to_winner(session, b, escrow_wallet_id="eid", escrow_address="ESC", winner="A",
         build_transfer_tx=btx, submit_tx=sub, signer=_Signer(), confirm_in_escrow=_ce,
-        build_usdc_sweep_tx=sweep, sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0, retries=3)
+        build_usdc_sweep_tx=sweep, sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0, max_attempts=3)
     assert calls["n"] == 3   # retried 3×
     assert session.query(BattlePull).filter_by(player_wallet="A").first().transferred is False
