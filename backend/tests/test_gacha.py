@@ -317,3 +317,21 @@ async def test_open_pack_insured_value_from_attribute_and_unauthenticated():
     out = await _svc().open_pack(memo="cc-y")
     assert out["insured_value"] == 1500.5
     assert out["authenticated"] is False
+
+
+@pytest.mark.asyncio
+async def test_generate_pack_turbo_flag(monkeypatch):
+    from app.services.gacha import GachaService
+    g = GachaService(base_url="http://x", api_key="k")
+    captured = {}
+    async def fake_request(method, path, json=None, params=None):
+        captured["json"] = json
+        return {"memo": "m", "transaction": "t"}
+    monkeypatch.setattr(g, "_request", fake_request)
+
+    await g.generate_pack("P", "pokemon_50", alt_player_address="E", turbo=True)
+    assert captured["json"]["turbo"] is True
+    assert captured["json"]["altPlayerAddress"] == "E"
+
+    await g.generate_pack("P", "pokemon_50")
+    assert "turbo" not in captured["json"]
