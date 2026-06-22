@@ -588,3 +588,25 @@ def test_royale_cancel_refunds_buyins(monkeypatch):
     assert r.json()["status"] == "cancelled"
     assert len(refunds) == 1                          # only the creator had joined
     assert refunds[0][0] == WALLET_A
+
+
+def test_verify_endpoint_pre_settle_and_404(client_priv, monkeypatch):
+    c, priv = client_priv
+
+    async def _high(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+    assert c.get("/pack-battles/does-not-exist/verify").status_code == 404
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    bid = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs).json()["id"]
+    r = c.get(f"/pack-battles/{bid}/verify")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["server_seed_hash"] and body["server_seed"] is None   # pre-settle

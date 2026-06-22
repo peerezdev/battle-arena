@@ -66,3 +66,75 @@ def test_create_sets_creator_wallet_and_cancel_rules(session):
     # cannot cancel again (not in lobby anymore)
     with pytest.raises(LobbyError):
         cancel_battle(session, b.id, "CREATOR")
+
+
+def test_get_battle_royale_live_state_no_cards(session):
+    from app.models import BattleRound
+    b = PackBattle(id="rv", mode="royale", machine_code="m", price=50, max_players=3,
+                   status="running", server_seed="ab" * 32, server_seed_hash="h", creator_wallet="A")
+    session.add(b)
+    session.add_all([
+        BattlePlayer(battle_id="rv", player_wallet="A", eliminated_round=None, accumulated_value=120.0),
+        BattlePlayer(battle_id="rv", player_wallet="B", eliminated_round=1, accumulated_value=40.0),
+    ])
+    session.add(BattleRound(battle_id="rv", round_number=1, client_seed="cs1",
+                            eliminated_wallet="B", tie_break_index=None))
+    session.commit()
+    v = get_battle(session, "rv")
+    assert v["creator_wallet"] == "A"
+    pa = next(p for p in v["players"] if p["wallet"] == "A")
+    pb = next(p for p in v["players"] if p["wallet"] == "B")
+    assert pa["eliminated_round"] is None and pa["accumulated_value"] == 120.0
+    assert pb["eliminated_round"] == 1
+    assert v["rounds"] == [{"round_number": 1, "eliminated_wallet": "B", "tie_break_index": None}]
+    assert "pulls" not in v and "server_seed" not in v   # running → no recap, no reveal
+
+
+def test_get_battle_postsettle_pull_recap(session):
+    from app.models import BattlePull
+    b = PackBattle(id="st", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="settled", winner="A", server_seed="ab" * 32, server_seed_hash="h",
+                   client_seed="cs", tie_break_index=None, creator_wallet="A")
+    session.add(b)
+    session.add(BattlePull(battle_id="st", player_wallet="A", memo="m1", round_number=1,
+                           nft_address="nftA", rarity="Epic", insured_value=500.0, auto_sold=False))
+    session.commit()
+    v = get_battle(session, "st")
+    assert v["server_seed"] == "ab" * 32                 # revealed post-settle
+    assert v["pulls"] == [{"round_number": 1, "player_wallet": "A", "nft_address": "nftA",
+                           "rarity": "Epic", "insured_value": 500.0, "auto_sold": False}]
+
+
+def test_verification_royale_rounds_and_reveal_gate(session):
+    from app.models import PackBattle, BattleRound
+    from app.services.pack_lobby import verification
+    from app.services.provably_fair import gen_server_seed
+    seed, h = gen_server_seed()
+    b = PackBattle(id="vr", mode="royale", machine_code="m", price=50, max_players=3,
+                   status="running", server_seed=seed, server_seed_hash=h)
+    session.add(b)
+    session.add(BattleRound(battle_id="vr", round_number=1, client_seed="cs1",
+                            eliminated_wallet="B", tie_break_index=2))
+    session.commit()
+    v = verification(session, b)
+    assert v["mode"] == "royale" and v["server_seed_hash"] == h
+    assert v["server_seed"] is None and v["commit_ok"] is None     # not settled → seed hidden
+    assert v["rounds"] == [{"round_number": 1, "client_seed": "cs1",
+                            "eliminated_wallet": "B", "tie_break_index": 2}]
+    b.status = "settled"; session.commit()
+    v2 = verification(session, b)
+    assert v2["server_seed"] == seed and v2["commit_ok"] is True    # post-settle → revealed + verified
+
+
+def test_verification_pack_tiebreak(session):
+    from app.models import PackBattle
+    from app.services.pack_lobby import verification
+    from app.services.provably_fair import gen_server_seed
+    seed, h = gen_server_seed()
+    b = PackBattle(id="vp", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="settled", server_seed=seed, server_seed_hash=h,
+                   client_seed="cs", tie_break_index=1)
+    session.add(b); session.commit()
+    v = verification(session, b)
+    assert v["mode"] == "pack" and v["client_seed"] == "cs" and v["tie_break_index"] == 1
+    assert v["commit_ok"] is True
