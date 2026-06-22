@@ -117,7 +117,7 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
         return
     for w in alive:
         await _sign_submit_retry(
-            lambda w=w: build_usdc_transfer_tx(escrow_address, w, share),
+            lambda w=w, share=share: build_usdc_transfer_tx(escrow_address, w, share),
             signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
             sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
             ctx=f"royale void leftover {w} in {battle.id}")

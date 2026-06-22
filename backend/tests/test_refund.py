@@ -58,8 +58,35 @@ async def test_refund_pack_void_noop_without_escrow(session):
     assert cards == []   # no escrow → nothing refunded
 
 
-from app.models import BattlePlayer, BattleRound  # noqa: E402
+from app.models import BattlePlayer  # noqa: E402
 from app.services.refund import refund_royale_void  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_refund_royale_void_noop_without_escrow(session):
+    """No escrow → refund_royale_void is a no-op; no cards, no USDC, no buybacks."""
+    b = PackBattle(id="r0", mode="royale", machine_code="m", price=50, max_players=2, status="voided")
+    session.add(b)
+    session.add(BattlePlayer(battle_id="r0", player_wallet="A", eliminated_round=None))
+    session.add(BattlePull(battle_id="r0", player_wallet="A", memo="mA", round_number=1,
+                           nft_address="nftA", auto_sold=False))
+    session.commit()
+
+    cards, usdc, bought = [], [], []
+    async def btx(esc, dest, nft): cards.append((dest, nft)); return f"tx-{nft}"
+    async def usdctx(src, dest, amt): usdc.append((dest, amt)); return f"u-{dest}"
+    async def sub(signed): return "sig"
+    async def buyback(nft): bought.append(nft)
+    async def esc_bal(esc): return 0
+
+    await refund_royale_void(session, b, escrow_wallet_id=None, escrow_address=None,
+        build_transfer_tx=btx, submit_tx=sub, signer=_Signer(), build_usdc_transfer_tx=usdctx,
+        buyback_to_escrow=buyback, escrow_usdc_balance=esc_bal, confirm_in_escrow=_ce,
+        sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0)
+
+    assert cards == []
+    assert usdc == []
+    assert bought == []
 
 
 @pytest.mark.asyncio
