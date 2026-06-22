@@ -72,7 +72,10 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
                 logger.warning("settle transfer retry for %s in battle %s: %s",
                                p.nft_address, battle.id, exc)
                 await sleep_fn(wait_delay)
-        session.commit()
+        try:
+            session.commit()
+        except Exception as exc:
+            logger.warning("settle commit failed in battle %s: %s", battle.id, exc)
     if build_usdc_sweep_tx is not None:
         for _ in range(max_attempts):
             try:
