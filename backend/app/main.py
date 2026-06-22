@@ -24,17 +24,17 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
-from .models import GachaPack, PackBattle
+from .models import GachaPack, PackBattle, BattlePlayer
 from .chat import ConnectionManager, ChatBuffer, abbreviate
 from .services.pack_lobby import (
     create_battle, join_battle,
     list_open as lobby_list_open,
-    get_battle, LobbyError,
+    get_battle, cancel_battle, LobbyError,
 )
 from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
-from .services.royale_funding import royale_buyin, collect_buyin
+from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc
 from .services.reservations import reserve, reserved_total, release_reservations
 
 logger = logging.getLogger(__name__)
@@ -500,6 +500,34 @@ def create_app(session_factory, chain: ChainSource,
         reserve(s, wallet, battle_id, b.price)
         if filled:
             asyncio.create_task(_run_bg(battle_id))
+        return get_battle(s, battle_id)
+
+    @app.post("/pack-battles/{battle_id}/cancel")
+    async def cancel_pack_battle(battle_id: str, wallet: str = Depends(current_user),
+                                 s: Session = Depends(db)):
+        b = s.get(PackBattle, battle_id)
+        if b is None:
+            raise HTTPException(404, "no existe")
+        is_royale = b.mode == "royale"
+        players = [p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()]
+        try:
+            cancel_battle(s, battle_id, wallet)   # validates creator + lobby, sets cancelled
+        except LobbyError as e:
+            raise HTTPException(409, str(e))
+        if is_royale:
+            # Refund each joined player their buy-in from the escrow (best-effort, bounded retries).
+            buyin = royale_buyin(b.max_players, b.price)
+            for pw in players:
+                for _ in range(3):
+                    try:
+                        bh = await fetch_latest_blockhash(solana_rpc_url)
+                        await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
+                                              b.escrow_address, pw, cc_usdc_mint, buyin, bh)
+                        break
+                    except Exception as exc:
+                        logger.warning("royale cancel refund retry for %s in %s: %s", pw, battle_id, exc)
+        else:
+            release_reservations(s, battle_id)
         return get_battle(s, battle_id)
 
     @app.get("/pack-battles/open")

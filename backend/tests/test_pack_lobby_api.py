@@ -83,7 +83,7 @@ DUMMY_RPC = "https://api.devnet.solana.com"
 DUMMY_MINT = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
 
 
-def _build_client():
+def _build_client(signer=None):
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -99,6 +99,7 @@ def _build_client():
         MockChainSource(),
         gacha=gacha,
         privy=privy,
+        privy_signer=signer,                # NEW: inject (None by default, as before)
         solana_rpc_url=DUMMY_RPC,
         cc_usdc_mint=DUMMY_MINT,
         privy_operator_wallet_id="op-wallet-id",
@@ -514,3 +515,72 @@ def test_reservations_released_after_run(client_priv, monkeypatch):
     # A's reservation for the finished battle was released → a second create now succeeds.
     r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a)
     assert r.status_code == 200, r.text
+
+
+def test_pack_cancel_releases_reservation_creator_only(client_priv, monkeypatch):
+    c, priv = client_priv
+
+    async def _high(*args, **kwargs):
+        return 1_000_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+    hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    bid = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a).json()["id"]
+
+    # Non-creator cannot cancel
+    hdrs_b = _auth_headers(priv, WALLET_B, WALLET_ID_B)
+    assert c.post(f"/pack-battles/{bid}/cancel", headers=hdrs_b).status_code == 409
+
+    # Creator cancels → cancelled
+    r = c.post(f"/pack-battles/{bid}/cancel", headers=hdrs_a)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "cancelled"
+
+
+class _FakeSigner:
+    async def create_solana_wallet(self):
+        return {"id": "esc-id", "address": "So1anaESCROW111111111111111111111111111111"}
+
+
+def test_royale_cancel_refunds_buyins(monkeypatch):
+    # The royale create path calls privy_signer.create_solana_wallet(), so this test builds a
+    # client WITH a fake signer (the default _build_client() passes privy_signer=None).
+    c, priv = _build_client(signer=_FakeSigner())
+    refunds = []
+
+    async def _high(*args, **kwargs):
+        return 1_000_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _collect(*args, **kwargs):
+        return "collect-sig"
+
+    async def _bh(*args, **kwargs):
+        return "11111111111111111111111111111111"
+
+    async def _distribute(rpc, signer, ewid, eaddr, player, mint, amount, bh):
+        refunds.append((player, amount)); return "refund-sig"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.collect_buyin", _collect)
+    monkeypatch.setattr("app.main.distribute_usdc", _distribute)
+
+    hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    res = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 3, "mode": "royale"}, headers=hdrs_a)
+    assert res.status_code == 200, res.text
+    bid = res.json()["id"]
+
+    r = c.post(f"/pack-battles/{bid}/cancel", headers=hdrs_a)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "cancelled"
+    assert len(refunds) == 1                          # only the creator had joined
+    assert refunds[0][0] == WALLET_A
