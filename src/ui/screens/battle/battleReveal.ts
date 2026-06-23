@@ -3,6 +3,7 @@ import type { Battle, BattleMode, BattleStatus, BattlePullInfo } from '../../../
 export interface RevealCardVM {
   wallet: string; isMe: boolean; nftAddress: string | null
   rarity: string | null; insuredValue: number | null; autoSold: boolean
+  grade: number | null; year: string | null
 }
 export interface RevealRoundVM {
   roundNumber: number; eliminatedWallet: string | null; cards: RevealCardVM[]
@@ -42,6 +43,8 @@ export function battleToReveal(battle: Battle, meWallet: string | null): RevealV
         rarity: p.rarity,
         insuredValue: p.insured_value,
         autoSold: p.auto_sold,
+        grade: p.grade,
+        year: p.year,
       })),
     }))
 
@@ -56,6 +59,8 @@ export function battleToReveal(battle: Battle, meWallet: string | null): RevealV
       rarity: p.rarity,
       insuredValue: p.insured_value,
       autoSold: p.auto_sold,
+      grade: p.grade,
+      year: p.year,
     })
     cardsByPlayer.set(p.player_wallet, arr)
   }

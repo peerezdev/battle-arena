@@ -11,8 +11,8 @@ const vm: RevealVM = {
   ],
   rounds: [
     { roundNumber: 1, eliminatedWallet: 'B', cards: [
-      { wallet: 'A', isMe: true, nftAddress: 'nftA', rarity: 'Epic', insuredValue: 120, autoSold: false },
-      { wallet: 'B', isMe: false, nftAddress: null, rarity: null, insuredValue: null, autoSold: false },
+      { wallet: 'A', isMe: true, nftAddress: 'nftA', rarity: 'Epic', insuredValue: 120, autoSold: false, grade: 10, year: '2018' },
+      { wallet: 'B', isMe: false, nftAddress: null, rarity: null, insuredValue: null, autoSold: false, grade: null, year: null },
     ] },
   ],
   potValue: 120,
