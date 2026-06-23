@@ -18,10 +18,10 @@ const settled: RevealVM = {
 }
 
 describe('PackReveal', () => {
-  // Stub the alias fetch so useAliases resolves without real network (falls back to wallet/Tú).
+  // Stub the alias/machine fetches so the hooks resolve without real network.
   afterEach(() => vi.restoreAllMocks())
 
-  it('reveals both big cards and highlights the winner once settled (reduced-motion)', async () => {
+  it('reveals both big cards and highlights the winner once the round is shown + settled', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
     // reduced-motion → the staged reveal jumps straight to the card, so both images render
     render(<PackReveal vm={settled} reducedMotion />)
@@ -30,10 +30,17 @@ describe('PackReveal', () => {
     expect(await screen.findByText(/gana/i)).toBeTruthy()    // winner appears after the reveal completes
   })
 
-  it('keeps cards face-down while running (no NFTs before settle)', () => {
+  it('shows the card back (abriendo…) while a round’s pulls are unresolved', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
-    render(<PackReveal vm={{ ...settled, status: 'running', winner: null }} reducedMotion />)
-    expect(screen.queryAllByRole('img')).toHaveLength(0)
+    const pending: RevealVM = {
+      ...settled, status: 'running', winner: null,
+      players: [
+        { ...settled.players[0], cards: [{ ...cardA, nftAddress: null }], total: 0 },
+        { ...settled.players[1], cards: [{ ...cardB, nftAddress: null }], total: 0 },
+      ],
+    }
+    render(<PackReveal vm={pending} reducedMotion />)
+    expect(screen.queryAllByRole('img')).toHaveLength(0)     // no card fronts until the pulls resolve
     expect(screen.getAllByText(/abriendo/i).length).toBeGreaterThan(0)
   })
 })
