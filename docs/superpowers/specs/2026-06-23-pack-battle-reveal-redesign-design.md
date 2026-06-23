@@ -1,8 +1,10 @@
 # Pack Battle reveal redesign — Design
 
 **Date:** 2026-06-23
-**Status:** approved
-**Scope:** frontend only (uses the existing `GET /users/{wallet}` endpoint; no backend change)
+**Status:** superseded by v2 (below) — v1 shipped on branch `pack-reveal-redesign` (commit be23fed)
+**Scope:** v1 frontend only; v2 adds a small backend change (expose `grade` + `year` in battle pulls)
+
+> **v2 (approved 2026-06-23):** replaces v1's "all cards at once" with a **round-by-round staged reveal** that mirrors the gacha animation. See the "## v2 — Round-by-round staged reveal" section at the end.
 
 ## Problem
 
@@ -67,3 +69,61 @@ A `useCountUp(target, { enabled })` hook animates 0 → target over a short dura
 - `PackReveal`: renders both players, the winner highlight on settled, display name = alias else short wallet.
 - `RevealCard`: `lg` size renders larger; `sm` unchanged.
 - Layout itself is not unit-testable in jsdom — verified via `tsc -b` + suite green + manual smoke-check.
+
+---
+
+## v2 — Round-by-round staged reveal (approved)
+
+v1 flipped all cards at once. v2 sequences the reveal **round by round**, each round playing the **gacha staged animation** for both players simultaneously.
+
+### Flow
+For each round `r` (a bundle box; single-box battles have exactly one round), gated on `status === 'settled'`:
+1. Both players' round-`r` cards reveal **at the same time** with the gacha staged animation: **YEAR → GRADE → RARITY → CARD** (~1.7s/step; reduced-motion jumps straight to CARD).
+2. When the card stage lands, each player's **value counter counts up** by that card's `insuredValue` (running accumulated total).
+3. Advance to round `r+1`, same process. After the last round: winner highlight + pot.
+
+Before `settled`: a face-down / "abriendo los packs…" waiting state (no NFTs shown early).
+
+### Data — expose `grade` + `year` in battle pulls (backend)
+The staged animation needs `year` and `grade` per card. Today `BattlePullInfo` exposes neither.
+- **`grade`** — already stored on `BattlePull.grade`; just add to the `get_battle` pull serializer + frontend type/VM.
+- **`year`** — `open_pack` returns it but it is not persisted. Add a nullable `year` column to `BattlePull`, store `pull.year = res.get("year")` in `run_battle`'s pull loop, and serialize it. Dev SQLite: add the column via `ALTER TABLE battle_pulls ADD COLUMN year VARCHAR` (additive, safe).
+
+`RevealCardVM` gains `grade: number | null` and `year: string | null`.
+
+### Shared staged-reveal component
+Extract the gacha staged reveal (`RevealResult` in `GachaVault.tsx`, "year → grade → rarity → card") into a shared `StagedCardReveal` so gacha and battle play the **identical** animation. It steps year→grade→rarity (only the present ones) then renders a card slot; takes a normalized card `{ year, grade, rarity, insuredValue, nftAddress, isMe }`, `reduced`, and an `onCardShown` callback (fires when the card stage lands → drives the counter bump + round advance). GachaVault is refactored to consume it; its existing tests stay green.
+
+### PackReveal orchestration
+`PackReveal` tracks `currentRound`. Per round it renders both players' `StagedCardReveal` for that round; when **both** report `onCardShown`, it bumps the per-player running counters and advances `currentRound`. Reduced-motion / already-settled-on-mount → reveal all rounds' final state immediately (counters at totals). Winner highlight after the final round.
+
+### Components / files (v2 delta)
+- `backend/app/models.py` — `BattlePull.year` column.
+- `backend/app/services/pack_engine.py` — store `pull.year`.
+- `backend/app/main.py` — serialize `grade` + `year` in the `get_battle` pull payload.
+- `src/onchain/packBattleClient.ts` — `BattlePullInfo.grade`, `.year`.
+- `src/ui/screens/battle/battleReveal.ts` — `RevealCardVM.grade`, `.year`.
+- `src/ui/screens/battle/StagedCardReveal.tsx` — new shared staged reveal (extracted from gacha).
+- `src/ui/screens/gacha/GachaVault.tsx` — consume `StagedCardReveal` (behavior preserved).
+- `src/ui/screens/battle/PackReveal.tsx` — round-by-round orchestration over `StagedCardReveal`.
+
+### Testing (v2 delta)
+- `battleReveal`: VM carries `grade`/`year` per card.
+- Backend: `get_battle` pull payload includes `grade` + `year`.
+- `StagedCardReveal`: reduced-motion shows the card immediately + fires `onCardShown`; full sequence steps through present stages.
+- `PackReveal`: round advances when both players' cards land; counters reach per-player totals; winner highlight after last round.
+- Layout/animation timing not unit-testable in jsdom — verified via build + suite green + manual smoke-check.
+
+---
+
+## v3 — polish (approved)
+
+Builds on v2. Adds card name, machine thumbnail, round indicator, and a card-back→front 3D flip.
+
+- **Card name** — add a `name` column to `BattlePull` (store from `open_pack`, serialize in `get_battle`), `BattlePullInfo.name` / `RevealCardVM.name`; shown under each revealed card (truncated).
+- **Machine thumbnail** — `useMachines()` hook (fetch `/gacha/machines` once, cached) → `code → { name, thumb }`. `RevealVM.machines` carries the per-round `machine_code` (from `battle.packs` by sequence; fallback `[machine_code]`). Current round's machine thumbnail + name shown in the round header.
+- **Round indicator** — "RONDA r/N" in the header (driven by current `round` + `maxRounds`).
+- **Card back + flip** — `StagedCardReveal` becomes a 3D flip card: during YEAR/GRADE/RARITY it shows the **card back** (`CardBack`, rarity-glow) with the stage text overlaid; on the card stage it flips (rotateY, framer-motion) to the front (`RevealCard`). Reduced-motion shows the front immediately.
+- **General polish** — round header (thumb + name + round), per-card name, winner glow at the end, spacing/hierarchy. Royale unchanged.
+
+New files: `src/ui/useMachines.ts`, `src/ui/screens/battle/CardBack.tsx`.

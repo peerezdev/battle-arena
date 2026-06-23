@@ -12,9 +12,9 @@ const base: Battle = {
   rounds: [{ round_number: 1, eliminated_wallet: 'B', tie_break_index: null }],
   server_seed_hash: 'h',
   pulls: [
-    { round_number: 1, player_wallet: 'A', nft_address: 'nftA', rarity: 'Epic', insured_value: 120, auto_sold: false },
-    { round_number: 1, player_wallet: 'B', nft_address: 'nftB', rarity: 'common', insured_value: 40, auto_sold: true },
-    { round_number: 2, player_wallet: 'A', nft_address: null, rarity: null, insured_value: null, auto_sold: false },
+    { round_number: 1, player_wallet: 'A', nft_address: 'nftA', rarity: 'Epic', insured_value: 120, auto_sold: false, grade: 10, year: '2018', name: 'Charizard', buyback_amount: null },
+    { round_number: 1, player_wallet: 'B', nft_address: 'nftB', rarity: 'common', insured_value: 40, auto_sold: true, grade: 9, year: '1999', name: 'Pikachu', buyback_amount: 5_000_000 },
+    { round_number: 2, player_wallet: 'A', nft_address: null, rarity: null, insured_value: null, auto_sold: false, grade: null, year: null, name: null, buyback_amount: null },
   ],
 }
 
@@ -28,14 +28,20 @@ describe('battleToReveal', () => {
     expect(vm.rounds[1].cards[0].nftAddress).toBeNull()        // pending
     expect(vm.players.find((p) => p.wallet === 'A')!.isMe).toBe(true)
     expect(vm.potValue).toBe(160)                              // 120 + 40, pending null ignored
+    // per-player aggregation across rounds (bundle-aware)
+    expect(vm.players.find((p) => p.wallet === 'A')!.cards).toHaveLength(2)  // round 1 + round 2 (pending)
+    expect(vm.players.find((p) => p.wallet === 'A')!.total).toBe(120)        // null insured ignored
+    expect(vm.players.find((p) => p.wallet === 'A')!.cards[0].year).toBe('2018')   // staged-reveal data
+    expect(vm.players.find((p) => p.wallet === 'A')!.cards[0].grade).toBe(10)
+    expect(vm.buybackTotal).toBe(5)                            // 5_000_000 base units / 1e6
   })
 
   it('groups pack pulls (round_number 1) into a single round', () => {
     const packBattle: Battle = {
       ...base, mode: 'pack', status: 'settled', winner: 'A', rounds: [],
       pulls: [
-        { round_number: 1, player_wallet: 'A', nft_address: 'nftA', rarity: 'Rare', insured_value: 300, auto_sold: false },
-        { round_number: 1, player_wallet: 'B', nft_address: 'nftB', rarity: 'common', insured_value: 10, auto_sold: false },
+        { round_number: 1, player_wallet: 'A', nft_address: 'nftA', rarity: 'Rare', insured_value: 300, auto_sold: false, grade: 10, year: '2020', name: 'Blastoise', buyback_amount: null },
+        { round_number: 1, player_wallet: 'B', nft_address: 'nftB', rarity: 'common', insured_value: 10, auto_sold: false, grade: 8, year: '2001', name: 'Rattata', buyback_amount: null },
       ],
     }
     const vm = battleToReveal(packBattle, 'B')
@@ -44,6 +50,8 @@ describe('battleToReveal', () => {
     expect(vm.rounds[0].cards).toHaveLength(2)
     expect(vm.winner).toBe('A')
     expect(vm.players.find((p) => p.wallet === 'B')!.isMe).toBe(true)
+    expect(vm.players.find((p) => p.wallet === 'A')!.total).toBe(300)
+    expect(vm.players.find((p) => p.wallet === 'B')!.cards).toHaveLength(1)
   })
 
   it('handles a battle with no pulls yet', () => {

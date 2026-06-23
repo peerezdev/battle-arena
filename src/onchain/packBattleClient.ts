@@ -9,6 +9,8 @@ export interface BattleRoundInfo { round_number: number; eliminated_wallet: stri
 export interface BattlePullInfo {
   round_number: number; player_wallet: string; nft_address: string | null
   rarity: string | null; insured_value: number | null; auto_sold: boolean
+  grade: number | null; year: string | null; name: string | null
+  buyback_amount: number | null   // USDC base units (×1e6) when a card was auto-sold
 }
 
 export interface Battle {
@@ -17,6 +19,7 @@ export interface Battle {
   players: BattlePlayerState[]; rounds: BattleRoundInfo[]; server_seed_hash: string | null
   server_seed?: string | null; client_seed?: string | null; tie_break_index?: number | null
   pulls?: BattlePullInfo[]
+  packs?: { machine_code: string; sequence: number; price: number }[]
   buyin?: number; escrow_address?: string
 }
 

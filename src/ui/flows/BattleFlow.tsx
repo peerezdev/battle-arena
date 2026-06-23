@@ -28,6 +28,7 @@ export function BattleFlow() {
   const { battle, error } = useBattle(battleId ?? null, 1500)
   const { identityToken } = useIdentityToken()
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [revealDone, setRevealDone] = useState(false)
   const exit = () => navigate('/app')
 
   function onCancelLobby() {
@@ -73,14 +74,15 @@ export function BattleFlow() {
     </Centered>
   }
 
-  // running | settled → reveal (+ result when settled)
+  // running | settled → reveal (+ result, but only AFTER the pack reveal animation finishes)
   const vm = battleToReveal(battle, meWallet)
+  const showResult = battle.status === 'settled' && (vm.mode === 'royale' || revealDone)
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       {vm.mode === 'royale'
         ? <RoyaleReveal vm={vm} reducedMotion={!!reduced} />
-        : <PackReveal vm={vm} reducedMotion={!!reduced} />}
-      {battle.status === 'settled' && <BattleResult vm={vm} battleId={battle.id} onExit={exit} />}
+        : <PackReveal vm={vm} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} />}
+      {showResult && <BattleResult vm={vm} battleId={battle.id} onExit={exit} />}
     </div>
   )
 }

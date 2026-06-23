@@ -89,7 +89,9 @@ def _rounds(session, battle_id):
 def _pull_recap(session, battle_id):
     return [{"round_number": p.round_number, "player_wallet": p.player_wallet,
              "nft_address": p.nft_address, "rarity": p.rarity,
-             "insured_value": p.insured_value, "auto_sold": p.auto_sold}
+             "insured_value": p.insured_value, "auto_sold": p.auto_sold,
+             "grade": p.grade, "year": p.year, "name": p.name,
+             "buyback_amount": p.buyback_amount}
             for p in session.query(BattlePull).filter_by(battle_id=battle_id)
             .order_by(BattlePull.round_number, BattlePull.id).all()]
 

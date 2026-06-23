@@ -157,6 +157,8 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                 pull.insured_value = res.get("insured_value") or 0
                 pull.grade = res.get("grade")
                 pull.rarity = res.get("rarity")
+                pull.year = res.get("year")
+                pull.name = res.get("name")
                 pull.auto_sold = bool(res.get("auto_sold"))
                 pull.buyback_amount = res.get("buyback_amount")
                 session.commit()

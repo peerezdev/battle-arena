@@ -104,12 +104,14 @@ def test_get_battle_postsettle_pull_recap(session):
                    client_seed="cs", tie_break_index=None, creator_wallet="A")
     session.add(b)
     session.add(BattlePull(battle_id="st", player_wallet="A", memo="m1", round_number=1,
-                           nft_address="nftA", rarity="Epic", insured_value=500.0, auto_sold=False))
+                           nft_address="nftA", rarity="Epic", insured_value=500.0, auto_sold=False,
+                           grade=10, year="2018", name="Charizard", buyback_amount=None))
     session.commit()
     v = get_battle(session, "st")
     assert v["server_seed"] == "ab" * 32                 # revealed post-settle
     assert v["pulls"] == [{"round_number": 1, "player_wallet": "A", "nft_address": "nftA",
-                           "rarity": "Epic", "insured_value": 500.0, "auto_sold": False}]
+                           "rarity": "Epic", "insured_value": 500.0, "auto_sold": False,
+                           "grade": 10, "year": "2018", "name": "Charizard", "buyback_amount": None}]
 
 
 def test_verification_royale_rounds_and_reveal_gate(session):

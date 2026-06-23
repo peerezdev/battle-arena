@@ -5,6 +5,7 @@ import { RARITY, COLORS } from '../../theme'
 
 const card = {
   wallet: 'A', isMe: true, nftAddress: 'nftA', rarity: 'Epic', insuredValue: 120, autoSold: false,
+  grade: 10, year: '2018', name: 'Charizard',
 }
 
 describe('RevealCard', () => {
@@ -23,7 +24,14 @@ describe('RevealCard', () => {
 
   it('marks auto-sold cards', () => {
     render(<RevealCard card={{ ...card, autoSold: true }} reducedMotion />)
-    expect(screen.getByText(/auto-sold/i)).toBeTruthy()
+    expect(screen.getByText('⚡')).toBeTruthy()
+  })
+
+  it('renders bigger at size="lg" (default sm)', () => {
+    const { container: sm } = render(<RevealCard card={card} reducedMotion />)
+    expect((sm.firstChild as HTMLElement).style.width).toBe('92px')
+    const { container: lg } = render(<RevealCard card={card} reducedMotion size="lg" />)
+    expect((lg.firstChild as HTMLElement).style.width).toBe('180px')
   })
 
   it('maps rarity case-insensitively, unknown → muted', () => {

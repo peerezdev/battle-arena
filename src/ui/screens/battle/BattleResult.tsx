@@ -1,27 +1,70 @@
 import { useState } from 'react'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { shortWallet } from './RoyaleReveal'
+import { RevealCard } from './RevealCard'
 import { VerifyPanel } from './VerifyPanel'
-import type { RevealVM } from './battleReveal'
+import { useAliases } from '../../useAliases'
+import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
 export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId: string; onExit: () => void }) {
-  const iWon = vm.winner != null && vm.winner === vm.meWallet
   const [verifyOpen, setVerifyOpen] = useState(false)
+  const aliases = useAliases(vm.players.map((p) => p.wallet))
+
+  const iAmPlayer = vm.players.some((p) => p.isMe)
+  const iWon = vm.winner != null && vm.winner === vm.meWallet
+  const winner = vm.players.find((p) => p.wallet === vm.winner)
+
+  const title = iWon ? '🏆 ¡Ganaste!' : iAmPlayer ? '💀 Has perdido' : 'Batalla terminada'
+  const titleColor = iWon ? COLORS.green : iAmPlayer ? COLORS.red : COLORS.text
+  const name = (p: RevealPlayerVM) => (p.isMe ? aliases[p.wallet] ?? 'Tú' : aliases[p.wallet] ?? shortWallet(p.wallet))
+
   return (
-    <div style={{ padding: '24px 16px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-      <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: iWon ? COLORS.green : COLORS.text }}>
-        {iWon ? '🏆 ¡Ganaste!' : 'Batalla terminada'}
-      </div>
-      {!iWon && vm.winner && (
-        <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
-          Ganador: {shortWallet(vm.winner)}
+    <div style={{ padding: '20px 16px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
+      <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 24, color: titleColor }}>{title}</div>
+
+      {winner && (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.12em', color: COLORS.muted }}>
+            GANA {name(winner).toUpperCase()} · SE LLEVA
+          </div>
+          <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 30, color: COLORS.green }}>
+            {formatUsd(winner.total)}
+          </div>
         </div>
       )}
-      <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>Bote</div>
-      <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 28, color: COLORS.green }}>
-        {formatUsd(vm.potValue)}
+
+      {/* per-player recap: name, total insuredValue, and all their cards ("hits") */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 560 }}>
+        {vm.players.map((p) => {
+          const isWinner = p.wallet === vm.winner
+          return (
+            <div key={p.wallet} style={{
+              border: `1px solid ${isWinner ? COLORS.green : COLORS.border}`, borderRadius: 14, padding: '12px 14px',
+              background: isWinner ? `linear-gradient(180deg,#14F1950c,${COLORS.panel})` : COLORS.panel,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14, color: p.isMe ? COLORS.green : COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {name(p)}{isWinner ? ' 🏆' : ''}
+                </span>
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 16, color: isWinner ? COLORS.green : COLORS.text, flexShrink: 0 }}>
+                  {formatUsd(p.total)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {p.cards.map((c, idx) => <RevealCard key={idx} card={c} reducedMotion size="sm" />)}
+              </div>
+            </div>
+          )
+        })}
       </div>
-      <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+
+      {vm.buybackTotal > 0 && (
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>
+          Total en buyback: <span style={{ color: COLORS.text, fontWeight: 700 }}>{formatUsd(vm.buybackTotal)}</span>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
         <button onClick={() => setVerifyOpen(true)} style={{
           background: 'transparent', color: COLORS.muted, border: `1px solid ${COLORS.border}`,
           borderRadius: 10, padding: '10px 18px', fontWeight: 700, cursor: 'pointer',
