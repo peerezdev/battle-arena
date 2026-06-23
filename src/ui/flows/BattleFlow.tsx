@@ -74,15 +74,25 @@ export function BattleFlow() {
     </Centered>
   }
 
-  // running | settled → reveal (+ result, but only AFTER the pack reveal animation finishes)
+  // running | settled → reveal, then a SEPARATE result screen (the pack reveal is replaced,
+  // not stacked, once its animation finishes).
   const vm = battleToReveal(battle, meWallet)
-  const showResult = battle.status === 'settled' && (vm.mode === 'royale' || revealDone)
+
+  if (vm.mode === 'pack') {
+    return (
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {battle.status === 'settled' && revealDone
+          ? <BattleResult vm={vm} battleId={battle.id} onExit={exit} />
+          : <PackReveal vm={vm} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} />}
+      </div>
+    )
+  }
+
+  // royale: rounds list + result below when settled (unchanged)
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      {vm.mode === 'royale'
-        ? <RoyaleReveal vm={vm} reducedMotion={!!reduced} />
-        : <PackReveal vm={vm} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} />}
-      {showResult && <BattleResult vm={vm} battleId={battle.id} onExit={exit} />}
+      <RoyaleReveal vm={vm} reducedMotion={!!reduced} />
+      {battle.status === 'settled' && <BattleResult vm={vm} battleId={battle.id} onExit={exit} />}
     </div>
   )
 }
