@@ -6,8 +6,8 @@ import type { RevealVM } from './battleReveal'
 const vm: RevealVM = {
   mode: 'royale', status: 'running', winner: null, meWallet: 'A',
   players: [
-    { wallet: 'A', isMe: true, accumulatedValue: 120, eliminatedRound: null },
-    { wallet: 'B', isMe: false, accumulatedValue: 40, eliminatedRound: 1 },
+    { wallet: 'A', isMe: true, accumulatedValue: 120, eliminatedRound: null, cards: [], total: 120 },
+    { wallet: 'B', isMe: false, accumulatedValue: 40, eliminatedRound: 1, cards: [], total: 40 },
   ],
   rounds: [
     { roundNumber: 1, eliminatedWallet: 'B', cards: [

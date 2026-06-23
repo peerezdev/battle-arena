@@ -28,6 +28,9 @@ describe('battleToReveal', () => {
     expect(vm.rounds[1].cards[0].nftAddress).toBeNull()        // pending
     expect(vm.players.find((p) => p.wallet === 'A')!.isMe).toBe(true)
     expect(vm.potValue).toBe(160)                              // 120 + 40, pending null ignored
+    // per-player aggregation across rounds (bundle-aware)
+    expect(vm.players.find((p) => p.wallet === 'A')!.cards).toHaveLength(2)  // round 1 + round 2 (pending)
+    expect(vm.players.find((p) => p.wallet === 'A')!.total).toBe(120)        // null insured ignored
   })
 
   it('groups pack pulls (round_number 1) into a single round', () => {
@@ -44,6 +47,8 @@ describe('battleToReveal', () => {
     expect(vm.rounds[0].cards).toHaveLength(2)
     expect(vm.winner).toBe('A')
     expect(vm.players.find((p) => p.wallet === 'B')!.isMe).toBe(true)
+    expect(vm.players.find((p) => p.wallet === 'A')!.total).toBe(300)
+    expect(vm.players.find((p) => p.wallet === 'B')!.cards).toHaveLength(1)
   })
 
   it('handles a battle with no pulls yet', () => {

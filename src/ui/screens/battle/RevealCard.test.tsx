@@ -26,6 +26,13 @@ describe('RevealCard', () => {
     expect(screen.getByText(/auto-sold/i)).toBeTruthy()
   })
 
+  it('renders bigger at size="lg" (default sm)', () => {
+    const { container: sm } = render(<RevealCard card={card} reducedMotion />)
+    expect((sm.firstChild as HTMLElement).style.width).toBe('92px')
+    const { container: lg } = render(<RevealCard card={card} reducedMotion size="lg" />)
+    expect((lg.firstChild as HTMLElement).style.width).toBe('180px')
+  })
+
   it('maps rarity case-insensitively, unknown → muted', () => {
     expect(rarityColor('Epic')).toBe(RARITY.epic)
     expect(rarityColor('common')).toBe(RARITY.common)

@@ -9,6 +9,8 @@ export interface RevealRoundVM {
 }
 export interface RevealPlayerVM {
   wallet: string; isMe: boolean; accumulatedValue: number; eliminatedRound: number | null
+  cards: RevealCardVM[]   // all of this player's pulls across rounds (bundle-aware)
+  total: number           // sum of insuredValue across this player's cards
 }
 export interface RevealVM {
   mode: BattleMode; status: BattleStatus; winner: string | null; meWallet: string | null
@@ -43,12 +45,32 @@ export function battleToReveal(battle: Battle, meWallet: string | null): RevealV
       })),
     }))
 
-  const players: RevealPlayerVM[] = battle.players.map((p) => ({
-    wallet: p.wallet,
-    isMe: p.wallet === meWallet,
-    accumulatedValue: p.accumulated_value,
-    eliminatedRound: p.eliminated_round,
-  }))
+  // Group every pull by player (across all rounds) for the per-player VS view (bundle-aware).
+  const cardsByPlayer = new Map<string, RevealCardVM[]>()
+  for (const p of pulls) {
+    const arr = cardsByPlayer.get(p.player_wallet) ?? []
+    arr.push({
+      wallet: p.player_wallet,
+      isMe: p.player_wallet === meWallet,
+      nftAddress: p.nft_address,
+      rarity: p.rarity,
+      insuredValue: p.insured_value,
+      autoSold: p.auto_sold,
+    })
+    cardsByPlayer.set(p.player_wallet, arr)
+  }
+
+  const players: RevealPlayerVM[] = battle.players.map((p) => {
+    const cards = cardsByPlayer.get(p.wallet) ?? []
+    return {
+      wallet: p.wallet,
+      isMe: p.wallet === meWallet,
+      accumulatedValue: p.accumulated_value,
+      eliminatedRound: p.eliminated_round,
+      cards,
+      total: cards.reduce((s, c) => s + (c.insuredValue ?? 0), 0),
+    }
+  })
 
   const potValue = pulls.reduce((s, p) => s + (p.insured_value ?? 0), 0)
 
