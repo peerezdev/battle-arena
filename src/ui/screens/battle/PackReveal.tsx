@@ -43,9 +43,9 @@ export function PackReveal({ vm, reducedMotion, onComplete }: {
       const t = setTimeout(() => { setRound((r) => r + 1); setDoneCount(0) }, reducedMotion ? 0 : ROUND_HOLD_MS)
       return () => clearTimeout(t)
     }
-    // last round shown — reveal the result once the battle has settled
+    // last round shown — hold it (same as between rounds) before the result screen takes over
     if (settled && !complete) {
-      const t = setTimeout(() => { setComplete(true); onComplete?.() }, reducedMotion ? 0 : 600)
+      const t = setTimeout(() => { setComplete(true); onComplete?.() }, reducedMotion ? 0 : ROUND_HOLD_MS)
       return () => clearTimeout(t)
     }
     // onComplete fires once, guarded by `complete`.
