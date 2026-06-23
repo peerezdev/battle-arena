@@ -21,13 +21,13 @@ describe('PackReveal', () => {
   // Stub the alias fetch so useAliases resolves without real network (falls back to wallet/Tú).
   afterEach(() => vi.restoreAllMocks())
 
-  it('reveals both big cards and highlights the winner once settled (reduced-motion)', () => {
+  it('reveals both big cards and highlights the winner once settled (reduced-motion)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
     // reduced-motion → the staged reveal jumps straight to the card, so both images render
     render(<PackReveal vm={settled} reducedMotion />)
     expect(screen.getAllByRole('img')).toHaveLength(2)
-    expect(screen.getByText(/gana/i)).toBeTruthy()
     expect(screen.getByText('Tú')).toBeTruthy()              // self shown as "Tú" (no alias)
+    expect(await screen.findByText(/gana/i)).toBeTruthy()    // winner appears after the reveal completes
   })
 
   it('keeps cards face-down while running (no NFTs before settle)', () => {

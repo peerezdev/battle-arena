@@ -24,7 +24,7 @@ describe('RevealCard', () => {
 
   it('marks auto-sold cards', () => {
     render(<RevealCard card={{ ...card, autoSold: true }} reducedMotion />)
-    expect(screen.getByText(/auto-sold/i)).toBeTruthy()
+    expect(screen.getByText('⚡')).toBeTruthy()
   })
 
   it('renders bigger at size="lg" (default sm)', () => {

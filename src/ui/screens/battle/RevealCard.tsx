@@ -9,30 +9,34 @@ export function rarityColor(rarity: string | null): string {
 }
 
 export type RevealCardSize = 'sm' | 'lg'
-
-const DIMS: Record<RevealCardSize, {
-  w: number; imgH: number; faceH: number; faceEmoji: number; fallback: number; valFont: number; autoFont: number; pad: string
-}> = {
-  sm: { w: 92, imgH: 100, faceH: 128, faceEmoji: 26, fallback: 34, valFont: 12, autoFont: 8.5, pad: '5px 7px' },
-  lg: { w: 180, imgH: 204, faceH: 252, faceEmoji: 46, fallback: 60, valFont: 18, autoFont: 10, pad: '9px 12px' },
+const PRESET: Record<RevealCardSize, { w: number; h: number }> = {
+  sm: { w: 92, h: 128 },
+  lg: { w: 180, h: 252 },
 }
 
-export function RevealCard({ card, reducedMotion, size = 'sm' }: {
-  card: RevealCardVM; reducedMotion: boolean; size?: RevealCardSize
+/** A graded-card tile at a FIXED width×height (so face-down, staging and revealed states
+ *  all line up). Pass explicit `w`/`h` for responsive sizing, else a `size` preset. */
+export function RevealCard({ card, reducedMotion, size = 'sm', w, h }: {
+  card: RevealCardVM; reducedMotion: boolean; size?: RevealCardSize; w?: number; h?: number
 }) {
   const [imgError, setImgError] = useState(false)
   const color = rarityColor(card.rarity)
-  const d = DIMS[size]
+  const width = w ?? PRESET[size].w
+  const height = h ?? PRESET[size].h
+  const big = width >= 150
+  const footerH = big ? 54 : 38
+  const valFont = big ? 18 : 12
+  const nameFont = big ? 11.5 : 9
+  const autoFont = big ? 9.5 : 8
 
   if (!card.nftAddress) {
-    // pending: face-down "opening…" tile
     return (
       <div style={{
-        width: d.w, height: d.faceH, borderRadius: 10, border: `1px solid ${COLORS.border}`,
+        width, height, borderRadius: 10, border: `1px solid ${COLORS.border}`,
         background: 'linear-gradient(160deg,#1b2236,#11161f)', display: 'flex',
         alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6,
       }}>
-        <span style={{ fontSize: d.faceEmoji, opacity: reducedMotion ? 1 : 0.8 }}>🂠</span>
+        <span style={{ fontSize: big ? 46 : 26, opacity: reducedMotion ? 1 : 0.8 }}>🂠</span>
         <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted }}>abriendo…</span>
       </div>
     )
@@ -42,31 +46,27 @@ export function RevealCard({ card, reducedMotion, size = 'sm' }: {
     <div
       className={reducedMotion ? undefined : 'animate-flip-in'}
       style={{
-        width: d.w, borderRadius: 10, border: `1px solid ${color}`, background: COLORS.panel,
+        width, height, borderRadius: 10, border: `1px solid ${color}`, background: COLORS.panel,
         overflow: 'hidden', boxShadow: card.isMe ? `0 0 0 2px ${COLORS.green}55` : 'none',
+        display: 'flex', flexDirection: 'column',
       }}
     >
-      <div style={{ height: d.imgH, background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ flex: 1, minHeight: 0, background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {imgError
-          ? <span style={{ fontSize: d.fallback }}>🃏</span>
+          ? <span style={{ fontSize: big ? 60 : 34 }}>🃏</span>
           : <img src={ccCardImageUrl(card.nftAddress)} alt="Card" onError={() => setImgError(true)}
                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} />}
       </div>
-      <div style={{ padding: d.pad, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ height: footerH, flexShrink: 0, padding: '0 8px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
         {card.name && (
-          <span style={{
-            fontFamily: FONTS.body, fontWeight: 600, fontSize: size === 'lg' ? 11.5 : 9, color: COLORS.text,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: d.w - 14,
-          }}>
+          <span style={{ fontFamily: FONTS.body, fontWeight: 600, fontSize: nameFont, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {card.name}
           </span>
         )}
-        <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: d.valFont, color }}>
+        <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: valFont, color }}>
           {formatUsd(card.insuredValue ?? 0)}
+          {card.autoSold && <span style={{ fontFamily: FONTS.mono, fontSize: autoFont, color: COLORS.muted, marginLeft: 6 }}>⚡</span>}
         </span>
-        {card.autoSold && (
-          <span style={{ fontFamily: FONTS.mono, fontSize: d.autoFont, color: COLORS.muted }}>⚡ auto-sold</span>
-        )}
       </div>
     </div>
   )

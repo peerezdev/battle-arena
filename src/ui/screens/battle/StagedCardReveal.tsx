@@ -77,7 +77,10 @@ export function StagedCardReveal({
                 >
                   <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>{stage.toUpperCase()}</div>
                   <div style={{
-                    fontFamily: FONTS.display, fontWeight: 900, fontSize: 36, lineHeight: 1,
+                    fontFamily: FONTS.display, fontWeight: 900, lineHeight: 1.05,
+                    // rarity is a word ("UNCOMMON") → smaller so it never spills past the card
+                    fontSize: stage === 'rarity' ? 20 : 34,
+                    maxWidth: width - 16, textAlign: 'center', wordBreak: 'break-word',
                     color: stage === 'rarity' ? rc : COLORS.text, textShadow: stage === 'rarity' ? SHADOW.glow(rc) : 'none',
                   }}>
                     {stageValue}
