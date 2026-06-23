@@ -16,6 +16,7 @@ from app.services.pack_orchestration import (
     fetch_latest_blockhash,
     usdc_balance_base_units,
     run_pack_battle_live,
+    seed_escrow,
 )
 from app.services.solana_tx import TOKEN_PROGRAM
 
@@ -500,6 +501,18 @@ async def test_run_pack_battle_live_no_refund_on_settled(session, monkeypatch):
     out = await po.run_pack_battle_live(session, b, gacha=None, signer=None, rpc_url="x",
         usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr", min_usdc_base_units=0)
     assert out == "settled" and refunded == []   # no refund on settle
+
+
+# ---------------------------------------------------------------------------
+# Test: seed_escrow guard — missing operator config fails clearly
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_seed_escrow_requires_operator_config():
+    """Missing operator wallet → a clear ValueError naming the env keys, not the cryptic
+    solders 'String is the wrong size' from Pubkey.from_string('')."""
+    with pytest.raises(ValueError, match="PRIVY_OPERATOR"):
+        await seed_escrow("http://x", _Signer(), "", "", ESCROW_ADDRESS, 10_000_000, BLOCKHASH)
 
 
 # ---------------------------------------------------------------------------
