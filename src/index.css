@@ -11,6 +11,21 @@ body {
   min-height: 100dvh;
 }
 
+/* Subtle dark scrollbars (the default OS bar looks bright on the dark UI) */
+* {
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: #2a3650 transparent;  /* Firefox: thumb / track */
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: #2a3650;
+  border-radius: 8px;
+  border: 2px solid transparent; /* padding → looks ~6px thin */
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: #3a4a6e; }
+
 :root {
   --font-display: 'Sora', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;

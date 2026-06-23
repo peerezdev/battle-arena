@@ -417,6 +417,8 @@ export default function GachaVault() {
                       fontSize: 13,
                       color: COLORS.text,
                       whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
                   >
                     {m.shortName ?? m.name}

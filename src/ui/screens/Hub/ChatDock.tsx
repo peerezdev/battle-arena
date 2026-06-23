@@ -51,7 +51,9 @@ export function ChatDock({
   }, [])
 
   // ── Resizable divider state ──
-  const [dropsHeight, setDropsHeight] = useState(240)
+  const [dropsHeight, setDropsHeight] = useState(
+    () => Math.max(120, Math.min(Math.round(window.innerHeight / 2), window.innerHeight - 260)),
+  )
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null)
 
   function handleResizerPointerDown(e: React.PointerEvent<HTMLDivElement>) {
@@ -142,19 +144,21 @@ export function ChatDock({
       {/* ── LIVE DROPS ── */}
       <div
         style={{
-          padding: '14px 16px',
           height: dropsHeight,
-          overflowY: 'auto',
           flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
         }}
       >
-        {/* Header */}
+        {/* Header — fixed (stays visible while the list scrolls) */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: 12,
+            padding: '14px 16px 10px',
+            flexShrink: 0,
           }}
         >
           <div
@@ -205,7 +209,8 @@ export function ChatDock({
           )}
         </div>
 
-        {/* Drop items */}
+        {/* Drop items — scrolls (header above stays fixed) */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 14px' }}>
         {drops.length === 0 ? (
           <div style={{ fontSize: 11, color: COLORS.muted }}>
             No drops yet — open a pack to see it here.
@@ -294,6 +299,7 @@ export function ChatDock({
             )
           })
         )}
+        </div>
       </div>
 
       {/* ── RESIZER HANDLE ── */}
