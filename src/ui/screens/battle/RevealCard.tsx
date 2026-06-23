@@ -53,6 +53,14 @@ export function RevealCard({ card, reducedMotion, size = 'sm' }: {
                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} />}
       </div>
       <div style={{ padding: d.pad, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {card.name && (
+          <span style={{
+            fontFamily: FONTS.body, fontWeight: 600, fontSize: size === 'lg' ? 11.5 : 9, color: COLORS.text,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: d.w - 14,
+          }}>
+            {card.name}
+          </span>
+        )}
         <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: d.valFont, color }}>
           {formatUsd(card.insuredValue ?? 0)}
         </span>

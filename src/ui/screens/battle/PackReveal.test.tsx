@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { PackReveal } from './PackReveal'
 import type { RevealVM } from './battleReveal'
 
-const cardA = { wallet: 'A', isMe: false, nftAddress: 'nftA', rarity: 'Rare', insuredValue: 300, autoSold: false, grade: 10, year: '2020' }
-const cardB = { wallet: 'B', isMe: true, nftAddress: 'nftB', rarity: 'common', insuredValue: 10, autoSold: false, grade: 8, year: '2001' }
+const cardA = { wallet: 'A', isMe: false, nftAddress: 'nftA', rarity: 'Rare', insuredValue: 300, autoSold: false, grade: 10, year: '2020', name: 'Blastoise' }
+const cardB = { wallet: 'B', isMe: true, nftAddress: 'nftB', rarity: 'common', insuredValue: 10, autoSold: false, grade: 8, year: '2001', name: 'Rattata' }
 
 const settled: RevealVM = {
   mode: 'pack', status: 'settled', winner: 'A', meWallet: 'B',
@@ -14,6 +14,7 @@ const settled: RevealVM = {
   ],
   rounds: [],
   potValue: 310,
+  machines: ['pokemon_50'],
 }
 
 describe('PackReveal', () => {

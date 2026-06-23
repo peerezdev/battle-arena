@@ -5,11 +5,13 @@ import { StagedCardReveal } from './StagedCardReveal'
 import { shortWallet } from './RoyaleReveal'
 import { useAliases } from '../../useAliases'
 import { useCountUp } from '../../useCountUp'
+import { useMachines } from '../../useMachines'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
 export function PackReveal({ vm, reducedMotion }: { vm: RevealVM; reducedMotion: boolean }) {
   const revealed = vm.status === 'settled'
   const aliases = useAliases(vm.players.map((p) => p.wallet))
+  const machines = useMachines()
   const maxRounds = vm.players.reduce((m, p) => Math.max(m, p.cards.length), 0)
 
   // Round-by-round orchestration: both players reveal round `round` at once; when both
@@ -35,10 +37,30 @@ export function PackReveal({ vm, reducedMotion }: { vm: RevealVM; reducedMotion:
   // How many rounds' cards are currently on screen (drives the running counter target).
   const shownRounds = revealed ? (cardShown ? round + 1 : round) : 0
 
+  const machine = machines[vm.machines[round] ?? vm.machines[0] ?? '']
+
   return (
     <div style={{ padding: '22px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-      <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '0.14em', color: COLORS.muted }}>
-        {revealed ? `POT · ${formatUsd(vm.potValue)}` : 'ABRIENDO LOS PACKS…'}
+      {/* round header: machine thumbnail + name + round indicator */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        {revealed && machine && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {machine.thumb && (
+              <img src={machine.thumb} alt="" style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: `1px solid ${COLORS.border}` }} />
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+              <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 13, color: COLORS.text }}>{machine.name}</span>
+              {maxRounds > 1 && (
+                <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.12em', color: COLORS.muted }}>
+                  RONDA {Math.min(round + 1, maxRounds)}/{maxRounds}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '0.14em', color: COLORS.muted }}>
+          {revealed ? `POT · ${formatUsd(vm.potValue)}` : 'ABRIENDO LOS PACKS…'}
+        </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
@@ -134,6 +156,6 @@ function faceDown(player: RevealPlayerVM, card: RevealCardVM | null): RevealCard
   return {
     wallet: player.wallet, isMe: player.isMe, nftAddress: null,
     rarity: card?.rarity ?? null, insuredValue: card?.insuredValue ?? null, autoSold: card?.autoSold ?? false,
-    grade: card?.grade ?? null, year: card?.year ?? null,
+    grade: card?.grade ?? null, year: card?.year ?? null, name: card?.name ?? null,
   }
 }

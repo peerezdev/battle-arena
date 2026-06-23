@@ -158,6 +158,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                 pull.grade = res.get("grade")
                 pull.rarity = res.get("rarity")
                 pull.year = res.get("year")
+                pull.name = res.get("name")
                 pull.auto_sold = bool(res.get("auto_sold"))
                 pull.buyback_amount = res.get("buyback_amount")
                 session.commit()

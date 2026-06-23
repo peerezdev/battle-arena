@@ -10,7 +10,7 @@ import { verifyBattle } from '../../../onchain/packBattleClient'
 
 const baseVm: RevealVM = {
   mode: 'royale', status: 'settled', winner: 'A', meWallet: 'A',
-  players: [], rounds: [], potValue: 160,
+  players: [], rounds: [], potValue: 160, machines: [],
 }
 
 describe('BattleResult', () => {

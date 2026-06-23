@@ -101,6 +101,7 @@ class BattlePull(Base):
     grade: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     rarity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     year: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     auto_sold: Mapped[bool] = mapped_column(Boolean, default=False)
     transferred: Mapped[bool] = mapped_column(Boolean, default=False)
     buyback_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

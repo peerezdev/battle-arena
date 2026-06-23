@@ -3,7 +3,7 @@ import type { Battle, BattleMode, BattleStatus, BattlePullInfo } from '../../../
 export interface RevealCardVM {
   wallet: string; isMe: boolean; nftAddress: string | null
   rarity: string | null; insuredValue: number | null; autoSold: boolean
-  grade: number | null; year: string | null
+  grade: number | null; year: string | null; name: string | null
 }
 export interface RevealRoundVM {
   roundNumber: number; eliminatedWallet: string | null; cards: RevealCardVM[]
@@ -16,6 +16,7 @@ export interface RevealPlayerVM {
 export interface RevealVM {
   mode: BattleMode; status: BattleStatus; winner: string | null; meWallet: string | null
   players: RevealPlayerVM[]; rounds: RevealRoundVM[]; potValue: number
+  machines: string[]   // machine_code per round (ordered); drives the per-round machine thumbnail
 }
 
 export function battleToReveal(battle: Battle, meWallet: string | null): RevealVM {
@@ -45,6 +46,7 @@ export function battleToReveal(battle: Battle, meWallet: string | null): RevealV
         autoSold: p.auto_sold,
         grade: p.grade,
         year: p.year,
+        name: p.name,
       })),
     }))
 
@@ -61,6 +63,7 @@ export function battleToReveal(battle: Battle, meWallet: string | null): RevealV
       autoSold: p.auto_sold,
       grade: p.grade,
       year: p.year,
+      name: p.name,
     })
     cardsByPlayer.set(p.player_wallet, arr)
   }
@@ -79,5 +82,10 @@ export function battleToReveal(battle: Battle, meWallet: string | null): RevealV
 
   const potValue = pulls.reduce((s, p) => s + (p.insured_value ?? 0), 0)
 
-  return { mode: battle.mode, status: battle.status, winner: battle.winner, meWallet, players, rounds, potValue }
+  // machine_code per round (ordered by sequence); legacy battles → a single-box bundle.
+  const machines: string[] = (battle.packs && battle.packs.length)
+    ? [...battle.packs].sort((a, b) => a.sequence - b.sequence).map((p) => p.machine_code)
+    : [battle.machine_code]
+
+  return { mode: battle.mode, status: battle.status, winner: battle.winner, meWallet, players, rounds, potValue, machines }
 }

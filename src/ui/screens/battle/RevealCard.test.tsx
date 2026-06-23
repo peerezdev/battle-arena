@@ -5,7 +5,7 @@ import { RARITY, COLORS } from '../../theme'
 
 const card = {
   wallet: 'A', isMe: true, nftAddress: 'nftA', rarity: 'Epic', insuredValue: 120, autoSold: false,
-  grade: 10, year: '2018',
+  grade: 10, year: '2018', name: 'Charizard',
 }
 
 describe('RevealCard', () => {

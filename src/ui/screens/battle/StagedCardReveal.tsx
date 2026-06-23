@@ -2,23 +2,29 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COLORS, FONTS, SHADOW } from '../../theme'
 import { rarityColor } from './RevealCard'
+import { CardBack } from './CardBack'
 
 type Stage = 'year' | 'grade' | 'rarity' | 'card'
 
-/** Gacha-style staged reveal: YEAR → GRADE → RARITY → CARD (only the stages that exist).
- *  Steps every `stepMs`; reduced-motion jumps straight to the card. Fires `onCardShown`
- *  once the card stage lands. The card itself is supplied via `children`. */
+/** Gacha-style staged reveal as a 3D flip card: during YEAR → GRADE → RARITY it shows the
+ *  card back (rarity-glow) with the stage text on top; on the card stage it flips (rotateY)
+ *  to the front (`children`). Reduced-motion shows the front immediately. `onCardShown` fires
+ *  once the card stage lands. */
 export function StagedCardReveal({
-  year, grade, rarity, reduced, stepMs = 1700, onCardShown, children,
+  year, grade, rarity, reduced, stepMs = 1700, width = 180, height = 252, onCardShown, children,
 }: {
   year: string | null
   grade: number | string | null
   rarity: string | null
   reduced: boolean
   stepMs?: number
+  width?: number
+  height?: number
   onCardShown?: () => void
   children: ReactNode
 }) {
+  const rc = rarityColor(rarity)
+
   const stages = useMemo<Stage[]>(() => {
     const s: Stage[] = []
     if (year) s.push('year')
@@ -46,31 +52,49 @@ export function StagedCardReveal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onCard])
 
-  if (onCard) return <>{children}</>
-
-  const rc = rarityColor(rarity)
-  const label = stage.toUpperCase()
-  const value = stage === 'year' ? year : stage === 'grade' ? grade : rarity
-  const valueColor = stage === 'rarity' ? rc : COLORS.text
-  const valueShadow = stage === 'rarity' ? SHADOW.glow(rc) : 'none'
+  const stageValue = stage === 'year' ? year : stage === 'grade' ? grade : rarity
 
   return (
-    <AnimatePresence mode="wait">
+    <div style={{ width, height, perspective: 1100 }}>
       <motion.div
-        key={stage}
-        initial={{ scale: 0.72, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 1.12, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-        style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, userSelect: 'none', minHeight: 252, justifyContent: 'center' }}
+        animate={{ rotateY: onCard ? 180 : 0 }}
+        transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 160, damping: 20 }}
+        style={{ position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d' }}
       >
-        <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: COLORS.muted }}>
-          {label}
+        {/* BACK — card back + the current stage text overlaid */}
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+          <CardBack width={width} height={height} accent={rc} />
+          {!onCard && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={stage}
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 1.1, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                  style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, userSelect: 'none' }}
+                >
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>{stage.toUpperCase()}</div>
+                  <div style={{
+                    fontFamily: FONTS.display, fontWeight: 900, fontSize: 36, lineHeight: 1,
+                    color: stage === 'rarity' ? rc : COLORS.text, textShadow: stage === 'rarity' ? SHADOW.glow(rc) : 'none',
+                  }}>
+                    {stageValue}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          )}
         </div>
-        <div style={{ fontFamily: FONTS.display, fontWeight: 900, fontSize: 42, color: valueColor, textShadow: valueShadow, lineHeight: 1 }}>
-          {value}
-        </div>
+
+        {/* FRONT — mounted only at the card stage; the flip reveals it */}
+        {onCard && (
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', display: 'flex', justifyContent: 'center' }}>
+            {children}
+          </div>
+        )}
       </motion.div>
-    </AnimatePresence>
+    </div>
   )
 }
