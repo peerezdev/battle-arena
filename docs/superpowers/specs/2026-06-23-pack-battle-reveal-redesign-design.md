@@ -113,3 +113,17 @@ Extract the gacha staged reveal (`RevealResult` in `GachaVault.tsx`, "year → g
 - `StagedCardReveal`: reduced-motion shows the card immediately + fires `onCardShown`; full sequence steps through present stages.
 - `PackReveal`: round advances when both players' cards land; counters reach per-player totals; winner highlight after last round.
 - Layout/animation timing not unit-testable in jsdom — verified via build + suite green + manual smoke-check.
+
+---
+
+## v3 — polish (approved)
+
+Builds on v2. Adds card name, machine thumbnail, round indicator, and a card-back→front 3D flip.
+
+- **Card name** — add a `name` column to `BattlePull` (store from `open_pack`, serialize in `get_battle`), `BattlePullInfo.name` / `RevealCardVM.name`; shown under each revealed card (truncated).
+- **Machine thumbnail** — `useMachines()` hook (fetch `/gacha/machines` once, cached) → `code → { name, thumb }`. `RevealVM.machines` carries the per-round `machine_code` (from `battle.packs` by sequence; fallback `[machine_code]`). Current round's machine thumbnail + name shown in the round header.
+- **Round indicator** — "RONDA r/N" in the header (driven by current `round` + `maxRounds`).
+- **Card back + flip** — `StagedCardReveal` becomes a 3D flip card: during YEAR/GRADE/RARITY it shows the **card back** (`CardBack`, rarity-glow) with the stage text overlaid; on the card stage it flips (rotateY, framer-motion) to the front (`RevealCard`). Reduced-motion shows the front immediately.
+- **General polish** — round header (thumb + name + round), per-card name, winner glow at the end, spacing/hierarchy. Royale unchanged.
+
+New files: `src/ui/useMachines.ts`, `src/ui/screens/battle/CardBack.tsx`.
