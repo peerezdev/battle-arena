@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
+import { useIsWide } from '../../useIsWide'
 import type { LiveBattle, BattleMode } from './hubMockData'
 
 type ModeTile = { mode: 'pack' | 'royale' | 'gacha' | 'mana'; icon: string; name: string; sub: string }
@@ -107,6 +108,8 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel }:
           alignItems: 'center',
           gap: 12,
           marginBottom: 14,
+          flexWrap: 'wrap',
+          rowGap: 8,
         }}
       >
         <span
@@ -203,6 +206,7 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel }:
 }
 
 function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void }) {
+  const narrow = !useIsWide('(min-width: 640px)')
   return (
     <div
       style={{
@@ -214,7 +218,8 @@ function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAc
         padding: '16px 20px',
         display: 'flex',
         alignItems: 'center',
-        gap: 20,
+        gap: narrow ? 10 : 20,
+        flexWrap: narrow ? 'wrap' : 'nowrap',
         marginBottom: 12,
         transition: 'border-color 0.12s',
       }}
@@ -226,7 +231,7 @@ function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAc
       }}
     >
       {/* Mode + title */}
-      <div style={{ minWidth: 140, display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ minWidth: narrow ? 0 : 140, flex: narrow ? '1 1 auto' : undefined, display: 'flex', flexDirection: 'column', gap: 5 }}>
         <div
           style={{
             fontFamily: FONTS.mono,
