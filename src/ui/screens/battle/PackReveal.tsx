@@ -10,6 +10,9 @@ import { useMachines } from '../../useMachines'
 import { useIsWide } from '../../useIsWide'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
+// How long a round's revealed cards stay on screen before the next round replaces them.
+const ROUND_HOLD_MS = 3000
+
 export function PackReveal({ vm, reducedMotion, onComplete }: {
   vm: RevealVM; reducedMotion: boolean; onComplete?: () => void
 }) {
@@ -36,7 +39,8 @@ export function PackReveal({ vm, reducedMotion, onComplete }: {
   useEffect(() => {
     if (!cardShown) return
     if (round < totalRounds - 1) {
-      const t = setTimeout(() => { setRound((r) => r + 1); setDoneCount(0) }, reducedMotion ? 0 : 700)
+      // hold the revealed round on screen before swapping in the next round's cards
+      const t = setTimeout(() => { setRound((r) => r + 1); setDoneCount(0) }, reducedMotion ? 0 : ROUND_HOLD_MS)
       return () => clearTimeout(t)
     }
     // last round shown — reveal the result once the battle has settled
