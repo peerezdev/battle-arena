@@ -58,7 +58,8 @@ export function AppShell() {
       style={{
         display: 'grid',
         gridTemplateColumns: gridCols,
-        height: '100vh',
+        gridTemplateRows: 'minmax(0, 1fr)', // cap the single row at the shell height so inner overflow:auto engages (instead of the auto row growing to content height and getting clipped)
+        height: '100dvh',
         background: COLORS.bg,
         position: 'relative',
         overflow: 'hidden',
@@ -72,7 +73,7 @@ export function AppShell() {
       )}
 
       {/* ── COLUMNA PRINCIPAL ─────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
         {/* Global topbar — brand + balance + auth + deposit + mute */}
         <header
           style={{
