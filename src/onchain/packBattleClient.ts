@@ -10,6 +10,7 @@ export interface BattlePullInfo {
   round_number: number; player_wallet: string; nft_address: string | null
   rarity: string | null; insured_value: number | null; auto_sold: boolean
   grade: number | null; year: string | null; name: string | null
+  buyback_amount: number | null   // USDC base units (×1e6) when a card was auto-sold
 }
 
 export interface Battle {

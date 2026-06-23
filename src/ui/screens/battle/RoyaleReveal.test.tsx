@@ -17,6 +17,7 @@ const vm: RevealVM = {
   ],
   potValue: 120,
   machines: ['m'],
+  buybackTotal: 0,
 }
 
 describe('RoyaleReveal', () => {
