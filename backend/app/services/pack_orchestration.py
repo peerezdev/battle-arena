@@ -102,6 +102,13 @@ async def seed_escrow(
     Uses Privy sign-only so the operator funds the escrow with gas lamports,
     then submits the signed transaction via our RPC node.
     """
+    # Fail with a clear message instead of a cryptic solders "String is the wrong size"
+    # from Pubkey.from_string("") when the operator wallet env vars are unset.
+    if not operator_address or not operator_wallet_id:
+        raise ValueError(
+            "operator wallet not configured — set PRIVY_OPERATOR_WALLET_ID and "
+            "PRIVY_OPERATOR_ADDRESS in backend/.env (the server wallet that funds escrow gas)"
+        )
     ix = transfer(TransferParams(
         from_pubkey=Pubkey.from_string(operator_address),
         to_pubkey=Pubkey.from_string(escrow_address),

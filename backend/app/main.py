@@ -642,6 +642,11 @@ def build_default_app() -> FastAPI:
     privy_signer = PrivySigner(app_id=s.privy_app_id, app_secret=s.privy_app_secret,
                                auth_key_pem=s.privy_auth_key, cluster_caip2=s.privy_solana_caip2,
                                quorum_id=s.privy_quorum_id) if s.privy_app_id else None
+    if privy_signer and not (s.privy_operator_wallet_id and s.privy_operator_address):
+        logger.warning(
+            "PRIVY_OPERATOR_WALLET_ID/PRIVY_OPERATOR_ADDRESS unset — Pack Battle/Royale will "
+            "void at settle (escrow gas can't be funded). Set them in backend/.env."
+        )
     return create_app(session_factory, chain, elo_start=s.elo_start, elo_k=s.elo_k,
                       cors_origins=s.cors_origins, gacha=gacha, privy=privy,
                       privy_signer=privy_signer,
