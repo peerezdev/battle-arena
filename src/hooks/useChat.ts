@@ -83,7 +83,8 @@ export function useChat(): {
               source: 'gacha',
               wallet: msg.wallet as string,
               username: (msg.username as string | null) ?? null,
-              ts: msg.ts as number,
+              // Backend emits ts in epoch SECONDS; the drops store + ago() use ms.
+              ts: (msg.ts as number) * 1000,
             })
           } else if (msg.type === 'error') {
             console.warn('[useChat] server error:', msg.error)
