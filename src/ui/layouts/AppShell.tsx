@@ -63,7 +63,7 @@ export function AppShell() {
         gridTemplateColumns: gridCols,
         gridTemplateRows: 'minmax(0, 1fr)', // cap the single row at the shell height so inner overflow:auto engages (instead of the auto row growing to content height and getting clipped)
         height: '100dvh',
-        background: COLORS.bg,
+        background: `radial-gradient(1100px 700px at 14% -8%,rgba(139,92,246,.16),transparent 60%),radial-gradient(900px 600px at 100% 8%,rgba(47,226,138,.10),transparent 55%),${COLORS.bg}`,
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -86,9 +86,9 @@ export function AppShell() {
             flexWrap: 'wrap',
             rowGap: 8,
             gap: 14,
-            padding: '10px 18px',
+            padding: '12px 18px',
             borderBottom: `1px solid ${COLORS.border}`,
-            background: '#0c1019',
+            background: 'transparent',
           }}
         >
           {/* Brand */}
@@ -96,10 +96,10 @@ export function AppShell() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 9,
               fontFamily: FONTS.display,
-              fontWeight: 800,
-              fontSize: 15,
+              fontWeight: 700,
+              fontSize: 19,
               letterSpacing: '-.01em',
             }}
           >
@@ -109,10 +109,10 @@ export function AppShell() {
                 height: 13,
                 borderRadius: 4,
                 background: GRADIENT,
-                boxShadow: '0 0 10px #9945FF88',
+                boxShadow: '0 0 10px #8b5cf688',
               }}
             />
-            BattleArena
+            <span>Collector <span style={{ color: COLORS.green }}>Arena</span></span>
           </div>
 
           {/* Spacer */}
@@ -138,7 +138,7 @@ export function AppShell() {
                 </span>
                 {reserved != null && reserved > 0 && (
                   <span style={{ fontSize: 9, color: COLORS.muted }}>
-                    · {formatUsd(reserved)} reservado
+                    · {formatUsd(reserved)} reserved
                   </span>
                 )}
               </div>
@@ -228,7 +228,7 @@ export function AppShell() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px #9945FF55',
+            boxShadow: '0 4px 16px #8b5cf655',
           }}
         >
           💬
