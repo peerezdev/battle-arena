@@ -80,7 +80,7 @@ export function Hub() {
             {actionError}
           </div>
         )}
-        <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} onCancel={onCancel} />
+        <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
       </div>
 
       <DelegationGate gate={gate} />

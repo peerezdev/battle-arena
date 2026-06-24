@@ -24,9 +24,10 @@ interface Props {
   onSelectMode: (mode: 'pack' | 'royale' | 'gacha' | 'mana') => void
   onBattleAction: (b: LiveBattle) => void
   onCancel?: (b: LiveBattle) => void
+  onOpen: (b: LiveBattle) => void
 }
 
-export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel }: Props) {
+export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, onOpen }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
 
   return (
@@ -199,13 +200,13 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel }:
 
       {/* (d) Battle rows */}
       {battles.map((b) => (
-        <BattleRow key={b.id} battle={b} onAction={onBattleAction} onCancel={onCancel} />
+        <BattleRow key={b.id} battle={b} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
       ))}
     </div>
   )
 }
 
-function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void }) {
+function BattleRow({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
   const narrow = !useIsWide('(min-width: 640px)')
   return (
     <div
@@ -222,7 +223,9 @@ function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAc
         flexWrap: narrow ? 'wrap' : 'nowrap',
         marginBottom: 12,
         transition: 'border-color 0.12s',
+        cursor: 'pointer',
       }}
+      onClick={() => onOpen(b)}
       onMouseEnter={(e) => {
         ;(e.currentTarget as HTMLDivElement).style.borderColor = '#ffffff22'
       }}
@@ -314,7 +317,7 @@ function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAc
 
         {b.action === 'watch' ? (
           <button
-            onClick={() => onAction(b)}
+            onClick={(e) => { e.stopPropagation(); onAction(b) }}
             style={{
               border: `1px solid ${COLORS.border}`,
               background: '#0c1019',
@@ -330,7 +333,7 @@ function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAc
           </button>
         ) : (
           <button
-            onClick={() => onAction(b)}
+            onClick={(e) => { e.stopPropagation(); onAction(b) }}
             style={{
               background: GRADIENT,
               color: '#06120c',
@@ -347,7 +350,7 @@ function BattleRow({ battle: b, onAction, onCancel }: { battle: LiveBattle; onAc
         )}
         {b.canCancel && onCancel && (
           <button
-            onClick={() => onCancel(b)}
+            onClick={(e) => { e.stopPropagation(); onCancel(b) }}
             style={{
               border: `1px solid ${COLORS.red}55`,
               background: 'transparent',

@@ -36,6 +36,7 @@ from .services.pack_orchestration import (
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc
 from .services.reservations import reserve, reserved_total, release_reservations
+from .services.bots import load_bots, pick_bot
 
 logger = logging.getLogger(__name__)
 
@@ -519,6 +520,44 @@ def create_app(session_factory, chain: ChainSource,
         reserve(s, wallet, battle_id, b.price)
         if filled:
             asyncio.create_task(_run_bg(battle_id))
+        return get_battle(s, battle_id)
+
+    @app.post("/pack-battles/{battle_id}/join-bot")
+    async def join_bot_pack_battle(battle_id: str, s: Session = Depends(db)):
+        """DEV/TEST: drop a random funded reserve bot into a lobby slot (no auth)."""
+        b = s.get(PackBattle, battle_id)
+        if b is None:
+            raise HTTPException(404, "no existe")
+        if b.status != "lobby":
+            raise HTTPException(409, "la batalla no está en lobby")
+        bots = load_bots()
+        if not bots:
+            raise HTTPException(409, "no hay bots configurados")
+        in_battle = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()}
+        buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
+        candidates = [bot for bot in bots if bot["address"] not in in_battle]
+        balances = {bot["address"]: await usdc_balance_base_units(solana_rpc_url, bot["address"], cc_usdc_mint)
+                    for bot in candidates}
+        bot = pick_bot(bots, in_battle, balances, buyin)
+        if bot is None:
+            raise HTTPException(409, "no hay bots libres con saldo suficiente")
+        bw, bid = bot["address"], bot["id"]
+        try:
+            if b.mode == "royale":
+                b2, filled = join_battle(s, battle_id, bw, bid)
+                blockhash = await fetch_latest_blockhash(solana_rpc_url)
+                await collect_buyin(solana_rpc_url, privy_signer, bid, bw,
+                                    privy_operator_wallet_id, privy_operator_address,
+                                    b2.escrow_address, cc_usdc_mint, buyin, blockhash)
+                if filled:
+                    asyncio.create_task(_run_royale_bg(battle_id))
+            else:
+                _b2, filled = join_battle(s, battle_id, bw, bid)
+                reserve(s, bw, battle_id, b.price)
+                if filled:
+                    asyncio.create_task(_run_bg(battle_id))
+        except LobbyError as e:
+            raise HTTPException(409, str(e))
         return get_battle(s, battle_id)
 
     @app.post("/pack-battles/{battle_id}/cancel")

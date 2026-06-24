@@ -34,6 +34,14 @@ describe('packBattleClient', () => {
     expect(f.mock.calls[1][0]).toBe(`${config.backendUrl}/pack-battles/b%201/cancel`)
   })
 
+  it('joinBot POSTs the join-bot path with NO auth header', async () => {
+    const f = mockFetch({ id: 'b1' }); vi.stubGlobal('fetch', f)
+    await client.joinBot('b1')
+    expect(f.mock.calls[0][0]).toBe(`${config.backendUrl}/pack-battles/b1/join-bot`)
+    expect(f.mock.calls[0][1].method).toBe('POST')
+    expect((f.mock.calls[0][1]?.headers ?? {}).Authorization).toBeUndefined()
+  })
+
   it('public reads send NO auth header', async () => {
     const f = mockFetch([]); vi.stubGlobal('fetch', f)
     await client.listOpenBattles()
