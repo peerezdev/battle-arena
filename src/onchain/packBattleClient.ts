@@ -26,6 +26,7 @@ export interface Battle {
 export interface OpenBattle {
   id: string; mode: BattleMode; machine_code: string; price: number
   max_players: number; players: number; buyin: number; creator_wallet: string | null
+  player_wallets: string[]
 }
 
 export interface VerifyRound { round_number: number; client_seed: string; eliminated_wallet: string; tie_break_index: number | null }

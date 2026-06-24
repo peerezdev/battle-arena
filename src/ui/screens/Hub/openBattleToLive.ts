@@ -25,5 +25,6 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
     costValue: b.buyin / BASE_UNITS, // convert base units → USD for display
     action: b.players < b.max_players ? 'join' : 'watch',
     canCancel: !!meWallet && b.creator_wallet === meWallet,
+    alreadyJoined: !!meWallet && (b.player_wallets ?? []).includes(meWallet),
   }
 }
