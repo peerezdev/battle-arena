@@ -136,7 +136,7 @@ export function BattleFlow() {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {battle.status === 'settled' && revealDone
           ? <BattleResult vm={vm} battleId={battle.id} onExit={exit} />
-          : <PackReveal vm={vm} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} />}
+          : <PackReveal vm={vm} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} onExit={exit} />}
       </div>
     )
   }

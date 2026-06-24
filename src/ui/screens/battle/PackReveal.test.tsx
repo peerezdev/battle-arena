@@ -31,7 +31,7 @@ describe('PackReveal', () => {
     renderR(<PackReveal vm={settled} reducedMotion />)
     expect(screen.getAllByRole('img')).toHaveLength(2)
     expect(screen.getByText('You')).toBeTruthy()             // self shown as "You" (no alias)
-    expect(await screen.findByText(/wins/i)).toBeTruthy()    // winner appears after the reveal completes
+    expect(await screen.findByText(/winner/i)).toBeTruthy()  // winner badge appears after the reveal completes
   })
 
   it('shows the card back (opening…) while a round’s pulls are unresolved', () => {
