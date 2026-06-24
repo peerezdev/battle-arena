@@ -13,3 +13,5 @@ onchain/test-ledger/
 
 # local/test sqlite db
 *.db
+.test_players.json
+backend/.test_players.json
