@@ -39,6 +39,10 @@ from .services.reservations import reserve, reserved_total, release_reservations
 
 logger = logging.getLogger(__name__)
 
+# Live Drops are broadcast to everyone with a delay so a drop never spoils the
+# opener's own reveal (the delay applies to the opener too).
+LIVE_DROP_DELAY_S = 30
+
 
 class AliasBody(BaseModel):
     alias: str = Field(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_]+$")
@@ -321,7 +325,28 @@ def create_app(session_factory, chain: ChainSource,
             pack.opened_at = datetime.now(timezone.utc)
             pack.nft_address = out["nft_address"]
             s.commit()
+            username = read_user_view(s, wallet, elo_start).get("alias")
+            drop = {
+                "type": "drop",
+                "id": out.get("nft_address"),
+                "wallet": wallet,
+                "username": username,
+                "name": out.get("name"),
+                "valueUsd": out.get("insured_value"),
+                "rarity": out.get("rarity"),
+                "image": out.get("image"),
+                "ts": int(_time.time()),
+            }
+            asyncio.create_task(_broadcast_drop_later(drop))
         return out
+
+    async def _broadcast_drop_later(drop: dict) -> None:
+        # Hold the drop so it never spoils the opener's own reveal.
+        try:
+            await asyncio.sleep(LIVE_DROP_DELAY_S)
+            await _chat_mgr.broadcast(drop)
+        except Exception:
+            logger.exception("live drop broadcast failed")
 
     @app.post("/gacha/yolo")
     async def gacha_yolo(body: YoloBody,

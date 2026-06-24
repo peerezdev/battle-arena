@@ -2,6 +2,14 @@ import { useState, useRef, useReducer, useEffect } from 'react'
 import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
 import { useChat } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
+import type { LiveDrop } from '../../drops/dropsStore'
+
+// Opener label for a drop row: username if known, else a short wallet.
+function dropOpener(drop: LiveDrop): string {
+  if (drop.username) return drop.username
+  const w = drop.wallet ?? ''
+  return w.length > 8 ? `${w.slice(0, 4)}…${w.slice(-4)}` : (w || 'anon')
+}
 
 // Palette for coloring usernames deterministically
 const USER_COLORS = ['#b78cff', '#14F195', '#5ad1ff', '#ff6b6b', '#ffd166', '#f7c59f']
@@ -254,7 +262,7 @@ export function ChatDock({
                   )}
                 </div>
 
-                {/* Name + rarity */}
+                {/* Name + username + rarity */}
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div
                     style={{
@@ -267,6 +275,18 @@ export function ChatDock({
                     }}
                   >
                     {drop.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: userColor(drop.username ?? drop.wallet),
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {dropOpener(drop)}
                   </div>
                   <div style={{ fontSize: 9, color: COLORS.muted }}>{drop.rarity ?? ''}</div>
                 </div>

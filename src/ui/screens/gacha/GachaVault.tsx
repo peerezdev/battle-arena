@@ -22,23 +22,14 @@ import {
   type YoloPacksResponse,
 } from '../../../onchain/gachaClient'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
-import { addDrop } from '../../drops/dropsStore'
 import { useReducedMotion } from '../../useReducedMotion'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardPoolGrid } from './CardPoolGrid'
 
-function recordDrop(result: Extract<OpenPackResult, { pending: false }>): void {
-  addDrop({
-    id: result.nft_address,
-    name: result.name ?? 'Card',
-    valueUsd: result.insured_value,
-    rarity: result.rarity,
-    image: result.image,
-    source: 'gacha',
-    ts: Date.now(),
-  })
-}
+// Live Drops are no longer recorded locally on open — the backend broadcasts
+// each drop over the chat WebSocket after a delay, so the opener never sees
+// their own drop spoil the reveal. See ChatDock's WS `drop` handler.
 
 // Map capitalized rarity → RARITY color token (same as GachaScreen)
 const RARITY_COLOR: Record<string, string> = {
@@ -158,7 +149,6 @@ export default function GachaVault() {
         setPhase({ kind: 'pending', memo: pack.memo })
       } else {
         setPhase({ kind: 'result', result })
-        recordDrop(result)
       }
     } catch (e) {
       setOpenError(e instanceof Error ? e.message : String(e))
@@ -176,7 +166,6 @@ export default function GachaVault() {
         setPhase({ kind: 'pending', memo })
       } else {
         setPhase({ kind: 'result', result })
-        recordDrop(result)
       }
     } catch (e) {
       setOpenError(e instanceof Error ? e.message : String(e))
@@ -224,7 +213,7 @@ export default function GachaVault() {
       setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: submitted.length })
       try {
         const r = await pollOpenPack(() => openPack(identityToken, submitted[i]))
-        if (!r.pending) { results.push(r); recordDrop(r) }
+        if (!r.pending) { results.push(r) }
       } catch { /* skip */ }
     }
     if (results.length === 0) { setPhase({ kind: 'pending', memo: submitted[0] }); return }
