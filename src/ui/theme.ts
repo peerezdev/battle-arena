@@ -48,7 +48,8 @@ export const RARITY = {
 
 export function formatUsd(v: number): string {
   if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`
-  return `$${v}`
+  // Max 2 decimals, drop trailing zeros (avoids float noise like 159.10000000000002).
+  return `$${Math.round(v * 100) / 100}`
 }
 
 export const FONTS = {
