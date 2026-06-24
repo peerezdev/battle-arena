@@ -136,8 +136,8 @@ export function LeaderboardPage() {
                   gridTemplateColumns: '40px 1fr auto auto',
                   alignItems: 'center',
                   gap: 12,
-                  background: isMe ? 'linear-gradient(160deg,#14F19518,#9945FF10)' : COLORS.panel,
-                  border: `1px solid ${isMe ? '#14F19555' : COLORS.border}`,
+                  background: isMe ? 'linear-gradient(160deg,#2fe28a18,#8b5cf610)' : COLORS.panel,
+                  border: `1px solid ${isMe ? '#2fe28a55' : COLORS.border}`,
                   borderRadius: 12,
                   padding: '12px 16px',
                 }}

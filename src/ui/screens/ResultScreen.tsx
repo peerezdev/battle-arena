@@ -127,7 +127,7 @@ export function ResultScreen({ winnerLabel, onFeedback, celebrate = true }: Prop
             fontWeight: 800,
             cursor: 'pointer',
             letterSpacing: '.03em',
-            boxShadow: '0 0 12px #14F19555',
+            boxShadow: '0 0 12px #2fe28a55',
             minHeight: '52px',
           }}
         >

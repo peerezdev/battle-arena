@@ -58,7 +58,7 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
               transition: 'border-color 0.12s, transform 0.12s',
             }}
             onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#9945FF44'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#8b5cf644'
               ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
             }}
             onMouseLeave={(e) => {
@@ -125,9 +125,9 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
         </span>
         <span
           style={{
-            background: '#14F19518',
+            background: '#2fe28a18',
             color: COLORS.green,
-            border: '1px solid #14F19533',
+            border: '1px solid #2fe28a33',
             borderRadius: 20,
             fontFamily: FONTS.mono,
             fontSize: 11,
@@ -189,7 +189,7 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
               cursor: 'pointer',
               background:
                 activeFilter === i
-                  ? 'linear-gradient(90deg,#9945FF33,#14F19522)'
+                  ? 'linear-gradient(90deg,#8b5cf633,#2fe28a22)'
                   : 'transparent',
             }}
           >
@@ -212,7 +212,7 @@ function BattleRow({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBatt
     <div
       style={{
         background: b.live
-          ? `linear-gradient(90deg,#14F1950c,${COLORS.panel} 40%)`
+          ? `linear-gradient(90deg,#2fe28a0c,${COLORS.panel} 40%)`
           : COLORS.panel,
         border: `1px solid ${COLORS.border}`,
         borderRadius: 16,
@@ -252,7 +252,7 @@ function BattleRow({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBatt
               style={{
                 fontSize: 8.5,
                 color: COLORS.green,
-                border: '1px solid #14F19544',
+                border: '1px solid #2fe28a44',
                 borderRadius: 5,
                 padding: '1px 6px',
                 letterSpacing: '0.05em',

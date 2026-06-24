@@ -81,9 +81,9 @@ export function CreateBattleModal({ onClose, onCreated }: {
             <button key={m} onClick={() => setMode(m)}
               style={{ flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer',
                 fontWeight: 700, fontFamily: FONTS.display,
-                background: mode === m ? 'linear-gradient(90deg,#9945FF33,#14F19522)' : '#0c1019',
+                background: mode === m ? 'linear-gradient(90deg,#8b5cf633,#2fe28a22)' : '#0c1019',
                 color: mode === m ? COLORS.text : COLORS.muted,
-                border: `1px solid ${mode === m ? '#9945FF44' : COLORS.border}` }}>
+                border: `1px solid ${mode === m ? '#8b5cf644' : COLORS.border}` }}>
               {m === 'pack' ? 'Pack' : 'Royale'}
             </button>
           ))}

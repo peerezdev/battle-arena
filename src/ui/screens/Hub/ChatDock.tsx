@@ -12,7 +12,7 @@ function dropOpener(drop: LiveDrop): string {
 }
 
 // Palette for coloring usernames deterministically
-const USER_COLORS = ['#b78cff', '#14F195', '#5ad1ff', '#ff6b6b', '#ffd166', '#f7c59f']
+const USER_COLORS = ['#b78cff', '#2fe28a', '#5ad1ff', '#ff6b6b', '#ffd166', '#f7c59f']
 function userColor(user: string | null | undefined): string {
   const s = user || 'anon'
   let hash = 0
@@ -439,7 +439,7 @@ export function ChatDock({
                       width: 21,
                       height: 21,
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg,#9945FF,#14F195)',
+                      background: 'linear-gradient(135deg,#8b5cf6,#2fe28a)',
                       flexShrink: 0,
                     }}
                   />
@@ -512,7 +512,7 @@ export function ChatDock({
               width: 38,
               borderRadius: 10,
               border: 'none',
-              background: 'linear-gradient(135deg,#9945FF,#14F195)',
+              background: 'linear-gradient(135deg,#8b5cf6,#2fe28a)',
               color: '#06120c',
               cursor: canPost ? 'pointer' : 'not-allowed',
               opacity: canPost ? 1 : 0.5,

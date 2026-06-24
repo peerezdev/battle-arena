@@ -42,7 +42,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
           return (
             <div key={p.wallet} style={{
               border: `1px solid ${isWinner ? COLORS.green : COLORS.border}`, borderRadius: 14, padding: '12px 14px',
-              background: isWinner ? `linear-gradient(180deg,#14F1950c,${COLORS.panel})` : COLORS.panel,
+              background: isWinner ? `linear-gradient(180deg,#2fe28a0c,${COLORS.panel})` : COLORS.panel,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
                 <span

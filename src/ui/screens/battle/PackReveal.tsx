@@ -125,7 +125,7 @@ function PlayerColumn({ player, name, round, roundReady, shownRounds, isWinner, 
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: 12, flexShrink: 0,
         borderRadius: 16, border: `1px solid ${isWinner ? COLORS.green : COLORS.border}`,
-        background: isWinner ? `linear-gradient(180deg,#14F1950e,${COLORS.panel})` : COLORS.panel,
+        background: isWinner ? `linear-gradient(180deg,#2fe28a0e,${COLORS.panel})` : COLORS.panel,
         boxShadow: isWinner ? `0 0 22px ${COLORS.green}33` : 'none',
       }}>
         <div

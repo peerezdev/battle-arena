@@ -25,7 +25,7 @@ export function QuickMatch({
       style={{
         borderRadius: 20,
         padding: 1,
-        background: 'linear-gradient(120deg,#9945FF55,#14F19533,transparent 70%)',
+        background: 'linear-gradient(120deg,#8b5cf655,#2fe28a33,transparent 70%)',
         marginBottom: 26,
       }}
     >
@@ -104,12 +104,12 @@ export function QuickMatch({
                     fontFamily: FONTS.display,
                     fontWeight: 700,
                     fontSize: 13,
-                    border: `1px solid ${active ? '#14F19566' : COLORS.border}`,
+                    border: `1px solid ${active ? '#2fe28a66' : COLORS.border}`,
                     borderRadius: 10,
                     padding: '9px 15px',
                     cursor: 'pointer',
                     color: active ? COLORS.green : COLORS.muted,
-                    background: active ? '#14F19514' : 'transparent',
+                    background: active ? '#2fe28a14' : 'transparent',
                   }}
                 >
                   ${n}
