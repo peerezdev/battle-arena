@@ -19,6 +19,7 @@ async def run_royale(
     build_transfer_tx, submit_tx, prepare_escrow,
     price_base, now_fn,
     sleep_fn=None, max_attempts=20, delay=3.0, build_usdc_sweep_tx=None,
+    escrow_usdc_balance=None,
 ) -> str:
     """Run the royale loop; return 'settled' or 'voided'."""
     sleep_fn = sleep_fn or asyncio.sleep
@@ -46,6 +47,22 @@ async def run_royale(
     except Exception as exc:
         logger.warning("royale escrow seed failed %s: %s", battle.id, exc)
         return await _void(session, battle)
+
+    # Fail safe: the escrow must hold what the rounds will distribute (sum over rounds =
+    # price_base * (n(n+1)/2 - 1)). If a buy-in is missing, void cleanly NOW — after the SOL
+    # seed so the refund works — instead of draining the escrow and failing mid-distribute.
+    if escrow_usdc_balance is not None and len(players) > 1:
+        n = len(players)
+        expected = price_base * (n * (n + 1) // 2 - 1)
+        have = 0
+        for _ in range(max_attempts):  # tolerate confirmation lag before deciding it's short
+            have = await escrow_usdc_balance(esc["address"])
+            if have >= expected:
+                break
+            await sleep_fn(delay)
+        if have < expected:
+            logger.warning("royale %s underfunded escrow: have %s need %s — voiding", battle.id, have, expected)
+            return await _void(session, battle)
 
     remaining = list(players)
     accumulated = {w: 0.0 for w in players}

@@ -542,22 +542,37 @@ def create_app(session_factory, chain: ChainSource,
         if bot is None:
             raise HTTPException(409, "no hay bots libres con saldo suficiente")
         bw, bid = bot["address"], bot["id"]
-        try:
-            if b.mode == "royale":
-                b2, filled = join_battle(s, battle_id, bw, bid)
-                blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        if b.mode == "royale":
+            # Fund the escrow with the bot's buy-in BEFORE joining, so a joined royale bot is
+            # always backed (otherwise the escrow is short and the run fails mid-distribute).
+            blockhash = await fetch_latest_blockhash(solana_rpc_url)
+            try:
                 await collect_buyin(solana_rpc_url, privy_signer, bid, bw,
                                     privy_operator_wallet_id, privy_operator_address,
-                                    b2.escrow_address, cc_usdc_mint, buyin, blockhash)
-                if filled:
-                    asyncio.create_task(_run_royale_bg(battle_id))
-            else:
+                                    b.escrow_address, cc_usdc_mint, buyin, blockhash)
+            except Exception as exc:
+                raise HTTPException(502, f"no se pudo cobrar el buy-in del bot: {exc}")
+            try:
                 _b2, filled = join_battle(s, battle_id, bw, bid)
-                reserve(s, bw, battle_id, b.price)
-                if filled:
-                    asyncio.create_task(_run_bg(battle_id))
-        except LobbyError as e:
-            raise HTTPException(409, str(e))
+            except LobbyError as e:
+                # Joined too late — refund the buy-in we just collected so it isn't stuck.
+                try:
+                    bh2 = await fetch_latest_blockhash(solana_rpc_url)
+                    await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
+                                          b.escrow_address, bw, cc_usdc_mint, buyin, bh2)
+                except Exception:
+                    logger.warning("join-bot refund failed for %s in %s", bw, battle_id)
+                raise HTTPException(409, str(e))
+            if filled:
+                asyncio.create_task(_run_royale_bg(battle_id))
+        else:
+            try:
+                _b2, filled = join_battle(s, battle_id, bw, bid)
+            except LobbyError as e:
+                raise HTTPException(409, str(e))
+            reserve(s, bw, battle_id, b.price)
+            if filled:
+                asyncio.create_task(_run_bg(battle_id))
         return get_battle(s, battle_id)
 
     @app.post("/pack-battles/{battle_id}/cancel")

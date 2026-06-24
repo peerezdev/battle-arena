@@ -317,6 +317,7 @@ async def run_royale_live(
         distribute=distribute, confirm_usdc=confirm_usdc_cb, confirm_in_escrow=confirm_in_escrow,
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
         price_base=price_base, now_fn=now_fn, build_usdc_sweep_tx=build_usdc_sweep_tx,
+        escrow_usdc_balance=escrow_usdc_balance,
     )
     if result == "voided":
         await refund_royale_void(
