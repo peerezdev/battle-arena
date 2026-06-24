@@ -14,8 +14,10 @@ def read_user_view(session: Session, wallet: str, elo_start: int) -> dict:
     """Lectura sin efectos: devuelve el usuario si existe, o una vista por defecto (sin persistir)."""
     u = session.get(User, wallet)
     if u is None:
-        return {"wallet": wallet, "alias": None, "elo": elo_start, "games_played": 0}
-    return {"wallet": u.wallet, "alias": u.alias, "elo": u.elo, "games_played": u.games_played}
+        return {"wallet": wallet, "alias": None, "elo": elo_start, "games_played": 0,
+                "gimmighouls": 0, "referred_by": None}
+    return {"wallet": u.wallet, "alias": u.alias, "elo": u.elo, "games_played": u.games_played,
+            "gimmighouls": u.gimmighouls, "referred_by": u.referred_by}
 
 
 def get_or_create_user(session: Session, wallet: str, elo_start: int) -> User:
@@ -40,7 +42,9 @@ def set_alias(session: Session, wallet: str, alias: str) -> None:
 
 
 def leaderboard(session: Session, limit: int = 50) -> list[User]:
-    return list(session.scalars(select(User).order_by(desc(User.elo)).limit(limit)))
+    return list(session.scalars(
+        select(User).order_by(desc(User.gimmighouls), desc(User.elo)).limit(limit)
+    ))
 
 
 def history(session: Session, wallet: str) -> list[RatingHistory]:

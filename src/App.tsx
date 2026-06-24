@@ -9,6 +9,7 @@ import { RoyaleFlow } from './ui/flows/RoyaleFlow'
 import { OnchainFlow } from './ui/flows/OnchainFlow'
 import { BattleFlow } from './ui/flows/BattleFlow'
 import { ProfilePage } from './ui/screens/Profile/ProfilePage'
+import { LeaderboardPage } from './ui/screens/Leaderboard/LeaderboardPage'
 
 const GachaVault = lazy(() => import('./ui/screens/gacha/GachaVault'))
 
@@ -47,6 +48,7 @@ export default function App() {
           />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/:wallet" element={<ProfilePage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

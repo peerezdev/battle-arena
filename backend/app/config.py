@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     privy_solana_caip2: str = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"  # devnet default
     privy_quorum_id: str = ""
     cc_usdc_mint: str = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+    gimmighoul_per_usdc: float = 1.0  # 1 USDC = 1 Gimmighoul (loyalty points); env: GIMMIGHOUL_PER_USDC
     privy_operator_wallet_id: str = ""
     privy_operator_address: str = ""
     escrow_seed_lamports: int = 10_000_000
