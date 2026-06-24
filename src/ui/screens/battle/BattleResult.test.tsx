@@ -29,23 +29,23 @@ describe('BattleResult', () => {
 
   it('celebrates when I am the winner and shows the winner total', () => {
     render(<MemoryRouter><BattleResult vm={baseVm} battleId="b1" onExit={() => {}} /></MemoryRouter>)
-    expect(screen.getByText(/ganaste/i)).toBeTruthy()
+    expect(screen.getByText(/you won/i)).toBeTruthy()
     expect(screen.getAllByText('$160').length).toBeGreaterThan(0)   // winner total
   })
 
   it('says you lost (and Volver works) when the winner is not me', () => {
     const onExit = vi.fn()
     render(<MemoryRouter><BattleResult vm={{ ...baseVm, meWallet: 'B' }} battleId="b1" onExit={onExit} /></MemoryRouter>)
-    expect(screen.queryByText(/ganaste/i)).toBeNull()
-    expect(screen.getByText(/perdido/i)).toBeTruthy()
-    fireEvent.click(screen.getByText(/volver/i))
+    expect(screen.queryByText(/you won/i)).toBeNull()
+    expect(screen.getByText(/you lost/i)).toBeTruthy()
+    fireEvent.click(screen.getByText(/back/i))
     expect(onExit).toHaveBeenCalled()
   })
 
   it('opens the Provably-Fair verify panel', async () => {
     render(<MemoryRouter><BattleResult vm={baseVm} battleId="b1" onExit={() => {}} /></MemoryRouter>)
-    fireEvent.click(screen.getByText(/verificar/i))
-    expect(await screen.findByText(/verificación provably-fair/i)).toBeTruthy()
+    fireEvent.click(screen.getByText(/verify/i))
+    expect(await screen.findByText(/provably-fair verification/i)).toBeTruthy()
     expect(verifyBattle).toHaveBeenCalledWith('b1')
   })
 })

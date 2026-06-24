@@ -51,19 +51,19 @@ export function VerifyPanel({ battleId, onClose }: { battleId: string; onClose: 
     <div role="dialog" aria-modal="true" onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={panel}>
         <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 16, color: COLORS.text, marginBottom: 12 }}>
-          Verificación Provably-Fair
+          Provably-Fair verification
         </div>
 
-        {error && <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red }}>No se pudo cargar la verificación</div>}
-        {!error && !v && <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>Cargando…</div>}
+        {error && <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red }}>Could not load verification</div>}
+        {!error && !v && <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>Loading…</div>}
 
         {v && (
           <>
             <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14, marginBottom: 12, color: verdictColor }}>
-              {commit === 'ok' && '✓ Commit verificado'}
-              {commit === 'mismatch' && '✗ El hash no coincide'}
-              {commit === 'unrevealed' && '🔒 La semilla se revela al terminar la batalla'}
-              {commit === 'pending' && 'verificando…'}
+              {commit === 'ok' && '✓ Commit verified'}
+              {commit === 'mismatch' && '✗ Hash mismatch'}
+              {commit === 'unrevealed' && '🔒 Seed revealed when the battle ends'}
+              {commit === 'pending' && 'verifying…'}
               {commit === 'na' && '—'}
             </div>
 
@@ -74,7 +74,7 @@ export function VerifyPanel({ battleId, onClose }: { battleId: string; onClose: 
               <div style={{ marginTop: 8 }}>
                 {(v.rounds ?? []).map((r) => (
                   <div key={r.round_number} style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginBottom: 6, wordBreak: 'break-all' }}>
-                    Ronda {r.round_number} · eliminado {shortWallet(r.eliminated_wallet)} · tie {r.tie_break_index ?? '—'}
+                    Round {r.round_number} · eliminated {shortWallet(r.eliminated_wallet)} · tie {r.tie_break_index ?? '—'}
                     <div>client_seed: {r.client_seed}</div>
                   </div>
                 ))}
@@ -87,14 +87,14 @@ export function VerifyPanel({ battleId, onClose }: { battleId: string; onClose: 
             )}
 
             <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.5, marginTop: 12 }}>
-              El operador se comprometió a <b>server_seed_hash</b> antes de la batalla. Al revelar el
-              <b> server_seed</b> y comprobar que su SHA-256 coincide con ese hash, se prueba que la semilla no
-              se cambió. Los <b>client_seed</b>/<b>tie_break_index</b> por ronda son los sorteos registrados.
+              The operator committed to <b>server_seed_hash</b> before the battle. Revealing the
+              <b> server_seed</b> and checking that its SHA-256 matches that hash proves the seed
+              wasn't changed. The per-round <b>client_seed</b>/<b>tie_break_index</b> are the recorded draws.
             </div>
           </>
         )}
 
-        <button onClick={onClose} style={closeBtn}>Volver</button>
+        <button onClick={onClose} style={closeBtn}>Back</button>
       </div>
     </div>
   )

@@ -104,7 +104,7 @@ export function PackReveal({ vm, reducedMotion, onComplete }: {
 }
 
 function displayName(p: RevealPlayerVM, alias: string | null | undefined): string {
-  if (p.isMe) return alias ?? 'Tú'
+  if (p.isMe) return alias ?? 'You'
   return alias ?? shortWallet(p.wallet)
 }
 
@@ -155,7 +155,7 @@ function PlayerColumn({ player, name, round, roundReady, shownRounds, isWinner, 
               <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
             </StagedCardReveal>
           ) : (
-            <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="abriendo…" />
+            <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="opening…" />
           )}
         </div>
 
@@ -164,7 +164,7 @@ function PlayerColumn({ player, name, round, roundReady, shownRounds, isWinner, 
         </div>
 
         {isWinner && (
-          <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 12, color: COLORS.green }}>🏆 Gana</div>
+          <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 12, color: COLORS.green }}>🏆 Wins</div>
         )}
       </div>
     </>

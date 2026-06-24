@@ -37,7 +37,7 @@ export function RevealCard({ card, reducedMotion, size = 'sm', w, h }: {
         alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 6,
       }}>
         <span style={{ fontSize: big ? 46 : 26, opacity: reducedMotion ? 1 : 0.8 }}>🂠</span>
-        <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted }}>abriendo…</span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted }}>opening…</span>
       </div>
     )
   }

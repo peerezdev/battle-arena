@@ -60,9 +60,9 @@ export function BattleFlow() {
   if (!battle) {
     return <Centered>
       <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
-        {error ? 'No se pudo cargar la batalla' : 'Cargando batalla…'}
+        {error ? 'Could not load the battle' : 'Loading battle…'}
       </div>
-      {error && <button onClick={exit} style={backBtn}>Volver</button>}
+      {error && <button onClick={exit} style={backBtn}>Back</button>}
     </Centered>
   }
 
@@ -71,7 +71,7 @@ export function BattleFlow() {
     const slots = Array.from({ length: battle.max_players }, (_, i) => battle.players[i] ?? null)
     return (
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 20 }}>Esperando jugadores</div>
+        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 20 }}>Waiting for players</div>
         <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
           {battle.players.length}/{battle.max_players} · {battle.mode.toUpperCase()}
         </div>
@@ -88,15 +88,15 @@ export function BattleFlow() {
                       fontFamily: FONTS.display, fontWeight: 900, fontSize: 16, border: `2px solid ${accent}`,
                       color: accent, boxShadow: `0 0 14px ${accent}66`,
                     }}>
-                      {isMe ? 'TÚ' : p.wallet.slice(0, 2)}
+                      {isMe ? 'YOU' : p.wallet.slice(0, 2)}
                     </div>
                     <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: isMe ? COLORS.green : COLORS.muted }}>
-                      {isMe ? 'Tú' : shortWallet(p.wallet)}
+                      {isMe ? 'You' : shortWallet(p.wallet)}
                     </div>
                   </>
                 ) : (
                   <>
-                    <CardBack width={92} height={128} accent={COLORS.border} label="vacío" />
+                    <CardBack width={92} height={128} accent={COLORS.border} label="empty" />
                     <button onClick={onJoinBot} disabled={joiningBot} style={joinBotBtn}>
                       {joiningBot ? '…' : '+ Join Bot'}
                     </button>
@@ -109,11 +109,11 @@ export function BattleFlow() {
         {botError && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>{botError}</div>}
         {isCreator && (
           <button onClick={onCancelLobby} style={{ ...backBtn, borderColor: `${COLORS.red}55`, color: COLORS.red }}>
-            Cancelar lobby
+            Cancel lobby
           </button>
         )}
         {cancelError && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>{cancelError}</div>}
-        <button onClick={exit} style={backBtn}>Volver</button>
+        <button onClick={exit} style={backBtn}>Back</button>
       </div>
     )
   }
@@ -121,9 +121,9 @@ export function BattleFlow() {
   if (battle.status === 'voided' || battle.status === 'cancelled') {
     return <Centered>
       <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 18 }}>
-        {battle.status === 'voided' ? 'Batalla anulada — reembolsado' : 'Lobby cancelado'}
+        {battle.status === 'voided' ? 'Battle voided — refunded' : 'Lobby cancelled'}
       </div>
-      <button onClick={exit} style={backBtn}>Volver</button>
+      <button onClick={exit} style={backBtn}>Back</button>
     </Centered>
   }
 

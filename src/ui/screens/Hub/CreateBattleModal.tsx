@@ -72,7 +72,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
         style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`,
           borderRadius: 14, padding: 22, maxWidth: 420, width: '100%' }}>
         <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 17, color: COLORS.text, marginBottom: 14 }}>
-          Crear batalla
+          Create battle
         </div>
 
         {/* Mode toggle */}
@@ -92,7 +92,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
         {mode === 'pack' ? (
           /* Bundle builder */
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 11, color: COLORS.muted }}>Cajas del bundle (máx {MAX_BOXES})</label>
+            <label style={{ fontSize: 11, color: COLORS.muted }}>Bundle boxes (max {MAX_BOXES})</label>
             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
               {machines.filter((m) => m.available !== false).map((m) => {
                 const n = counts[m.code] ?? 0
@@ -109,7 +109,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
               })}
             </div>
             <div style={{ marginTop: 8, fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>
-              {boxes}/{MAX_BOXES} cajas · {formatUsd(costUsd)} total
+              {boxes}/{MAX_BOXES} boxes · {formatUsd(costUsd)} total
             </div>
           </div>
         ) : (
@@ -128,7 +128,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
 
         {/* Player count */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: COLORS.muted }}>Jugadores</label>
+          <label style={{ fontSize: 11, color: COLORS.muted }}>Players</label>
           <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
             {PLAYER_COUNTS.map((nn) => (
               <button key={nn} onClick={() => setPlayers(nn)}
@@ -152,13 +152,13 @@ export function CreateBattleModal({ onClose, onCreated }: {
           <button onClick={onClose} disabled={busy}
             style={{ background: 'transparent', color: COLORS.muted, border: `1px solid ${COLORS.border}`,
               borderRadius: 10, padding: '10px 16px', fontWeight: 600, cursor: 'pointer' }}>
-            Cancelar
+            Cancel
           </button>
           <button onClick={submit} disabled={createDisabled}
             style={{ background: busy ? COLORS.panel2 : COLORS.green, color: busy ? COLORS.muted : '#03110a',
               border: 'none', borderRadius: 10, padding: '10px 18px', fontWeight: 800,
               fontFamily: FONTS.display, cursor: busy ? 'wait' : 'pointer' }}>
-            {busy ? 'Creando…' : 'Crear'}
+            {busy ? 'Creating…' : 'Create'}
           </button>
         </div>
       </div>

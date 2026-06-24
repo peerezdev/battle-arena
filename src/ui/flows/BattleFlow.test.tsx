@@ -27,32 +27,32 @@ describe('BattleFlow', () => {
   it('shows the waiting room in lobby', () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'lobby', pulls: [] }, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/esperando/i)).toBeTruthy()
+    expect(screen.getByText(/waiting/i)).toBeTruthy()
   })
 
   it('renders the royale reveal while running', () => {
     mockUseBattle.mockReturnValue({ battle: royaleRunning, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/Ronda 1/i)).toBeTruthy()
+    expect(screen.getByText(/Round 1/i)).toBeTruthy()
   })
 
   it('shows the result once settled', () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'settled', winner: 'A' }, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/ganaste/i)).toBeTruthy()
+    expect(screen.getByText(/you won/i)).toBeTruthy()
   })
 
   it('shows the voided message', () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'voided' }, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/anulad/i)).toBeTruthy()
+    expect(screen.getByText(/voided/i)).toBeTruthy()
   })
 
   it('shows error message and Volver button when battle cannot load', () => {
     mockUseBattle.mockReturnValue({ battle: null, error: 'no existe', loading: false })
     render(<BattleFlow />)
-    expect(screen.getByText(/No se pudo cargar la batalla/i)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /volver/i })).toBeTruthy()
+    expect(screen.getByText(/could not load/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /back/i })).toBeTruthy()
   })
 
   it('lets the creator cancel from the lobby waiting room', () => {
@@ -61,7 +61,7 @@ describe('BattleFlow', () => {
       loading: false, error: null,
     })
     render(<BattleFlow />)
-    const btn = screen.getByText(/cancelar lobby/i)
+    const btn = screen.getByText(/cancel lobby/i)
     fireEvent.click(btn)
     expect(cancelBattle).toHaveBeenCalledWith('tok', 'b1')
   })
@@ -72,6 +72,6 @@ describe('BattleFlow', () => {
       loading: false, error: null,
     })
     render(<BattleFlow />)
-    expect(screen.queryByText(/cancelar lobby/i)).toBeNull()
+    expect(screen.queryByText(/cancel lobby/i)).toBeNull()
   })
 })

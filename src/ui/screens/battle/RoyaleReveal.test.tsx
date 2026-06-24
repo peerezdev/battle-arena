@@ -24,8 +24,8 @@ describe('RoyaleReveal', () => {
   it('renders the round cards (resolved + pending) and marks the eliminated player', () => {
     render(<RoyaleReveal vm={vm} reducedMotion />)
     expect(screen.getByRole('img')).toBeTruthy()          // A's resolved card
-    expect(screen.getByText(/abriendo/i)).toBeTruthy()    // B's pending card
-    expect(screen.getByText(/Ronda 1/i)).toBeTruthy()
-    expect(screen.getAllByText(/eliminad/i).length).toBeGreaterThan(0)  // B marked out
+    expect(screen.getByText(/opening/i)).toBeTruthy()    // B's pending card
+    expect(screen.getByText(/Round 1/i)).toBeTruthy()
+    expect(screen.getAllByText(/eliminated/i).length).toBeGreaterThan(0)  // B marked out
   })
 })

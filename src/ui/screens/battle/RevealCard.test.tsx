@@ -12,7 +12,7 @@ describe('RevealCard', () => {
   it('shows a face-down opening state when the pull is pending', () => {
     render(<RevealCard card={{ ...card, nftAddress: null }} reducedMotion />)
     expect(screen.queryByRole('img')).toBeNull()
-    expect(screen.getByText(/abriendo/i)).toBeTruthy()
+    expect(screen.getByText(/opening/i)).toBeTruthy()
   })
 
   it('shows the card image (by mint) once resolved', () => {

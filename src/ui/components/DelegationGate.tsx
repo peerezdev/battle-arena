@@ -21,11 +21,11 @@ export function DelegationGate({ gate }: { gate: ReturnType<typeof useDelegation
         }}
       >
         <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 16, color: COLORS.text, marginBottom: 8 }}>
-          Habilitar firma de batalla
+          Enable battle signing
         </div>
         <div style={{ fontSize: 12.5, color: COLORS.muted, lineHeight: 1.5, marginBottom: 16 }}>
-          Para crear o unirte a una batalla, concede acceso de firma (session signer) para que las
-          tiradas se ejecuten en el servidor sin pop-ups. Puedes revocarlo cuando quieras en Privy.
+          To create or join a battle, grant signing access (session signer) so pulls run on the
+          server without pop-ups. You can revoke it anytime in Privy.
         </div>
         {gate.error && (
           <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, marginBottom: 12, wordBreak: 'break-word' }}>
@@ -42,7 +42,7 @@ export function DelegationGate({ gate }: { gate: ReturnType<typeof useDelegation
               padding: '10px 16px', fontWeight: 600, cursor: 'pointer',
             }}
           >
-            Cancelar
+            Cancel
           </button>
           <button
             onClick={() => void gate.confirm()}
@@ -55,7 +55,7 @@ export function DelegationGate({ gate }: { gate: ReturnType<typeof useDelegation
               cursor: gate.busy ? 'wait' : 'pointer',
             }}
           >
-            {gate.busy ? 'Concediendo…' : 'Habilitar'}
+            {gate.busy ? 'Granting…' : 'Enable'}
           </button>
         </div>
       </div>

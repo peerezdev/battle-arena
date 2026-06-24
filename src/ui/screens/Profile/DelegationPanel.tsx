@@ -14,7 +14,7 @@ export function DelegationPanel() {
     setStatus('')
     try {
       await enable()
-      setStatus('✓ Acceso de firma concedido (session signer añadido).')
+      setStatus('✓ Signing access granted (session signer added).')
     } catch (e) {
       setStatus('ERROR: ' + (e instanceof Error ? `${e.name}: ${e.message}` : String(e)))
     } finally {
@@ -28,10 +28,10 @@ export function DelegationPanel() {
     <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 16, marginTop: 16 }}>
       <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14, color: COLORS.text, marginBottom: 6 }}>Pack Battle signing</div>
       <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 10, lineHeight: 1.5 }}>
-        Concede acceso de firma para que las batallas se ejecuten sin pop-ups. Puedes revocarlo cuando quieras en Privy.
+        Grant signing access so battles run without pop-ups. You can revoke it anytime in Privy.
       </div>
       {done ? (
-        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.green }}>✓ Habilitado</div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.green }}>✓ Enabled</div>
       ) : (
         <button
           onClick={() => void onEnable()}
@@ -53,7 +53,7 @@ export function DelegationPanel() {
               display: 'inline-block', animation: 'ba-spin 0.7s linear infinite',
             }} />
           )}
-          {busy ? 'Concediendo…' : 'Enable'}
+          {busy ? 'Granting…' : 'Enable'}
         </button>
       )}
       {status && (

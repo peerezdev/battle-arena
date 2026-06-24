@@ -36,7 +36,7 @@ export function Hub() {
 
   function onCancel(b: LiveBattle) {
     setActionError(null)
-    if (!identityToken) { setActionError('Inicia sesión para cancelar.'); return }
+    if (!identityToken) { setActionError('Sign in to cancel.'); return }
     cancelBattle(identityToken, b.id).catch((e) => {
       setActionError(e instanceof Error ? e.message : String(e))
     })
@@ -46,7 +46,7 @@ export function Hub() {
   function onBattleAction(b: LiveBattle) {
     setActionError(null)
     if (b.action === 'watch') { navigate('/play/battle/' + b.id); return }
-    if (!identityToken) { setActionError('Inicia sesión para unirte.'); return }
+    if (!identityToken) { setActionError('Sign in to join.'); return }
     gate.requireDelegation(async () => {
       try {
         await joinBattle(identityToken, b.id)
@@ -67,7 +67,7 @@ export function Hub() {
           <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 20,
             letterSpacing: '-0.01em', color: COLORS.text }}>Lobby</span>
           <span style={{ color: COLORS.muted, fontWeight: 500, fontSize: 13, marginLeft: 10 }}>
-            · {liveBattles.length} lobbies abiertos
+            · {liveBattles.length} open lobbies
           </span>
         </div>
       </div>

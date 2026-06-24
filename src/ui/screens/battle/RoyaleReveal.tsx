@@ -12,10 +12,10 @@ export function RoyaleReveal({ vm, reducedMotion }: { vm: RevealVM; reducedMotio
       {vm.rounds.map((round) => (
         <div key={round.roundNumber}>
           <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14, color: COLORS.text, marginBottom: 10 }}>
-            Ronda {round.roundNumber}
+            Round {round.roundNumber}
             {round.eliminatedWallet && (
               <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, marginLeft: 10 }}>
-                {shortWallet(round.eliminatedWallet)} eliminado
+                {shortWallet(round.eliminatedWallet)} eliminated
               </span>
             )}
           </div>
@@ -27,7 +27,7 @@ export function RoyaleReveal({ vm, reducedMotion }: { vm: RevealVM; reducedMotio
                 <div key={card.wallet} style={{ opacity: isElim ? 0.55 : 1, textAlign: 'center' }}>
                   <RevealCard card={card} reducedMotion={reducedMotion} />
                   <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: card.isMe ? COLORS.green : COLORS.muted, marginTop: 5 }}>
-                    {card.isMe ? 'tú' : shortWallet(card.wallet)}
+                    {card.isMe ? 'you' : shortWallet(card.wallet)}
                   </div>
                   {player && (
                     <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted }}>

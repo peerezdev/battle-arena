@@ -16,9 +16,9 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
   const iWon = vm.winner != null && vm.winner === vm.meWallet
   const winner = vm.players.find((p) => p.wallet === vm.winner)
 
-  const title = iWon ? '🏆 ¡Ganaste!' : iAmPlayer ? '💀 Has perdido' : 'Batalla terminada'
+  const title = iWon ? '🏆 You won!' : iAmPlayer ? '💀 You lost' : 'Battle over'
   const titleColor = iWon ? COLORS.green : iAmPlayer ? COLORS.red : COLORS.text
-  const name = (p: RevealPlayerVM) => (p.isMe ? aliases[p.wallet] ?? 'Tú' : aliases[p.wallet] ?? shortWallet(p.wallet))
+  const name = (p: RevealPlayerVM) => (p.isMe ? aliases[p.wallet] ?? 'You' : aliases[p.wallet] ?? shortWallet(p.wallet))
 
   return (
     <div style={{ padding: '20px 16px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
@@ -27,7 +27,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
       {winner && (
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.12em', color: COLORS.muted }}>
-            GANA {name(winner).toUpperCase()} · SE LLEVA
+            {name(winner).toUpperCase()} WINS · TAKES
           </div>
           <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 30, color: COLORS.green }}>
             {formatUsd(winner.total)}
@@ -47,7 +47,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
                 <span
                   onClick={() => navigate(`/profile/${p.wallet}`)}
-                  title="Ver perfil"
+                  title="View profile"
                   style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14, color: p.isMe ? COLORS.green : COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: `${COLORS.muted}66` }}>
                   {name(p)}{isWinner ? ' 🏆' : ''}
                 </span>
@@ -65,7 +65,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
 
       {vm.buybackTotal > 0 && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>
-          Total en buyback: <span style={{ color: COLORS.text, fontWeight: 700 }}>{formatUsd(vm.buybackTotal)}</span>
+          Buyback total: <span style={{ color: COLORS.text, fontWeight: 700 }}>{formatUsd(vm.buybackTotal)}</span>
         </div>
       )}
 
@@ -74,13 +74,13 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
           background: 'transparent', color: COLORS.muted, border: `1px solid ${COLORS.border}`,
           borderRadius: 10, padding: '10px 18px', fontWeight: 700, cursor: 'pointer',
         }}>
-          Verificar (Provably Fair)
+          Verify (Provably Fair)
         </button>
         <button onClick={onExit} style={{
           background: '#0c1019', color: COLORS.text, border: `1px solid ${COLORS.border}`,
           borderRadius: 10, padding: '10px 22px', fontWeight: 700, cursor: 'pointer',
         }}>
-          Volver
+          Back
         </button>
       </div>
       {verifyOpen && <VerifyPanel battleId={battleId} onClose={() => setVerifyOpen(false)} />}

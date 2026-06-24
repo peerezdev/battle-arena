@@ -30,11 +30,11 @@ describe('PackReveal', () => {
     // reduced-motion → the staged reveal jumps straight to the card, so both images render
     renderR(<PackReveal vm={settled} reducedMotion />)
     expect(screen.getAllByRole('img')).toHaveLength(2)
-    expect(screen.getByText('Tú')).toBeTruthy()              // self shown as "Tú" (no alias)
-    expect(await screen.findByText(/gana/i)).toBeTruthy()    // winner appears after the reveal completes
+    expect(screen.getByText('You')).toBeTruthy()             // self shown as "You" (no alias)
+    expect(await screen.findByText(/wins/i)).toBeTruthy()    // winner appears after the reveal completes
   })
 
-  it('shows the card back (abriendo…) while a round’s pulls are unresolved', () => {
+  it('shows the card back (opening…) while a round’s pulls are unresolved', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
     const pending: RevealVM = {
       ...settled, status: 'running', winner: null,
@@ -45,6 +45,6 @@ describe('PackReveal', () => {
     }
     renderR(<PackReveal vm={pending} reducedMotion />)
     expect(screen.queryAllByRole('img')).toHaveLength(0)     // no card fronts until the pulls resolve
-    expect(screen.getAllByText(/abriendo/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/opening/i).length).toBeGreaterThan(0)
   })
 })
