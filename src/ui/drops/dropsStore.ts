@@ -5,6 +5,8 @@ export interface LiveDrop {
   rarity: string | null
   image: string | null
   source: 'gacha' | 'pack' | 'royale'
+  wallet: string
+  username: string | null
   ts: number
 }
 

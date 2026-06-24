@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { config } from '../onchain/config'
+import { addDrop } from '../ui/drops/dropsStore'
 
 export interface ChatLine { user: string; text: string; ts: number }
 
@@ -70,6 +71,20 @@ export function useChat(): {
             ])
           } else if (msg.type === 'presence') {
             setOnline(msg.online as number)
+          } else if (msg.type === 'drop') {
+            // Global Live Drop broadcast by the backend (delayed ~30s so the
+            // opener never sees their own drop spoil the reveal).
+            addDrop({
+              id: (msg.id as string) ?? (msg.wallet as string) + ':' + (msg.ts as number),
+              name: (msg.name as string) ?? 'Card',
+              valueUsd: (msg.valueUsd as number | null) ?? null,
+              rarity: (msg.rarity as string | null) ?? null,
+              image: (msg.image as string | null) ?? null,
+              source: 'gacha',
+              wallet: msg.wallet as string,
+              username: (msg.username as string | null) ?? null,
+              ts: msg.ts as number,
+            })
           } else if (msg.type === 'error') {
             console.warn('[useChat] server error:', msg.error)
           }
