@@ -109,7 +109,7 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <span style={{ fontFamily: FONTS.display, fontSize: 19, fontWeight: 700, letterSpacing: '-.01em' }}>ROYALE</span>
+              <span style={{ fontFamily: FONTS.display, fontSize: 19, fontWeight: 700, letterSpacing: '-.01em' }}>ROYALE {Math.round(entry)}</span>
               {!settled && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,94,122,.12)', border: '1px solid rgba(255,94,122,.32)', fontFamily: FONTS.mono, fontSize: 11, color: '#ff8198' }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5e7a', boxShadow: '0 0 6px #ff5e7a' }} />LIVE
@@ -123,7 +123,9 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
         </div>
         <div style={{ flex: '1 1 220px', minWidth: 190 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.muted }}>{settled ? 'Battle complete' : 'Eliminating the lowest value…'}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.muted }}>
+              {settled ? 'Battle complete' : <>Eliminating the lowest value<span style={{ color: '#ff5e7a', animation: 'ba-dots 1.2s infinite' }}>.</span><span style={{ color: '#ff5e7a', animation: 'ba-dots 1.2s .2s infinite' }}>.</span><span style={{ color: '#ff5e7a', animation: 'ba-dots 1.2s .4s infinite' }}>.</span></>}
+            </span>
             <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>round <span style={{ color: COLORS.text, fontWeight: 700 }}>{Math.min(currentRound, totalRounds)}</span> / {totalRounds}</span>
           </div>
           <div style={{ height: 8, borderRadius: 8, background: '#ffffff10', overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
@@ -149,6 +151,8 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
           const leader = p.wallet === leaderWallet
           const atRisk = p.wallet === atRiskWallet
           const gold = rank === 1 && settled
+          const topCard = [...p.cards].sort((a, b) => (b.insuredValue ?? 0) - (a.insuredValue ?? 0))[0]
+          const year = topCard?.year ?? '—'
           return (
             <div key={p.wallet} style={{
               position: 'relative', borderRadius: 18, padding: 16, overflow: 'hidden',
@@ -183,6 +187,14 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
                     </div>
                     <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#6c7682', marginTop: 2 }}>{p.cards.length} cards</div>
                   </div>
+                </div>
+                {/* pack mini */}
+                <div style={{ position: 'relative', width: '100%', height: 128, borderRadius: 14, overflow: 'hidden', background: 'linear-gradient(165deg,#161b24,#0a0d13)', border: `1px solid ${COLORS.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                  <span style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(135deg,rgba(255,255,255,.04) 0 1px,transparent 1px 11px)', opacity: 0.7 }} />
+                  <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '34%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)', animation: 'ba-sweep 3.8s infinite' }} />
+                  <span style={{ position: 'relative', width: 42, height: 42, borderRadius: '50%', background: 'radial-gradient(circle at 35% 30%,#a98bff,#6a44e0 55%,#2fe28a)', boxShadow: '0 0 24px -6px rgba(139,92,246,.8),inset 0 2px 5px rgba(255,255,255,.35)', animation: 'ba-orb 4s ease-in-out infinite', marginBottom: 8 }} />
+                  <span style={{ position: 'relative', fontFamily: FONTS.display, fontSize: 26, fontWeight: 700, lineHeight: 1, letterSpacing: '-.02em', color: COLORS.text }}>{year}</span>
+                  <span style={{ position: 'relative', fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.36em', color: '#9aa4b2', marginTop: 4 }}>TCG</span>
                 </div>
                 {/* value + chips */}
                 <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>

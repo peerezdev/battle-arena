@@ -144,3 +144,5 @@ textarea::placeholder {
 @keyframes ba-float { 0%,100%{transform:rotate(var(--r)) translateY(0)} 50%{transform:rotate(var(--r)) translateY(-9px)} }
 @keyframes ba-glow { 0%,100%{box-shadow:0 0 0 1px rgba(139,92,246,.30),0 24px 80px -30px rgba(139,92,246,.55)} 50%{box-shadow:0 0 0 1px rgba(47,226,138,.30),0 24px 80px -28px rgba(47,226,138,.45)} }
 @keyframes ba-sweep { 0%{transform:translateX(-130%) skewX(-20deg)} 60%,100%{transform:translateX(320%) skewX(-20deg)} }
+@keyframes ba-orb { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-4px) scale(1.05)} }
+@keyframes ba-dots { 0%{opacity:.2} 50%{opacity:1} 100%{opacity:.2} }
