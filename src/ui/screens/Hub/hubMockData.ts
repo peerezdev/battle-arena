@@ -11,6 +11,7 @@ export interface LiveBattle {
   costLabel: string; costValue: number; action: 'watch' | 'join'
   canCancel?: boolean
   alreadyJoined?: boolean
+  entry: number; pot: number; slots: string; statusText: string; statusColor: string
 }
 export interface HubStat { value: string; label: string; gradient?: boolean }
 

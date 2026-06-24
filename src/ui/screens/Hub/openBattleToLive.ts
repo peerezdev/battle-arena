@@ -12,6 +12,13 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
   const shown = Math.min(b.players, MAX_AVATARS)
   const players = Array.from({ length: shown }, (_, i) => ({ violet: i % 2 === 1 }))
   const extra = b.players > MAX_AVATARS ? `+${b.players - MAX_AVATARS}` : undefined
+  const entry = b.buyin / BASE_UNITS // convert base units → USD for display
+  const full = b.players >= b.max_players
+  const status = full
+    ? { statusText: 'Live', statusColor: '#ff5e7a' }
+    : b.max_players > 2
+      ? { statusText: 'Filling', statusColor: '#f5b73d' }
+      : { statusText: 'Waiting for opponent', statusColor: '#2fe28a' }
   return {
     id: b.id,
     mode: b.mode,
@@ -22,9 +29,13 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
     extra,
     cards: b.mode === 'royale' ? ['🎴'] : ['🔥', '💧'],
     costLabel: b.mode === 'royale' ? 'ENTRY' : 'BUY-IN',
-    costValue: b.buyin / BASE_UNITS, // convert base units → USD for display
-    action: b.players < b.max_players ? 'join' : 'watch',
+    costValue: entry,
+    action: full ? 'watch' : 'join',
     canCancel: !!meWallet && b.creator_wallet === meWallet,
     alreadyJoined: !!meWallet && (b.player_wallets ?? []).includes(meWallet),
+    entry,
+    pot: entry * b.max_players,
+    slots: `${b.players}/${b.max_players}`,
+    ...status,
   }
 }

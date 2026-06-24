@@ -1,14 +1,25 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
-import { useIsWide } from '../../useIsWide'
 import type { LiveBattle, BattleMode } from './hubMockData'
 
-type ModeTile = { mode: 'pack' | 'royale' | 'gacha' | 'mana'; icon: string; name: string; sub: string }
+function Svg({ children }: { children: ReactNode }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
+  )
+}
+
+const SWORDS = <Svg><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" x2="19" y1="19" y2="13" /><line x1="16" x2="20" y1="16" y2="20" /><line x1="19" x2="21" y1="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" x2="9" y1="14" y2="18" /><line x1="7" x2="4" y1="17" y2="20" /><line x1="3" x2="5" y1="19" y2="21" /></Svg>
+const CROWN = <Svg><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></Svg>
+const BOX = <Svg><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></Svg>
+const TARGET = <Svg><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></Svg>
+
+type ModeTile = { mode: 'pack' | 'royale' | 'gacha' | 'mana'; icon: ReactNode; name: string; sub: string; accent: 'green' | 'purple' }
 const MODE_TILES: ModeTile[] = [
-  { mode: 'pack',   icon: '⚔️', name: 'Pack Battle',   sub: '1v1 · winner takes both' },
-  { mode: 'royale', icon: '👑', name: 'Battle Royale',  sub: '2–10 · last one wins' },
-  { mode: 'gacha',  icon: '🎰', name: 'Gacha',          sub: 'Open packs · pull & play' },
-  { mode: 'mana',   icon: '🎯', name: 'Mana Duel',      sub: 'Skill · value = edge' },
+  { mode: 'pack',   icon: SWORDS, name: 'Pack Battle',   sub: '1v1 · winner takes both',  accent: 'green' },
+  { mode: 'royale', icon: CROWN,  name: 'Battle Royale',  sub: '2–10 · last one wins',     accent: 'purple' },
+  { mode: 'gacha',  icon: BOX,    name: 'Gacha',          sub: 'Open packs · pull & play', accent: 'green' },
+  { mode: 'mana',   icon: TARGET, name: 'Mana Duel',      sub: 'Skill · value = edge',     accent: 'purple' },
 ]
 
 const MODE_LABEL: Record<BattleMode, string> = {
@@ -41,43 +52,52 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
           marginBottom: 28,
         }}
       >
-        {MODE_TILES.map((tile) => (
+        {MODE_TILES.map((tile) => {
+          const green = tile.accent === 'green'
+          const icoColor = green ? '#2fe28a' : '#a98bff'
+          const icoBg = green ? 'rgba(47,226,138,.12)' : 'rgba(139,92,246,.14)'
+          const icoBd = green ? 'rgba(47,226,138,.35)' : 'rgba(139,92,246,.4)'
+          const cardBg = green
+            ? 'linear-gradient(180deg,rgba(47,226,138,.06),rgba(255,255,255,.01))'
+            : 'linear-gradient(180deg,rgba(139,92,246,.07),rgba(255,255,255,.01))'
+          return (
           <button
             key={tile.mode}
             onClick={() => onSelectMode(tile.mode)}
             style={{
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               gap: 12,
-              background: COLORS.panel,
+              background: cardBg,
               border: `1px solid ${COLORS.border}`,
-              borderRadius: 14,
-              padding: '14px 16px',
+              borderRadius: 18,
+              padding: 18,
               cursor: 'pointer',
               textAlign: 'left',
               transition: 'border-color 0.12s, transform 0.12s',
             }}
             onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#8b5cf644'
-              ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = icoBd
+              ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-4px)'
             }}
             onMouseLeave={(e) => {
               ;(e.currentTarget as HTMLButtonElement).style.borderColor = COLORS.border
               ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'
             }}
           >
-            {/* icon box */}
+            {/* icon badge */}
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 11,
+                width: 46,
+                height: 46,
+                borderRadius: 13,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 19,
-                background: '#0c1019',
-                border: `1px solid ${COLORS.border}`,
+                color: icoColor,
+                background: icoBg,
+                border: `1px solid ${icoBd}`,
+                boxShadow: `0 0 22px -8px ${icoColor}`,
                 flexShrink: 0,
               }}
             >
@@ -87,19 +107,20 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
               <div
                 style={{
                   fontFamily: FONTS.display,
-                  fontSize: 13.5,
+                  fontSize: 16,
                   fontWeight: 700,
                   color: COLORS.text,
                 }}
               >
                 {tile.name}
               </div>
-              <div style={{ fontSize: 10, color: COLORS.muted, marginTop: 1 }}>
+              <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
                 {tile.sub}
               </div>
             </div>
           </button>
-        ))}
+          )
+        })}
       </div>
 
       {/* (b) Live battles header */}
@@ -198,175 +219,95 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
         ))}
       </div>
 
-      {/* (d) Battle rows */}
-      {battles.map((b) => (
-        <BattleRow key={b.id} battle={b} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
-      ))}
+      {/* (d) Battle cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
+        {battles.map((b) => (
+          <BattleCard key={b.id} battle={b} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
+        ))}
+      </div>
     </div>
   )
 }
 
-function BattleRow({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
-  const narrow = !useIsWide('(min-width: 640px)')
+function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
+  const purple = b.mode === 'royale' || b.mode === 'mana'
+  const modeColor = purple ? '#a98bff' : '#2fe28a'
+  const modeBg = purple ? 'rgba(139,92,246,.14)' : 'rgba(47,226,138,.12)'
+  const modeBd = purple ? 'rgba(139,92,246,.4)' : 'rgba(47,226,138,.35)'
   return (
     <div
-      style={{
-        background: b.live
-          ? `linear-gradient(90deg,#2fe28a0c,${COLORS.panel} 40%)`
-          : COLORS.panel,
-        border: `1px solid ${COLORS.border}`,
-        borderRadius: 16,
-        padding: '16px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: narrow ? 10 : 20,
-        flexWrap: narrow ? 'wrap' : 'nowrap',
-        marginBottom: 12,
-        transition: 'border-color 0.12s',
-        cursor: 'pointer',
-      }}
       onClick={() => onOpen(b)}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: 18,
+        padding: 18,
+        background: 'linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))',
+        border: `1px solid ${COLORS.border}`,
+        cursor: 'pointer',
+        transition: 'border-color 0.12s, transform 0.12s',
+      }}
       onMouseEnter={(e) => {
         ;(e.currentTarget as HTMLDivElement).style.borderColor = '#ffffff22'
+        ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'
       }}
       onMouseLeave={(e) => {
         ;(e.currentTarget as HTMLDivElement).style.borderColor = COLORS.border
+        ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'
       }}
     >
-      {/* Mode + title */}
-      <div style={{ minWidth: narrow ? 0 : 140, flex: narrow ? '1 1 auto' : undefined, display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <div
-          style={{
-            fontFamily: FONTS.mono,
-            fontSize: 10.5,
-            fontWeight: 700,
-            color: '#b78cff',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
+      {/* mode badge + status */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 11px', borderRadius: 8,
+          fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 500,
+          color: modeColor, background: modeBg, border: `1px solid ${modeBd}`,
+        }}>
           {MODE_LABEL[b.mode]}
-          {b.live && (
-            <span
-              style={{
-                fontSize: 8.5,
-                color: COLORS.green,
-                border: '1px solid #2fe28a44',
-                borderRadius: 5,
-                padding: '1px 6px',
-                letterSpacing: '0.05em',
-              }}
-            >
-              LIVE
-            </span>
-          )}
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: b.statusColor }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.statusColor, boxShadow: `0 0 6px ${b.statusColor}` }} />
+          {b.statusText}
+        </span>
+      </div>
+
+      {/* pot + entry */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.muted, letterSpacing: '.04em', marginBottom: 3 }}>POT</div>
+          <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 28, letterSpacing: '-.02em', color: COLORS.text }}>
+            {formatUsd(b.pot)}
+          </div>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>{b.title}</div>
-        <div style={{ fontSize: 10, color: COLORS.muted }}>{b.sub}</div>
-      </div>
-
-      {/* Players */}
-      <PlayerAvatars players={b.players} extra={b.extra} />
-
-      {/* Cards */}
-      <div style={{ display: 'flex', gap: 7 }}>
-        {b.cards.map((emoji, i) => (
-          <div
-            key={i}
-            style={{
-              width: 38,
-              height: 52,
-              borderRadius: 7,
-              background: 'linear-gradient(160deg,#1b2236,#11161f)',
-              border: `1px solid ${COLORS.border}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 15,
-            }}
-          >
-            {emoji}
-          </div>
-        ))}
-      </div>
-
-      {/* Cost + action */}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 20 }}>
         <div style={{ textAlign: 'right' }}>
-          <div
-            style={{
-              fontSize: 9,
-              color: COLORS.muted,
-              letterSpacing: '0.08em',
-            }}
-          >
-            {b.costLabel}
-          </div>
-          <div
-            style={{
-              fontFamily: FONTS.display,
-              fontWeight: 800,
-              fontSize: 18,
-              color: COLORS.green,
-            }}
-          >
-            {formatUsd(b.costValue)}
-          </div>
+          <div style={{ fontSize: 11, color: COLORS.muted, letterSpacing: '.04em', marginBottom: 3 }}>{b.costLabel}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.muted }}>{formatUsd(b.entry)}</div>
+        </div>
+      </div>
+
+      {/* players + action */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <PlayerAvatars players={b.players} extra={b.extra} />
+          <span style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>{b.slots}</span>
         </div>
 
         {b.action === 'watch' ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); onAction(b) }}
-            style={{
-              border: `1px solid ${COLORS.border}`,
-              background: '#0c1019',
-              color: COLORS.text,
-              borderRadius: 11,
-              padding: '11px 18px',
-              fontWeight: 600,
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          >
-            👁 Watch
+          <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
+            style={{ border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, borderRadius: 11, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>
+            Watch
+          </button>
+        ) : b.canCancel && onCancel ? (
+          <button onClick={(e) => { e.stopPropagation(); onCancel(b) }}
+            style={{ border: `1px solid ${COLORS.red}55`, background: 'transparent', color: COLORS.red, borderRadius: 11, padding: '9px 16px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
+            Cancel
           </button>
         ) : b.alreadyJoined ? (
-          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.muted, padding: '11px 0' }}>
-            You're in
-          </div>
+          <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted }}>You're in</span>
         ) : (
-          <button
-            onClick={(e) => { e.stopPropagation(); onAction(b) }}
-            style={{
-              background: GRADIENT,
-              color: '#06120c',
-              border: 'none',
-              borderRadius: 11,
-              padding: '11px 22px',
-              fontWeight: 800,
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
+            style={{ background: GRADIENT, color: '#06120c', border: 'none', borderRadius: 11, padding: '9px 18px', fontWeight: 800, fontSize: 13.5, cursor: 'pointer', boxShadow: '0 0 18px -6px rgba(47,226,138,.7)' }}>
             Join
-          </button>
-        )}
-        {b.canCancel && onCancel && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onCancel(b) }}
-            style={{
-              border: `1px solid ${COLORS.red}55`,
-              background: 'transparent',
-              color: COLORS.red,
-              borderRadius: 11,
-              padding: '11px 16px',
-              fontWeight: 700,
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
           </button>
         )}
       </div>
