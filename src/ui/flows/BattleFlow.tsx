@@ -7,7 +7,7 @@ import { cancelBattle, joinBot } from '../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
 import { useReducedMotion } from '../useReducedMotion'
 import { battleToReveal } from '../screens/battle/battleReveal'
-import { RoyaleReveal } from '../screens/battle/RoyaleReveal'
+import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { CardBack } from '../screens/battle/CardBack'
@@ -141,10 +141,13 @@ export function BattleFlow() {
     )
   }
 
-  // royale: full Battle Royale screen — round-by-round grid + result view (champion + standings)
+  // royale: round-by-round grid while running; once every round is done (settled) the
+  // separate result screen (champion + standings) replaces it — like the pack reveal.
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <RoyaleReveal vm={vm} reducedMotion={!!reduced} battleId={battle.id} onExit={exit} />
+      {battle.status === 'settled'
+        ? <RoyaleResult vm={vm} battleId={battle.id} onExit={exit} />
+        : <RoyaleReveal vm={vm} reducedMotion={!!reduced} />}
     </div>
   )
 }

@@ -24,64 +24,61 @@ const TINTS = ['linear-gradient(135deg,#a98bff,#6a44e0)', 'linear-gradient(135de
 const tintFor = (w: string) => TINTS[Math.abs([...w].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % TINTS.length]
 const medalColor = (r: number) => (r === 1 ? '#f5c542' : r === 2 ? '#c8d0da' : r === 3 ? '#e8964e' : COLORS.muted)
 
-export function RoyaleReveal({ vm, battleId, onExit }: {
-  vm: RevealVM; reducedMotion?: boolean; battleId?: string; onExit?: () => void
-}) {
-  const navigate = useNavigate()
-  const aliases = useAliases(vm.players.map((p) => p.wallet))
-  const settled = vm.status === 'settled'
-  const [view, setView] = useState<'round' | 'result'>(settled ? 'result' : 'round')
-  const [verifyOpen, setVerifyOpen] = useState(false)
+const TITLE = (
+  <h1 style={{ margin: 0, fontFamily: FONTS.display, fontSize: 'clamp(22px,3vw,30px)', fontWeight: 700, letterSpacing: '-.02em' }}>
+    Battle <span style={{ color: '#a98bff' }}>Royale</span>
+  </h1>
+)
+const screenStyle = { padding: '18px clamp(14px,2.4vw,28px) 28px', display: 'flex', flexDirection: 'column' as const, gap: 18 }
 
-  const name = (p: RevealPlayerVM) => (p.isMe ? aliases[p.wallet] ?? 'You' : aliases[p.wallet] ?? shortWallet(p.wallet))
-
+function useRanked(vm: RevealVM) {
   // Finish ranking: still-alive (eliminatedRound null) on top by value; eliminated below by when they went out.
-  const ranked = [...vm.players]
+  return [...vm.players]
     .sort((a, b) => ((b.eliminatedRound ?? 1e9) - (a.eliminatedRound ?? 1e9)) || (b.total - a.total))
     .map((p, i) => ({ p, rank: i + 1 }))
+}
+const nameOf = (aliases: Record<string, string | null>) => (p: RevealPlayerVM) =>
+  p.isMe ? aliases[p.wallet] ?? 'You' : aliases[p.wallet] ?? shortWallet(p.wallet)
+
+// Round-by-round view — shown while the royale is running.
+export function RoyaleReveal({ vm }: { vm: RevealVM; reducedMotion?: boolean }) {
+  const aliases = useAliases(vm.players.map((p) => p.wallet))
+  const settled = vm.status === 'settled'
+  const name = nameOf(aliases)
+  const ranked = useRanked(vm)
   const alive = ranked.filter((r) => r.p.eliminatedRound == null)
   const leaderWallet = !settled && alive.length ? alive[0].p.wallet : null
   const atRiskWallet = !settled && alive.length > 1 ? alive[alive.length - 1].p.wallet : null
-
   const entry = vm.players.length ? vm.potValue / vm.players.length : 0
-  const currentRound = vm.rounds.length
-  const totalRounds = Math.max(1, vm.players.length - 1)
 
   return (
-    <div style={{ padding: '18px clamp(14px,2.4vw,28px) 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {/* title + view tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontFamily: FONTS.display, fontSize: 'clamp(22px,3vw,30px)', fontWeight: 700, letterSpacing: '-.02em' }}>
-          Battle <span style={{ color: '#a98bff' }}>Royale</span>
-        </h1>
-        {settled && (
-          <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, background: '#ffffff08', border: `1px solid ${COLORS.border}` }}>
-            {([['round', 'Round by round'], ['result', 'Results']] as const).map(([k, label]) => (
-              <button key={k} onClick={() => setView(k)} style={{
-                position: 'relative', padding: '9px 18px', borderRadius: 9, border: 0, cursor: 'pointer',
-                fontFamily: FONTS.body, fontSize: 13.5, fontWeight: 600,
-                color: view === k ? COLORS.text : COLORS.muted,
-                background: view === k ? 'linear-gradient(180deg,rgba(47,226,138,.16),rgba(139,92,246,.12))' : 'transparent',
-                ...(view === k ? { boxShadow: `inset 0 0 0 1px rgba(47,226,138,.32)` } : {}),
-              }}>{label}</button>
-            ))}
-          </div>
-        )}
-      </div>
+    <div style={screenStyle}>
+      {TITLE}
+      <RoundView
+        vm={vm} name={name} ranked={ranked} alive={alive.length}
+        leaderWallet={leaderWallet} atRiskWallet={atRiskWallet} settled={settled}
+        entry={entry} currentRound={vm.rounds.length} totalRounds={Math.max(1, vm.players.length - 1)}
+      />
+    </div>
+  )
+}
 
-      {view === 'round' ? (
-        <RoundView
-          vm={vm} name={name} ranked={ranked} alive={alive.length}
-          leaderWallet={leaderWallet} atRiskWallet={atRiskWallet} settled={settled}
-          entry={entry} currentRound={currentRound} totalRounds={totalRounds}
-        />
-      ) : (
-        <ResultView
-          vm={vm} name={name} ranked={ranked} entry={entry}
-          onRematch={() => navigate('/play/royale')} onExit={onExit} onVerify={() => setVerifyOpen(true)}
-        />
-      )}
+// Separate result screen — shown once every round has finished (battle settled).
+export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?: string; onExit?: () => void }) {
+  const navigate = useNavigate()
+  const aliases = useAliases(vm.players.map((p) => p.wallet))
+  const [verifyOpen, setVerifyOpen] = useState(false)
+  const name = nameOf(aliases)
+  const ranked = useRanked(vm)
+  const entry = vm.players.length ? vm.potValue / vm.players.length : 0
 
+  return (
+    <div style={screenStyle}>
+      {TITLE}
+      <ResultView
+        vm={vm} name={name} ranked={ranked} entry={entry}
+        onRematch={() => navigate('/play/royale')} onExit={onExit} onVerify={() => setVerifyOpen(true)}
+      />
       {verifyOpen && battleId && <VerifyPanel battleId={battleId} onClose={() => setVerifyOpen(false)} />}
     </div>
   )
