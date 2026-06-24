@@ -34,7 +34,7 @@ from .services.pack_lobby import (
 from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
-from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc
+from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin
 from .services.reservations import reserve, reserved_total, release_reservations
 from .services.bots import load_bots, pick_bot
 
@@ -612,8 +612,10 @@ def create_app(session_factory, chain: ChainSource,
                 for _ in range(3):
                     try:
                         bh = await fetch_latest_blockhash(solana_rpc_url)
-                        await distribute_usdc(solana_rpc_url, privy_signer, escrow_wallet_id,
-                                              escrow_address, pw, cc_usdc_mint, buyin, bh)
+                        # operator pays the fee — the escrow has no SOL when cancelled pre-run
+                        await refund_buyin(solana_rpc_url, privy_signer, escrow_wallet_id, escrow_address,
+                                           privy_operator_wallet_id, privy_operator_address,
+                                           pw, cc_usdc_mint, buyin, bh)
                         break
                     except Exception as exc:
                         logger.warning("royale cancel refund retry for %s in %s: %s", pw, battle_id, exc)
