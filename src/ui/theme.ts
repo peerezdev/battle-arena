@@ -1,17 +1,17 @@
 // Shared "Crypto Platform" design tokens — UI only, no engine logic.
 export const COLORS = {
-  bg: '#0b0e14',
-  panel: '#161b24',
-  panel2: '#1b212c',
+  bg: '#06080b',
+  panel: '#11161f',
+  panel2: '#171d28',
   border: '#ffffff14',
-  muted: '#9aa3b2',
-  text: '#e9edf5',
-  green: '#14F195',    // jugador A / "tú"
-  violet: '#9945FF',   // jugador B / rival
-  red: '#ff5c72',      // SOLO peligro / derrota / eliminación
+  muted: '#8b95a3',
+  text: '#eef2f6',
+  green: '#2fe28a',    // player A / "you"
+  violet: '#8b5cf6',   // player B / opponent (accent purple)
+  red: '#ff5e7a',      // ONLY danger / loss / elimination
 } as const
 
-export const GRADIENT = 'linear-gradient(90deg,#9945FF,#14F195)'
+export const GRADIENT = 'linear-gradient(135deg,#8b5cf6,#2fe28a)'
 
 export const SHADOW = {
   panel: '0 8px 24px #00000055',
@@ -21,19 +21,19 @@ export const SHADOW = {
 export const player = {
   a: {
     color: COLORS.green,
-    glow: '0 0 8px #14F19566',
-    glowLg: '0 0 16px #14F19533',
-    gradient: 'linear-gradient(90deg,#0f2a1e,#0b0e14)',
-    borderColor: '#14F19555',
+    glow: '0 0 8px #2fe28a66',
+    glowLg: '0 0 16px #2fe28a33',
+    gradient: 'linear-gradient(90deg,#0f2a1e,#06080b)',
+    borderColor: '#2fe28a55',
     label: '🟢',
     sliderClass: 'slider-green',
   },
   b: {
     color: COLORS.violet,
-    glow: '0 0 8px #9945FF66',
-    glowLg: '0 0 16px #9945FF33',
-    gradient: 'linear-gradient(90deg,#1a1430,#0b0e14)',
-    borderColor: '#9945FF55',
+    glow: '0 0 8px #8b5cf666',
+    glowLg: '0 0 16px #8b5cf633',
+    gradient: 'linear-gradient(90deg,#1a1430,#06080b)',
+    borderColor: '#8b5cf655',
     label: '🟣',
     sliderClass: 'slider-violet',
   },
@@ -52,7 +52,7 @@ export function formatUsd(v: number): string {
 }
 
 export const FONTS = {
-  display: "'Sora', system-ui, sans-serif",
+  display: "'Space Grotesk', system-ui, sans-serif",
   mono: "'JetBrains Mono', 'Courier New', monospace",
-  body: "'Inter', system-ui, sans-serif",
+  body: "'Space Grotesk', system-ui, sans-serif",
 } as const
