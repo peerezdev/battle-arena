@@ -495,18 +495,28 @@ def create_app(session_factory, chain: ChainSource,
             # For royale, check that the player can cover the buy-in.
             buyin = royale_buyin(b.max_players, b.price)
             await _require_available(wallet, buyin, s)
+            # Collect the buy-in into the pre-created escrow BEFORE joining — single attempt.
+            # If the charge fails, the player is NOT joined and gets the error (toast).
+            blockhash = await fetch_latest_blockhash(solana_rpc_url)
+            try:
+                await collect_buyin(
+                    solana_rpc_url, privy_signer, wallet_id, wallet,
+                    privy_operator_wallet_id, privy_operator_address,
+                    b.escrow_address, cc_usdc_mint, buyin, blockhash,
+                )
+            except Exception as exc:
+                raise HTTPException(502, f"No se pudo cobrar el buy-in: {exc}")
             try:
                 b, filled = join_battle(s, battle_id, wallet, wallet_id)
             except LobbyError as e:
+                # Joined too late — refund the buy-in we just collected so it isn't stuck.
+                try:
+                    bh2 = await fetch_latest_blockhash(solana_rpc_url)
+                    await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
+                                          b.escrow_address, wallet, cc_usdc_mint, buyin, bh2)
+                except Exception:
+                    logger.warning("join refund failed for %s in %s", wallet, battle_id)
                 raise HTTPException(409, str(e))
-            # Collect the buy-in from the joining player into the pre-created escrow.
-            blockhash = await fetch_latest_blockhash(solana_rpc_url)
-            await collect_buyin(
-                solana_rpc_url, privy_signer,
-                wallet_id, wallet,
-                privy_operator_wallet_id, privy_operator_address,
-                b.escrow_address, cc_usdc_mint, buyin, blockhash,
-            )
             if filled:
                 asyncio.create_task(_run_royale_bg(battle_id))
             return get_battle(s, battle_id)
@@ -543,28 +553,16 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(409, "no hay bots libres con saldo suficiente")
         bw, bid = bot["address"], bot["id"]
         if b.mode == "royale":
-            # Fund the escrow with the bot's buy-in and CONFIRM it landed BEFORE joining, so a
-            # joined royale bot is always backed (handles confirmation lag, silent on-chain
-            # failures and concurrent joins). Otherwise the escrow is short and the run voids.
-            before = await usdc_balance_base_units(solana_rpc_url, b.escrow_address, cc_usdc_mint)
-            funded, last_err = False, None
-            for _ in range(3):
-                try:
-                    blockhash = await fetch_latest_blockhash(solana_rpc_url)
-                    await collect_buyin(solana_rpc_url, privy_signer, bid, bw,
-                                        privy_operator_wallet_id, privy_operator_address,
-                                        b.escrow_address, cc_usdc_mint, buyin, blockhash)
-                except Exception as exc:
-                    last_err = exc
-                for _ in range(8):  # poll until the escrow actually reflects the buy-in
-                    if await usdc_balance_base_units(solana_rpc_url, b.escrow_address, cc_usdc_mint) >= before + buyin:
-                        funded = True
-                        break
-                    await asyncio.sleep(1.5)
-                if funded:
-                    break
-            if not funded:
-                raise HTTPException(502, f"no se pudo cobrar/confirmar el buy-in del bot: {last_err}")
+            # Collect the bot's buy-in into the escrow BEFORE joining — single attempt. If the
+            # charge fails, the bot is NOT joined and the caller surfaces the error (toast):
+            # no silent unfunded joins, no double charge.
+            blockhash = await fetch_latest_blockhash(solana_rpc_url)
+            try:
+                await collect_buyin(solana_rpc_url, privy_signer, bid, bw,
+                                    privy_operator_wallet_id, privy_operator_address,
+                                    b.escrow_address, cc_usdc_mint, buyin, blockhash)
+            except Exception as exc:
+                raise HTTPException(502, f"No se pudo cobrar el buy-in del bot: {exc}")
             try:
                 _b2, filled = join_battle(s, battle_id, bw, bid)
             except LobbyError as e:

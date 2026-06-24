@@ -60,6 +60,7 @@ async def run_royale(
             if have >= expected:
                 break
             await sleep_fn(delay)
+        logger.info("royale %s funding check: have=%s expected=%s players=%s", battle.id, have, expected, n)
         if have < expected:
             logger.warning("royale %s underfunded escrow: have %s need %s — voiding", battle.id, have, expected)
             return await _void(session, battle)

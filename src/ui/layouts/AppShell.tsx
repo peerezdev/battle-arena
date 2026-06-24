@@ -12,6 +12,7 @@ import { LeftRail } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
+import { Toaster } from '../toast'
 
 const DOCK_KEY = 'ba.dockCollapsed'
 
@@ -215,6 +216,9 @@ export function AppShell() {
 
       {/* ── DEPOSIT MODAL ─────────────────────────────────────────────────── */}
       <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
+
+      {/* ── TOASTS ────────────────────────────────────────────────────────── */}
+      <Toaster />
 
       {/* ── CHAT DRAWER OVERLAY (tablet / móvil) ──────────────────────────── */}
       {!(wideRail && wideDock) && chatOpen && (

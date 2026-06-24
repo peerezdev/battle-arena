@@ -12,6 +12,7 @@ import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { CardBack } from '../screens/battle/CardBack'
 import { shortWallet } from '../screens/battle/RoyaleReveal'
+import { showToast } from '../toast'
 
 function Centered({ children }: { children: ReactNode }) {
   return (
@@ -48,7 +49,11 @@ export function BattleFlow() {
     setBotError(null)
     setJoiningBot(true)
     joinBot(battle.id)
-      .catch((e) => setBotError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => {
+        const m = e instanceof Error ? e.message : String(e)
+        setBotError(m)
+        showToast(m)
+      })
       .finally(() => setJoiningBot(false))
   }
 
