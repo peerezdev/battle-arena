@@ -73,6 +73,11 @@ export function cancelBattle(token: string, id: string): Promise<Battle> {
   })
 }
 
+/** DEV/TEST: drop a random funded reserve bot into a lobby slot (no auth). */
+export function joinBot(id: string): Promise<Battle> {
+  return battleFetch<Battle>(`/pack-battles/${encodeURIComponent(id)}/join-bot`, { method: 'POST' })
+}
+
 export function listOpenBattles(): Promise<OpenBattle[]> {
   return battleFetch<OpenBattle[]>('/pack-battles/open')
 }

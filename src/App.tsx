@@ -46,6 +46,7 @@ export default function App() {
             }
           />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/:wallet" element={<ProfilePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

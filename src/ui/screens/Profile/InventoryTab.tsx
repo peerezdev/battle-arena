@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { useCollectorCryptNfts, type OwnedCard } from '../../../inventory/useCollectorCryptNfts'
+import { usePublicInventory } from '../../../inventory/usePublicInventory'
 import { InventoryCardModal } from './InventoryCardModal'
 
 function CardTile({ card, onClick }: { card: OwnedCard; onClick: () => void }) {
@@ -49,7 +50,31 @@ function Section({ title, cards, onSelect }: { title: string; cards: OwnedCard[]
   )
 }
 
-export function InventoryTab() {
+/** Read-only inventory for another player's wallet (cards shown as 'connected' → no buyback). */
+function PublicInventory({ wallet }: { wallet: string }) {
+  const { cards, loading } = usePublicInventory(wallet)
+  const [selected, setSelected] = useState<OwnedCard | null>(null)
+  if (loading) {
+    return <div style={{ color: COLORS.muted, fontFamily: FONTS.body, fontSize: 14 }}>Loading cards…</div>
+  }
+  if (cards.length === 0) {
+    return <div style={{ color: COLORS.muted, fontFamily: FONTS.body, fontSize: 14 }}>No Collector Crypt cards in this wallet.</div>
+  }
+  const owned: OwnedCard[] = cards.map((c) => ({ ...c, source: 'connected' }))
+  return (
+    <div>
+      <Section title="INVENTORY" cards={owned} onSelect={setSelected} />
+      {selected && <InventoryCardModal card={selected} onClose={() => setSelected(null)} onSold={() => {}} />}
+    </div>
+  )
+}
+
+export function InventoryTab({ wallet }: { wallet?: string }) {
+  if (wallet) return <PublicInventory wallet={wallet} />
+  return <OwnInventory />
+}
+
+function OwnInventory() {
   const { cards, loading, refresh } = useCollectorCryptNfts()
   const [selected, setSelected] = useState<OwnedCard | null>(null)
   const embedded = cards.filter((c) => c.source === 'embedded')

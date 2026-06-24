@@ -7,6 +7,7 @@ now_fn) never block the event loop.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 from datetime import datetime, timezone
 
@@ -39,6 +40,16 @@ async def fetch_latest_blockhash(rpc_url: str) -> str:
         resp.raise_for_status()
         data = resp.json()
     return data["result"]["value"]["blockhash"]
+
+
+async def sol_balance(rpc_url: str, address: str) -> int:
+    """Owner's SOL balance in lamports (0 if the account does not exist yet)."""
+    payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [address]}
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(rpc_url, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+    return (data.get("result") or {}).get("value") or 0
 
 
 async def usdc_balance_base_units(
@@ -283,9 +294,16 @@ async def run_royale_live(
 
     async def prepare_escrow(esc_addr):
         bh = await fetch_latest_blockhash(rpc_url)
-        return await seed_escrow(
+        sig = await seed_escrow(
             rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, bh
         )
+        # Wait for the SOL seed to CONFIRM: the escrow is the fee-payer for the per-round USDC
+        # distributions, and an unconfirmed seed makes those fail with AccountNotFound.
+        for _ in range(20):
+            if await sol_balance(rpc_url, esc_addr) > 0:
+                break
+            await asyncio.sleep(1.5)
+        return sig
 
     async def build_usdc_sweep_tx(esc_addr, winner_addr):
         bal = await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
@@ -317,6 +335,7 @@ async def run_royale_live(
         distribute=distribute, confirm_usdc=confirm_usdc_cb, confirm_in_escrow=confirm_in_escrow,
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
         price_base=price_base, now_fn=now_fn, build_usdc_sweep_tx=build_usdc_sweep_tx,
+        escrow_usdc_balance=escrow_usdc_balance,
     )
     if result == "voided":
         await refund_royale_void(

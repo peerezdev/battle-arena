@@ -52,3 +52,14 @@ async def collect_buyin(rpc_url, signer, player_wallet_id, player_address, opera
     signed = await signer.sign_solana(player_wallet_id, tx)        # player authorizes the USDC move
     signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
     return await submit_signed_tx(rpc_url, signed)
+
+
+async def refund_buyin(rpc_url, signer, escrow_wallet_id, escrow_address, operator_wallet_id,
+                       operator_address, player_address, usdc_mint, amount, blockhash) -> str:
+    """Refund a buy-in escrow→player. 2-signer: escrow = USDC authority, operator = fee-payer
+    (the escrow may hold no SOL when a royale is cancelled before it ran/seeded)."""
+    tx = build_token_transfer(escrow_address, player_address, usdc_mint, blockhash,
+                              amount=amount, decimals=6, fee_payer=operator_address)
+    signed = await signer.sign_solana(escrow_wallet_id, tx)
+    signed = await signer.sign_solana(operator_wallet_id, signed)
+    return await submit_signed_tx(rpc_url, signed)

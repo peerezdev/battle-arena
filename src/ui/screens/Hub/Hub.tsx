@@ -6,6 +6,7 @@ import type { HubNav, LiveBattle } from './hubMockData'
 import { STAKE_OPTIONS } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
+import { showToast } from '../../toast'
 import { useOpenBattles } from '../../../onchain/useOpenBattles'
 import { openBattleToLive } from './openBattleToLive'
 import { joinBattle, cancelBattle } from '../../../onchain/packBattleClient'
@@ -51,7 +52,9 @@ export function Hub() {
         await joinBattle(identityToken, b.id)
         navigate('/play/battle/' + b.id)
       } catch (e) {
-        setActionError(e instanceof Error ? e.message : String(e))
+        const m = e instanceof Error ? e.message : String(e)
+        setActionError(m)
+        showToast(m)
       }
     })
   }
@@ -80,7 +83,7 @@ export function Hub() {
             {actionError}
           </div>
         )}
-        <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} onCancel={onCancel} />
+        <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
       </div>
 
       <DelegationGate gate={gate} />

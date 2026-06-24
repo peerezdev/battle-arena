@@ -569,14 +569,14 @@ def test_royale_cancel_refunds_buyins(monkeypatch):
     async def _bh(*args, **kwargs):
         return "11111111111111111111111111111111"
 
-    async def _distribute(rpc, signer, ewid, eaddr, player, mint, amount, bh):
+    async def _refund(rpc, signer, ewid, eaddr, opid, opaddr, player, mint, amount, bh):
         refunds.append((player, amount)); return "refund-sig"
 
     monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
     monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
     monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
     monkeypatch.setattr("app.main.collect_buyin", _collect)
-    monkeypatch.setattr("app.main.distribute_usdc", _distribute)
+    monkeypatch.setattr("app.main.refund_buyin", _refund)
 
     hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
     res = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 3, "mode": "royale"}, headers=hdrs_a)
