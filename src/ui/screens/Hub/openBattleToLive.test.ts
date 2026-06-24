@@ -6,6 +6,7 @@ import type { OpenBattle } from '../../../onchain/packBattleClient'
 const base: OpenBattle = {
   id: 'b1', mode: 'pack', machine_code: 'pokemon_50',
   price: 50_000_000, max_players: 2, players: 1, buyin: 50_000_000, creator_wallet: null,
+  player_wallets: [],
 }
 
 describe('openBattleToLive', () => {
@@ -42,5 +43,13 @@ describe('openBattleToLive', () => {
     expect(openBattleToLive(mine, 'ME').canCancel).toBe(true)
     expect(openBattleToLive(mine, 'OTHER').canCancel).toBe(false)
     expect(openBattleToLive(mine, null).canCancel).toBe(false)
+  })
+
+  it('sets alreadyJoined when meWallet is in the player_wallets list', () => {
+    const b = { ...base, player_wallets: ['WC', 'ME'] }
+    expect(openBattleToLive(b, 'ME').alreadyJoined).toBe(true)
+    expect(openBattleToLive(b, 'OTHER').alreadyJoined).toBe(false)
+    expect(openBattleToLive(b, null).alreadyJoined).toBe(false)
+    expect(openBattleToLive({ ...base }, 'ME').alreadyJoined).toBe(false)
   })
 })

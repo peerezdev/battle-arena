@@ -331,6 +331,10 @@ function BattleRow({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBatt
           >
             👁 Watch
           </button>
+        ) : b.alreadyJoined ? (
+          <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.muted, padding: '11px 0' }}>
+            Ya estás dentro
+          </div>
         ) : (
           <button
             onClick={(e) => { e.stopPropagation(); onAction(b) }}

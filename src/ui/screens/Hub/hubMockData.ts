@@ -10,6 +10,7 @@ export interface LiveBattle {
   players: { violet: boolean }[]; extra?: string; cards: string[]
   costLabel: string; costValue: number; action: 'watch' | 'join'
   canCancel?: boolean
+  alreadyJoined?: boolean
 }
 export interface HubStat { value: string; label: string; gradient?: boolean }
 

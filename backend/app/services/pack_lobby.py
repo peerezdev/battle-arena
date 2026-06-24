@@ -105,12 +105,13 @@ def _packs(session, battle_id):
 def list_open(session):
     out = []
     for b in session.query(PackBattle).filter_by(status="lobby").all():
-        players = session.query(BattlePlayer).filter_by(battle_id=b.id).count()
+        players = session.query(BattlePlayer).filter_by(battle_id=b.id).all()
         buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
         out.append({"id": b.id, "mode": b.mode, "machine_code": b.machine_code,
                     "price": b.price, "max_players": b.max_players,
-                    "players": players, "buyin": buyin,
-                    "creator_wallet": b.creator_wallet})
+                    "players": len(players), "buyin": buyin,
+                    "creator_wallet": b.creator_wallet,
+                    "player_wallets": [p.player_wallet for p in players]})
     return out
 
 

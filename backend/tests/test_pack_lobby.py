@@ -161,7 +161,8 @@ def test_list_open_includes_mode_and_buyin(session):
     assert by_mode["royale"]["buyin"] == royale_buyin(4, 50_000_000)
     # base shape preserved
     assert set(by_mode["pack"]) == {
-        "id", "mode", "machine_code", "price", "max_players", "players", "buyin", "creator_wallet"}
+        "id", "mode", "machine_code", "price", "max_players", "players", "buyin",
+        "creator_wallet", "player_wallets"}
 
 
 def test_list_open_includes_creator_wallet(session):
@@ -170,6 +171,16 @@ def test_list_open_includes_creator_wallet(session):
     row = list_open(session)[0]
     assert row["creator_wallet"] == "WC"
     assert "creator_wallet" in row
+
+
+def test_list_open_includes_player_wallets(session):
+    # a 3-seat royale so it stays in lobby after a second player joins
+    b = create_battle(session, "WC", "wid-c", machine_code="pokemon_50",
+                      price=50_000_000, max_players=3, mode="royale")
+    join_battle(session, b.id, "WB", "wid-b")
+    row = list_open(session)[0]
+    assert row["players"] == 2
+    assert set(row["player_wallets"]) == {"WC", "WB"}
 
 
 def test_create_battle_with_bundle_persists_packs_and_total(session):
