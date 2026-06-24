@@ -1,6 +1,7 @@
 import { COLORS, GRADIENT, FONTS } from '../../theme'
 import { MOCK_STATS, STAKE_OPTIONS, type HubStat } from './hubMockData'
 import { useIsWide } from '../../useIsWide'
+import { useReducedMotion } from '../../useReducedMotion'
 
 interface Props {
   stakes?: number[]
@@ -20,6 +21,7 @@ export function QuickMatch({
   stats = MOCK_STATS,
 }: Props) {
   const wide = useIsWide('(min-width: 620px)')
+  const reducedMotion = useReducedMotion()
   return (
     <div
       style={{
@@ -32,12 +34,13 @@ export function QuickMatch({
       <div
         style={{
           borderRadius: 19,
-          background: 'radial-gradient(120% 140% at 0% 0%,#1a1838,#0e1320 60%)',
+          background: 'linear-gradient(135deg,rgba(139,92,246,.16),rgba(13,17,22,.6) 42%,rgba(47,226,138,.10))',
           padding: '26px 16px',
           display: 'flex',
           flexDirection: wide ? 'row' : 'column',
           alignItems: wide ? 'center' : 'stretch',
           gap: wide ? 28 : 18,
+          animation: reducedMotion ? 'none' : 'ba-glow 7s ease-in-out infinite',
         }}
       >
         {/* Left: content */}
@@ -154,49 +157,62 @@ export function QuickMatch({
           </div>
         </div>
 
-        {/* Right: stats */}
+        {/* Right: VS visual + stats */}
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             gap: 22,
             paddingLeft: wide ? 24 : 0,
             paddingTop: wide ? undefined : 16,
             borderLeft: wide ? `1px solid ${COLORS.border}` : 'none',
             borderTop: wide ? undefined : `1px solid ${COLORS.border}`,
-            width: wide ? undefined : '100%',
+            width: wide ? 320 : '100%',
+            flexShrink: 0,
           }}
         >
-          {stats.map((s) => (
-            <div key={s.label}>
-              <div
-                style={{
-                  fontFamily: FONTS.display,
-                  fontWeight: 800,
-                  fontSize: 22,
-                  ...(s.gradient
-                    ? {
-                        background: GRADIENT,
-                        WebkitBackgroundClip: 'text',
-                        backgroundClip: 'text',
-                        color: 'transparent',
-                      }
-                    : { color: COLORS.text }),
-                }}
-              >
-                {s.value}
+          {/* VS visual — two floating cards + badge */}
+          <div style={{ position: 'relative', height: 196, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              ['--r' as string]: '-9deg', position: 'absolute', left: '15%', width: 116, height: 162, borderRadius: 15,
+              background: 'linear-gradient(160deg,#15351f,#0c2418)', border: '1px solid rgba(47,226,138,.45)',
+              boxShadow: '0 0 40px -12px rgba(47,226,138,.6),inset 0 1px 0 rgba(255,255,255,.12)',
+              transform: 'rotate(-9deg)', animation: reducedMotion ? 'none' : 'ba-float 5s ease-in-out infinite',
+            } as React.CSSProperties} />
+            <div style={{
+              ['--r' as string]: '9deg', position: 'absolute', right: '15%', width: 116, height: 162, borderRadius: 15,
+              background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(139,92,246,.5)',
+              boxShadow: '0 0 40px -12px rgba(139,92,246,.6),inset 0 1px 0 rgba(255,255,255,.12)',
+              transform: 'rotate(9deg)', animation: reducedMotion ? 'none' : 'ba-float 5s ease-in-out .6s infinite',
+            } as React.CSSProperties} />
+            <div style={{
+              position: 'relative', zIndex: 2, width: 56, height: 56, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: FONTS.mono, fontSize: 17, fontWeight: 700, color: '#fff', background: '#0b0f14',
+              border: '2px solid transparent', backgroundImage: `linear-gradient(#0b0f14,#0b0f14),${GRADIENT}`,
+              backgroundOrigin: 'border-box', backgroundClip: 'padding-box,border-box',
+              boxShadow: '0 0 30px -6px rgba(139,92,246,.7)',
+            }}>VS</div>
+          </div>
+
+          {/* Stats row */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            {stats.map((s) => (
+              <div key={s.label} style={{ flex: 1, padding: '12px 13px', borderRadius: 14, background: '#ffffff08', border: `1px solid ${COLORS.border}` }}>
+                <div
+                  style={{
+                    fontFamily: FONTS.display, fontWeight: 800, fontSize: 20,
+                    ...(s.gradient
+                      ? { background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }
+                      : { color: COLORS.text }),
+                  }}
+                >
+                  {s.value}
+                </div>
+                <div style={{ fontSize: 10.5, color: COLORS.muted, marginTop: 3 }}>{s.label}</div>
               </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: COLORS.muted,
-                  letterSpacing: '0.05em',
-                  marginTop: 2,
-                }}
-              >
-                {s.label}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>
