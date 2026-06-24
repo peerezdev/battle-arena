@@ -35,4 +35,16 @@ describe('ChatDock live drops', () => {
     expect(screen.getByText('Charizard')).toBeTruthy()
     expect(screen.getByText('So1a…ZZZZ')).toBeTruthy()
   })
+
+  // Regression: drops persisted before the global-drops change lack wallet/username.
+  // ChatDock must render them (as 'anon') instead of crashing on userColor(undefined).
+  it('renders a legacy drop without wallet/username without crashing', () => {
+    addDrop({
+      id: 'mint-legacy', name: 'Squirtle', valueUsd: 10, rarity: 'Common',
+      image: null, source: 'gacha', ts: Date.now(),
+    } as any)
+    render(<ChatDock />)
+    expect(screen.getByText('Squirtle')).toBeTruthy()
+    expect(screen.getByText('anon')).toBeTruthy()
+  })
 })

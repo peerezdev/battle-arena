@@ -13,9 +13,10 @@ function dropOpener(drop: LiveDrop): string {
 
 // Palette for coloring usernames deterministically
 const USER_COLORS = ['#b78cff', '#14F195', '#5ad1ff', '#ff6b6b', '#ffd166', '#f7c59f']
-function userColor(user: string): string {
+function userColor(user: string | null | undefined): string {
+  const s = user || 'anon'
   let hash = 0
-  for (let i = 0; i < user.length; i++) hash = (hash * 31 + user.charCodeAt(i)) | 0
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0
   return USER_COLORS[Math.abs(hash) % USER_COLORS.length]
 }
 
