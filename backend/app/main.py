@@ -543,15 +543,28 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(409, "no hay bots libres con saldo suficiente")
         bw, bid = bot["address"], bot["id"]
         if b.mode == "royale":
-            # Fund the escrow with the bot's buy-in BEFORE joining, so a joined royale bot is
-            # always backed (otherwise the escrow is short and the run fails mid-distribute).
-            blockhash = await fetch_latest_blockhash(solana_rpc_url)
-            try:
-                await collect_buyin(solana_rpc_url, privy_signer, bid, bw,
-                                    privy_operator_wallet_id, privy_operator_address,
-                                    b.escrow_address, cc_usdc_mint, buyin, blockhash)
-            except Exception as exc:
-                raise HTTPException(502, f"no se pudo cobrar el buy-in del bot: {exc}")
+            # Fund the escrow with the bot's buy-in and CONFIRM it landed BEFORE joining, so a
+            # joined royale bot is always backed (handles confirmation lag, silent on-chain
+            # failures and concurrent joins). Otherwise the escrow is short and the run voids.
+            before = await usdc_balance_base_units(solana_rpc_url, b.escrow_address, cc_usdc_mint)
+            funded, last_err = False, None
+            for _ in range(3):
+                try:
+                    blockhash = await fetch_latest_blockhash(solana_rpc_url)
+                    await collect_buyin(solana_rpc_url, privy_signer, bid, bw,
+                                        privy_operator_wallet_id, privy_operator_address,
+                                        b.escrow_address, cc_usdc_mint, buyin, blockhash)
+                except Exception as exc:
+                    last_err = exc
+                for _ in range(8):  # poll until the escrow actually reflects the buy-in
+                    if await usdc_balance_base_units(solana_rpc_url, b.escrow_address, cc_usdc_mint) >= before + buyin:
+                        funded = True
+                        break
+                    await asyncio.sleep(1.5)
+                if funded:
+                    break
+            if not funded:
+                raise HTTPException(502, f"no se pudo cobrar/confirmar el buy-in del bot: {last_err}")
             try:
                 _b2, filled = join_battle(s, battle_id, bw, bid)
             except LobbyError as e:
