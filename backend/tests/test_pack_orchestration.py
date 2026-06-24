@@ -17,6 +17,8 @@ from app.services.pack_orchestration import (
     usdc_balance_base_units,
     run_pack_battle_live,
     seed_escrow,
+    sol_balance,
+    seed_and_confirm_sol,
 )
 from app.services.solana_tx import TOKEN_PROGRAM
 
@@ -145,6 +147,13 @@ def _make_rpc_handler(
             return httpx.Response(200, json={
                 "jsonrpc": "2.0", "id": body.get("id", 1),
                 "result": {"value": {"blockhash": blockhash}},
+            })
+
+        if method == "getBalance":
+            # Escrow SOL already landed → seed_and_confirm_sol confirms on the first poll.
+            return httpx.Response(200, json={
+                "jsonrpc": "2.0", "id": body.get("id", 1),
+                "result": {"value": 10_000_000},
             })
 
         if method == "getTokenAccountBalance":
@@ -513,6 +522,117 @@ async def test_seed_escrow_requires_operator_config():
     solders 'String is the wrong size' from Pubkey.from_string('')."""
     with pytest.raises(ValueError, match="PRIVY_OPERATOR"):
         await seed_escrow("http://x", _Signer(), "", "", ESCROW_ADDRESS, 10_000_000, BLOCKHASH)
+
+
+# ---------------------------------------------------------------------------
+# Test: sol_balance — getBalance via httpx
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_sol_balance_returns_lamports():
+    """getBalance returns result.value lamports as an int."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert body["method"] == "getBalance"
+        return httpx.Response(200, json={
+            "jsonrpc": "2.0", "id": body.get("id", 1),
+            "result": {"value": 12_345},
+        })
+    with respx.mock:
+        respx.post(RPC_URL).mock(side_effect=handler)
+        result = await sol_balance(RPC_URL, ESCROW_ADDRESS)
+    assert result == 12_345
+
+
+@pytest.mark.asyncio
+async def test_sol_balance_returns_zero_on_rpc_error():
+    """RPC error / network failure → 0 (treated as not-yet-funded)."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "jsonrpc": "2.0", "id": 1,
+            "error": {"code": -32602, "message": "boom"},
+        })
+    with respx.mock:
+        respx.post(RPC_URL).mock(side_effect=handler)
+        result = await sol_balance(RPC_URL, ESCROW_ADDRESS)
+    assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# Test: seed_and_confirm_sol — seeds then polls sol_balance until > 0
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_seed_and_confirm_sol_polls_until_balance_positive(monkeypatch):
+    """seed_and_confirm_sol seeds once, then polls sol_balance, NOT proceeding
+    while balance is 0; it returns only once balance > 0."""
+    import app.services.pack_orchestration as po
+
+    seed_calls = []
+    async def fake_seed_escrow(rpc_url, signer, operator_wallet_id, operator_address,
+                               escrow_address, lamports, blockhash):
+        seed_calls.append(escrow_address)
+        return "seed-sig"
+
+    # 0 on the first two polls, positive on the third
+    balances = [0, 0, 7]
+    bal_calls = []
+    async def fake_sol_balance(rpc_url, address):
+        bal_calls.append(address)
+        return balances[len(bal_calls) - 1]
+
+    slept = []
+    async def fake_sleep(secs):
+        slept.append(secs)
+
+    async def fake_bh(rpc):
+        return BLOCKHASH
+
+    monkeypatch.setattr(po, "seed_escrow", fake_seed_escrow)
+    monkeypatch.setattr(po, "sol_balance", fake_sol_balance)
+    monkeypatch.setattr(po, "fetch_latest_blockhash", fake_bh)
+    monkeypatch.setattr(po.asyncio, "sleep", fake_sleep)
+
+    await seed_and_confirm_sol(
+        RPC_URL, _Signer(), OPERATOR_WALLET_ID, OPERATOR_ADDRESS,
+        ESCROW_ADDRESS, SEED_LAMPORTS,
+    )
+
+    # Seeded exactly once with the escrow address
+    assert seed_calls == [ESCROW_ADDRESS]
+    # Polled until balance > 0 (3 reads: 0, 0, 7) — did NOT proceed while 0
+    assert len(bal_calls) == 3
+    # Slept between the zero polls (cadence ~1.5s)
+    assert slept and all(s == pytest.approx(1.5) for s in slept)
+
+
+@pytest.mark.asyncio
+async def test_seed_and_confirm_sol_caps_polling(monkeypatch):
+    """If balance never lands, polling is capped (~20 attempts) rather than looping forever."""
+    import app.services.pack_orchestration as po
+
+    async def fake_seed_escrow(*a, **k):
+        return "seed-sig"
+    bal_calls = []
+    async def fake_sol_balance(rpc_url, address):
+        bal_calls.append(address)
+        return 0  # never funded
+    async def fake_sleep(secs):
+        pass
+    async def fake_bh(rpc):
+        return BLOCKHASH
+
+    monkeypatch.setattr(po, "seed_escrow", fake_seed_escrow)
+    monkeypatch.setattr(po, "sol_balance", fake_sol_balance)
+    monkeypatch.setattr(po, "fetch_latest_blockhash", fake_bh)
+    monkeypatch.setattr(po.asyncio, "sleep", fake_sleep)
+
+    await seed_and_confirm_sol(
+        RPC_URL, _Signer(), OPERATOR_WALLET_ID, OPERATOR_ADDRESS,
+        ESCROW_ADDRESS, SEED_LAMPORTS,
+    )
+    # Capped: did not loop unbounded
+    assert 1 <= len(bal_calls) <= 20
 
 
 # ---------------------------------------------------------------------------
