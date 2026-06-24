@@ -424,6 +424,22 @@ def create_app(session_factory, chain: ChainSource,
             release_reservations(s2, battle_id)
             s2.close()
 
+    # Serialize on-chain buy-in collection (concurrent submits drop silently on devnet) and
+    # CONFIRM the funds actually landed (submit does not wait for confirmation). Raises if not
+    # confirmed — the caller surfaces it (toast) and does NOT join. No retry → no double charge.
+    _buyin_lock = asyncio.Lock()
+
+    async def collect_buyin_confirmed(player_wallet_id: str, player_wallet: str, escrow_address: str, amount: int):
+        # Concurrent collects race and silently drop on devnet → serialize them (one at a time
+        # with a short settle so each lands before the next). If the charge itself fails,
+        # collect_buyin raises and the caller surfaces it (toast); no retry → no double charge.
+        async with _buyin_lock:
+            blockhash = await fetch_latest_blockhash(solana_rpc_url)
+            await collect_buyin(solana_rpc_url, privy_signer, player_wallet_id, player_wallet,
+                                privy_operator_wallet_id, privy_operator_address,
+                                escrow_address, cc_usdc_mint, amount, blockhash)
+            await asyncio.sleep(1)  # let the tx land before the next serialized collect
+
     @app.post("/pack-battles")
     async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),
                                  wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
@@ -447,13 +463,10 @@ def create_app(session_factory, chain: ChainSource,
             b.escrow_address = esc["address"]
             s.commit()
             # Collect the creator's buy-in immediately (creator is the first player)
-            blockhash = await fetch_latest_blockhash(solana_rpc_url)
-            await collect_buyin(
-                solana_rpc_url, privy_signer,
-                wallet_id, wallet,
-                privy_operator_wallet_id, privy_operator_address,
-                b.escrow_address, cc_usdc_mint, buyin, blockhash,
-            )
+            try:
+                await collect_buyin_confirmed(wallet_id, wallet, b.escrow_address, buyin)
+            except Exception as exc:
+                raise HTTPException(502, f"No se pudo cobrar tu buy-in: {exc}")
             resp = get_battle(s, b.id)
             resp["buyin"] = buyin
             resp["escrow_address"] = b.escrow_address
@@ -497,13 +510,8 @@ def create_app(session_factory, chain: ChainSource,
             await _require_available(wallet, buyin, s)
             # Collect the buy-in into the pre-created escrow BEFORE joining — single attempt.
             # If the charge fails, the player is NOT joined and gets the error (toast).
-            blockhash = await fetch_latest_blockhash(solana_rpc_url)
             try:
-                await collect_buyin(
-                    solana_rpc_url, privy_signer, wallet_id, wallet,
-                    privy_operator_wallet_id, privy_operator_address,
-                    b.escrow_address, cc_usdc_mint, buyin, blockhash,
-                )
+                await collect_buyin_confirmed(wallet_id, wallet, b.escrow_address, buyin)
             except Exception as exc:
                 raise HTTPException(502, f"No se pudo cobrar el buy-in: {exc}")
             try:
@@ -556,11 +564,8 @@ def create_app(session_factory, chain: ChainSource,
             # Collect the bot's buy-in into the escrow BEFORE joining — single attempt. If the
             # charge fails, the bot is NOT joined and the caller surfaces the error (toast):
             # no silent unfunded joins, no double charge.
-            blockhash = await fetch_latest_blockhash(solana_rpc_url)
             try:
-                await collect_buyin(solana_rpc_url, privy_signer, bid, bw,
-                                    privy_operator_wallet_id, privy_operator_address,
-                                    b.escrow_address, cc_usdc_mint, buyin, blockhash)
+                await collect_buyin_confirmed(bid, bw, b.escrow_address, buyin)
             except Exception as exc:
                 raise HTTPException(502, f"No se pudo cobrar el buy-in del bot: {exc}")
             try:
