@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { RevealCard, rarityColor } from './RevealCard'
 import { StagedCardReveal } from './StagedCardReveal'
@@ -111,6 +112,7 @@ function PlayerColumn({ player, name, round, roundReady, shownRounds, isWinner, 
   player: RevealPlayerVM; name: string; round: number; roundReady: boolean; shownRounds: number
   isWinner: boolean; reducedMotion: boolean; onCardShown: () => void; cardW: number; cardH: number; divider: boolean
 }) {
+  const navigate = useNavigate()
   const target = player.cards.slice(0, shownRounds).reduce((s, c) => s + (c.insuredValue ?? 0), 0)
   const counted = useCountUp(target, !reducedMotion)
   const currentCard = player.cards[round]
@@ -126,11 +128,15 @@ function PlayerColumn({ player, name, round, roundReady, shownRounds, isWinner, 
         background: isWinner ? `linear-gradient(180deg,#14F1950e,${COLORS.panel})` : COLORS.panel,
         boxShadow: isWinner ? `0 0 22px ${COLORS.green}33` : 'none',
       }}>
-        <div style={{
-          fontFamily: FONTS.display, fontWeight: 800, fontSize: 13, maxWidth: cardW,
-          color: player.isMe ? COLORS.green : COLORS.text,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <div
+          onClick={() => navigate(`/profile/${player.wallet}`)}
+          title="Ver perfil"
+          style={{
+            fontFamily: FONTS.display, fontWeight: 800, fontSize: 13, maxWidth: cardW,
+            color: player.isMe ? COLORS.green : COLORS.text,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            cursor: 'pointer', textDecoration: 'underline', textDecorationColor: `${COLORS.muted}66`,
+          }}>
           {name}
         </div>
 

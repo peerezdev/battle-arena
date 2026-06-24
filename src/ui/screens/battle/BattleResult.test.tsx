@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { BattleResult } from './BattleResult'
 import type { RevealVM } from './battleReveal'
 
@@ -27,14 +28,14 @@ describe('BattleResult', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('celebrates when I am the winner and shows the winner total', () => {
-    render(<BattleResult vm={baseVm} battleId="b1" onExit={() => {}} />)
+    render(<MemoryRouter><BattleResult vm={baseVm} battleId="b1" onExit={() => {}} /></MemoryRouter>)
     expect(screen.getByText(/ganaste/i)).toBeTruthy()
     expect(screen.getAllByText('$160').length).toBeGreaterThan(0)   // winner total
   })
 
   it('says you lost (and Volver works) when the winner is not me', () => {
     const onExit = vi.fn()
-    render(<BattleResult vm={{ ...baseVm, meWallet: 'B' }} battleId="b1" onExit={onExit} />)
+    render(<MemoryRouter><BattleResult vm={{ ...baseVm, meWallet: 'B' }} battleId="b1" onExit={onExit} /></MemoryRouter>)
     expect(screen.queryByText(/ganaste/i)).toBeNull()
     expect(screen.getByText(/perdido/i)).toBeTruthy()
     fireEvent.click(screen.getByText(/volver/i))
@@ -42,7 +43,7 @@ describe('BattleResult', () => {
   })
 
   it('opens the Provably-Fair verify panel', async () => {
-    render(<BattleResult vm={baseVm} battleId="b1" onExit={() => {}} />)
+    render(<MemoryRouter><BattleResult vm={baseVm} battleId="b1" onExit={() => {}} /></MemoryRouter>)
     fireEvent.click(screen.getByText(/verificar/i))
     expect(await screen.findByText(/verificación provably-fair/i)).toBeTruthy()
     expect(verifyBattle).toHaveBeenCalledWith('b1')

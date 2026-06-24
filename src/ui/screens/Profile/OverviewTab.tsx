@@ -15,9 +15,11 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-export function OverviewTab() {
-  const { username, elo, gamesPlayed } = useProfile()
-  const address = useEmbeddedSolanaAddress()
+export function OverviewTab({ wallet }: { wallet?: string }) {
+  const { username, elo, gamesPlayed } = useProfile(wallet)
+  const own = useEmbeddedSolanaAddress()
+  const address = wallet ?? own
+  const isSelf = !wallet
   const [wl, setWl] = useState({ wins: 0, losses: 0, draws: 0 })
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function OverviewTab() {
   return (
     <div>
       <div style={{ fontFamily: FONTS.body, fontSize: 15, color: COLORS.text, marginBottom: 16 }}>
-        {username ? <strong>{username}</strong> : <span style={{ color: COLORS.muted }}>No username yet — set one in Settings.</span>}
+        {username ? <strong>{username}</strong> : <span style={{ color: COLORS.muted }}>{isSelf ? 'No username yet — set one in Settings.' : 'Sin username'}</span>}
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <StatCard label="ELO" value={elo ?? '—'} />
@@ -48,7 +50,7 @@ export function OverviewTab() {
         <StatCard label="LOSSES" value={wl.losses} />
         <StatCard label="DRAWS" value={wl.draws} />
       </div>
-      <DelegationPanel />
+      {isSelf && <DelegationPanel />}
     </div>
   )
 }

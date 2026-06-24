@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { shortWallet } from './RoyaleReveal'
 import { RevealCard } from './RevealCard'
@@ -8,6 +9,7 @@ import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
 export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId: string; onExit: () => void }) {
   const [verifyOpen, setVerifyOpen] = useState(false)
+  const navigate = useNavigate()
   const aliases = useAliases(vm.players.map((p) => p.wallet))
 
   const iAmPlayer = vm.players.some((p) => p.isMe)
@@ -43,7 +45,10 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
               background: isWinner ? `linear-gradient(180deg,#14F1950c,${COLORS.panel})` : COLORS.panel,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14, color: p.isMe ? COLORS.green : COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span
+                  onClick={() => navigate(`/profile/${p.wallet}`)}
+                  title="Ver perfil"
+                  style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14, color: p.isMe ? COLORS.green : COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: `${COLORS.muted}66` }}>
                   {name(p)}{isWinner ? ' 🏆' : ''}
                 </span>
                 <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 16, color: isWinner ? COLORS.green : COLORS.text, flexShrink: 0 }}>

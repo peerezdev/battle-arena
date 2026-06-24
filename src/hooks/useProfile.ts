@@ -8,8 +8,9 @@ export interface ProfileData {
   gamesPlayed: number | null
 }
 
-export function useProfile(): ProfileData & { loading: boolean; refresh: () => void } {
-  const address = useEmbeddedSolanaAddress()
+export function useProfile(addressOverride?: string | null): ProfileData & { loading: boolean; refresh: () => void } {
+  const own = useEmbeddedSolanaAddress()
+  const address = addressOverride ?? own
   const [data, setData] = useState<ProfileData>({ username: null, elo: null, gamesPlayed: null })
   const [loading, setLoading] = useState(false)
   const [nonce, setNonce] = useState(0)
