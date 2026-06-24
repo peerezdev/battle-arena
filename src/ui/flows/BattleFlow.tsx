@@ -141,11 +141,10 @@ export function BattleFlow() {
     )
   }
 
-  // royale: rounds list + result below when settled (unchanged)
+  // royale: full Battle Royale screen — round-by-round grid + result view (champion + standings)
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      <RoyaleReveal vm={vm} reducedMotion={!!reduced} />
-      {battle.status === 'settled' && <BattleResult vm={vm} battleId={battle.id} onExit={exit} />}
+      <RoyaleReveal vm={vm} reducedMotion={!!reduced} battleId={battle.id} onExit={exit} />
     </div>
   )
 }

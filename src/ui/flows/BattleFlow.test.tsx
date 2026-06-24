@@ -22,7 +22,10 @@ const royaleRunning = {
 }
 
 describe('BattleFlow', () => {
-  beforeEach(() => mockUseBattle.mockReset())
+  beforeEach(() => {
+    mockUseBattle.mockReset()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+  })
 
   it('shows the waiting room in lobby', () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'lobby', pulls: [] }, loading: false, error: null })
@@ -33,13 +36,13 @@ describe('BattleFlow', () => {
   it('renders the royale reveal while running', () => {
     mockUseBattle.mockReturnValue({ battle: royaleRunning, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/Round 1/i)).toBeTruthy()
+    expect(screen.getByText(/ALIVE/i)).toBeTruthy()
   })
 
   it('shows the result once settled', () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'settled', winner: 'A' }, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/you won/i)).toBeTruthy()
+    expect(screen.getByText(/victory/i)).toBeTruthy()
   })
 
   it('shows the voided message', () => {
