@@ -38,9 +38,15 @@ async def confirm_usdc(rpc_url: str, owner: str, usdc_mint: str, min_base_units:
 
 
 async def distribute_usdc(rpc_url, signer, escrow_wallet_id, escrow_address, player_address,
-                          usdc_mint, amount, blockhash) -> str:
-    tx = build_token_transfer(escrow_address, player_address, usdc_mint, blockhash, amount=amount, decimals=6)
-    signed = await signer.sign_solana(escrow_wallet_id, tx)   # escrow (has SOL) is sole signer/fee-payer
+                          usdc_mint, amount, blockhash, *,
+                          operator_wallet_id, operator_address) -> str:
+    # 2-signer: escrow = USDC authority, operator = fee-payer. The escrow never needs SOL, which
+    # avoids the devnet "debit an account but found no record of a prior credit" race on a freshly
+    # seeded escrow. Same pattern as collect_buyin / refund_buyin.
+    tx = build_token_transfer(escrow_address, player_address, usdc_mint, blockhash,
+                              amount=amount, decimals=6, fee_payer=operator_address)
+    signed = await signer.sign_solana(escrow_wallet_id, tx)        # escrow authorizes the USDC move
+    signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
     return await submit_signed_tx(rpc_url, signed)
 
 

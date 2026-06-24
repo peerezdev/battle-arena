@@ -50,7 +50,7 @@ async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_
 async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_address, winner,
                                  build_transfer_tx, submit_tx, signer, confirm_in_escrow,
                                  build_usdc_sweep_tx, sleep_fn, wait_max_attempts, wait_delay,
-                                 max_attempts=3) -> None:
+                                 max_attempts=3, operator_wallet_id=None) -> None:
     """Resilient settle (call ONLY after the winner is decided — never voids):
     transfer each non-auto-sold escrow NFT to the winner with max_attempts total attempts per card
     (set transferred=True on success; on UnsupportedNftStandard or exhausted max_attempts leave
@@ -88,6 +88,8 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
                 sweep = await build_usdc_sweep_tx(escrow_address, winner)
                 if sweep:
                     signed = await signer.sign_solana(escrow_wallet_id, sweep)
+                    if operator_wallet_id:
+                        signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
                     await submit_tx(signed)
                 break
             except Exception as exc:
@@ -100,7 +102,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                      sponsor: bool = False,
                      open_max_attempts: int = 20, open_delay: float = 3.0,
                      escrow_max_attempts: int = 20, escrow_delay: float = 3.0,
-                     sleep_fn=None, build_usdc_sweep_tx=None) -> str:
+                     sleep_fn=None, build_usdc_sweep_tx=None, operator_wallet_id="") -> str:
     # sponsor=False → user-pays (the fee-payer wallet needs SOL). sponsor=True requires
     # Privy "App pays" gas sponsorship to be enabled for the cluster.
     # NOTE: sponsor is no longer used in settle (transfers go via our-RPC submit_tx);
@@ -188,6 +190,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
         confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
         sleep_fn=sleep_fn, wait_max_attempts=escrow_max_attempts, wait_delay=escrow_delay,
+        operator_wallet_id=operator_wallet_id,
     )
 
     battle.winner = winner; battle.status = "settled"; battle.settled_at = now_fn()

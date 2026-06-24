@@ -11,13 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 async def _sign_submit_retry(build_tx, *, signer, escrow_wallet_id, submit_tx,
-                             sleep_fn, wait_delay, max_attempts, ctx) -> bool:
-    """build_tx() → sign(escrow) → submit, with bounded retries. UnsupportedNftStandard → give up (no
+                             sleep_fn, wait_delay, max_attempts, ctx, operator_wallet_id=None) -> bool:
+    """build_tx() → sign(escrow [+ operator fee-payer]) → submit, with bounded retries.
+    When operator_wallet_id is set the operator co-signs as fee-payer (the tx must be built with
+    fee_payer=operator), so the escrow never needs SOL. UnsupportedNftStandard → give up (no
     retry). Never raises. Returns True on success."""
     for _ in range(max_attempts):
         try:
             tx = await build_tx()
             signed = await signer.sign_solana(escrow_wallet_id, tx)
+            if operator_wallet_id:
+                signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
             await submit_tx(signed)
             return True
         except UnsupportedNftStandard as exc:
@@ -32,7 +36,7 @@ async def _sign_submit_retry(build_tx, *, signer, escrow_wallet_id, submit_tx,
 async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
                            build_transfer_tx, submit_tx, signer, build_usdc_transfer_tx,
                            confirm_in_escrow, sleep_fn=None, wait_max_attempts=20,
-                           wait_delay=3.0, max_attempts=3) -> None:
+                           wait_delay=3.0, max_attempts=3, operator_wallet_id=None) -> None:
     """Pack Battle void refund: return each puller their own pull — the non-common card, or the
     auto-sold common's buyback_amount USDC. No-op if there is no escrow (pre-flight void). Never raises."""
     sleep_fn = sleep_fn or asyncio.sleep
@@ -48,7 +52,7 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
                 lambda p=p: build_usdc_transfer_tx(escrow_address, p.player_wallet, p.buyback_amount),
                 signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
-                ctx=f"pack void usdc {p.player_wallet} in {battle.id}")
+                ctx=f"pack void usdc {p.player_wallet} in {battle.id}", operator_wallet_id=operator_wallet_id)
         elif p.nft_address:
             async def _build(p=p):
                 await _wait_in_escrow(confirm_in_escrow, escrow_address, p.nft_address,
@@ -63,7 +67,8 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
 async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_address,
                              build_transfer_tx, submit_tx, signer, build_usdc_transfer_tx,
                              buyback_to_escrow, escrow_usdc_balance, confirm_in_escrow,
-                             sleep_fn=None, wait_max_attempts=20, wait_delay=3.0, max_attempts=3) -> None:
+                             sleep_fn=None, wait_max_attempts=20, wait_delay=3.0, max_attempts=3,
+                             operator_wallet_id=None) -> None:
     """Battle Royale void refund: alive players (eliminated_round IS NULL) get their own pulls (non-common
     cards + auto-sold commons' USDC); each eliminated player's non-common cards are bought back; the leftover
     escrow USDC is split equally among the alive. Eliminated get nothing. No-op if no escrow. Never raises."""
@@ -86,7 +91,7 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
                     lambda p=p: build_usdc_transfer_tx(escrow_address, p.player_wallet, p.buyback_amount),
                     signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                     sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
-                    ctx=f"royale void usdc {p.player_wallet} in {battle.id}")
+                    ctx=f"royale void usdc {p.player_wallet} in {battle.id}", operator_wallet_id=operator_wallet_id)
         elif p.nft_address:
             async def _build(p=p):
                 await _wait_in_escrow(confirm_in_escrow, escrow_address, p.nft_address,
@@ -119,5 +124,5 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
         await _sign_submit_retry(
             lambda w=w, share=share: build_usdc_transfer_tx(escrow_address, w, share),
             signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
-            sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
+            sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts, operator_wallet_id=operator_wallet_id,
             ctx=f"royale void leftover {w} in {battle.id}")

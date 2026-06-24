@@ -19,7 +19,7 @@ async def run_royale(
     build_transfer_tx, submit_tx, prepare_escrow,
     price_base, now_fn,
     sleep_fn=None, max_attempts=20, delay=3.0, build_usdc_sweep_tx=None,
-    escrow_usdc_balance=None,
+    escrow_usdc_balance=None, operator_wallet_id="",
 ) -> str:
     """Run the royale loop; return 'settled' or 'voided'."""
     sleep_fn = sleep_fn or asyncio.sleep
@@ -170,6 +170,7 @@ async def run_royale(
             build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
             confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
             sleep_fn=sleep_fn, wait_max_attempts=max_attempts, wait_delay=delay,
+            operator_wallet_id=operator_wallet_id,
         )
 
         battle.winner = winner

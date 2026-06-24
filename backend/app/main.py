@@ -566,7 +566,9 @@ def create_app(session_factory, chain: ChainSource,
                 try:
                     bh2 = await fetch_latest_blockhash(solana_rpc_url)
                     await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
-                                          b.escrow_address, wallet, cc_usdc_mint, buyin, bh2)
+                                          b.escrow_address, wallet, cc_usdc_mint, buyin, bh2,
+                                          operator_wallet_id=privy_operator_wallet_id,
+                                          operator_address=privy_operator_address)
                 except Exception:
                     logger.warning("join refund failed for %s in %s", wallet, battle_id)
                 raise HTTPException(409, str(e))
@@ -620,7 +622,9 @@ def create_app(session_factory, chain: ChainSource,
                 try:
                     bh2 = await fetch_latest_blockhash(solana_rpc_url)
                     await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
-                                          b.escrow_address, bw, cc_usdc_mint, buyin, bh2)
+                                          b.escrow_address, bw, cc_usdc_mint, buyin, bh2,
+                                          operator_wallet_id=privy_operator_wallet_id,
+                                          operator_address=privy_operator_address)
                 except Exception:
                     logger.warning("join-bot refund failed for %s in %s", bw, battle_id)
                 raise HTTPException(409, str(e))
