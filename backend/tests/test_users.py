@@ -4,7 +4,8 @@ from app.models import RatingHistory
 
 def test_read_user_view_default_and_existing(Session):
     with Session() as s:
-        assert read_user_view(s, "GHOST", 1200) == {"wallet": "GHOST", "alias": None, "elo": 1200, "games_played": 0}
+        assert read_user_view(s, "GHOST", 1200) == {"wallet": "GHOST", "alias": None, "elo": 1200,
+                                                     "games_played": 0, "gimmighouls": 0, "referred_by": None}
         get_or_create_user(s, "A", 1200).elo = 1400
         s.commit()
         assert read_user_view(s, "A", 1200)["elo"] == 1400

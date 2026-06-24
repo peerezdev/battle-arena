@@ -21,6 +21,7 @@ from .services.users import (
     get_or_create_user, read_user_view, set_alias, leaderboard, history, AliasTakenError,
 )
 from .services.matches import register_match, list_open, sync_match, MatchError
+from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
@@ -42,6 +43,10 @@ logger = logging.getLogger(__name__)
 
 class AliasBody(BaseModel):
     alias: str = Field(min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_]+$")
+
+
+class ReferralBody(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
 
 
 class GeneratePackBody(BaseModel):
@@ -201,9 +206,24 @@ def create_app(session_factory, chain: ChainSource,
         diff = va - vb
         return {"elo_a": va, "elo_b": vb, "diff": diff, "gap_label": gap_label(diff)}
 
+    @app.post("/users/{wallet}/referral")
+    async def post_referral(wallet: str, body: ReferralBody,
+                            authed: str = Depends(current_user), s: Session = Depends(db)):
+        if wallet != authed:
+            raise HTTPException(403, "wallet mismatch")
+        get_or_create_user(s, authed, elo_start)
+        try:
+            out = apply_referral_code(s, authed, body.code)
+            s.commit()
+        except ReferralError as e:
+            s.rollback()
+            raise HTTPException(409, str(e))
+        return out
+
     @app.get("/leaderboard")
     async def get_leaderboard(limit: int = Query(default=50, ge=1, le=200), s: Session = Depends(db)):
-        return [{"wallet": u.wallet, "alias": u.alias, "elo": u.elo} for u in leaderboard(s, limit)]
+        return [{"wallet": u.wallet, "alias": u.alias, "gimmighouls": u.gimmighouls, "elo": u.elo}
+                for u in leaderboard(s, limit)]
 
     # ── Gacha (proxy a Collector Crypt; la x-api-key vive solo aquí) ─────────
     _gacha_hits: dict[str, list[float]] = {}

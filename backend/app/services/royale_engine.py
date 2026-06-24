@@ -157,6 +157,11 @@ async def run_royale(
         battle.winner = winner
         battle.status = "settled"
         battle.settled_at = now_fn()
+        # Loyalty points: per-player buy-in for a royale is royale_buyin(max_players, price).
+        from app.services.referrals import award_battle_loyalty
+        from app.services.royale_funding import royale_buyin
+        award_battle_loyalty(session, battle, players,
+                             float(royale_buyin(battle.max_players, battle.price)))
         session.commit()
         return "settled"
 

@@ -191,5 +191,8 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     )
 
     battle.winner = winner; battle.status = "settled"; battle.settled_at = now_fn()
+    # Loyalty points: award each participant their buy-in (per-player = battle.price for pack).
+    from app.services.referrals import award_battle_loyalty
+    award_battle_loyalty(session, battle, players, float(battle.price))
     session.commit()
     return "settled"
