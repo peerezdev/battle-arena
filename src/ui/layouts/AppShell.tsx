@@ -4,6 +4,7 @@ import { usePrivy } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd } from '../theme'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
 import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalance'
+import { useProfile } from '../../hooks/useProfile'
 import { useReducedMotion } from '../useReducedMotion'
 import { useIsWide } from '../useIsWide'
 import { AuthButtons } from '../components/AuthButtons'
@@ -22,6 +23,7 @@ export function AppShell() {
   const reducedMotion = useReducedMotion()
   const { usdc } = useUsdcBalance()
   const { reserved } = useReservedBalance()
+  const { gimmighouls } = useProfile()
   const { authenticated } = usePrivy()
 
   // Breakpoints copied verbatim from Hub.tsx
@@ -139,6 +141,25 @@ export function AppShell() {
                     · {formatUsd(reserved)} reservado
                   </span>
                 )}
+              </div>
+
+              {/* Gimmighouls — loyalty points */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  background: '#11161f',
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 11,
+                  padding: '7px 13px',
+                }}
+                title="Gimmighouls"
+              >
+                <img src="/gimmighoul.png" alt="" width={16} height={16} style={{ display: 'block' }} />
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
+                  {gimmighouls != null ? gimmighouls.toLocaleString() : '—'}
+                </span>
               </div>
             </>
           )}

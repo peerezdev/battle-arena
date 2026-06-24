@@ -6,19 +6,20 @@ export interface ProfileData {
   username: string | null
   elo: number | null
   gamesPlayed: number | null
+  gimmighouls: number | null
 }
 
 export function useProfile(addressOverride?: string | null): ProfileData & { loading: boolean; refresh: () => void } {
   const own = useEmbeddedSolanaAddress()
   const address = addressOverride ?? own
-  const [data, setData] = useState<ProfileData>({ username: null, elo: null, gamesPlayed: null })
+  const [data, setData] = useState<ProfileData>({ username: null, elo: null, gamesPlayed: null, gimmighouls: null })
   const [loading, setLoading] = useState(false)
   const [nonce, setNonce] = useState(0)
   const refresh = useCallback(() => setNonce((n) => n + 1), [])
 
   useEffect(() => {
     if (!address) {
-      setData({ username: null, elo: null, gamesPlayed: null })
+      setData({ username: null, elo: null, gamesPlayed: null, gimmighouls: null })
       return
     }
     let cancelled = false
@@ -27,7 +28,7 @@ export function useProfile(addressOverride?: string | null): ProfileData & { loa
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => {
         if (cancelled || !u) return
-        setData({ username: u.alias ?? null, elo: u.elo ?? null, gamesPlayed: u.games_played ?? null })
+        setData({ username: u.alias ?? null, elo: u.elo ?? null, gamesPlayed: u.games_played ?? null, gimmighouls: u.gimmighouls ?? null })
       })
       .catch((err) => {
         if (import.meta.env.DEV) console.warn('[useProfile] fetch error:', err)
