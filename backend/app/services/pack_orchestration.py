@@ -99,6 +99,43 @@ async def usdc_balance_base_units(
         return 0
 
 
+async def sol_balance(rpc_url: str, address: str) -> int:
+    """Return the address's SOL balance in lamports via getBalance.
+
+    Network/RPC errors → 0 (treated as "not funded yet"), so the confirm-poll
+    in seed_and_confirm_sol never crashes; it just keeps waiting/retrying.
+    """
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getBalance",
+        "params": [address, {"commitment": "confirmed"}],
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(rpc_url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError:
+        return 0
+
+    if "error" in data:
+        return 0
+    value = (data.get("result") or {}).get("value")
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return 0
+
+
+# Confirm-poll cadence: seed SOL, then poll until it lands before using the escrow.
+# Matches the royale path's historical ≈20 attempts × 1.5s.
+_SOL_CONFIRM_ATTEMPTS = 20
+_SOL_CONFIRM_DELAY_S = 1.5
+
+
 async def seed_escrow(
     rpc_url: str,
     signer,
@@ -129,6 +166,37 @@ async def seed_escrow(
     tx_b64 = base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
     signed = await signer.sign_solana(operator_wallet_id, tx_b64)
     return await submit_signed_tx(rpc_url, signed)
+
+
+async def seed_and_confirm_sol(
+    rpc_url: str,
+    signer,
+    operator_wallet_id: str,
+    operator_address: str,
+    escrow_address: str,
+    lamports: int,
+) -> str:
+    """Seed the escrow with gas SOL, then poll until the balance lands (> 0).
+
+    Used by BOTH the pack-battle and royale prepare_escrow closures so the
+    escrow always has gas confirmed on-chain before any USDC transfer runs —
+    avoids the intermittent "AccountNotFound" / "found no record of a prior
+    credit" failures from using the escrow before the seed transfer confirmed.
+
+    Polls sol_balance(escrow_address) > 0 for up to _SOL_CONFIRM_ATTEMPTS
+    attempts spaced _SOL_CONFIRM_DELAY_S apart, then proceeds regardless (the
+    downstream transfer will surface a clear failure if it truly never landed).
+    """
+    bh = await fetch_latest_blockhash(rpc_url)
+    sig = await seed_escrow(
+        rpc_url, signer, operator_wallet_id, operator_address, escrow_address, lamports, bh
+    )
+    for attempt in range(_SOL_CONFIRM_ATTEMPTS):
+        if await sol_balance(rpc_url, escrow_address) > 0:
+            break
+        if attempt < _SOL_CONFIRM_ATTEMPTS - 1:
+            await asyncio.sleep(_SOL_CONFIRM_DELAY_S)
+    return sig
 
 
 async def run_pack_battle_live(
@@ -189,9 +257,11 @@ async def run_pack_battle_live(
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
 
     async def prepare_escrow(esc_addr):
-        bh = await fetch_latest_blockhash(rpc_url)
-        await seed_escrow(
-            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, bh
+        # Seed gas SOL and confirm it landed (poll balance > 0) BEFORE using the
+        # escrow — otherwise the ATA pre-create / USDC transfers can hit
+        # "AccountNotFound" / "no record of a prior credit".
+        await seed_and_confirm_sol(
+            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports
         )
         # Pre-create the escrow's USDC ATA (operator pays) so CC's turbo auto-buyback payout
         # does not revert (CreateIdempotent would otherwise exhaust the payout tx's CU budget).
@@ -293,17 +363,11 @@ async def run_royale_live(
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
 
     async def prepare_escrow(esc_addr):
-        bh = await fetch_latest_blockhash(rpc_url)
-        sig = await seed_escrow(
-            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports, bh
+        # Seed gas SOL and confirm it landed (poll balance > 0) before the escrow
+        # is used for distribute/sweep — same confirm-poll as the pack-battle path.
+        return await seed_and_confirm_sol(
+            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports
         )
-        # Wait for the SOL seed to CONFIRM: the escrow is the fee-payer for the per-round USDC
-        # distributions, and an unconfirmed seed makes those fail with AccountNotFound.
-        for _ in range(20):
-            if await sol_balance(rpc_url, esc_addr) > 0:
-                break
-            await asyncio.sleep(1.5)
-        return sig
 
     async def build_usdc_sweep_tx(esc_addr, winner_addr):
         bal = await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
