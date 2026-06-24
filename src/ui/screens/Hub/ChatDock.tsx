@@ -20,16 +20,21 @@ function userColor(user: string | null | undefined): string {
   return USER_COLORS[Math.abs(hash) % USER_COLORS.length]
 }
 
+// Normalize a timestamp to milliseconds. Backend emits epoch SECONDS; local/legacy
+// drops are stored in ms. Anything below ~1e12 is seconds (pre-2001 in ms terms).
+function toMs(ts: number): number {
+  return ts < 1e12 ? ts * 1000 : ts
+}
+
 function formatTs(ts: number): string {
-  // Backend emits ts in seconds (epoch); Date expects milliseconds.
-  const d = new Date(ts * 1000)
+  const d = new Date(toMs(ts))
   const hh = d.getHours().toString().padStart(2, '0')
   const mm = d.getMinutes().toString().padStart(2, '0')
   return `${hh}:${mm}`
 }
 
 function ago(ts: number): string {
-  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000))
+  const s = Math.max(0, Math.floor((Date.now() - toMs(ts)) / 1000))
   if (s < 60) return 'just now'
   const m = Math.floor(s / 60)
   if (m < 60) return `${m}m ago`

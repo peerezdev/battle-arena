@@ -36,6 +36,20 @@ describe('ChatDock live drops', () => {
     expect(screen.getByText('So1a…ZZZZ')).toBeTruthy()
   })
 
+  // Regression: a drop with ts in epoch SECONDS (backend / legacy cache) must render
+  // a sane relative time, not "~20608d ago" from treating seconds as milliseconds.
+  it('renders a seconds-epoch ts as a recent time, not decades ago', () => {
+    addDrop({
+      id: 'mint-secs', name: 'Mew', valueUsd: 50, rarity: 'Rare',
+      image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'kai',
+      ts: Math.floor(Date.now() / 1000), // seconds, like the backend emits
+    })
+    render(<ChatDock />)
+    expect(screen.getByText('Mew')).toBeTruthy()
+    // no drop should render a decades-old age from misreading seconds as ms
+    expect(screen.queryByText(/\d{3,}d ago/)).toBeNull()
+  })
+
   // Regression: drops persisted before the global-drops change lack wallet/username.
   // ChatDock must render them (as 'anon') instead of crashing on userColor(undefined).
   it('renders a legacy drop without wallet/username without crashing', () => {
