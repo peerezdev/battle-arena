@@ -142,7 +142,7 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
             color: COLORS.text,
           }}
         >
-          Live battles
+          Live games
         </span>
         <span
           style={{
@@ -155,7 +155,7 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
             padding: '2px 10px',
           }}
         >
-          {battles.filter((b) => b.live).length} live
+          {battles.length} live
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <span
