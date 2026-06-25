@@ -194,9 +194,6 @@ export function AppShell() {
 
         </header>
 
-        {/* Mobile: Live Drops as a horizontal strip at the top (desktop uses the right dock) */}
-        {!wideRail && <LiveDropsStrip />}
-
         {/* Routed page content */}
         <main
           style={{
@@ -208,6 +205,8 @@ export function AppShell() {
             paddingBottom: !wideRail ? 72 : 0, // space for bottom nav on mobile
           }}
         >
+          {/* Mobile: Live Drops strip at the top of the scroll (scrolls away on scroll down) */}
+          {!wideRail && <LiveDropsStrip />}
           <Outlet />
         </main>
       </div>
