@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { COLORS, FONTS, GRADIENT } from '../../theme'
 import type { HubNav } from './hubMockData'
 
@@ -30,6 +30,7 @@ const ITEMS: { id: HubNav; label: string }[] = [
 ]
 
 export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSelect: (id: HubNav) => void; onProfile?: () => void }) {
+  const [hovered, setHovered] = useState<HubNav | null>(null)
   return (
     <nav
       style={{
@@ -60,11 +61,14 @@ export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSe
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, width: '100%' }}>
         {ITEMS.map((item) => {
           const isActive = item.id === active
+          const isHover = !isActive && hovered === item.id
           return (
             <button
               key={item.id}
               onClick={() => onSelect(item.id)}
               title={item.label}
+              onMouseEnter={() => setHovered(item.id)}
+              onMouseLeave={() => setHovered((h) => (h === item.id ? null : h))}
               style={{
                 position: 'relative',
                 width: 62,
@@ -75,23 +79,11 @@ export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSe
                 alignItems: 'center',
                 gap: 6,
                 cursor: 'pointer',
-                color: isActive ? COLORS.text : COLORS.muted,
-                background: 'transparent',
+                color: isActive || isHover ? COLORS.text : COLORS.muted,
+                background: isHover ? '#ffffff0a' : 'transparent',
                 border: 'none',
                 transition: 'color .12s, background .12s',
                 fontFamily: FONTS.body,
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  ;(e.currentTarget as HTMLButtonElement).style.background = '#ffffff0a'
-                  ;(e.currentTarget as HTMLButtonElement).style.color = COLORS.text
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-                  ;(e.currentTarget as HTMLButtonElement).style.color = COLORS.muted
-                }
               }}
             >
               {isActive && (
