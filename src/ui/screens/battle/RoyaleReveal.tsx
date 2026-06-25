@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
+import { RevealCard } from './RevealCard'
 import { useAliases } from '../../useAliases'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
@@ -231,6 +232,10 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
   const me = ranked.find((r) => r.p.isMe)
   const myRank = me?.rank
   const myElimRound = me?.p.eliminatedRound
+  // The champion (winner takes all) gets EVERY card pulled in the match; commons are shown
+  // auto-sold (buyback) via RevealCard's ⚡ marker. The pot = total value of all that loot.
+  const allLoot = vm.players.flatMap((p) => p.cards)
+  const lootTotal = allLoot.reduce((s, c) => s + (c.insuredValue ?? 0), 0)
 
   return (
     <div>
@@ -269,21 +274,15 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>TAKES THE POT</div>
-              <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-.02em', background: 'linear-gradient(120deg,#f5c542,#3df0a0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(vm.potValue)}</div>
+              <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-.02em', background: 'linear-gradient(120deg,#f5c542,#3df0a0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(lootTotal)}</div>
             </div>
           </div>
           <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted, marginBottom: 12 }}>CHAMPION LOOT · {formatUsd(champ.total)}</div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {champ.cards.map((c, i) => {
-                const r = rarOf(c.rarity)
-                return (
-                  <div key={i} style={{ position: 'relative', width: 78, height: 106, borderRadius: 11, overflow: 'hidden', background: `linear-gradient(160deg,${r.tint},rgba(8,10,14,.5))`, border: `1px solid ${r.border}`, boxShadow: '0 10px 26px -12px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.14)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 8 }}>
-                    <span style={{ position: 'absolute', top: 8, left: 8, fontFamily: FONTS.mono, fontSize: 8, letterSpacing: '.1em', color: 'rgba(255,255,255,.7)' }}>{r.label}</span>
-                    <span style={{ fontFamily: FONTS.mono, fontSize: 12, fontWeight: 700, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.8)' }}>{formatUsd(c.insuredValue ?? 0)}</span>
-                  </div>
-                )
-              })}
+            <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted, marginBottom: 12 }}>CHAMPION LOOT · {formatUsd(lootTotal)}</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {allLoot.map((c, i) => (
+                <RevealCard key={i} card={c} reducedMotion w={78} h={108} />
+              ))}
             </div>
           </div>
         </section>
