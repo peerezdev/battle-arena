@@ -18,7 +18,7 @@ from .privy import PrivyVerifier, PrivyAuthError
 from .chain.base import ChainSource
 from .chain.mock import MockChainSource
 from .services.users import (
-    get_or_create_user, read_user_view, set_alias, leaderboard, history, AliasTakenError,
+    get_or_create_user, read_user_view, read_user_stats, set_alias, leaderboard, history, AliasTakenError,
 )
 from .services.matches import register_match, list_open, sync_match, MatchError
 from .services.referrals import apply_referral_code, ReferralError
@@ -172,6 +172,10 @@ def create_app(session_factory, chain: ChainSource,
     @app.get("/users/{wallet}")
     async def get_user(wallet: str, s: Session = Depends(db)):
         return read_user_view(s, wallet, elo_start)
+
+    @app.get("/users/{wallet}/stats")
+    async def get_user_stats(wallet: str, s: Session = Depends(db)):
+        return read_user_stats(s, wallet)
 
     @app.get("/users/{wallet}/history")
     async def get_history(wallet: str, s: Session = Depends(db)):

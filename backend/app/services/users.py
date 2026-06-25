@@ -51,3 +51,58 @@ def history(session: Session, wallet: str) -> list[RatingHistory]:
     return list(session.scalars(
         select(RatingHistory).where(RatingHistory.wallet == wallet).order_by(desc(RatingHistory.ts))
     ))
+
+
+def read_user_stats(session: Session, wallet: str) -> dict:
+    """Aggregate profile stats from settled battles + pulls. Computed on read (no schema):
+    battles/wins/win_rate/total_wagered, the best single card pulled, and the biggest loot
+    (combined insured value) of a battle the wallet won."""
+    from ..models import PackBattle, BattlePlayer, BattlePull
+    USDC = 1_000_000  # USDC base units → dollars
+
+    battles = list(session.scalars(
+        select(PackBattle)
+        .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
+        .where(BattlePlayer.player_wallet == wallet, PackBattle.status == "settled")
+    ))
+    n_battles = len(battles)
+    wins = sum(1 for b in battles if b.winner == wallet)
+    wagered_usd = sum(b.price for b in battles) / USDC
+
+    # best hit — the single highest-value card this wallet ever pulled
+    best_pull = session.scalars(
+        select(BattlePull)
+        .where(BattlePull.player_wallet == wallet, BattlePull.insured_value.isnot(None))
+        .order_by(desc(BattlePull.insured_value)).limit(1)
+    ).first()
+    best_hit = None
+    if best_pull is not None:
+        best_hit = {"name": best_pull.name, "grade": best_pull.grade, "rarity": best_pull.rarity,
+                    "year": best_pull.year, "valueUsd": best_pull.insured_value}
+
+    # best victory — biggest combined loot (all cards) of a battle this wallet won
+    best_victory = None
+    for b in battles:
+        if b.winner != wallet:
+            continue
+        loot = session.scalar(
+            select(func.coalesce(func.sum(BattlePull.insured_value), 0.0))
+            .where(BattlePull.battle_id == b.id)
+        ) or 0.0
+        if best_victory is None or loot > best_victory["amountUsd"]:
+            opponents = [w for (w,) in session.execute(
+                select(BattlePlayer.player_wallet)
+                .where(BattlePlayer.battle_id == b.id, BattlePlayer.player_wallet != wallet)
+            )]
+            best_victory = {"amountUsd": loot, "mode": b.mode, "machineCode": b.machine_code,
+                            "opponents": opponents}
+
+    return {
+        "wallet": wallet,
+        "battles": n_battles,
+        "wins": wins,
+        "winRate": (wins / n_battles) if n_battles else 0.0,
+        "totalWageredUsd": wagered_usd,
+        "bestHit": best_hit,
+        "bestVictory": best_victory,
+    }
