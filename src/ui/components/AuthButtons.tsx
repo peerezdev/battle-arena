@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { COLORS, GRADIENT, FONTS } from '../theme'
 import { useProfile } from '../../hooks/useProfile'
 import { useIsWide } from '../useIsWide'
-import { showToast } from '../toast'
+import { WithdrawModal } from './WithdrawModal'
 
 /** Abbreviate a wallet address: "ABcd…WXyz" (first 4 + last 4 chars). */
 function abbrevAddr(addr: string): string {
@@ -55,6 +55,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
   const navigate = useNavigate()
   const { username } = useProfile()
   const [open, setOpen] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
   const isCompact = variant === 'compact'
   const wide = useIsWide('(min-width: 760px)')
@@ -111,6 +112,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
   const avatar = isCompact ? 30 : 34
 
   return (
+    <>
     <div ref={boxRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen((o) => !o)}
@@ -175,7 +177,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
           <MenuItem
             icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>}
             label="Withdraw"
-            onClick={() => { setOpen(false); showToast('Withdrawals are coming soon.', 'info') }}
+            onClick={() => { setOpen(false); setWithdrawOpen(true) }}
           />
           <MenuItem
             icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
@@ -197,5 +199,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
         </div>
       )}
     </div>
+    <WithdrawModal open={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
+    </>
   )
 }
