@@ -92,34 +92,35 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
     )
   }
 
-  // ── Authenticated: Profile button + dropdown ───────────────────────────────
+  // ── Authenticated: user-icon button + dropdown ─────────────────────────────
   const emailAddr = user?.email?.address
   const walletAddr = user?.wallet?.address
-  const displayName = username ?? emailAddr ?? (walletAddr ? abbrevAddr(walletAddr) : 'Account')
+  const idLine = emailAddr ?? (walletAddr ? abbrevAddr(walletAddr) : null)
+  const size = isCompact ? 34 : 38
 
   return (
     <div ref={boxRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen((o) => !o)}
-        title={emailAddr ?? walletAddr ?? undefined}
+        title={username ?? emailAddr ?? walletAddr ?? 'Account'}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
+          position: 'relative',
+          width: size,
+          height: size,
+          borderRadius: '50%',
           background: '#11161f',
           border: `1px solid ${COLORS.border}`,
-          borderRadius: '10px',
-          padding: isCompact ? '6px 12px' : '8px 14px',
-          fontSize: isCompact ? '11px' : '13px',
-          fontFamily: FONTS.mono,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           color: COLORS.text,
-          maxWidth: isCompact ? '160px' : '220px',
           cursor: 'pointer',
+          flexShrink: 0,
         }}
       >
-        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: COLORS.green, flexShrink: 0 }} />
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
-        <span style={{ marginLeft: 2, color: COLORS.muted, fontSize: 10 }}>▾</span>
+        <svg width={isCompact ? 17 : 19} height={isCompact ? 17 : 19} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+        {/* online dot */}
+        <span style={{ position: 'absolute', right: -1, bottom: -1, width: 9, height: 9, borderRadius: '50%', background: COLORS.green, border: '2px solid #11161f', boxShadow: `0 0 6px ${COLORS.green}` }} />
       </button>
 
       {open && (
@@ -128,7 +129,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
             position: 'absolute',
             top: 'calc(100% + 6px)',
             right: 0,
-            minWidth: 160,
+            minWidth: 200,
             background: '#11161f',
             border: `1px solid ${COLORS.border}`,
             borderRadius: 10,
@@ -137,20 +138,26 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
             boxShadow: '0 8px 24px #00000066',
           }}
         >
+          {/* identity header */}
+          <div style={{ padding: '8px 11px 10px' }}>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.16em', color: COLORS.muted }}>SIGNED IN AS</div>
+            <div style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 14, color: COLORS.text, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {username ?? idLine ?? 'Account'}
+            </div>
+            {username && idLine && (
+              <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{idLine}</div>
+            )}
+          </div>
+          <div style={{ height: 1, background: COLORS.border, margin: '2px 0 6px' }} />
+
           <button
-            onClick={() => {
-              setOpen(false)
-              navigate('/profile')
-            }}
+            onClick={() => { setOpen(false); navigate('/profile') }}
             style={menuItemStyle}
           >
             View profile
           </button>
           <button
-            onClick={() => {
-              setOpen(false)
-              void logout()
-            }}
+            onClick={() => { setOpen(false); void logout() }}
             style={{ ...menuItemStyle, color: COLORS.muted }}
           >
             Log out
