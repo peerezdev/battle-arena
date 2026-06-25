@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
-import { AnimaOverlay } from './AnimaModel'
 import { useAliases } from '../../useAliases'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
@@ -76,7 +75,6 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
 
   return (
     <div style={screenStyle}>
-      <AnimaOverlay />
       {TITLE}
       <ResultView
         vm={vm} name={name} ranked={ranked} entry={entry}
