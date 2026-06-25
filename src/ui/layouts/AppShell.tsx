@@ -132,8 +132,9 @@ export function AppShell() {
 
           {/* Balance + Gimmighouls — labelled groups on desktop; one divided box on mobile */}
           {authenticated && (wideRail ? (
-            <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            // Desktop: USDC + Gimmighouls inside ONE pill, label-on-top, split by a divider.
+            <div style={{ display: 'flex', alignItems: 'stretch', background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 13 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 15px' }}>
                 <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>BALANCE</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <img src="/usdc.svg" alt="" width={19} height={19} style={{ display: 'block' }} />
@@ -145,7 +146,8 @@ export function AppShell() {
                   )}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }} title="Gimmighouls">
+              <span style={{ width: 1, background: COLORS.border, margin: '7px 0' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 15px' }} title="Gimmighouls">
                 <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>GIMMIGHOULS</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                   <img src="/gimmighoul.png" alt="" width={19} height={19} style={{ display: 'block' }} />
@@ -154,7 +156,7 @@ export function AppShell() {
                   </span>
                 </div>
               </div>
-            </>
+            </div>
           ) : (
             // Mobile: USDC | Gimmighouls in one box, split by a vertical divider.
             <div style={{ display: 'flex', alignItems: 'stretch', background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 11 }}>
