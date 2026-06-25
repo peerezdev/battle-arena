@@ -125,52 +125,44 @@ export function AppShell() {
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Balance + Gimmighouls — with a session (compact on mobile) */}
-          {authenticated && (
+          {/* Balance + Gimmighouls — two pills on desktop; one divided box on mobile */}
+          {authenticated && (wideRail ? (
             <>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: wideRail ? 8 : 6,
-                  background: '#11161f',
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 11,
-                  padding: wideRail ? '7px 13px' : '6px 10px',
-                }}
-              >
-                <img src="/usdc.svg" alt="" width={wideRail ? 20 : 17} height={wideRail ? 20 : 17} style={{ display: 'block' }} />
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: wideRail ? 14 : 13 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 11, padding: '7px 13px' }}>
+                <img src="/usdc.svg" alt="" width={20} height={20} style={{ display: 'block' }} />
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
                   {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
                 </span>
-                {wideRail && reserved != null && reserved > 0 && (
-                  <span style={{ fontSize: 9, color: COLORS.muted }}>
-                    · {formatUsd(reserved)} reserved
-                  </span>
+                {reserved != null && reserved > 0 && (
+                  <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(reserved)} reserved</span>
                 )}
               </div>
-
-              {/* Gimmighouls — loyalty points */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: wideRail ? 7 : 6,
-                  background: '#11161f',
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 11,
-                  padding: wideRail ? '7px 13px' : '6px 10px',
-                }}
-                title="Gimmighouls"
-              >
-                <img src="/gimmighoul.png" alt="" width={wideRail ? 20 : 17} height={wideRail ? 20 : 17} style={{ display: 'block' }} />
-                {wideRail && <span style={{ fontSize: 10, color: COLORS.muted, letterSpacing: '.1em' }}>Gimmighouls</span>}
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: wideRail ? 14 : 13 }}>
-                  {gimmighouls == null ? '—' : wideRail ? gimmighouls.toLocaleString() : fmtGh(gimmighouls)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 11, padding: '7px 13px' }} title="Gimmighouls">
+                <img src="/gimmighoul.png" alt="" width={20} height={20} style={{ display: 'block' }} />
+                <span style={{ fontSize: 10, color: COLORS.muted, letterSpacing: '.1em' }}>Gimmighouls</span>
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
+                  {gimmighouls != null ? gimmighouls.toLocaleString() : '—'}
                 </span>
               </div>
             </>
-          )}
+          ) : (
+            // Mobile: USDC | Gimmighouls in one box, split by a vertical divider.
+            <div style={{ display: 'flex', alignItems: 'stretch', background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 11 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
+                <img src="/usdc.svg" alt="" width={17} height={17} style={{ display: 'block' }} />
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 13 }}>
+                  {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
+                </span>
+              </div>
+              <span style={{ width: 1, background: COLORS.border }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }} title="Gimmighouls">
+                <img src="/gimmighoul.png" alt="" width={17} height={17} style={{ display: 'block' }} />
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 13 }}>
+                  {gimmighouls != null ? fmtGh(gimmighouls) : '—'}
+                </span>
+              </div>
+            </div>
+          ))}
 
           {/* Auth buttons */}
           <AuthButtons variant="compact" />
