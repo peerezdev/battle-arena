@@ -130,24 +130,29 @@ export function AppShell() {
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Balance + Gimmighouls — two pills on desktop; one divided box on mobile */}
+          {/* Balance + Gimmighouls — labelled groups on desktop; one divided box on mobile */}
           {authenticated && (wideRail ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 11, padding: '7px 13px' }}>
-                <img src="/usdc.svg" alt="" width={20} height={20} style={{ display: 'block' }} />
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
-                  {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
-                </span>
-                {reserved != null && reserved > 0 && (
-                  <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(reserved)} reserved</span>
-                )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>BALANCE</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <img src="/usdc.svg" alt="" width={19} height={19} style={{ display: 'block' }} />
+                  <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
+                    {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
+                  </span>
+                  {reserved != null && reserved > 0 && (
+                    <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(reserved)} reserved</span>
+                  )}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 11, padding: '7px 13px' }} title="Gimmighouls">
-                <img src="/gimmighoul.png" alt="" width={20} height={20} style={{ display: 'block' }} />
-                <span style={{ fontSize: 10, color: COLORS.muted, letterSpacing: '.1em' }}>Gimmighouls</span>
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
-                  {gimmighouls != null ? gimmighouls.toLocaleString() : '—'}
-                </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }} title="Gimmighouls">
+                <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>GIMMIGHOULS</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <img src="/gimmighoul.png" alt="" width={19} height={19} style={{ display: 'block' }} />
+                  <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
+                    {gimmighouls != null ? gimmighouls.toLocaleString() : '—'}
+                  </span>
+                </div>
               </div>
             </>
           ) : (
@@ -169,9 +174,7 @@ export function AppShell() {
             </div>
           ))}
 
-          {/* Auth buttons */}
-          <AuthButtons variant="compact" />
-
+          {/* Deposit (before the account pill, as in the mockup) */}
           {authenticated && (
             <button
               onClick={() => setDepositOpen(true)}
@@ -179,18 +182,22 @@ export function AppShell() {
                 background: GRADIENT,
                 border: 'none',
                 borderRadius: 10,
-                padding: '7px 14px',
+                padding: wideRail ? '9px 16px' : '7px 14px',
                 color: '#06120c',
-                fontWeight: 700,
-                fontSize: 12,
+                fontWeight: 800,
+                fontSize: wideRail ? 13 : 12,
                 fontFamily: FONTS.display,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
+                boxShadow: '0 0 18px -6px rgba(47,226,138,.7)',
               }}
             >
               + Deposit
             </button>
           )}
+
+          {/* Account pill */}
+          <AuthButtons variant="compact" />
 
         </header>
 

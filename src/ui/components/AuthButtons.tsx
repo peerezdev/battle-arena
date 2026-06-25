@@ -15,6 +15,7 @@ import { usePrivy } from '@privy-io/react-auth'
 import { useNavigate } from 'react-router-dom'
 import { COLORS, GRADIENT, FONTS } from '../theme'
 import { useProfile } from '../../hooks/useProfile'
+import { useIsWide } from '../useIsWide'
 
 /** Abbreviate a wallet address: "ABcd…WXyz" (first 4 + last 4 chars). */
 function abbrevAddr(addr: string): string {
@@ -49,6 +50,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
   const [open, setOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
   const isCompact = variant === 'compact'
+  const wide = useIsWide('(min-width: 760px)')
 
   useEffect(() => {
     if (!open) return
@@ -92,35 +94,48 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
     )
   }
 
-  // ── Authenticated: user-icon button + dropdown ─────────────────────────────
+  // ── Authenticated: avatar pill (initial + name + caret) + dropdown ──────────
   const emailAddr = user?.email?.address
   const walletAddr = user?.wallet?.address
   const idLine = emailAddr ?? (walletAddr ? abbrevAddr(walletAddr) : null)
-  const size = isCompact ? 34 : 38
+  const displayName = username ?? idLine ?? 'Account'
+  const initial = (username ?? emailAddr ?? walletAddr ?? '?').slice(0, 1).toUpperCase()
+  const showName = wide
+  const avatar = isCompact ? 30 : 34
 
   return (
     <div ref={boxRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen((o) => !o)}
-        title={username ?? emailAddr ?? walletAddr ?? 'Account'}
+        title={displayName}
         style={{
-          position: 'relative',
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          background: '#11161f',
-          border: `1px solid ${COLORS.border}`,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          gap: 8,
+          background: '#11161f',
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 999,
+          padding: showName ? '4px 12px 4px 4px' : 4,
           color: COLORS.text,
           cursor: 'pointer',
           flexShrink: 0,
         }}
       >
-        <svg width={isCompact ? 17 : 19} height={isCompact ? 17 : 19} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-        {/* online dot */}
-        <span style={{ position: 'absolute', right: -1, bottom: -1, width: 9, height: 9, borderRadius: '50%', background: COLORS.green, border: '2px solid #11161f', boxShadow: `0 0 6px ${COLORS.green}` }} />
+        <span style={{
+          position: 'relative', width: avatar, height: avatar, borderRadius: '50%', background: GRADIENT,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          fontFamily: FONTS.display, fontWeight: 800, fontSize: 13, color: '#06120c',
+        }}>
+          {initial}
+          {/* online dot */}
+          <span style={{ position: 'absolute', right: -1, bottom: -1, width: 9, height: 9, borderRadius: '50%', background: COLORS.green, border: '2px solid #11161f', boxShadow: `0 0 6px ${COLORS.green}` }} />
+        </span>
+        {showName && (
+          <span style={{ fontFamily: FONTS.body, fontWeight: 700, fontSize: 13, color: COLORS.text, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {displayName}
+          </span>
+        )}
+        <span style={{ color: COLORS.muted, fontSize: 10, marginRight: showName ? 2 : 3 }}>▾</span>
       </button>
 
       {open && (
