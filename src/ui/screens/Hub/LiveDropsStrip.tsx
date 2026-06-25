@@ -1,4 +1,4 @@
-import { COLORS, FONTS, formatUsd } from '../../theme'
+import { COLORS, FONTS, formatUsd, rarityGlow } from '../../theme'
 import { useDrops } from '../../drops/useDrops'
 
 /** Mobile-only horizontal Live Drops bar — sits at the top and scrolls sideways
@@ -23,12 +23,20 @@ export function LiveDropsStrip() {
       {drops.length === 0 ? (
         <span style={{ fontSize: 11, color: COLORS.muted }}>No drops yet — open a pack.</span>
       ) : (
-        drops.map((d) => (
+        drops.map((d) => {
+          const glow = rarityGlow(d.rarity)
+          return (
           <div key={d.id} style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
-            padding: '6px 11px 6px 6px', borderRadius: 11, background: '#ffffff08', border: `1px solid ${COLORS.border}`,
+            padding: '6px 11px 6px 6px', borderRadius: 11, background: '#ffffff08',
+            border: `1px solid ${glow ?? COLORS.border}`,
+            boxShadow: glow ? `0 0 12px -2px ${glow}` : undefined,
           }}>
-            <span style={{ flex: 'none', width: 26, height: 34, borderRadius: 5, overflow: 'hidden', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{
+              flex: 'none', width: 26, height: 34, borderRadius: 5, overflow: 'hidden', background: '#0c1019',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: glow ? `inset 0 0 8px -2px ${glow}` : undefined,
+            }}>
               {d.image ? <img src={d.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 14 }}>🃏</span>}
             </span>
             <div style={{ minWidth: 0 }}>
@@ -38,7 +46,8 @@ export function LiveDropsStrip() {
               </div>
             </div>
           </div>
-        ))
+          )
+        })
       )}
     </div>
   )

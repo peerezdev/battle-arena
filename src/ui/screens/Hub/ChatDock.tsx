@@ -1,5 +1,5 @@
 import { useState, useRef, useReducer, useEffect } from 'react'
-import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
+import { COLORS, FONTS, RARITY, formatUsd, rarityGlow } from '../../theme'
 import { useChat } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
 import { useProfile } from '../../../hooks/useProfile'
@@ -248,6 +248,7 @@ export function ChatDock({
         ) : (
           drops.map((drop) => {
             const accent = RARITY_ACCENT[(drop.rarity ?? '').toLowerCase()] ?? COLORS.green
+            const glow = rarityGlow(drop.rarity)
             return (
               <div
                 key={drop.id}
@@ -271,6 +272,8 @@ export function ChatDock({
                     fontSize: 13,
                     flexShrink: 0,
                     overflow: 'hidden',
+                    border: glow ? `1px solid ${glow}` : undefined,
+                    boxShadow: glow ? `0 0 12px -1px ${glow}, inset 0 0 8px -3px ${glow}` : undefined,
                   }}
                 >
                   {drop.image ? (
