@@ -369,6 +369,45 @@ def create_app(session_factory, chain: ChainSource,
         except Exception:
             logger.exception("live drop broadcast failed")
 
+    async def _broadcast_battle_drops(battle_id: str) -> None:
+        """Surface a settled battle's pulls in the global Recent Drops feed.
+
+        Mirrors the gacha drop broadcast, but one drop per pull and without the
+        anti-spoiler delay (participants already watched the reveal). Staggered so
+        they stream into the feed instead of arriving as one burst.
+        """
+        try:
+            from .models import BattlePull
+            s3 = session_factory()
+            try:
+                pulls = (s3.query(BattlePull)
+                         .filter(BattlePull.battle_id == battle_id,
+                                 BattlePull.nft_address.isnot(None))
+                         .all())
+                alias_cache: dict = {}
+                drops = []
+                for p in pulls:
+                    if p.player_wallet not in alias_cache:
+                        alias_cache[p.player_wallet] = read_user_view(s3, p.player_wallet, elo_start).get("alias")
+                    drops.append({
+                        "type": "drop",
+                        "id": p.nft_address,
+                        "wallet": p.player_wallet,
+                        "username": alias_cache[p.player_wallet],
+                        "name": p.name,
+                        "valueUsd": p.insured_value,
+                        "rarity": p.rarity,
+                        "image": f"https://nft-dev.collectorcrypt.com/front/{p.nft_address}",
+                        "ts": int(_time.time()),
+                    })
+            finally:
+                s3.close()
+            for d in drops:
+                await _chat_mgr.broadcast(d)
+                await asyncio.sleep(0.5)
+        except Exception:
+            logger.exception("battle drops broadcast failed")
+
     @app.post("/gacha/yolo")
     async def gacha_yolo(body: YoloBody,
                          wallet: str = Depends(current_user),
@@ -441,6 +480,7 @@ def create_app(session_factory, chain: ChainSource,
                 rpc_url=solana_rpc_url, usdc_mint=cc_usdc_mint,
                 min_usdc_base_units=b.price, operator_wallet_id=privy_operator_wallet_id,
                 operator_address=privy_operator_address, seed_lamports=escrow_seed_lamports)
+            asyncio.create_task(_broadcast_battle_drops(battle_id))
         except Exception:
             logger.warning("background run failed for %s", battle_id)
         finally:
@@ -463,6 +503,7 @@ def create_app(session_factory, chain: ChainSource,
                 operator_address=privy_operator_address,
                 seed_lamports=escrow_seed_lamports,
                 price_base=b.price)
+            asyncio.create_task(_broadcast_battle_drops(battle_id))
         except Exception:
             logger.warning("background royale run failed for %s", battle_id)
         finally:
