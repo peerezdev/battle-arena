@@ -17,7 +17,7 @@ export function LiveDropsStrip() {
         fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.16em', color: COLORS.muted,
       }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: COLORS.green, boxShadow: `0 0 8px ${COLORS.green}` }} />
-        DROPS
+        RECENT DROPS
       </div>
 
       {drops.length === 0 ? (

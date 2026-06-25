@@ -213,7 +213,7 @@ export function ChatDock({
                 display: 'inline-block',
               }}
             />
-            LIVE DROPS
+            RECENT DROPS
           </div>
           {onToggle && (
             <button
