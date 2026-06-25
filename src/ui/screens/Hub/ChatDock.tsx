@@ -256,7 +256,12 @@ export function ChatDock({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: '7px 0',
+                  padding: '8px 10px',
+                  margin: '3px 0',
+                  borderRadius: 12,
+                  border: `1px solid ${glow ?? 'transparent'}`,
+                  background: glow ? `${glow}14` : 'transparent',
+                  boxShadow: glow ? `0 0 16px -3px ${glow}, inset 0 0 10px -6px ${glow}` : undefined,
                 }}
               >
                 {/* Card image / emoji */}
@@ -272,8 +277,6 @@ export function ChatDock({
                     fontSize: 13,
                     flexShrink: 0,
                     overflow: 'hidden',
-                    border: glow ? `1px solid ${glow}` : undefined,
-                    boxShadow: glow ? `0 0 12px -1px ${glow}, inset 0 0 8px -3px ${glow}` : undefined,
                   }}
                 >
                   {drop.image ? (
