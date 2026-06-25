@@ -29,6 +29,10 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
   const winner = vm.players.find((p) => p.wallet === vm.winner) ?? ranked[0]
   const title = iWon ? 'You won!' : iAmPlayer ? 'You lost' : 'Battle over'
 
+  // Winner takes ALL cards pulled in the battle; the prize = total insured value of that loot.
+  const allLoot = vm.players.flatMap((p) => p.cards)
+  const lootTotal = allLoot.reduce((s, c) => s + (c.insuredValue ?? 0), 0)
+
   return (
     <div style={{ padding: '22px clamp(14px,2.4vw,28px) 32px', display: 'flex', flexDirection: 'column', gap: 22 }}>
       {/* winner hero */}
@@ -61,7 +65,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
         {winner && (
           <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4, animation: 'ba-prizein .6s cubic-bezier(.2,1.2,.4,1) both' }}>
             <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>PRIZE</div>
-            <div style={{ fontFamily: FONTS.display, fontSize: 'clamp(46px,7vw,70px)', fontWeight: 700, letterSpacing: '-.03em', lineHeight: .9, background: 'linear-gradient(120deg,#3df0a0,#13c98a 60%,#8b5cf6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(winner.total)}</div>
+            <div style={{ fontFamily: FONTS.display, fontSize: 'clamp(46px,7vw,70px)', fontWeight: 700, letterSpacing: '-.03em', lineHeight: .9, background: 'linear-gradient(120deg,#3df0a0,#13c98a 60%,#8b5cf6)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(lootTotal)}</div>
           </div>
         )}
 
@@ -71,6 +75,24 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
           <button onClick={onExit} style={{ padding: '13px 22px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.muted, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>Back to lobby</button>
         </div>
       </section>
+
+      {/* winner's haul — every card pulled in the battle goes to the winner */}
+      {allLoot.length > 0 && (
+        <section style={{
+          borderRadius: 22, padding: 'clamp(20px,2.4vw,30px)',
+          background: 'linear-gradient(135deg,rgba(47,226,138,.08),rgba(13,17,22,.6) 55%,rgba(139,92,246,.06))',
+          border: '1px solid rgba(47,226,138,.32)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.2em', color: COLORS.green }}>WINNER TAKES ALL · {formatUsd(lootTotal)}</span>
+            <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(47,226,138,.25),transparent)' }} />
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>{allLoot.length} cards</span>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {allLoot.map((c, i) => <RevealCard key={i} card={c} reducedMotion w={120} h={200} />)}
+          </div>
+        </section>
+      )}
 
       {/* standings */}
       <div>
@@ -91,7 +113,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
                 border: `1px solid ${isWinner ? 'rgba(47,226,138,.5)' : COLORS.border}`,
                 boxShadow: isWinner ? '0 0 50px -18px rgba(47,226,138,.5)' : 'none',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
                   <span style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: '50%', fontFamily: FONTS.mono, fontSize: 14, fontWeight: 700, color: ps.ink, background: ps.bg, border: `1px solid ${ps.border}` }}>#{i + 1}</span>
                   <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#06170f', background: tintFor(p.wallet), border: `2px solid ${p.isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{name(p).slice(0, 1).toUpperCase()}</span>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -104,9 +126,6 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
                     <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.16em', color: COLORS.muted }}>PACK VALUE</div>
                     <div style={{ fontFamily: FONTS.display, fontSize: 20, fontWeight: 700, letterSpacing: '-.02em', color: isWinner ? COLORS.green : COLORS.text }}>{formatUsd(p.total)}</div>
                   </div>
-                </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {p.cards.map((c, idx) => <RevealCard key={idx} card={c} reducedMotion size="sm" />)}
                 </div>
               </div>
             )
