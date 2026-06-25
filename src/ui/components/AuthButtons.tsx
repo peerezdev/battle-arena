@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { COLORS, GRADIENT, FONTS } from '../theme'
 import { useProfile } from '../../hooks/useProfile'
 import { useIsWide } from '../useIsWide'
+import { showToast } from '../toast'
 
 /** Abbreviate a wallet address: "ABcd…WXyz" (first 4 + last 4 chars). */
 function abbrevAddr(addr: string): string {
@@ -27,18 +28,24 @@ interface AuthButtonsProps {
   variant?: 'nav' | 'compact'
 }
 
-const menuItemStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  textAlign: 'left',
-  background: 'transparent',
-  border: 'none',
-  color: '#e9edf5',
-  borderRadius: 7,
-  padding: '9px 11px',
-  fontSize: 13,
-  fontFamily: 'Inter, system-ui, sans-serif',
-  cursor: 'pointer',
+function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
+        background: hover ? '#ffffff0a' : 'transparent', border: 'none', borderRadius: 8,
+        padding: '9px 11px', fontSize: 13.5, fontFamily: FONTS.body, fontWeight: 600,
+        color: danger ? COLORS.red : COLORS.text, cursor: 'pointer',
+      }}
+    >
+      <span style={{ display: 'flex', color: danger ? COLORS.red : COLORS.muted, flexShrink: 0 }}>{icon}</span>
+      {label}
+    </button>
+  )
 }
 
 export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
@@ -144,39 +151,49 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
             position: 'absolute',
             top: 'calc(100% + 6px)',
             right: 0,
-            minWidth: 200,
+            minWidth: 214,
             background: '#11161f',
             border: `1px solid ${COLORS.border}`,
-            borderRadius: 10,
+            borderRadius: 12,
             padding: 6,
             zIndex: 50,
             boxShadow: '0 8px 24px #00000066',
           }}
         >
-          {/* identity header */}
-          <div style={{ padding: '8px 11px 10px' }}>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.16em', color: COLORS.muted }}>SIGNED IN AS</div>
-            <div style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 14, color: COLORS.text, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {username ?? idLine ?? 'Account'}
+          {/* identity header: avatar + name + wallet */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px 11px' }}>
+            <span style={{ width: 38, height: 38, borderRadius: '50%', background: GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 15, color: '#06120c' }}>{initial}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 14.5, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{username ?? idLine ?? 'Account'}</div>
+              {walletAddr && (
+                <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginTop: 1 }}>{abbrevAddr(walletAddr)}</div>
+              )}
             </div>
-            {username && idLine && (
-              <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{idLine}</div>
-            )}
           </div>
           <div style={{ height: 1, background: COLORS.border, margin: '2px 0 6px' }} />
 
-          <button
+          <MenuItem
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>}
+            label="Withdraw"
+            onClick={() => { setOpen(false); showToast('Withdrawals are coming soon.', 'info') }}
+          />
+          <MenuItem
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>}
+            label="My Profile"
             onClick={() => { setOpen(false); navigate('/profile') }}
-            style={menuItemStyle}
-          >
-            View profile
-          </button>
-          <button
+          />
+          <MenuItem
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /></svg>}
+            label="Inventory"
+            onClick={() => { setOpen(false); navigate('/profile?tab=inventory') }}
+          />
+          <div style={{ height: 1, background: COLORS.border, margin: '6px 0' }} />
+          <MenuItem
+            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>}
+            label="Log out"
+            danger
             onClick={() => { setOpen(false); void logout() }}
-            style={{ ...menuItemStyle, color: COLORS.muted }}
-          >
-            Log out
-          </button>
+          />
         </div>
       )}
     </div>
