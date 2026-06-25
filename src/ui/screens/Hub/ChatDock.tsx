@@ -2,6 +2,9 @@ import { useState, useRef, useReducer, useEffect } from 'react'
 import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
 import { useChat } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
+import { useProfile } from '../../../hooks/useProfile'
+import { showToast } from '../../toast'
+import { UsernameModal } from '../../components/UsernameModal'
 import type { LiveDrop } from '../../drops/dropsStore'
 
 // Opener label for a drop row: username if known, else a short wallet.
@@ -56,7 +59,20 @@ export function ChatDock({
 }) {
   const drops = useDrops()
   const { messages, send, canPost, online } = useChat()
+  const { username } = useProfile()
   const [draft, setDraft] = useState('')
+  const [nameModal, setNameModal] = useState(false)
+  const promptedName = useRef(false)
+
+  // First time the user focuses the chat with no username set, nudge them to pick one.
+  function onChatFocus() {
+    if (canPost && !username && !promptedName.current) {
+      promptedName.current = true
+      showToast('Set a username so others recognize you in chat', 'info', {
+        label: 'Choose username', onClick: () => setNameModal(true),
+      })
+    }
+  }
 
   const [, forceTick] = useReducer((x: number) => x + 1, 0)
   useEffect(() => {
@@ -489,6 +505,7 @@ export function ChatDock({
             disabled={!canPost}
             placeholder={canPost ? 'Type a message…' : 'Log in to chat'}
             value={draft}
+            onFocus={onChatFocus}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
             style={{
@@ -523,6 +540,7 @@ export function ChatDock({
           </button>
         </div>
       </div>
+      {nameModal && <UsernameModal onClose={() => setNameModal(false)} />}
     </aside>
   )
 }
