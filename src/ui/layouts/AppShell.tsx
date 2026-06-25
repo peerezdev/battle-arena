@@ -11,11 +11,19 @@ import { AuthButtons } from '../components/AuthButtons'
 import { DepositModal } from '../components/DepositModal'
 import { LeftRail } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
+import { LiveDropsStrip } from '../screens/Hub/LiveDropsStrip'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
 
 const DOCK_KEY = 'ba.dockCollapsed'
+
+// Compact Gimmighoul count for the tight mobile header (262,500,000 → 262.5M).
+function fmtGh(n: number): string {
+  if (n >= 1e6) return `${+(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3) return `${+(n / 1e3).toFixed(1)}k`
+  return String(n)
+}
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -29,7 +37,6 @@ export function AppShell() {
   // Breakpoints copied verbatim from Hub.tsx
   const wideRail = useIsWide('(min-width: 760px)')
   const wideDock = useIsWide('(min-width: 1100px)')
-  const showBalance = useIsWide('(min-width: 480px)')
 
   const [depositOpen, setDepositOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
@@ -72,7 +79,7 @@ export function AppShell() {
       {wideRail ? (
         <LeftRail active={active} onSelect={onSelect} onProfile={() => navigate('/profile')} />
       ) : (
-        <BottomNav active={active} onSelect={onSelect} />
+        <BottomNav active={active} onSelect={onSelect} onChat={() => setChatOpen(true)} />
       )}
 
       {/* ── COLUMNA PRINCIPAL ─────────────────────────────────────────────── */}
@@ -112,31 +119,31 @@ export function AppShell() {
                 boxShadow: '0 0 10px #8b5cf688',
               }}
             />
-            <span>Collector <span style={{ color: COLORS.green }}>Arena</span></span>
+            {wideRail && <span>Collector <span style={{ color: COLORS.green }}>Arena</span></span>}
           </div>
 
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Balance + Deposit — solo con sesión */}
-          {authenticated && showBalance && (
+          {/* Balance + Gimmighouls — with a session (compact on mobile) */}
+          {authenticated && (
             <>
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  gap: wideRail ? 8 : 6,
                   background: '#11161f',
                   border: `1px solid ${COLORS.border}`,
                   borderRadius: 11,
-                  padding: '7px 13px',
+                  padding: wideRail ? '7px 13px' : '6px 10px',
                 }}
               >
-                <span style={{ fontSize: 9, color: COLORS.muted, letterSpacing: '.1em' }}>BALANCE</span>
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
+                <img src="/usdc.svg" alt="" width={wideRail ? 20 : 17} height={wideRail ? 20 : 17} style={{ display: 'block' }} />
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: wideRail ? 14 : 13 }}>
                   {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
                 </span>
-                {reserved != null && reserved > 0 && (
+                {wideRail && reserved != null && reserved > 0 && (
                   <span style={{ fontSize: 9, color: COLORS.muted }}>
                     · {formatUsd(reserved)} reserved
                   </span>
@@ -148,17 +155,18 @@ export function AppShell() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 7,
+                  gap: wideRail ? 7 : 6,
                   background: '#11161f',
                   border: `1px solid ${COLORS.border}`,
                   borderRadius: 11,
-                  padding: '7px 13px',
+                  padding: wideRail ? '7px 13px' : '6px 10px',
                 }}
                 title="Gimmighouls"
               >
-                <img src="/gimmighoul.png" alt="" width={16} height={16} style={{ display: 'block' }} />
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 14 }}>
-                  {gimmighouls != null ? gimmighouls.toLocaleString() : '—'}
+                <img src="/gimmighoul.png" alt="" width={wideRail ? 20 : 17} height={wideRail ? 20 : 17} style={{ display: 'block' }} />
+                {wideRail && <span style={{ fontSize: 10, color: COLORS.muted, letterSpacing: '.1em' }}>Gimmighouls</span>}
+                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: wideRail ? 14 : 13 }}>
+                  {gimmighouls == null ? '—' : wideRail ? gimmighouls.toLocaleString() : fmtGh(gimmighouls)}
                 </span>
               </div>
             </>
@@ -189,6 +197,9 @@ export function AppShell() {
 
         </header>
 
+        {/* Mobile: Live Drops as a horizontal strip at the top (desktop uses the right dock) */}
+        {!wideRail && <LiveDropsStrip />}
+
         {/* Routed page content */}
         <main
           style={{
@@ -207,14 +218,14 @@ export function AppShell() {
       {/* ── CHAT DOCK (ancho completo — desktop) ──────────────────────────── */}
       {showDock && <ChatDock collapsed={dockCollapsed} onToggle={toggleDock} />}
 
-      {/* ── FLOATING CHAT BUTTON (tablet / móvil) ─────────────────────────── */}
-      {!(wideRail && wideDock) && (
+      {/* ── FLOATING CHAT BUTTON (tablet only — mobile opens chat from the bottom nav) ── */}
+      {wideRail && !wideDock && (
         <button
           onClick={() => setChatOpen((o) => !o)}
           title="Chat"
           style={{
             position: 'fixed',
-            bottom: !wideRail ? 80 : 24, // above bottom nav on mobile
+            bottom: 24,
             right: 20,
             width: 48,
             height: 48,
@@ -280,10 +291,17 @@ export function AppShell() {
 function BottomNav({
   active,
   onSelect,
+  onChat,
 }: {
   active: HubNav
   onSelect: (id: HubNav) => void
+  onChat: () => void
 }) {
+  const btn = {
+    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 3,
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    padding: '8px 6px', borderRadius: 10, fontFamily: FONTS.body, flex: '1 1 0', minWidth: 0,
+  }
   return (
     <nav
       style={{
@@ -292,42 +310,32 @@ function BottomNav({
         left: 0,
         right: 0,
         height: 60,
-        background: '#0c1019',
+        background: 'rgba(9,11,16,.94)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
         borderTop: `1px solid ${COLORS.border}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
         zIndex: 50,
+        overflowX: 'auto',
       }}
     >
       {NAV_ITEMS.map((item) => {
         const isActive = item.id === active
         return (
-          <button
-            key={item.id}
-            onClick={() => onSelect(item.id)}
-            title={item.label}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 3,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: isActive ? COLORS.text : COLORS.muted,
-              padding: '8px 10px',
-              borderRadius: 10,
-              fontFamily: FONTS.body,
-            }}
-          >
+          <button key={item.id} onClick={() => onSelect(item.id)} title={item.label}
+            style={{ ...btn, color: isActive ? COLORS.text : COLORS.muted }}>
             <span style={{ fontSize: 18 }}>{item.icon}</span>
-            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>
-              {item.label}
-            </span>
+            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>{item.label}</span>
           </button>
         )
       })}
+      {/* Chat lives in the nav on mobile (no floating button) */}
+      <button onClick={onChat} title="Chat" style={{ ...btn, color: COLORS.muted }}>
+        <span style={{ fontSize: 18 }}>💬</span>
+        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>Chat</span>
+      </button>
     </nav>
   )
 }
