@@ -46,8 +46,18 @@ export function StagedCardReveal({
   const stage = stages[i]
   const onCard = stage === 'card'
 
+  // The rarity must not be telegraphed early: the back stays neutral through YEAR/GRADE and only
+  // takes the rarity color once the RARITY stage (or the card) is actually on screen.
+  const rarityIdx = stages.indexOf('rarity')
+  const backAccent = rarityIdx !== -1 && i >= rarityIdx ? rc : COLORS.muted
+
   useEffect(() => {
-    if (onCard) onCardShown?.()
+    if (!onCard) return
+    // Fire AFTER the flip lands so totals/leaders update once the card is actually shown
+    // (not while it's still flipping). Reduced motion fires synchronously.
+    if (reduced) { onCardShown?.(); return }
+    const t = setTimeout(() => onCardShown?.(), 550)
+    return () => clearTimeout(t)
     // Fire once when the card stage is reached; onCardShown identity intentionally ignored.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onCard])
@@ -63,7 +73,7 @@ export function StagedCardReveal({
       >
         {/* BACK — card back + the current stage text overlaid */}
         <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
-          <CardBack width={width} height={height} accent={rc} />
+          <CardBack width={width} height={height} accent={backAccent} />
           {!onCard && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AnimatePresence mode="wait">
