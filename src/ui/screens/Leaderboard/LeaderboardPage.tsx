@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
-import { COLORS, FONTS } from '../../theme'
+import { COLORS, FONTS, GRADIENT } from '../../theme'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import {
   fetchLeaderboard, fetchUser, applyReferralCode,
@@ -11,6 +11,23 @@ import {
 function shortWallet(w: string): string {
   return w.length > 10 ? `${w.slice(0, 4)}…${w.slice(-4)}` : w
 }
+const fmt = (n: number) => n.toLocaleString('en-US')
+
+const TINTS = ['linear-gradient(135deg,#a98bff,#6a44e0)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#2fe28a,#16a87a)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
+const tintFor = (w: string) => TINTS[Math.abs([...(w || 'x')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % TINTS.length]
+
+const MEDALS: Record<number, { medal: string; glow: string; ring: string }> = {
+  1: { medal: 'linear-gradient(135deg,#ffe08a,#f5b73d)', glow: 'rgba(245,183,61,.7)', ring: 'rgba(245,197,66,.7)' },
+  2: { medal: 'linear-gradient(135deg,#e6edf5,#b6c2d2)', glow: 'rgba(200,212,228,.6)', ring: 'rgba(220,228,238,.5)' },
+  3: { medal: 'linear-gradient(135deg,#e6a96a,#c07a3e)', glow: 'rgba(200,130,70,.6)', ring: 'rgba(210,150,90,.5)' },
+}
+
+// A small Gimmighoul coin (matches the gold token in the mockup).
+function Coin({ size = 14 }: { size?: number }) {
+  return <span style={{ width: size, height: size, borderRadius: '50%', background: 'radial-gradient(circle at 35% 30%,#ffd96b,#e8a020)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.4)', flexShrink: 0, display: 'inline-block' }} />
+}
+
+const RANGES = [['all', 'Global'], ['month', 'Month'], ['week', 'Week']] as const
 
 export function LeaderboardPage() {
   const navigate = useNavigate()
@@ -21,6 +38,7 @@ export function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [myGimmighouls, setMyGimmighouls] = useState<number | null>(null)
   const [myCode, setMyCode] = useState<string | null>(null)
+  const [range, setRange] = useState<string>('all') // all-time only for now (no time-series backend)
 
   const [codeInput, setCodeInput] = useState('')
   const [applying, setApplying] = useState(false)
@@ -39,11 +57,7 @@ export function LeaderboardPage() {
     if (!myWallet) return
     let cancelled = false
     fetchUser(myWallet)
-      .then((u) => {
-        if (cancelled) return
-        setMyGimmighouls(u.gimmighouls)
-        setMyCode(u.referred_by)
-      })
+      .then((u) => { if (cancelled) return; setMyGimmighouls(u.gimmighouls); setMyCode(u.referred_by) })
       .catch(() => { /* ignore */ })
     return () => { cancelled = true }
   }, [myWallet])
@@ -64,104 +78,177 @@ export function LeaderboardPage() {
     }
   }
 
+  const myIdx = myWallet ? rows.findIndex((r) => r.wallet === myWallet) : -1
+  const myRow = myIdx >= 0 ? rows[myIdx] : null
+  const myGh = myGimmighouls ?? myRow?.gimmighouls ?? null
+  const myElo = myRow?.elo ?? null
+  // Lead = margin over the next player (if #1) or gap to the player above.
+  const lead = myIdx === 0 && rows[1] ? (myGh ?? 0) - rows[1].gimmighouls
+    : myIdx > 0 ? (myGh ?? 0) - rows[myIdx - 1].gimmighouls : null
+
+  const top3 = rows.slice(0, 3)
+  const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3 // 2-1-3 stepped
+
   return (
-    <div style={{ maxWidth: 880, width: '100%', margin: '0 auto', padding: '28px 22px' }}>
-      <h1 style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 26, margin: '0 0 18px' }}>Leaderboard</h1>
-
-      {/* Referral code section */}
-      <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 14, padding: '16px 18px', marginBottom: 22 }}>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '0.14em', color: COLORS.muted }}>YOUR GIMMIGHOULS</div>
-        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 28, color: COLORS.green, marginTop: 4 }}>
-          {myGimmighouls ?? '—'}
+    <div style={{ padding: '22px clamp(18px,2.4vw,34px) 44px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* title + range tabs */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <span style={{ width: 42, height: 42, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,197,66,.12)', border: '1px solid rgba(245,197,66,.35)', color: '#f5c542', boxShadow: '0 0 22px -8px rgba(245,197,66,.8)' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
+        </span>
+        <h1 style={{ margin: 0, fontFamily: FONTS.display, fontSize: 'clamp(26px,3.2vw,34px)', fontWeight: 700, letterSpacing: '-.02em' }}>Leaderboard</h1>
+        <span style={{ fontSize: 14, color: COLORS.muted }}>· by accumulated Gimmighouls</span>
+        <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, background: '#ffffff08', border: `1px solid ${COLORS.border}` }}>
+          {RANGES.map(([k, label]) => (
+            <button key={k} onClick={() => setRange(k)} style={{
+              position: 'relative', padding: '8px 16px', borderRadius: 9, border: 0, cursor: 'pointer',
+              fontFamily: FONTS.body, fontSize: 13.5, fontWeight: 500,
+              color: range === k ? COLORS.text : COLORS.muted,
+              background: range === k ? 'linear-gradient(180deg,rgba(47,226,138,.16),rgba(139,92,246,.10))' : 'transparent',
+              boxShadow: range === k ? 'inset 0 0 0 1px rgba(47,226,138,.32)' : 'none',
+            }}>{label}</button>
+          ))}
         </div>
-
-        <div style={{ marginTop: 14, fontFamily: FONTS.body, fontSize: 13, color: COLORS.text }}>
-          {myCode ? (
-            <span>Referral code applied: <strong>{myCode}</strong></span>
-          ) : (
-            <span style={{ color: COLORS.muted }}>Have a creator code? Apply it to boost your Gimmighouls.</span>
-          )}
-        </div>
-
-        {!myCode && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-            <input
-              aria-label="Referral code"
-              placeholder="Referral code"
-              value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
-              disabled={!myWallet || applying}
-              style={{
-                flex: 1, minWidth: 160, background: COLORS.bg, border: `1px solid ${COLORS.border}`,
-                borderRadius: 10, padding: '10px 12px', color: COLORS.text, fontFamily: FONTS.body, fontSize: 14,
-              }}
-            />
-            <button
-              type="button"
-              onClick={onApply}
-              disabled={!myWallet || applying || !codeInput.trim()}
-              style={{
-                background: COLORS.green, border: 'none', borderRadius: 10, padding: '10px 18px',
-                color: '#04130c', fontFamily: FONTS.body, fontWeight: 700, fontSize: 14,
-                cursor: !myWallet || applying || !codeInput.trim() ? 'default' : 'pointer',
-                opacity: !myWallet || applying || !codeInput.trim() ? 0.5 : 1,
-              }}
-            >
-              {applying ? 'Applying…' : 'Apply'}
-            </button>
-          </div>
-        )}
-
-        {applyMsg && (
-          <div style={{ marginTop: 10, fontFamily: FONTS.body, fontSize: 13, color: applyMsg.ok ? COLORS.green : COLORS.red }}>
-            {applyMsg.text}
-          </div>
-        )}
       </div>
 
-      {/* Ranked list */}
-      {loading ? (
-        <div style={{ color: COLORS.muted, fontFamily: FONTS.body }}>Loading…</div>
-      ) : rows.length === 0 ? (
-        <div style={{ color: COLORS.muted, fontFamily: FONTS.body }}>No players yet.</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {rows.map((r, i) => {
-            const isMe = myWallet != null && r.wallet === myWallet
-            return (
-              <div
-                key={r.wallet}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '40px 1fr auto auto',
-                  alignItems: 'center',
-                  gap: 12,
-                  background: isMe ? 'linear-gradient(160deg,#2fe28a18,#8b5cf610)' : COLORS.panel,
-                  border: `1px solid ${isMe ? '#2fe28a55' : COLORS.border}`,
-                  borderRadius: 12,
-                  padding: '12px 16px',
-                }}
-              >
-                <div style={{ fontFamily: FONTS.mono, fontSize: 14, color: COLORS.muted }}>#{i + 1}</div>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/profile/${r.wallet}`)}
-                  style={{
-                    background: 'transparent', border: 'none', textAlign: 'left', padding: 0, cursor: 'pointer',
-                    fontFamily: FONTS.body, fontWeight: 700, fontSize: 15, color: COLORS.text,
-                  }}
-                >
-                  {r.alias ?? shortWallet(r.wallet)}
-                </button>
-                <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 16, color: COLORS.green }}>
-                  {r.gimmighouls}
+      {/* your standing + creator code */}
+      <section style={{
+        position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(20px,2.4vw,30px)',
+        background: 'linear-gradient(135deg,rgba(47,226,138,.12),rgba(13,17,22,.55) 48%,rgba(139,92,246,.12))',
+        border: `1px solid ${COLORS.border}`, animation: 'ba-leadglow 6s ease-in-out infinite',
+      }}>
+        <div style={{ position: 'relative', display: 'flex', gap: 30, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: GRADIENT, color: '#06170f', fontFamily: FONTS.display, fontSize: 12, fontWeight: 700, boxShadow: '0 6px 22px -8px rgba(47,226,138,.8)' }}>
+                🏆 {myIdx >= 0 ? `RANK #${myIdx + 1}` : 'UNRANKED'}
+              </span>
+              <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.2em', color: COLORS.muted }}>YOUR GIMMIGHOULS</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ fontFamily: FONTS.display, fontSize: 'clamp(38px,6vw,58px)', fontWeight: 700, letterSpacing: '-.03em', lineHeight: .95, color: COLORS.green, textShadow: '0 4px 30px rgba(47,226,138,.35)' }}>
+                {myGh != null ? fmt(myGh) : '—'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
+              <Stat label="ELO" value={myElo != null ? String(myElo) : '—'} />
+              {lead != null && <Stat label={myIdx === 0 ? 'LEAD' : 'GAP'} value={`${lead >= 0 ? '+' : ''}${fmt(lead)}`} accent />}
+              <Stat label="PLAYERS" value={String(rows.length)} />
+            </div>
+          </div>
+
+          {/* creator code */}
+          <div style={{ flex: '1 1 300px', minWidth: 260, padding: 20, borderRadius: 18, background: 'rgba(8,10,14,.45)', border: `1px solid ${COLORS.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,.14)', border: '1px solid rgba(139,92,246,.4)', color: '#a98bff' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
+              </span>
+              <span style={{ fontFamily: FONTS.display, fontSize: 15, fontWeight: 700 }}>Have a creator code?</span>
+            </div>
+            {myCode ? (
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: COLORS.text }}>
+                Applied: <strong style={{ color: COLORS.green }}>{myCode}</strong> — boosting your Gimmighouls.
+              </p>
+            ) : (
+              <>
+                <p style={{ margin: '0 0 14px', fontSize: 13, lineHeight: 1.5, color: COLORS.muted }}>Apply it to boost your Gimmighouls and climb faster.</p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <input
+                    aria-label="Referral code" placeholder="Referral code" value={codeInput}
+                    onChange={(e) => setCodeInput(e.target.value)} disabled={!myWallet || applying}
+                    style={{ flex: 1, minWidth: 0, padding: '12px 15px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, fontFamily: FONTS.mono, fontSize: 13.5, letterSpacing: '.04em', outline: 'none' }}
+                  />
+                  <button type="button" onClick={onApply} disabled={!myWallet || applying || !codeInput.trim()}
+                    style={{ flex: 'none', padding: '12px 22px', borderRadius: 12, border: 0, cursor: !myWallet || applying || !codeInput.trim() ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, color: '#06170f', background: GRADIENT, opacity: !myWallet || applying || !codeInput.trim() ? 0.5 : 1, boxShadow: '0 0 20px -6px rgba(47,226,138,.7)' }}>
+                    {applying ? 'Applying…' : 'Apply'}
+                  </button>
                 </div>
-                <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>{r.elo} ELO</div>
+              </>
+            )}
+            {applyMsg && <div style={{ marginTop: 10, fontFamily: FONTS.body, fontSize: 13, color: applyMsg.ok ? COLORS.green : COLORS.red }}>{applyMsg.text}</div>}
+          </div>
+        </div>
+      </section>
+
+      {/* podium top 3 */}
+      {top3.length === 3 && (
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14 }}>
+          {podiumOrder.map((d) => {
+            const rank = rows.indexOf(d) + 1
+            const m = MEDALS[rank]
+            const first = rank === 1
+            const isMe = d.wallet === myWallet
+            return (
+              <div key={d.wallet} onClick={() => navigate(`/profile/${d.wallet}`)} style={{
+                flex: '1 1 0', minWidth: 0, position: 'relative', overflow: 'hidden', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: first ? '26px 18px 24px' : '20px 16px',
+                borderRadius: 20, border: `1px solid ${first ? 'rgba(47,226,138,.5)' : COLORS.border}`,
+                background: first ? 'linear-gradient(180deg,rgba(47,226,138,.12),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012))',
+                boxShadow: first ? '0 0 60px -18px rgba(47,226,138,.6)' : 'none',
+              }}>
+                <div style={{ width: first ? 54 : 46, height: first ? 54 : 46, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONTS.mono, fontWeight: 700, fontSize: first ? 20 : 17, color: '#06170f', background: m.medal, boxShadow: `0 8px 26px -8px ${m.glow}` }}>{rank}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: tintFor(d.wallet), border: `2px solid ${isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{(d.alias ?? d.wallet).slice(0, 1).toUpperCase()}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{d.alias ?? shortWallet(d.wallet)}</span>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: FONTS.display, fontSize: first ? 21 : 18, fontWeight: 700, letterSpacing: '-.02em', color: first ? COLORS.green : COLORS.text }}><Coin size={16} />{fmt(d.gimmighouls)}</div>
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginTop: 3 }}>{d.elo} ELO</div>
+                </div>
               </div>
             )
           })}
         </div>
       )}
+
+      {/* full ranking */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.2em', color: COLORS.muted }}>FULL RANKING</span>
+          <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(255,255,255,.10),transparent)' }} />
+        </div>
+        {loading ? (
+          <div style={{ color: COLORS.muted, fontFamily: FONTS.body }}>Loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{ color: COLORS.muted, fontFamily: FONTS.body }}>No players yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {rows.map((r, i) => {
+              const isMe = myWallet != null && r.wallet === myWallet
+              return (
+                <div key={r.wallet} onClick={() => navigate(`/profile/${r.wallet}`)} style={{
+                  position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderRadius: 14, cursor: 'pointer',
+                  background: isMe ? 'linear-gradient(90deg,rgba(47,226,138,.10),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))',
+                  border: `1px solid ${isMe ? 'rgba(47,226,138,.45)' : COLORS.border}`,
+                  boxShadow: isMe ? '0 0 40px -16px rgba(47,226,138,.5)' : 'none',
+                }}>
+                  {isMe && <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: GRADIENT }} />}
+                  <span style={{ flex: 'none', width: 38, fontFamily: FONTS.mono, fontSize: 15, fontWeight: 700, color: i < 3 ? '#f5c542' : '#6c7682' }}>#{i + 1}</span>
+                  <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#06170f', background: tintFor(r.wallet), border: `2px solid ${isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{(r.alias ?? r.wallet).slice(0, 1).toUpperCase()}</span>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <span style={{ fontSize: 15.5, fontWeight: 700, color: isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.alias ?? shortWallet(r.wallet)}</span>
+                    {isMe && <span style={{ flex: 'none', padding: '2px 8px', borderRadius: 6, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 9.5, fontWeight: 700, color: COLORS.green }}>YOU</span>}
+                  </div>
+                  <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <Coin />
+                    <span style={{ fontFamily: FONTS.mono, fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', color: isMe ? COLORS.green : COLORS.text }}>{fmt(r.gimmighouls)}</span>
+                  </div>
+                  <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', padding: '5px 11px', borderRadius: 8, background: '#ffffff08', border: `1px solid ${COLORS.border}`, fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>{r.elo} ELO</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div style={{ padding: '10px 16px', borderRadius: 13, background: '#ffffff08', border: `1px solid ${COLORS.border}` }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.16em', color: COLORS.muted }}>{label}</div>
+      <div style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 700, letterSpacing: '-.01em', marginTop: 2, color: accent ? COLORS.green : COLORS.text }}>{value}</div>
     </div>
   )
 }
