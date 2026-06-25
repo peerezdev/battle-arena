@@ -79,7 +79,12 @@ export function AppShell() {
       {wideRail ? (
         <LeftRail active={active} onSelect={onSelect} onProfile={() => navigate('/profile')} />
       ) : (
-        <BottomNav active={active} onSelect={onSelect} onChat={() => setChatOpen(true)} />
+        <BottomNav
+          active={active}
+          onSelect={(id) => { setChatOpen(false); onSelect(id) }}
+          onChat={() => setChatOpen((o) => !o)}
+          chatActive={chatOpen}
+        />
       )}
 
       {/* ── COLUMNA PRINCIPAL ─────────────────────────────────────────────── */}
@@ -270,10 +275,12 @@ function BottomNav({
   active,
   onSelect,
   onChat,
+  chatActive,
 }: {
   active: HubNav
   onSelect: (id: HubNav) => void
   onChat: () => void
+  chatActive: boolean
 }) {
   const btn = {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 3,
@@ -300,7 +307,7 @@ function BottomNav({
       }}
     >
       {NAV_ITEMS.map((item) => {
-        const isActive = item.id === active
+        const isActive = !chatActive && item.id === active
         return (
           <button key={item.id} onClick={() => onSelect(item.id)} title={item.label}
             style={{ ...btn, color: isActive ? COLORS.text : COLORS.muted }}>
@@ -310,7 +317,7 @@ function BottomNav({
         )
       })}
       {/* Chat lives in the nav on mobile (no floating button) */}
-      <button onClick={onChat} title="Chat" style={{ ...btn, color: COLORS.muted }}>
+      <button onClick={onChat} title="Chat" style={{ ...btn, color: chatActive ? COLORS.text : COLORS.muted }}>
         <span style={{ fontSize: 18 }}>💬</span>
         <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>Chat</span>
       </button>
