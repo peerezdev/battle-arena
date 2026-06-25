@@ -244,37 +244,23 @@ export function AppShell() {
       {/* ── TOASTS ────────────────────────────────────────────────────────── */}
       <Toaster />
 
-      {/* ── CHAT DRAWER OVERLAY (tablet / móvil) ──────────────────────────── */}
-      {!(wideRail && wideDock) && chatOpen && (
+      {/* ── CHAT — tablet: side drawer (full dock) · mobile: full-screen chat-only over the nav ── */}
+      {chatOpen && !(wideRail && wideDock) && (wideRail ? (
         <>
-          {/* Backdrop */}
-          <div
-            onClick={() => setChatOpen(false)}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0,0,0,0.55)',
-              zIndex: 110,
-            }}
-          />
-          {/* Drawer */}
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              right: 0,
-              width: 'min(340px, 100vw)',
-              height: '100vh',
-              zIndex: 120,
-              transform: reducedMotion ? 'none' : 'translateX(0)',
-              transition: reducedMotion ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
-              overflowY: 'auto',
-            }}
-          >
+          <div onClick={() => setChatOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 110 }} />
+          <div style={{
+            position: 'fixed', top: 0, right: 0, width: 'min(340px, 100vw)', height: '100vh', zIndex: 120, overflowY: 'auto',
+            transition: reducedMotion ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
+          }}>
             <ChatDock />
           </div>
         </>
-      )}
+      ) : (
+        // Mobile: chat only, full screen except the bottom nav.
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 60, zIndex: 120, background: '#0c1019', display: 'flex', flexDirection: 'column' }}>
+          <ChatDock chatOnly onClose={() => setChatOpen(false)} />
+        </div>
+      ))}
     </div>
   )
 }

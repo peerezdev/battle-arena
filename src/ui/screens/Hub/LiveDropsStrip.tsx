@@ -9,17 +9,18 @@ export function LiveDropsStrip() {
   return (
     <div style={{
       flexShrink: 0, borderBottom: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.015)',
-      padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10,
-      overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap',
+      padding: '10px 12px 8px', display: 'flex', flexDirection: 'column', gap: 8,
     }}>
+      {/* label on top so the row below uses the full width */}
       <div style={{
-        flexShrink: 0, display: 'flex', alignItems: 'center', gap: 7,
+        display: 'flex', alignItems: 'center', gap: 7,
         fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.16em', color: COLORS.muted,
       }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: COLORS.green, boxShadow: `0 0 8px ${COLORS.green}` }} />
         RECENT DROPS
       </div>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap' }}>
       {drops.length === 0 ? (
         <span style={{ fontSize: 11, color: COLORS.muted }}>No drops yet — open a pack.</span>
       ) : (
@@ -49,6 +50,7 @@ export function LiveDropsStrip() {
           )
         })
       )}
+      </div>
     </div>
   )
 }

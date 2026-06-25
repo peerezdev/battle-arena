@@ -53,9 +53,15 @@ const RARITY_ACCENT: Record<string, string> = {
 export function ChatDock({
   collapsed = false,
   onToggle,
+  chatOnly = false,
+  onClose,
 }: {
   collapsed?: boolean
   onToggle?: () => void
+  /** Chat-only mode (mobile full-screen): hides the Recent Drops section. */
+  chatOnly?: boolean
+  /** When provided, shows a close (✕) button in the chat header (mobile drawer). */
+  onClose?: () => void
 }) {
   const drops = useDrops()
   const { messages, send, canPost, online } = useChat()
@@ -165,13 +171,14 @@ export function ChatDock({
     <aside
       style={{
         background: '#0c1019',
-        borderLeft: `1px solid ${COLORS.border}`,
+        borderLeft: chatOnly ? 'none' : `1px solid ${COLORS.border}`,
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: chatOnly ? '100%' : '100vh',
       }}
     >
-      {/* ── LIVE DROPS ── */}
+      {!chatOnly && (<>
+      {/* ── RECENT DROPS ── */}
       <div
         style={{
           height: dropsHeight,
@@ -377,6 +384,7 @@ export function ChatDock({
           }}
         />
       </div>
+      </>)}
 
       {/* ── CHAT REGION (flex: 1, scrolls internally) ── */}
       <div
@@ -426,6 +434,19 @@ export function ChatDock({
           >
             {online} online
           </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              title="Close chat"
+              style={{
+                marginLeft: 'auto', background: 'transparent', border: `1px solid ${COLORS.border}`,
+                color: COLORS.muted, borderRadius: 8, width: 26, height: 26, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* ── MESSAGES ── */}
