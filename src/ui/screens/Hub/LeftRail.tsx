@@ -11,7 +11,7 @@ function Svg({ children }: { children: ReactNode }) {
   )
 }
 
-const ICONS: Record<HubNav, ReactNode> = {
+export const NAV_ICONS: Record<HubNav, ReactNode> = {
   lobby: <Svg><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 22V12h6v10" /></Svg>,
   pack: <Svg><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" x2="19" y1="19" y2="13" /><line x1="16" x2="20" y1="16" y2="20" /><line x1="19" x2="21" y1="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" x2="9" y1="14" y2="18" /><line x1="7" x2="4" y1="17" y2="20" /><line x1="3" x2="5" y1="19" y2="21" /></Svg>,
   royale: <Svg><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></Svg>,
@@ -98,7 +98,7 @@ export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSe
                   }}
                 />
               )}
-              {ICONS[item.id]}
+              {NAV_ICONS[item.id]}
               <span style={{ position: 'relative', fontSize: 11, fontWeight: 500, letterSpacing: '.02em' }}>
                 {item.label}
               </span>

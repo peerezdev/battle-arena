@@ -9,7 +9,7 @@ import { useReducedMotion } from '../useReducedMotion'
 import { useIsWide } from '../useIsWide'
 import { AuthButtons } from '../components/AuthButtons'
 import { DepositModal } from '../components/DepositModal'
-import { LeftRail } from '../screens/Hub/LeftRail'
+import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
 import { LiveDropsStrip } from '../screens/Hub/LiveDropsStrip'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
@@ -263,7 +263,7 @@ export function AppShell() {
       ) : (
         // Mobile: chat only, full screen except the bottom nav.
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 60, zIndex: 120, background: '#0c1019', display: 'flex', flexDirection: 'column' }}>
-          <ChatDock chatOnly onClose={() => setChatOpen(false)} />
+          <ChatDock chatOnly />
         </div>
       ))}
     </div>
@@ -311,14 +311,14 @@ function BottomNav({
         return (
           <button key={item.id} onClick={() => onSelect(item.id)} title={item.label}
             style={{ ...btn, color: isActive ? COLORS.text : COLORS.muted }}>
-            <span style={{ fontSize: 18 }}>{item.icon}</span>
+            {NAV_ICONS[item.id]}
             <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>{item.label}</span>
           </button>
         )
       })}
       {/* Chat lives in the nav on mobile (no floating button) */}
       <button onClick={onChat} title="Chat" style={{ ...btn, color: chatActive ? COLORS.text : COLORS.muted }}>
-        <span style={{ fontSize: 18 }}>💬</span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
         <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>Chat</span>
       </button>
     </nav>
