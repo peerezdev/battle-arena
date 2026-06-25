@@ -9,7 +9,6 @@ import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import {
   fetchMachines,
   fetchMachineCards,
-  generatePack,
   generateYoloPacks,
   submitTx,
   openPack,
@@ -122,40 +121,6 @@ export default function GachaVault() {
   }, [selected?.code])
 
   // ── Buy / open flow (mirrors GachaScreen.buy) ──────────────────────────────
-  async function handleOpen() {
-    if (!selected || !identityToken) return
-    // Defensive: don't start a pull we positively know can't be paid.
-    if (usdc != null && usdc < (selected.price ?? 0)) {
-      setOpenError(`Insufficient USDC — this pack costs $${selected.price}. Deposit USDC and try again.`)
-      return
-    }
-    setOpenError(null)
-    let pack: { memo: string; transaction: string }
-    try {
-      setPhase({ kind: 'opening', step: 'firmando' })
-      pack = await generatePack(identityToken, selected.code)
-      const signed = await signTransactionBase64(pack.transaction)
-      setPhase({ kind: 'opening', step: 'enviando' })
-      await submitTx(identityToken, signed)
-    } catch (e) {
-      setOpenError(`Couldn't open this pack: ${e instanceof Error ? e.message : String(e)}. Try another machine.`)
-      setPhase({ kind: 'machines' })
-      return
-    }
-    setPhase({ kind: 'opening', step: 'abriendo' })
-    try {
-      const result = await pollOpenPack(() => openPack(identityToken, pack.memo))
-      if (result.pending) {
-        setPhase({ kind: 'pending', memo: pack.memo })
-      } else {
-        setPhase({ kind: 'result', result })
-      }
-    } catch (e) {
-      setOpenError(e instanceof Error ? e.message : String(e))
-      setPhase({ kind: 'pending', memo: pack.memo })
-    }
-  }
-
   async function retryOpen(memo: string) {
     if (!identityToken) return
     setOpenError(null)
@@ -443,7 +408,6 @@ export default function GachaVault() {
           <div style={wideGacha ? { position: 'sticky', top: 16 } : undefined}>
             <MachineDetailPanel
               machine={selected}
-              onOpen={() => void handleOpen()}
               authed={!!identityToken}
               usdc={usdc}
               onYolo={(c, t) => void handleYolo(c, t)}

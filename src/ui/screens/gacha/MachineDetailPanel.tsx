@@ -7,7 +7,6 @@ import { yoloTotalCost, clampCount } from '../../../onchain/gachaClient'
 
 interface Props {
   machine: GachaMachine
-  onOpen: () => void
   /** Logged in (identity token present). */
   authed: boolean
   /** Embedded-wallet USDC balance; null = unknown/still loading. */
@@ -24,7 +23,7 @@ const RARITY_COLOR: Record<string, string> = {
   Common: RARITY.common, common: RARITY.common,
 }
 
-export function MachineDetailPanel({ machine, onOpen, authed, usdc, onYolo }: Props) {
+export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
   const reduced = useReducedMotion()
 
   const [yoloCount, setYoloCount] = useState(1)
@@ -32,21 +31,7 @@ export function MachineDetailPanel({ machine, onOpen, authed, usdc, onYolo }: Pr
   const yoloTotal = yoloTotalCost(machine.price ?? 0, yoloCount)
   const yoloBlocked = !authed || machine.available === false || (usdc != null && usdc < yoloTotal)
 
-  // Gate the OPEN button by USDC balance. We only BLOCK when we positively know
-  // the balance is below the pack price; while the balance is unknown (null /
-  // still loading) we allow the attempt and let the on-chain tx surface any
-  // shortfall, so a slow/unavailable RPC never wedges the button.
-  const price = machine.price ?? 0
-  const insufficient = authed && usdc != null && usdc < price
   const unavailable = machine.available === false
-  const blocked = !authed || insufficient || unavailable
-  const buttonLabel = unavailable
-    ? 'Currently unavailable'
-    : !authed
-      ? 'Log in to open'
-      : insufficient
-        ? `Insufficient USDC · $${(usdc ?? 0).toFixed(2)}`
-        : `OPEN NOW · ${formatUsd(machine.price)}`
 
   // Sort odds with the canonical order; unknown rarities go last
   const oddsEntries = Object.entries(machine.odds ?? {}).sort(([a], [b]) => {
@@ -214,30 +199,6 @@ export function MachineDetailPanel({ machine, onOpen, authed, usdc, onYolo }: Pr
           ⚠ This machine is currently off — try another pack.
         </div>
       )}
-
-      {/* OPEN NOW button */}
-      <motion.button
-        onClick={onOpen}
-        disabled={blocked}
-        whileTap={reduced || blocked ? undefined : { scale: 0.97 }}
-        style={{
-          width: '100%',
-          background: blocked ? COLORS.panel2 : GRADIENT,
-          color: blocked ? COLORS.muted : '#06120c',
-          border: blocked ? `1px solid ${COLORS.border}` : 'none',
-          borderRadius: 12,
-          padding: '16px 20px',
-          fontSize: 15,
-          fontWeight: 800,
-          fontFamily: FONTS.display,
-          cursor: blocked ? 'not-allowed' : 'pointer',
-          letterSpacing: '.03em',
-          boxShadow: blocked ? 'none' : SHADOW.glow(COLORS.green),
-          transition: 'background 0.2s',
-        }}
-      >
-        {buttonLabel}
-      </motion.button>
 
       {onYolo && (
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
