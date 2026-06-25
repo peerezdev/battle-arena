@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
+import { AnimaOverlay } from './AnimaModel'
 import { useAliases } from '../../useAliases'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
@@ -75,6 +76,7 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
 
   return (
     <div style={screenStyle}>
+      <AnimaOverlay />
       {TITLE}
       <ResultView
         vm={vm} name={name} ranked={ranked} entry={entry}
@@ -281,7 +283,7 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
             <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted, marginBottom: 12 }}>CHAMPION LOOT · {formatUsd(lootTotal)}</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {allLoot.map((c, i) => (
-                <RevealCard key={i} card={c} reducedMotion w={78} h={108} />
+                <RevealCard key={i} card={c} reducedMotion w={120} h={200} />
               ))}
             </div>
           </div>

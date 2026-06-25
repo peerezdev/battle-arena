@@ -14,18 +14,22 @@
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
     "@privy-io/react-auth": "^3.31.0",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
     "@solana-program/memo": "^0.11.2",
     "@solana-program/system": "^0.12.2",
     "@solana-program/token": "^0.14.0",
     "@solana/kit": "^6.10.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
+    "@types/three": "^0.184.1",
     "buffer": "^6.0.3",
     "framer-motion": "^12.40.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.18.0"
+    "react-router-dom": "^7.18.0",
+    "three": "^0.185.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
