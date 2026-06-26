@@ -26,6 +26,19 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
   const wideCols = useIsWide('(min-width: 560px)')
   const [selected, setSelected] = useState<MachineCard | null>(null)
 
+  // Color-grade toggle (persisted) — boosts saturation/contrast so cards pop.
+  const [filterOn, setFilterOn] = useState<boolean>(() => {
+    try { return localStorage.getItem('ba.poolColorFilter') !== 'off' } catch { return true }
+  })
+  function toggleFilter() {
+    setFilterOn((on) => {
+      const next = !on
+      try { localStorage.setItem('ba.poolColorFilter', next ? 'on' : 'off') } catch { /* ignore */ }
+      return next
+    })
+  }
+  const imgFilter = `${filterOn ? 'saturate(1.22) contrast(1.07) brightness(1.03) ' : ''}drop-shadow(0 4px 12px rgba(0,0,0,0.45))`
+
   const containerVariants = {
     hidden: {},
     show: { transition: { staggerChildren: reduced ? 0 : 0.04 } },
@@ -75,6 +88,20 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
             {liveCount} live in pool
           </span>
         )}
+        <button
+          onClick={toggleFilter}
+          title="Toggle color filter"
+          style={{
+            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7, padding: '6px 11px', borderRadius: 9,
+            border: `1px solid ${filterOn ? 'rgba(47,226,138,.45)' : COLORS.border}`,
+            background: filterOn ? 'rgba(47,226,138,.10)' : '#ffffff08',
+            color: filterOn ? COLORS.green : COLORS.muted,
+            cursor: 'pointer', fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
+          COLOR {filterOn ? 'ON' : 'OFF'}
+        </button>
       </div>
 
       {/* Loading state */}
@@ -181,7 +208,7 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
                     <img
                       src={card.image}
                       alt={card.name ?? undefined}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'saturate(1.22) contrast(1.07) brightness(1.03) drop-shadow(0 4px 12px rgba(0,0,0,0.45))' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', filter: imgFilter, transition: reduced ? undefined : 'filter 0.18s' }}
                     />
                   ) : (
                     <span style={{ fontSize: 40 }}>🃏</span>
