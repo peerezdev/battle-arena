@@ -25,12 +25,12 @@ describe('CreateBattleModal multi-pack', () => {
     render(<CreateBattleModal onClose={() => {}} onCreated={() => {}} />)
     await screen.findByText('PKMN 25')
     // Create is disabled with 0 boxes
-    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Create battle' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(plusButtons()[0])   // m25 → 1
     fireEvent.click(plusButtons()[0])   // m25 → 2
     fireEvent.click(plusButtons()[1])   // m50 → 1
-    expect(screen.getByText(/3\/10 boxes/)).toBeTruthy()
-    const create = screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement
+    expect(screen.getByText(/3\/10 packs/)).toBeTruthy()
+    const create = screen.getByRole('button', { name: 'Create battle' }) as HTMLButtonElement
     expect(create.disabled).toBe(false)
     fireEvent.click(create)
     expect(createBattle).toHaveBeenCalledWith('tok', {
@@ -43,7 +43,7 @@ describe('CreateBattleModal multi-pack', () => {
     render(<CreateBattleModal onClose={() => {}} onCreated={() => {}} />)
     await screen.findByText('PKMN 25')
     for (let i = 0; i < 10; i++) fireEvent.click(plusButtons()[0])   // m25 → 10
-    expect(screen.getByText(/10\/10 boxes/)).toBeTruthy()
+    expect(screen.getByText(/10\/10 packs/)).toBeTruthy()
     expect(plusButtons().every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
   })
 })
