@@ -22,6 +22,7 @@ import {
 } from '../../../onchain/gachaClient'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
+import { HoloCard } from '../../components/HoloCard'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardPoolGrid } from './CardPoolGrid'
@@ -859,17 +860,13 @@ function CardDetailsView({
       {/* ── Image area ──────────────────────────────────────────────────────── */}
       {mainImgSrc ? (
         <div style={{ marginBottom: 16 }}>
-          <img
+          <HoloCard
             src={mainImgSrc}
             alt={result.name ?? 'Card image'}
-            style={{
-              width: '100%',
-              maxHeight: 280,
-              objectFit: 'contain',
-              borderRadius: 10,
-              border: `1px solid ${rarityColor}44`,
-              display: 'block',
-            }}
+            rarity={result.rarity}
+            accent={rarityColor}
+            radius={10}
+            imgStyle={{ maxHeight: 280, objectFit: 'contain' }}
           />
           {/* Thumbnails — only when multiple images */}
           {images.length > 1 && (
