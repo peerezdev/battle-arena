@@ -27,9 +27,11 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
   const wideCols = useIsWide('(min-width: 560px)')
   const [selected, setSelected] = useState<MachineCard | null>(null)
 
-  // Color-grade filter — toggled from the topbar; boosts saturation/contrast so cards pop.
+  // Color-grade filter — toggled from the topbar. Uses an SVG filter (#ba-pop) that boosts saturation
+  // but masks bright/white areas by luminance, so whites stay white instead of picking up a tint.
   const filterOn = usePoolColorFilter()
-  const imgFilter = `${filterOn ? 'saturate(1.22) contrast(1.07) brightness(1.03) ' : ''}drop-shadow(0 4px 12px rgba(0,0,0,0.45))`
+  const dropShadow = 'drop-shadow(0 4px 12px rgba(0,0,0,0.45))'
+  const imgFilter = filterOn ? `url(#ba-pop) ${dropShadow}` : dropShadow
 
   const containerVariants = {
     hidden: {},
@@ -42,6 +44,28 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
 
   return (
     <div>
+      {/* Color-pop filter: saturate, but keep bright/white areas neutral via a luminance mask. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+        <filter id="ba-pop" colorInterpolationFilters="sRGB">
+          <feColorMatrix type="saturate" values="1.45" result="sat" />
+          {/* luminance → alpha (rgb zeroed) */}
+          <feColorMatrix in="SourceGraphic" type="matrix"
+            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.299 0.587 0.114 0 0" result="lum" />
+          {/* bias the mask to near-white only */}
+          <feComponentTransfer in="lum" result="hi">
+            <feFuncA type="gamma" amplitude="1" exponent="7" offset="0" />
+          </feComponentTransfer>
+          {/* inverse mask = 1 − hi */}
+          <feComponentTransfer in="hi" result="lo">
+            <feFuncA type="table" tableValues="1 0" />
+          </feComponentTransfer>
+          {/* original in highlights, saturated elsewhere; sum the two masked layers */}
+          <feComposite in="SourceGraphic" in2="hi" operator="in" result="origHi" />
+          <feComposite in="sat" in2="lo" operator="in" result="satLo" />
+          <feComposite in="origHi" in2="satLo" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
+        </filter>
+      </svg>
+
       {/* Heading */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <span
