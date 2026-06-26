@@ -1,5 +1,25 @@
-from app.services.users import get_or_create_user, read_user_view, read_user_stats, set_alias, leaderboard, history
+from app.services.users import get_or_create_user, read_user_view, read_user_stats, read_user_battles, set_alias, leaderboard, history
 from app.models import RatingHistory, PackBattle, BattlePlayer, BattlePull
+
+
+def test_read_user_battles(Session):
+    with Session() as s:
+        s.add(PackBattle(id="b1", mode="pack", machine_code="pokemon_50", price=50_000_000, max_players=2, status="settled", winner="W1"))
+        s.add_all([BattlePlayer(battle_id="b1", player_wallet="W1"), BattlePlayer(battle_id="b1", player_wallet="W2")])
+        s.add_all([
+            BattlePull(battle_id="b1", player_wallet="W1", memo="m", nft_address="N1", insured_value=100.0),
+            BattlePull(battle_id="b1", player_wallet="W2", memo="m", nft_address="N2", insured_value=30.0),
+        ])
+        s.add(PackBattle(id="b2", mode="pack", machine_code="pokemon_25", price=25_000_000, max_players=2, status="settled", winner="W2"))
+        s.add_all([BattlePlayer(battle_id="b2", player_wallet="W1"), BattlePlayer(battle_id="b2", player_wallet="W2")])
+        s.commit()
+
+        rows = read_user_battles(s, "W1")
+        assert len(rows) == 2
+        byid = {r["battleId"]: r for r in rows}
+        assert byid["b1"]["result"] == "win" and byid["b1"]["amountUsd"] == 130.0 and byid["b1"]["cards"] == 1
+        assert byid["b1"]["opponents"] == ["W2"]
+        assert byid["b2"]["result"] == "loss" and byid["b2"]["amountUsd"] == -25.0
 
 
 def test_read_user_stats(Session):
@@ -32,7 +52,8 @@ def test_read_user_stats(Session):
 def test_read_user_view_default_and_existing(Session):
     with Session() as s:
         assert read_user_view(s, "GHOST", 1200) == {"wallet": "GHOST", "alias": None, "elo": 1200,
-                                                     "games_played": 0, "gimmighouls": 0, "referred_by": None}
+                                                     "games_played": 0, "gimmighouls": 0, "referred_by": None,
+                                                     "withdraw_address": None}
         get_or_create_user(s, "A", 1200).elo = 1400
         s.commit()
         assert read_user_view(s, "A", 1200)["elo"] == 1400

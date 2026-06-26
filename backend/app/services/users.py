@@ -15,9 +15,9 @@ def read_user_view(session: Session, wallet: str, elo_start: int) -> dict:
     u = session.get(User, wallet)
     if u is None:
         return {"wallet": wallet, "alias": None, "elo": elo_start, "games_played": 0,
-                "gimmighouls": 0, "referred_by": None}
+                "gimmighouls": 0, "referred_by": None, "withdraw_address": None}
     return {"wallet": u.wallet, "alias": u.alias, "elo": u.elo, "games_played": u.games_played,
-            "gimmighouls": u.gimmighouls, "referred_by": u.referred_by}
+            "gimmighouls": u.gimmighouls, "referred_by": u.referred_by, "withdraw_address": u.withdraw_address}
 
 
 def get_or_create_user(session: Session, wallet: str, elo_start: int) -> User:
@@ -106,3 +106,50 @@ def read_user_stats(session: Session, wallet: str) -> dict:
         "bestHit": best_hit,
         "bestVictory": best_victory,
     }
+
+
+def read_user_battles(session: Session, wallet: str, limit: int = 20) -> list[dict]:
+    """The wallet's most recent settled battles for the History tab. amountUsd is signed:
+    a win = the battle's combined loot (all cards won); a loss = minus the entry buy-in."""
+    from ..models import PackBattle, BattlePlayer, BattlePull
+    USDC = 1_000_000
+
+    battles = list(session.scalars(
+        select(PackBattle)
+        .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
+        .where(BattlePlayer.player_wallet == wallet, PackBattle.status == "settled")
+        .order_by(desc(PackBattle.settled_at), desc(PackBattle.created_at))
+        .limit(limit)
+    ))
+    out = []
+    for b in battles:
+        won = b.winner == wallet
+        if won:
+            amount = session.scalar(
+                select(func.coalesce(func.sum(BattlePull.insured_value), 0.0))
+                .where(BattlePull.battle_id == b.id)
+            ) or 0.0
+        else:
+            amount = -(b.price / USDC)
+        cards = session.scalar(
+            select(func.count()).select_from(BattlePull)
+            .where(BattlePull.battle_id == b.id, BattlePull.player_wallet == wallet)
+        ) or 0
+        opponents = [w for (w,) in session.execute(
+            select(BattlePlayer.player_wallet)
+            .where(BattlePlayer.battle_id == b.id, BattlePlayer.player_wallet != wallet)
+        )]
+        out.append({
+            "battleId": b.id, "mode": b.mode, "machineCode": b.machine_code,
+            "result": "win" if won else "loss", "amountUsd": amount,
+            "cards": cards, "opponents": opponents,
+            "ts": (b.settled_at or b.created_at).timestamp() if (b.settled_at or b.created_at) else None,
+        })
+    return out
+
+
+def set_withdraw_address(session: Session, wallet: str, address: Optional[str]) -> None:
+    user = session.get(User, wallet)
+    if user is None:
+        raise ValueError("usuario no existe")
+    user.withdraw_address = address

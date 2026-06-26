@@ -17,6 +17,7 @@ class User(Base):
     games_played: Mapped[int] = mapped_column(Integer, default=0)
     gimmighouls: Mapped[int] = mapped_column(Integer, default=0)
     referred_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # ReferralCode.code
+    withdraw_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # USDC payout destination
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     __table_args__ = (

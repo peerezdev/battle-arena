@@ -8,11 +8,12 @@
  * NOTE: the on-chain transfer itself is not wired yet (no backend withdraw endpoint).
  * The form validates the inputs and surfaces the request; submission is a placeholder.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { COLORS, GRADIENT, FONTS, SHADOW } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
 import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalance'
+import { useProfile } from '../../hooks/useProfile'
 import { formatUsd } from '../theme'
 import { showToast } from '../toast'
 
@@ -36,11 +37,17 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
   const reducedMotion = useReducedMotion()
   const { usdc } = useUsdcBalance()
   const { reserved } = useReservedBalance()
+  const { withdrawAddress } = useProfile()
   const available = availableUsd(usdc, reserved)
 
   const [dest, setDest] = useState('')
   const [amount, setAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  // Prefill the destination from the saved withdrawal address when the modal opens.
+  useEffect(() => {
+    if (open && withdrawAddress) setDest((d) => (d === '' ? withdrawAddress : d))
+  }, [open, withdrawAddress])
 
   if (!open) return null
 

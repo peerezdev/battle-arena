@@ -21,6 +21,7 @@ def make_session_factory(engine):
 _ENSURE_COLUMNS = [
     ("users", "gimmighouls", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "referred_by", "VARCHAR"),
+    ("users", "withdraw_address", "VARCHAR"),
     ("pack_battles", "gimmighouls_awarded", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
