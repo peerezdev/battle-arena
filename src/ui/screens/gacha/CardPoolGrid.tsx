@@ -181,7 +181,7 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
                     <img
                       src={card.image}
                       alt={card.name ?? undefined}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.45))' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'saturate(1.22) contrast(1.07) brightness(1.03) drop-shadow(0 4px 12px rgba(0,0,0,0.45))' }}
                     />
                   ) : (
                     <span style={{ fontSize: 40 }}>🃏</span>
