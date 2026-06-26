@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT } from '../../theme'
+import { useIsWide } from '../../useIsWide'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import {
   fetchLeaderboard, fetchUser, applyReferralCode,
@@ -12,14 +13,24 @@ function shortWallet(w: string): string {
   return w.length > 10 ? `${w.slice(0, 4)}…${w.slice(-4)}` : w
 }
 const fmt = (n: number) => n.toLocaleString('en-US')
+// Compact format for mobile: 1K, 100K, 1M, 100M… (sign-aware, trims trailing .0).
+function fmtCompact(n: number): string {
+  const sign = n < 0 ? '-' : ''
+  const a = Math.abs(n)
+  const trim = (x: number) => String(+x.toFixed(1))
+  if (a >= 1e9) return `${sign}${trim(a / 1e9)}B`
+  if (a >= 1e6) return `${sign}${trim(a / 1e6)}M`
+  if (a >= 1e3) return `${sign}${trim(a / 1e3)}K`
+  return `${sign}${a}`
+}
 
 const TINTS = ['linear-gradient(135deg,#a98bff,#6a44e0)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#2fe28a,#16a87a)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
 const tintFor = (w: string) => TINTS[Math.abs([...(w || 'x')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % TINTS.length]
 
-const MEDALS: Record<number, { medal: string; glow: string; ring: string }> = {
-  1: { medal: 'linear-gradient(135deg,#ffe08a,#f5b73d)', glow: 'rgba(245,183,61,.7)', ring: 'rgba(245,197,66,.7)' },
-  2: { medal: 'linear-gradient(135deg,#e6edf5,#b6c2d2)', glow: 'rgba(200,212,228,.6)', ring: 'rgba(220,228,238,.5)' },
-  3: { medal: 'linear-gradient(135deg,#e6a96a,#c07a3e)', glow: 'rgba(200,130,70,.6)', ring: 'rgba(210,150,90,.5)' },
+const MEDALS: Record<number, { medal: string; glow: string; accent: string; cardBg: string; cardBorder: string }> = {
+  1: { medal: 'linear-gradient(135deg,#ffe08a,#f5b73d)', glow: 'rgba(245,183,61,.6)', accent: '#f5c542', cardBg: 'linear-gradient(180deg,rgba(245,197,66,.14),rgba(255,255,255,.012))', cardBorder: 'rgba(245,197,66,.5)' },
+  2: { medal: 'linear-gradient(135deg,#e6edf5,#b6c2d2)', glow: 'rgba(200,212,228,.5)', accent: '#dbe4ee', cardBg: 'linear-gradient(180deg,rgba(220,228,238,.11),rgba(255,255,255,.012))', cardBorder: 'rgba(220,228,238,.45)' },
+  3: { medal: 'linear-gradient(135deg,#e6a96a,#c07a3e)', glow: 'rgba(200,130,70,.5)', accent: '#e6a96a', cardBg: 'linear-gradient(180deg,rgba(210,150,90,.13),rgba(255,255,255,.012))', cardBorder: 'rgba(210,150,90,.45)' },
 }
 
 // A small Gimmighoul coin (matches the gold token in the mockup).
@@ -33,6 +44,8 @@ export function LeaderboardPage() {
   const navigate = useNavigate()
   const myWallet = useEmbeddedSolanaAddress()
   const { identityToken } = useIdentityToken()
+  const wide = useIsWide('(min-width: 760px)')
+  const fmtN = (n: number) => (wide ? fmt(n) : fmtCompact(n))
 
   const [rows, setRows] = useState<LeaderboardRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,7 +94,6 @@ export function LeaderboardPage() {
   const myIdx = myWallet ? rows.findIndex((r) => r.wallet === myWallet) : -1
   const myRow = myIdx >= 0 ? rows[myIdx] : null
   const myGh = myGimmighouls ?? myRow?.gimmighouls ?? null
-  const myElo = myRow?.elo ?? null
   // Lead = margin over the next player (if #1) or gap to the player above.
   const lead = myIdx === 0 && rows[1] ? (myGh ?? 0) - rows[1].gimmighouls
     : myIdx > 0 ? (myGh ?? 0) - rows[myIdx - 1].gimmighouls : null
@@ -127,12 +139,11 @@ export function LeaderboardPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
               <div style={{ fontFamily: FONTS.display, fontSize: 'clamp(38px,6vw,58px)', fontWeight: 700, letterSpacing: '-.03em', lineHeight: .95, color: COLORS.green, textShadow: '0 4px 30px rgba(47,226,138,.35)' }}>
-                {myGh != null ? fmt(myGh) : '—'}
+                {myGh != null ? fmtN(myGh) : '—'}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
-              <Stat label="ELO" value={myElo != null ? String(myElo) : '—'} />
-              {lead != null && <Stat label={myIdx === 0 ? 'LEAD' : 'GAP'} value={`${lead >= 0 ? '+' : ''}${fmt(lead)}`} accent />}
+              {lead != null && <Stat label={myIdx === 0 ? 'LEAD' : 'GAP'} value={`${lead >= 0 ? '+' : ''}${fmtN(lead)}`} accent />}
               <Stat label="PLAYERS" value={String(rows.length)} />
             </div>
           </div>
@@ -182,19 +193,16 @@ export function LeaderboardPage() {
               <div key={d.wallet} onClick={() => navigate(`/profile/${d.wallet}`)} style={{
                 flex: '1 1 0', minWidth: 0, position: 'relative', overflow: 'hidden', cursor: 'pointer',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: first ? '26px 18px 24px' : '20px 16px',
-                borderRadius: 20, border: `1px solid ${first ? 'rgba(47,226,138,.5)' : COLORS.border}`,
-                background: first ? 'linear-gradient(180deg,rgba(47,226,138,.12),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012))',
-                boxShadow: first ? '0 0 60px -18px rgba(47,226,138,.6)' : 'none',
+                borderRadius: 20, border: `1px solid ${m.cardBorder}`,
+                background: m.cardBg,
+                boxShadow: `0 0 60px -18px ${m.glow}`,
               }}>
                 <div style={{ width: first ? 54 : 46, height: first ? 54 : 46, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONTS.mono, fontWeight: 700, fontSize: first ? 20 : 17, color: '#06170f', background: m.medal, boxShadow: `0 8px 26px -8px ${m.glow}` }}>{rank}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: tintFor(d.wallet), border: `2px solid ${isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{(d.alias ?? d.wallet).slice(0, 1).toUpperCase()}</span>
                   <span style={{ fontSize: 15, fontWeight: 700, color: isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{d.alias ?? shortWallet(d.wallet)}</span>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: FONTS.display, fontSize: first ? 21 : 18, fontWeight: 700, letterSpacing: '-.02em', color: first ? COLORS.green : COLORS.text }}><Coin size={16} />{fmt(d.gimmighouls)}</div>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginTop: 3 }}>{d.elo} ELO</div>
-                </div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: FONTS.display, fontSize: first ? 21 : 18, fontWeight: 700, letterSpacing: '-.02em', color: m.accent }}><Coin size={16} />{fmtN(d.gimmighouls)}</div>
               </div>
             )
           })}
@@ -231,9 +239,8 @@ export function LeaderboardPage() {
                   </div>
                   <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                     <Coin />
-                    <span style={{ fontFamily: FONTS.mono, fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', color: isMe ? COLORS.green : COLORS.text }}>{fmt(r.gimmighouls)}</span>
+                    <span style={{ fontFamily: FONTS.mono, fontSize: 15, fontWeight: 700, letterSpacing: '-.01em', color: isMe ? COLORS.green : COLORS.text }}>{fmtN(r.gimmighouls)}</span>
                   </div>
-                  <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', padding: '5px 11px', borderRadius: 8, background: '#ffffff08', border: `1px solid ${COLORS.border}`, fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>{r.elo} ELO</span>
                 </div>
               )
             })}
