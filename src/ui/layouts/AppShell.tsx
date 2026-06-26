@@ -132,25 +132,27 @@ export function AppShell() {
 
           {/* Balance + Gimmighouls — labelled groups on desktop; one divided box on mobile */}
           {authenticated && (wideRail ? (
-            // Desktop: USDC + Gimmighouls inside ONE pill, label-on-top, split by a divider.
-            <div style={{ display: 'flex', alignItems: 'stretch', background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 13 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 15px' }}>
-                <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>BALANCE</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <img src="/usdc.svg" alt="" width={19} height={19} style={{ display: 'block' }} />
-                  <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
-                    {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
-                  </span>
-                  {reserved != null && reserved > 0 && (
-                    <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(reserved)} reserved</span>
-                  )}
+            // Desktop: USDC + Gimmighouls in ONE pill — image left (full height) + label above number.
+            <div style={{ display: 'flex', alignItems: 'stretch', background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 13, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 15px' }}>
+                <img src="/usdc.svg" alt="" style={{ height: 40, width: 'auto', display: 'block' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.1 }}>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>USDC</span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
+                      {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
+                    </span>
+                    {reserved != null && reserved > 0 && (
+                      <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(reserved)} reserved</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <span style={{ width: 1, background: COLORS.border, margin: '7px 0' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 15px' }} title="Gimmighouls">
-                <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>GIMMIGHOULS</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <img src="/gimmighoul.png" alt="" width={19} height={19} style={{ display: 'block' }} />
+              <span style={{ width: 1, background: COLORS.border }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 15px' }} title="Gimmighouls">
+                <img src="/gimmighoul.png" alt="" style={{ height: 40, width: 'auto', display: 'block' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.1 }}>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>GIMMIGHOULS</span>
                   <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
                     {gimmighouls != null ? gimmighouls.toLocaleString() : '—'}
                   </span>
