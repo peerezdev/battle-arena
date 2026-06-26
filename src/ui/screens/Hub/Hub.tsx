@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../../theme'
@@ -14,6 +14,7 @@ import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 import { CreateBattleModal } from './CreateBattleModal'
+import { loadMachineList } from '../../useMachines'
 
 export function Hub() {
   const navigate = useNavigate()
@@ -24,6 +25,9 @@ export function Hub() {
   const gate = useDelegationGate()
   const [createOpen, setCreateOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  // Warm the machine catalogue cache on lobby load so Create Battle opens with machines ready.
+  useEffect(() => { void loadMachineList() }, [])
 
   const liveBattles = battles.map((b) => openBattleToLive(b, meWallet))
 

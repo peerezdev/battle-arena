@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, formatUsd } from '../../theme'
-import { fetchMachines, type GachaMachine } from '../../../onchain/gachaClient'
+import { useMachineList } from '../../useMachines'
 import { createBattle, type BattleMode } from '../../../onchain/packBattleClient'
 import { buildCreateBody, bundleToPacks, totalBoxes, bundleCostUsd } from './createBattleBody'
 import { useDelegationGate } from '../../components/useDelegationGate'
@@ -15,7 +15,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
 }) {
   const { identityToken } = useIdentityToken()
   const gate = useDelegationGate()
-  const [machines, setMachines] = useState<GachaMachine[]>([])
+  const { machines, loading: machinesLoading } = useMachineList()   // shared/cached → instant on reopen
   const [machineCode, setMachineCode] = useState<string>('')   // royale single machine
   const [counts, setCounts] = useState<Record<string, number>>({})   // pack bundle
   const [mode, setMode] = useState<BattleMode>('pack')
@@ -23,13 +23,10 @@ export function CreateBattleModal({ onClose, onCreated }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Default the royale machine selection once the catalogue is available.
   useEffect(() => {
-    let cancelled = false
-    fetchMachines()
-      .then((m) => { if (!cancelled) { setMachines(m); setMachineCode((c) => c || m[0]?.code || '') } })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : String(e)) })
-    return () => { cancelled = true }
-  }, [])
+    setMachineCode((c) => c || machines[0]?.code || '')
+  }, [machines])
 
   const boxes = totalBoxes(counts)
   const costUsd = bundleCostUsd(counts, machines)
@@ -94,6 +91,9 @@ export function CreateBattleModal({ onClose, onCreated }: {
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, color: COLORS.muted }}>Bundle boxes (max {MAX_BOXES})</label>
             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
+              {machinesLoading && machines.length === 0 && (
+                <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, padding: '14px 4px' }}>Loading machines…</div>
+              )}
               {machines.filter((m) => m.available !== false).map((m) => {
                 const n = counts[m.code] ?? 0
                 return (
