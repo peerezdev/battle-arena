@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { COLORS, FONTS, RARITY, SHADOW, formatUsd } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { useIsWide } from '../../useIsWide'
-import { usePoolColorFilter } from '../../usePoolColorFilter'
 import type { MachineCard } from '../../../onchain/gachaClient'
 import { CardDetailsModal } from './CardDetailsModal'
 
@@ -27,11 +26,9 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
   const wideCols = useIsWide('(min-width: 560px)')
   const [selected, setSelected] = useState<MachineCard | null>(null)
 
-  // Color-grade filter — toggled from the topbar. Uses an SVG filter (#ba-pop) that boosts saturation
-  // but masks bright/white areas by luminance, so whites stay white instead of picking up a tint.
-  const filterOn = usePoolColorFilter()
-  const dropShadow = 'drop-shadow(0 4px 12px rgba(0,0,0,0.45))'
-  const imgFilter = filterOn ? `url(#ba-pop) ${dropShadow}` : dropShadow
+  // Color-pop filter (#ba-pop): boosts saturation but masks bright/white areas by luminance,
+  // so whites stay white instead of picking up a tint.
+  const imgFilter = 'url(#ba-pop) drop-shadow(0 4px 12px rgba(0,0,0,0.45))'
 
   const containerVariants = {
     hidden: {},

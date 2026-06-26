@@ -7,7 +7,6 @@ import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalanc
 import { useProfile } from '../../hooks/useProfile'
 import { useReducedMotion } from '../useReducedMotion'
 import { useIsWide } from '../useIsWide'
-import { usePoolColorFilter, toggleColorFilter } from '../usePoolColorFilter'
 import { AuthButtons } from '../components/AuthButtons'
 import { DepositModal } from '../components/DepositModal'
 import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
@@ -34,7 +33,6 @@ export function AppShell() {
   const { reserved } = useReservedBalance()
   const { gimmighouls } = useProfile()
   const { authenticated } = usePrivy()
-  const colorOn = usePoolColorFilter()
 
   // Breakpoints copied verbatim from Hub.tsx
   const wideRail = useIsWide('(min-width: 760px)')
@@ -177,22 +175,6 @@ export function AppShell() {
               </div>
             </div>
           ))}
-
-          {/* Card color-filter toggle (applies to the gacha pool) */}
-          <button
-            onClick={toggleColorFilter}
-            title={`Card color filter: ${colorOn ? 'on' : 'off'}`}
-            aria-pressed={colorOn}
-            style={{
-              flexShrink: 0, width: wideRail ? 36 : 32, height: wideRail ? 36 : 32, borderRadius: 10,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              border: `1px solid ${colorOn ? 'rgba(47,226,138,.45)' : COLORS.border}`,
-              background: colorOn ? 'rgba(47,226,138,.10)' : '#11161f',
-              color: colorOn ? COLORS.green : COLORS.muted,
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
-          </button>
 
           {/* Deposit (before the account pill, as in the mockup) */}
           {authenticated && (
