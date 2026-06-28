@@ -46,10 +46,11 @@ export function StagedCardReveal({
   const stage = stages[i]
   const onCard = stage === 'card'
 
-  // The rarity must not be telegraphed early: the back stays neutral through YEAR/GRADE and only
-  // takes the rarity color once the RARITY stage (or the card) is actually on screen.
-  const rarityIdx = stages.indexOf('rarity')
-  const backAccent = rarityIdx !== -1 && i >= rarityIdx ? rc : COLORS.muted
+  // The rarity color must land WITH the rarity text, not before. With AnimatePresence mode="wait"
+  // the rarity text only mounts after the previous stage finishes exiting, so we flip the back color
+  // when that text's enter animation completes (opacity === 1 distinguishes enter from exit).
+  const [accentOn, setAccentOn] = useState(false)
+  const backAccent = accentOn ? rc : COLORS.muted
 
   useEffect(() => {
     if (!onCard) return
@@ -83,6 +84,7 @@ export function StagedCardReveal({
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 1.1, opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                  onAnimationComplete={(def) => { if (stage === 'rarity' && (def as { opacity?: number })?.opacity === 1) setAccentOn(true) }}
                   style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, userSelect: 'none' }}
                 >
                   <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>{stage.toUpperCase()}</div>

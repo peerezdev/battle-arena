@@ -11,6 +11,7 @@ export function CardBack({ width, height, accent, label }: { width: number; heig
       boxShadow: `0 0 20px ${accent}33, inset 0 0 34px #00000077`,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
       position: 'relative', overflow: 'hidden',
+      transition: 'border-color .35s ease, box-shadow .35s ease',
     }}>
       <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(135deg,#ffffff08 0 2px,transparent 2px 11px)' }} />
       <div style={{ width: 46, height: 46, borderRadius: 13, background: GRADIENT, boxShadow: `0 0 18px ${accent}88`, transform: 'rotate(45deg)' }} />
