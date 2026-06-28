@@ -3,7 +3,7 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { useMachineList } from '../../useMachines'
 import { createBattle, type BattleMode } from '../../../onchain/packBattleClient'
-import { buildCreateBody, bundleToPacks, totalBoxes, bundleCostUsd } from './createBattleBody'
+import { buildCreateBody, bundleToPacks, totalBoxes, bundleCostUsd, royaleTotalPulls, royaleEntryUsd } from './createBattleBody'
 import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 
@@ -45,7 +45,9 @@ export function CreateBattleModal({ onClose, onCreated }: {
   const boxes = totalBoxes(counts)
   const costUsd = bundleCostUsd(counts, machines)
   const royalePrice = machines.find((m) => m.code === machineCode)?.price ?? 0
-  const total = isRoyale ? royalePrice : costUsd
+  // Royale entry per player accounts for every pack opened (1 elimination/round), split across players.
+  const royalePulls = royaleTotalPulls(players)
+  const total = isRoyale ? royaleEntryUsd(players, royalePrice) : costUsd
 
   const visible = machines
     .filter((m) => m.available !== false)
@@ -216,7 +218,11 @@ export function CreateBattleModal({ onClose, onCreated }: {
         {/* footer */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '15px clamp(20px,2.6vw,28px)', borderTop: `1px solid ${COLORS.border}`, background: '#ffffff05' }}>
           <div style={{ marginRight: 'auto' }}>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.06em', color: COLORS.muted }}>{isRoyale ? '1 machine · entry per player' : `${boxes}/${MAX_BOXES} packs · entry per player`}</div>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.06em', color: COLORS.muted }}>
+              {isRoyale
+                ? `entry per player · ${royalePulls} packs over ${Math.max(0, players - 1)} rounds`
+                : `${boxes}/${MAX_BOXES} packs · entry per player`}
+            </div>
             <div style={{ fontFamily: FONTS.display, fontSize: 21, fontWeight: 700, letterSpacing: '-.01em', color: COLORS.green, marginTop: 2 }}>{formatUsd(total)}</div>
           </div>
           <button onClick={onClose} disabled={busy}
