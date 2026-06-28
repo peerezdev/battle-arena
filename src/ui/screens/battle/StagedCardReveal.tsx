@@ -74,7 +74,7 @@ export function StagedCardReveal({
       >
         {/* BACK — card back + the current stage text overlaid */}
         <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
-          <CardBack width={width} height={height} accent={backAccent} />
+          <CardBack width={width} height={height} accent={backAccent} strong={accentOn} />
           {!onCard && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AnimatePresence mode="wait">
