@@ -50,7 +50,9 @@ export function StagedCardReveal({
   // the rarity text only mounts after the previous stage finishes exiting, so we flip the back color
   // when that text's enter animation STARTS (opacity === 1 distinguishes enter from exit).
   const [accentOn, setAccentOn] = useState(false)
-  const backAccent = accentOn ? rc : COLORS.muted
+  // Common stays like the neutral state — no rarity color, no strong beam.
+  const isCommon = (rarity ?? '').toLowerCase() === 'common'
+  const backAccent = accentOn && !isCommon ? rc : COLORS.muted
 
   useEffect(() => {
     if (!onCard) return
@@ -74,7 +76,7 @@ export function StagedCardReveal({
       >
         {/* BACK — card back + the current stage text overlaid */}
         <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
-          <CardBack width={width} height={height} accent={backAccent} strong={accentOn} />
+          <CardBack width={width} height={height} accent={backAccent} strong={accentOn && !isCommon} />
           {!onCard && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AnimatePresence mode="wait">
