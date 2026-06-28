@@ -25,12 +25,21 @@ const rarOf = (r: string | null) => RAR[(r ?? '').toLowerCase()] ?? RAR.common
 const TINTS = ['linear-gradient(135deg,#a98bff,#6a44e0)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#2fe28a,#1aa0d8)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
 const tintFor = (w: string) => TINTS[Math.abs([...w].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % TINTS.length]
 
+// Panel + card sizing scales with the player count so 2 players feel big and 10 stay legible.
+function layoutFor(n: number, wide: boolean): { panelW: number; cardW: number; compact: boolean } {
+  if (!wide) return n > 4 ? { panelW: 150, cardW: 100, compact: true } : { panelW: 230, cardW: 140, compact: false }
+  if (n <= 2) return { panelW: 320, cardW: 168, compact: false }
+  if (n <= 4) return { panelW: 248, cardW: 150, compact: false }
+  if (n <= 6) return { panelW: 208, cardW: 128, compact: true }
+  return { panelW: 178, cardW: 110, compact: true }
+}
+
 export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
   vm: RevealVM; reducedMotion: boolean; onComplete?: () => void; onExit?: () => void
 }) {
   const wide = useIsWide('(min-width: 560px)')
-  const cardW = wide ? 168 : 128
-  const cardH = wide ? 236 : 188
+  const { panelW, cardW, compact } = layoutFor(vm.players.length, wide)
+  const cardH = Math.round(cardW * 1.4)
 
   const aliases = useAliases(vm.players.map((p) => p.wallet))
   const machines = useMachines()
@@ -66,6 +75,10 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
   const totals = vm.players.map((p) => p.cards.slice(0, shownRounds).reduce((s, c) => s + (c.insuredValue ?? 0), 0))
   const leadIdx = totals.reduce((best, v, i) => (v > totals[best] ? i : best), 0)
   const leaderWallet = complete ? vm.winner : (shownRounds > 0 ? vm.players[leadIdx]?.wallet : null)
+
+  // The pot builds up as cards are revealed (combined value of everything opened so far).
+  const revealedPot = totals.reduce((s, v) => s + v, 0)
+  const pot = useCountUp(revealedPot, !reducedMotion)
 
   function skip() {
     setRound(totalRounds - 1)
@@ -120,13 +133,13 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
 
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }}>TOTAL POT</div>
-          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(vm.potValue)}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(pot)}</div>
         </div>
       </section>
 
-      {/* ── player panels ── */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'stretch', justifyContent: 'center', gap: wide ? 14 : 8, flexWrap: 'wrap' }}>
-        {vm.players.map((p, i) => (
+      {/* ── player panels — responsive grid, centered, scales with player count ── */}
+      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: wide ? 14 : 8 }}>
+        {vm.players.map((p) => (
           <PlayerPanel
             key={p.wallet}
             player={p}
@@ -138,9 +151,10 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
             isWinner={complete && p.wallet === vm.winner}
             reducedMotion={reducedMotion}
             onCardShown={handleCardShown}
+            panelW={panelW}
             cardW={cardW}
             cardH={cardH}
-            divider={i > 0}
+            compact={compact}
           />
         ))}
       </div>
@@ -164,9 +178,10 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
   )
 }
 
-function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, isWinner, reducedMotion, onCardShown, cardW, cardH, divider }: {
+function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, isWinner, reducedMotion, onCardShown, panelW, cardW, cardH, compact }: {
   player: RevealPlayerVM; name: string; round: number; roundReady: boolean; shownRounds: number
-  isLeader: boolean; isWinner: boolean; reducedMotion: boolean; onCardShown: () => void; cardW: number; cardH: number; divider: boolean
+  isLeader: boolean; isWinner: boolean; reducedMotion: boolean; onCardShown: () => void
+  panelW: number; cardW: number; cardH: number; compact: boolean
 }) {
   const navigate = useNavigate()
   const shown = player.cards.slice(0, shownRounds)
@@ -176,77 +191,70 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
   const currentCard = player.cards[round]
   const hot = isLeader || isWinner
 
+  const chip = compact ? { w: 30, h: 42, f: 7 } : { w: 42, h: 58, f: 8.5 }
+
   return (
-    <>
-      {divider && (
-        <div style={{ alignSelf: 'center', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '0 6px' }}>
-          <div style={{ width: 1, height: 48, background: 'linear-gradient(180deg,transparent,rgba(255,255,255,.16),transparent)' }} />
-          <div style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONTS.mono, fontSize: 13, fontWeight: 700, color: '#fff', background: '#0b0f14', borderRadius: '50%', border: '2px solid transparent', backgroundImage: `linear-gradient(#0b0f14,#0b0f14),${GRADIENT}`, backgroundOrigin: 'border-box', backgroundClip: 'padding-box,border-box', boxShadow: '0 0 26px -6px rgba(139,92,246,.7)' }}>VS</div>
-          <div style={{ width: 1, height: 48, background: 'linear-gradient(180deg,transparent,rgba(255,255,255,.16),transparent)' }} />
+    <div style={{
+      position: 'relative', flex: '0 0 auto', width: panelW,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 11 : 16, padding: compact ? '16px 12px' : '22px 18px', borderRadius: compact ? 16 : 22,
+      background: hot ? 'linear-gradient(180deg,rgba(47,226,138,.10),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012))',
+      border: `1px solid ${hot ? 'rgba(47,226,138,.5)' : COLORS.border}`,
+      boxShadow: hot ? '0 0 60px -16px rgba(47,226,138,.6)' : 'none',
+    }}>
+      {hot && (
+        <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 5, padding: '4px 11px', borderRadius: 20, background: GRADIENT, color: '#06170f', fontFamily: FONTS.display, fontSize: compact ? 10 : 11.5, fontWeight: 700, boxShadow: '0 8px 24px -8px rgba(47,226,138,.8)', whiteSpace: 'nowrap' }}>
+          👑 {isWinner ? 'WINNER' : 'WINNING'}
         </div>
       )}
-      <div style={{
-        position: 'relative', flex: '1 1 280px', maxWidth: 360, minWidth: 240,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '22px 18px', borderRadius: 22,
-        background: hot ? 'linear-gradient(180deg,rgba(47,226,138,.10),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012))',
-        border: `1px solid ${hot ? 'rgba(47,226,138,.5)' : COLORS.border}`,
-        boxShadow: hot ? '0 0 60px -16px rgba(47,226,138,.6)' : 'none',
-      }}>
-        {hot && (
-          <div style={{ position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: GRADIENT, color: '#06170f', fontFamily: FONTS.display, fontSize: 11.5, fontWeight: 700, boxShadow: '0 8px 24px -8px rgba(47,226,138,.8)', whiteSpace: 'nowrap' }}>
-            👑 {isWinner ? 'WINNER' : 'WINNING'}
+
+      {/* identity */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, maxWidth: '100%' }}>
+        <span style={{ flex: 'none', width: compact ? 30 : 38, height: compact ? 30 : 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: compact ? 12 : 14, fontWeight: 700, color: '#06170f', background: tintFor(player.wallet), border: `2px solid ${player.isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{name.slice(0, 1).toUpperCase()}</span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span onClick={() => navigate(`/profile/${player.wallet}`)} title="View profile"
+              style={{ fontSize: compact ? 13 : 15.5, fontWeight: 700, color: player.isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: panelW - (compact ? 64 : 90), cursor: 'pointer' }}>{name}</span>
+            {player.isMe && <span style={{ flex: 'none', padding: '2px 6px', borderRadius: 5, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
           </div>
-        )}
-
-        {/* identity */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-          <span style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#06170f', background: tintFor(player.wallet), border: `2px solid ${player.isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{name.slice(0, 1).toUpperCase()}</span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span onClick={() => navigate(`/profile/${player.wallet}`)} title="View profile"
-                style={{ fontSize: 15.5, fontWeight: 700, color: player.isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 130, cursor: 'pointer' }}>{name}</span>
-              {player.isMe && <span style={{ flex: 'none', padding: '2px 7px', borderRadius: 6, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 9.5, fontWeight: 700, color: COLORS.green }}>YOU</span>}
-            </div>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: '#6c7682', marginTop: 2 }}>{shown.length} cards opened</div>
-          </div>
-        </div>
-
-        {/* card stage */}
-        <div style={{ width: cardW, height: cardH }}>
-          {roundReady && currentCard ? (
-            <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
-              reduced={reducedMotion} width={cardW} height={cardH} onCardShown={onCardShown}>
-              <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
-            </StagedCardReveal>
-          ) : (
-            <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="opening…" />
-          )}
-        </div>
-
-        {/* running total + delta */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>TOTAL VALUE</div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: FONTS.display, fontSize: 34, fontWeight: 700, letterSpacing: '-.02em', color: hot ? COLORS.green : COLORS.text }}>{formatUsd(counted)}</span>
-            {delta > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.green }}>↑ {formatUsd(delta)}</span>}
-          </div>
-        </div>
-
-        {/* revealed strip */}
-        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', justifyContent: 'center' }}>
-          {shown.map((c, idx) => {
-            const r = rarOf(c.rarity)
-            return (
-              <div key={idx} style={{ width: 42, height: 58, borderRadius: 8, background: `linear-gradient(160deg,${r.tint},rgba(8,10,14,.5))`, border: `1px solid ${r.border}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 4 }}>
-                <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.7)' }}>{formatUsd(c.insuredValue ?? 0)}</span>
-              </div>
-            )
-          })}
-          {shown.length < player.cards.length && (
-            <div style={{ width: 42, height: 58, borderRadius: 8, border: '1px dashed rgba(255,255,255,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5c6675', fontSize: 18 }}>+</div>
-          )}
+          <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#6c7682', marginTop: 2 }}>{shown.length} cards</div>
         </div>
       </div>
-    </>
+
+      {/* card stage */}
+      <div style={{ width: cardW, height: cardH }}>
+        {roundReady && currentCard ? (
+          <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
+            reduced={reducedMotion} width={cardW} height={cardH} onCardShown={onCardShown}>
+            <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
+          </StagedCardReveal>
+        ) : (
+          <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="opening…" />
+        )}
+      </div>
+
+      {/* running total + delta */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.2em', color: COLORS.muted }}>TOTAL VALUE</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+          <span style={{ fontFamily: FONTS.display, fontSize: compact ? 22 : 34, fontWeight: 700, letterSpacing: '-.02em', color: hot ? COLORS.green : COLORS.text }}>{formatUsd(counted)}</span>
+          {delta > 0 && !compact && <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.green }}>↑ {formatUsd(delta)}</span>}
+        </div>
+      </div>
+
+      {/* revealed strip */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {shown.map((c, idx) => {
+          const r = rarOf(c.rarity)
+          return (
+            <div key={idx} style={{ width: chip.w, height: chip.h, borderRadius: 7, background: `linear-gradient(160deg,${r.tint},rgba(8,10,14,.5))`, border: `1px solid ${r.border}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,.14)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 3 }}>
+              <span style={{ fontFamily: FONTS.mono, fontSize: chip.f, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.7)' }}>{formatUsd(c.insuredValue ?? 0)}</span>
+            </div>
+          )
+        })}
+        {shown.length < player.cards.length && (
+          <div style={{ width: chip.w, height: chip.h, borderRadius: 7, border: '1px dashed rgba(255,255,255,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5c6675', fontSize: 16 }}>+</div>
+        )}
+      </div>
+    </div>
   )
 }
