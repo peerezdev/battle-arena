@@ -43,7 +43,7 @@ export const RARITY = {
   common: COLORS.muted,
   uncommon: COLORS.green,
   rare: '#5ad1ff',
-  epic: '#f0b54a',
+  epic: '#a98bff',
 } as const
 
 /** Beam-of-light glow color for a Live Drop by rarity. Common (or unknown) → null (no glow). */
@@ -51,7 +51,7 @@ export function rarityGlow(rarity: string | null | undefined): string | null {
   switch ((rarity ?? '').toLowerCase()) {
     case 'uncommon': return '#2fe28a'  // green
     case 'rare': return '#4ea8ff'      // blue
-    case 'epic': return '#ff5e7a'      // red
+    case 'epic': return '#a98bff'      // purple
     case 'legendary':
     case 'mythic': return '#f5c542'    // gold (above epic)
     default: return null               // common / unknown → no glow
