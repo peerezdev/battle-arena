@@ -5,15 +5,19 @@
  * Asks for a destination Solana wallet and an amount. The amount must be > 0 and
  * never exceed the user's available balance (USDC minus reserved).
  *
- * NOTE: the on-chain transfer itself is not wired yet (no backend withdraw endpoint).
- * The form validates the inputs and surfaces the request; submission is a placeholder.
+ * Submits to POST /users/me/withdraw, which moves USDC from the player's (delegated) wallet to the
+ * destination with the operator as fee-payer. Gated by the delegation flow (same as battles).
  */
 import { useEffect, useState } from 'react'
+import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, SHADOW } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
 import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalance'
 import { useProfile } from '../../hooks/useProfile'
+import { useDelegationGate } from './useDelegationGate'
+import { DelegationGate } from './DelegationGate'
+import { config } from '../../onchain/config'
 import { formatUsd } from '../theme'
 import { showToast } from '../toast'
 
@@ -35,6 +39,8 @@ const labelStyle: React.CSSProperties = {
 
 export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
   const reducedMotion = useReducedMotion()
+  const { identityToken } = useIdentityToken()
+  const gate = useDelegationGate()
   const { usdc } = useUsdcBalance()
   const { reserved } = useReservedBalance()
   const { withdrawAddress } = useProfile()
@@ -43,6 +49,7 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
   const [dest, setDest] = useState('')
   const [amount, setAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   // Prefill the destination from the saved withdrawal address when the modal opens.
   useEffect(() => {
@@ -54,17 +61,35 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
   const amountNum = Number(amount)
   const amountValid = amount !== '' && Number.isFinite(amountNum) && amountNum > 0 && available != null && amountNum <= available
   const destValid = SOL_ADDRESS.test(dest.trim())
-  const canSubmit = destValid && amountValid
+  const canSubmit = destValid && amountValid && !busy
 
   function submit() {
     if (available == null) { setError('Balance unavailable. Try again.'); return }
     if (!destValid) { setError('Enter a valid Solana wallet address.'); return }
     if (amount === '' || !Number.isFinite(amountNum) || amountNum <= 0) { setError('Enter an amount greater than 0.'); return }
     if (amountNum > available) { setError(`Amount exceeds your available balance (${formatUsd(available)}).`); return }
+    if (!identityToken) { setError('Log in to withdraw.'); return }
     setError(null)
-    // TODO: call the backend withdraw endpoint to move USDC on-chain.
-    showToast(`Withdrawal of ${formatUsd(amountNum)} to ${dest.slice(0, 4)}…${dest.slice(-4)} requested.`, 'success')
-    onClose()
+    // Needs the wallet delegated so the server can sign the transfer (same as battles).
+    gate.requireDelegation(async () => {
+      setBusy(true)
+      try {
+        const resp = await fetch(`${config.backendUrl}/users/me/withdraw`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${identityToken}`, 'ngrok-skip-browser-warning': 'true' },
+          body: JSON.stringify({ address: dest.trim(), amount: amountNum }),
+        })
+        if (resp.status === 402) { setError('Insufficient available balance.'); return }
+        if (resp.status === 503) { setError('Withdrawals are temporarily unavailable.'); return }
+        if (!resp.ok) { setError('Withdrawal failed. Please try again.'); return }
+        showToast(`Withdrew ${formatUsd(amountNum)} to ${dest.slice(0, 4)}…${dest.slice(-4)} ✓`, 'success')
+        onClose()
+      } catch {
+        setError('Network error.')
+      } finally {
+        setBusy(false)
+      }
+    })
   }
 
   return (
@@ -137,13 +162,14 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
           style={{
             background: canSubmit ? GRADIENT : '#1a2230', border: 'none', borderRadius: 10, padding: '12px 0',
             color: canSubmit ? '#06120c' : COLORS.muted, fontWeight: 800, fontSize: 14, fontFamily: FONTS.display,
-            cursor: canSubmit ? 'pointer' : 'default', width: '100%', letterSpacing: '0.01em',
+            cursor: !canSubmit ? 'default' : 'pointer', width: '100%', letterSpacing: '0.01em',
             transition: reducedMotion ? 'none' : 'background 0.15s',
           }}
         >
-          Withdraw
+          {busy ? 'Withdrawing…' : 'Withdraw'}
         </button>
       </div>
+      <DelegationGate gate={gate} />
     </>
   )
 }

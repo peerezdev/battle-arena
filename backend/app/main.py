@@ -36,7 +36,7 @@ from .services.pack_lobby import (
 from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
-from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin
+from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc
 from .services.reservations import reserve, reserved_total, release_reservations
 from .services.bots import load_bots, pick_bot
 
@@ -58,6 +58,11 @@ class ReferralBody(BaseModel):
 class WithdrawAddressBody(BaseModel):
     # Base58 Solana address (32–44 chars). Empty string clears it.
     address: str = Field(max_length=64, pattern=r"^$|^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+
+
+class WithdrawBody(BaseModel):
+    address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # destination Solana wallet
+    amount: float = Field(gt=0)  # USDC (dollars)
 
 
 class GeneratePackBody(BaseModel):
@@ -546,6 +551,25 @@ def create_app(session_factory, chain: ChainSource,
                                 privy_operator_wallet_id, privy_operator_address,
                                 escrow_address, cc_usdc_mint, amount, blockhash)
             await asyncio.sleep(1)  # let the tx land before the next serialized collect
+
+    @app.post("/users/me/withdraw")
+    async def me_withdraw(body: WithdrawBody, wallet: str = Depends(current_user),
+                          wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        # Move USDC from the player's (delegated) wallet to an external address; operator pays gas.
+        if privy_signer is None or not (privy_operator_wallet_id and privy_operator_address):
+            raise HTTPException(503, "withdrawals_unavailable")
+        amount = int(round(body.amount * 1_000_000))   # USDC base units
+        if amount <= 0:
+            raise HTTPException(422, "amount must be > 0")
+        await _require_available(wallet, amount, s)     # caps at on-chain balance − reserved
+        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        try:
+            sig = await withdraw_usdc(solana_rpc_url, privy_signer, wallet_id, wallet,
+                                      privy_operator_wallet_id, privy_operator_address,
+                                      body.address, cc_usdc_mint, amount, blockhash)
+        except Exception as exc:
+            raise HTTPException(502, f"withdraw failed: {exc}")
+        return {"signature": sig, "amount": body.amount, "address": body.address}
 
     @app.post("/pack-battles")
     async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),
