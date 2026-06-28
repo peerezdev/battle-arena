@@ -274,7 +274,7 @@ function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBat
       {/* pot + entry */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 18 }}>
         <div>
-          <div style={{ fontSize: 11, color: COLORS.muted, letterSpacing: '.04em', marginBottom: 3 }}>POT</div>
+          <div style={{ fontSize: 11, color: COLORS.muted, letterSpacing: '.04em', marginBottom: 3 }}>EST. POT</div>
           <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 28, letterSpacing: '-.02em', color: COLORS.text }}>
             {formatUsd(b.pot)}
           </div>

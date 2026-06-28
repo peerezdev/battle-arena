@@ -48,6 +48,8 @@ export function CreateBattleModal({ onClose, onCreated }: {
   // Royale entry per player accounts for every pack opened (1 elimination/round), split across players.
   const royalePulls = royaleTotalPulls(players)
   const total = isRoyale ? royaleEntryUsd(players, royalePrice) : costUsd
+  // Estimated pot at a full lobby. Royale: price × packs. Pack: bundle cost × players.
+  const estimatedPot = isRoyale ? royalePrice * royalePulls : costUsd * players
 
   const visible = machines
     .filter((m) => m.available !== false)
@@ -218,12 +220,21 @@ export function CreateBattleModal({ onClose, onCreated }: {
         {/* footer */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '15px clamp(20px,2.6vw,28px)', borderTop: `1px solid ${COLORS.border}`, background: '#ffffff05' }}>
           <div style={{ marginRight: 'auto' }}>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.06em', color: COLORS.muted }}>
-              {isRoyale
-                ? `entry per player · ${royalePulls} packs over ${Math.max(0, players - 1)} rounds`
-                : `${boxes}/${MAX_BOXES} packs · entry per player`}
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.14em', color: COLORS.muted }}>ENTRY / PLAYER</div>
+                <div style={{ fontFamily: FONTS.display, fontSize: 21, fontWeight: 700, letterSpacing: '-.01em', color: COLORS.green, marginTop: 2 }}>{formatUsd(total)}</div>
+              </div>
+              <div>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.14em', color: COLORS.muted }}>EST. POT</div>
+                <div style={{ fontFamily: FONTS.display, fontSize: 21, fontWeight: 700, letterSpacing: '-.01em', color: COLORS.text, marginTop: 2 }}>{formatUsd(estimatedPot)}</div>
+              </div>
             </div>
-            <div style={{ fontFamily: FONTS.display, fontSize: 21, fontWeight: 700, letterSpacing: '-.01em', color: COLORS.green, marginTop: 2 }}>{formatUsd(total)}</div>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.04em', color: COLORS.muted, marginTop: 6 }}>
+              {isRoyale
+                ? `${royalePulls} packs over ${Math.max(0, players - 1)} rounds · ${players} players`
+                : `${boxes}/${MAX_BOXES} packs · ${players} players`}
+            </div>
           </div>
           <button onClick={onClose} disabled={busy}
             style={{ padding: '13px 22px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 14.5, fontWeight: 600 }}>Cancel</button>
