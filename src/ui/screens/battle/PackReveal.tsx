@@ -187,7 +187,6 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
   const shown = player.cards.slice(0, shownRounds)
   const target = shown.reduce((s, c) => s + (c.insuredValue ?? 0), 0)
   const counted = useCountUp(target, !reducedMotion)
-  const delta = shown.length ? shown[shown.length - 1].insuredValue ?? 0 : 0
   const currentCard = player.cards[round]
   const hot = isLeader || isWinner
 
@@ -216,7 +215,7 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
               style={{ fontSize: compact ? 13 : 15.5, fontWeight: 700, color: player.isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: panelW - (compact ? 64 : 90), cursor: 'pointer' }}>{name}</span>
             {player.isMe && <span style={{ flex: 'none', padding: '2px 6px', borderRadius: 5, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
           </div>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#6c7682', marginTop: 2 }}>{shown.length} cards</div>
+          <div style={{ fontFamily: FONTS.display, fontSize: compact ? 14 : 16, fontWeight: 800, letterSpacing: '-.01em', color: hot ? COLORS.green : COLORS.text, marginTop: 2 }}>{formatUsd(counted)}</div>
         </div>
       </div>
 
@@ -230,15 +229,6 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
         ) : (
           <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="opening…" />
         )}
-      </div>
-
-      {/* running total + delta */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.2em', color: COLORS.muted }}>TOTAL VALUE</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-          <span style={{ fontFamily: FONTS.display, fontSize: compact ? 22 : 34, fontWeight: 700, letterSpacing: '-.02em', color: hot ? COLORS.green : COLORS.text }}>{formatUsd(counted)}</span>
-          {delta > 0 && !compact && <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.green }}>↑ {formatUsd(delta)}</span>}
-        </div>
       </div>
 
       {/* revealed strip */}
