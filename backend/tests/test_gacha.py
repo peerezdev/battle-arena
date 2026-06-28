@@ -14,7 +14,7 @@ MACHINE = {
     "shortName": "Poke50", "thumbnailUrl": "/pokemon_50.png",
     "videoSrc": "/pokemon_50.webm", "videoHevc": "/pokemon_50.hevc.mp4",
     "instantBuyback": 80, "contains": 1,
-    "tierRanges": {}, "extra_ignored": "x",
+    "tierRanges": {"common": {"start": 150, "end": 250}}, "extra_ignored": "x",
 }
 
 
@@ -70,7 +70,7 @@ async def test_machines_maps_and_caches():
     out = await svc.machines()
     assert out == [{
         "code": "pokemon_50", "name": "Pokemon 50", "price": 50,
-        "odds": MACHINE["odds"], "stock": MACHINE["stock"], "ev": 42.5,
+        "odds": MACHINE["odds"], "tierRanges": MACHINE["tierRanges"], "stock": MACHINE["stock"], "ev": 42.5,
         "image": "",
         "shortName": "Poke50", "thumbnailUrl": f"{BASE}/pokemon_50.png",
         "videoSrc": f"{BASE}/pokemon_50.webm", "videoHevc": f"{BASE}/pokemon_50.hevc.mp4",
@@ -78,7 +78,7 @@ async def test_machines_maps_and_caches():
         "turboMode": None,
         "available": True,
     }]
-    assert "tierRanges" not in out[0]
+    assert out[0]["tierRanges"] == {"common": {"start": 150, "end": 250}}
     assert "extra_ignored" not in out[0]
     await svc.machines()
     assert route.call_count == 1  # cache 60s

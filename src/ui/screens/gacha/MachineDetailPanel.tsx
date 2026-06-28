@@ -279,21 +279,31 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
           {oddsEntries.map(([rarity, pct]) => {
             const accent = RARITY_COLOR[rarity] ?? COLORS.muted
             const width = totalOdds > 0 ? Math.round((pct / totalOdds) * 100) : pct
+            const range = machine.tierRanges?.[rarity.toLowerCase()]
             return (
               <div key={rarity}>
                 <div
                   style={{
                     display: 'flex',
+                    alignItems: 'baseline',
                     justifyContent: 'space-between',
+                    gap: 8,
                     marginBottom: 4,
                     fontFamily: FONTS.mono,
                     fontSize: 11,
                   }}
                 >
-                  <span style={{ color: accent, textTransform: 'capitalize', fontWeight: 700 }}>
-                    {rarity.toLowerCase()}
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0 }}>
+                    <span style={{ color: accent, textTransform: 'capitalize', fontWeight: 700 }}>
+                      {rarity.toLowerCase()}
+                    </span>
+                    {range && (
+                      <span style={{ color: COLORS.muted, fontSize: 10 }} title="Card value range">
+                        {formatUsd(range.start)}–{formatUsd(range.end)}
+                      </span>
+                    )}
                   </span>
-                  <span style={{ color: COLORS.muted }}>{+(pct * 100).toFixed(2)}%</span>
+                  <span style={{ color: COLORS.muted, flexShrink: 0 }}>{+(pct * 100).toFixed(2)}%</span>
                 </div>
                 <div
                   style={{

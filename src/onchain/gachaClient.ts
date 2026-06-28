@@ -7,6 +7,7 @@ export interface GachaMachine {
   name: string
   price: number
   odds: Record<string, number>
+  tierRanges?: Record<string, { start: number; end: number }> | null
   stock: Record<string, number>
   ev: number | null
   image: string | null
