@@ -17,6 +17,7 @@ const api = { target: 'http://localhost:9090', changeOrigin: true, bypass: htmlB
 const backendProxy = {
   '/gacha': api,
   '/pack-battles': api,
+  '/wallet': api,
   '/auth': api,
   '/users': api,
   '/matches': api,

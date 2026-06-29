@@ -135,9 +135,9 @@ export function AppShell() {
             // Desktop: USDC + Gimmighouls in ONE pill — image left (full height) + label above number.
             <div style={{ display: 'flex', alignItems: 'stretch', background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 13, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 15px' }}>
-                <img src="/usdc.svg" alt="" style={{ height: 40, width: 'auto', display: 'block' }} />
+                <img src="/usdc.svg" alt="" style={{ height: 20, width: 'auto', display: 'block' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.1 }}>
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>USDC</span>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted, paddingBottom: '1px' }}>USDC</span>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                     <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
                       {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
@@ -149,10 +149,10 @@ export function AppShell() {
                 </div>
               </div>
               <span style={{ width: 1, background: COLORS.border }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 15px' }} title="Gimmighouls">
-                <img src="/gimmighoul.png" alt="" style={{ height: 40, width: 'auto', display: 'block' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 1, padding: '6px 15px' }} title="Gimmighouls">
+                <img src="/gimmighoul.png" alt="" style={{ height: 23, width: 'auto', display: 'block' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.1 }}>
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted }}>GIMMIGHOULS</span>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted, paddingBottom: '1px' }}>GIMMIGHOULS</span>
                   <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
                     {gimmighouls != null ? gimmighouls.toLocaleString() : '—'}
                   </span>
