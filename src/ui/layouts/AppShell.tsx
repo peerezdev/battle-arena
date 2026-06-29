@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { usePrivy } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd } from '../theme'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
@@ -68,7 +68,6 @@ export function AppShell() {
   const chatUnread = !wideRail && !chatOpen && chatMessages.length > seenChat
 
   const active: HubNav = activeNavFromPath(pathname) ?? 'lobby'
-  const onSelect = (id: HubNav) => navigate(NAV_ROUTES[id])
 
   // ── Grid columns — mirrors Hub.tsx logic + collapsible dock column ──────────
   const showDock = wideRail && wideDock
@@ -92,11 +91,11 @@ export function AppShell() {
     >
       {/* ── LEFT RAIL (desktop/tablet) o BOTTOM NAV (móvil) ───────────────── */}
       {wideRail ? (
-        <LeftRail active={active} onSelect={onSelect} onProfile={() => navigate('/profile')} />
+        <LeftRail active={active} onProfile={() => navigate('/profile')} />
       ) : (
         <BottomNav
           active={active}
-          onSelect={(id) => { setChatOpen(false); onSelect(id) }}
+          onNavigate={() => setChatOpen(false)}
           onChat={() => setChatOpen((o) => !o)}
           chatActive={chatOpen}
           chatUnread={chatUnread}
@@ -299,13 +298,13 @@ export function AppShell() {
 // ─── Bottom navigation bar (móvil) — mirrors Hub.tsx BottomNav verbatim ──────
 function BottomNav({
   active,
-  onSelect,
+  onNavigate,
   onChat,
   chatActive,
   chatUnread,
 }: {
   active: HubNav
-  onSelect: (id: HubNav) => void
+  onNavigate: () => void
   onChat: () => void
   chatActive: boolean
   chatUnread: boolean
@@ -337,11 +336,11 @@ function BottomNav({
       {NAV_ITEMS.map((item) => {
         const isActive = !chatActive && item.id === active
         return (
-          <button key={item.id} onClick={() => onSelect(item.id)} title={item.label}
-            style={{ ...btn, color: isActive ? COLORS.text : COLORS.muted }}>
+          <Link key={item.id} to={NAV_ROUTES[item.id]} onClick={onNavigate} title={item.label}
+            style={{ ...btn, textDecoration: 'none', color: isActive ? COLORS.text : COLORS.muted }}>
             {NAV_ICONS[item.id]}
             <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>{item.label}</span>
-          </button>
+          </Link>
         )
       })}
       {/* Chat lives in the nav on mobile (no floating button) */}

@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT } from '../../theme'
+import { NAV_ROUTES } from '../../layouts/navRoutes'
 import type { HubNav } from './hubMockData'
 
 function Svg({ children }: { children: ReactNode }) {
@@ -26,10 +28,10 @@ const ITEMS: { id: HubNav; label: string }[] = [
   { id: 'royale', label: 'Royale' },
   { id: 'gacha', label: 'Gacha' },
   { id: 'mana', label: 'Mana' },
-  { id: 'ranks', label: 'Ranks' },
+  { id: 'ranks', label: 'Leaderboard' },
 ]
 
-export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSelect: (id: HubNav) => void; onProfile?: () => void }) {
+export function LeftRail({ active, onProfile }: { active: HubNav; onProfile?: () => void }) {
   const [hovered, setHovered] = useState<HubNav | null>(null)
   return (
     <nav
@@ -63,9 +65,9 @@ export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSe
           const isActive = item.id === active
           const isHover = !isActive && hovered === item.id
           return (
-            <button
+            <Link
               key={item.id}
-              onClick={() => onSelect(item.id)}
+              to={NAV_ROUTES[item.id]}
               title={item.label}
               onMouseEnter={() => setHovered(item.id)}
               onMouseLeave={() => setHovered((h) => (h === item.id ? null : h))}
@@ -82,6 +84,7 @@ export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSe
                 color: isActive || isHover ? COLORS.text : COLORS.muted,
                 background: isHover ? '#ffffff0a' : 'transparent',
                 border: 'none',
+                textDecoration: 'none',
                 transition: 'color .12s, background .12s',
                 fontFamily: FONTS.body,
               }}
@@ -102,7 +105,7 @@ export function LeftRail({ active, onSelect, onProfile }: { active: HubNav; onSe
               <span style={{ position: 'relative', fontSize: 11, fontWeight: 500, letterSpacing: '.02em' }}>
                 {item.label}
               </span>
-            </button>
+            </Link>
           )
         })}
       </div>

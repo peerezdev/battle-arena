@@ -43,5 +43,5 @@ export const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
   { id: 'royale', icon: '👑', label: 'Royale' },
   { id: 'gacha',  icon: '🎰', label: 'Gacha'  },
   { id: 'mana',   icon: '🎯', label: 'Mana'   },
-  { id: 'ranks',  icon: '🏆', label: 'Ranks'  },
+  { id: 'ranks',  icon: '🏆', label: 'Leaderboard'  },
 ]
