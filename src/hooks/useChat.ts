@@ -12,7 +12,7 @@ function buildWsUrl(identityToken: string | null | undefined): string {
   return identityToken ? `${path}?token=${encodeURIComponent(identityToken)}` : path
 }
 
-export function useChat(): {
+export function useChat(enabled = true): {
   messages: ChatLine[]
   send: (text: string) => void
   connected: boolean
@@ -108,7 +108,7 @@ export function useChat(): {
       }
     }
 
-    connect()
+    if (enabled) connect()
 
     return () => {
       mountedRef.current = false
@@ -122,7 +122,7 @@ export function useChat(): {
         wsRef.current = null
       }
     }
-  }, [identityToken])
+  }, [identityToken, enabled])
 
   const send = useCallback((text: string) => {
     const ws = wsRef.current

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { usePrivy } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd } from '../theme'
@@ -11,6 +11,7 @@ import { AuthButtons } from '../components/AuthButtons'
 import { DepositModal } from '../components/DepositModal'
 import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
+import { useChat } from '../../hooks/useChat'
 import { LiveDropsStrip } from '../screens/Hub/LiveDropsStrip'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
@@ -52,6 +53,20 @@ export function AppShell() {
     })
   }
 
+  // ── Mobile chat unread dot ─────────────────────────────────────────────────
+  // On mobile the chat is only mounted while open, so keep a persistent connection here to know
+  // when a new message arrives while it's closed. Mark everything seen when the chat is open.
+  const { messages: chatMessages } = useChat(!wideRail)
+  const [seenChat, setSeenChat] = useState(0)
+  const seenInit = useRef(false)
+  useEffect(() => {
+    if (!seenInit.current && chatMessages.length > 0) { seenInit.current = true; setSeenChat(chatMessages.length) }
+  }, [chatMessages.length])
+  useEffect(() => {
+    if (chatOpen) setSeenChat(chatMessages.length)   // viewing the chat clears the badge
+  }, [chatOpen, chatMessages.length])
+  const chatUnread = !wideRail && !chatOpen && chatMessages.length > seenChat
+
   const active: HubNav = activeNavFromPath(pathname) ?? 'lobby'
   const onSelect = (id: HubNav) => navigate(NAV_ROUTES[id])
 
@@ -84,6 +99,7 @@ export function AppShell() {
           onSelect={(id) => { setChatOpen(false); onSelect(id) }}
           onChat={() => setChatOpen((o) => !o)}
           chatActive={chatOpen}
+          chatUnread={chatUnread}
         />
       )}
 
@@ -286,11 +302,13 @@ function BottomNav({
   onSelect,
   onChat,
   chatActive,
+  chatUnread,
 }: {
   active: HubNav
   onSelect: (id: HubNav) => void
   onChat: () => void
   chatActive: boolean
+  chatUnread: boolean
 }) {
   const btn = {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 3,
@@ -328,7 +346,12 @@ function BottomNav({
       })}
       {/* Chat lives in the nav on mobile (no floating button) */}
       <button onClick={onChat} title="Chat" style={{ ...btn, color: chatActive ? COLORS.text : COLORS.muted }}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+        <span style={{ position: 'relative', display: 'inline-flex' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+          {chatUnread && (
+            <span aria-label="Unread messages" style={{ position: 'absolute', top: -3, right: -4, width: 9, height: 9, borderRadius: '50%', background: COLORS.red, border: '2px solid rgba(9,11,16,.94)', boxShadow: `0 0 6px ${COLORS.red}` }} />
+          )}
+        </span>
         <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>Chat</span>
       </button>
     </nav>
