@@ -21,7 +21,7 @@ import {
   type OpenPackResult,
   type YoloPacksResponse,
 } from '../../../onchain/gachaClient'
-import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
+import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { HoloCard } from '../../components/HoloCard'
 import { useIsWide } from '../../useIsWide'
@@ -1262,25 +1262,20 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
               style={{ padding: '8px 14px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 13, fontWeight: 600 }}>Keep all</button>
             <button onClick={() => setAll(true)} disabled={claiming}
               style={{ padding: '8px 14px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 13, fontWeight: 600 }}>Sell all</button>
-            <button onClick={claim} disabled={claiming || pending.length === 0}
-              style={{ marginLeft: 'auto', padding: '9px 18px', borderRadius: 11, border: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 13.5,
-                cursor: (claiming || pending.length === 0) ? 'default' : 'pointer',
-                background: pending.length === 0 ? COLORS.panel2 : GRADIENT, color: pending.length === 0 ? COLORS.muted : '#06120c' }}>
-              {claiming ? 'Claiming…' : pending.length > 0 ? `Claim · sell ${pending.length} (~${formatUsd(estimate)})` : 'Claim'}
-            </button>
           </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
           {results.map((r, i) => {
-            const accent = RARITY_COLOR[r.rarity] ?? COLORS.muted
             const mint = r.nft_address
             const st = mint ? status[mint] : undefined
             const isSell = mint ? !!sell[mint] : false
             const decidable = !r.auto_sold && !!mint && st !== 'sold'
+            const glow = rarityGlow(r.rarity)   // same beam as Recent Drops (common = none)
+            const buyback = (r.insured_value ?? 0) * pct / 100
             return (
-              <div key={mint ?? i} style={{ background: COLORS.panel2, border: `1px solid ${isSell && decidable ? `${COLORS.violet}aa` : `${accent}55`}`, borderRadius: 10, overflow: 'hidden' }}>
-                <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8, opacity: isSell && decidable ? 0.6 : 1 }}>
+              <div key={mint ?? i} style={{ background: COLORS.panel2, border: `1px solid ${glow ?? COLORS.border}`, borderRadius: 10, overflow: 'hidden', boxShadow: glow ? `0 0 16px -3px ${glow}, inset 0 0 12px -7px ${glow}` : undefined }}>
+                <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 }}>
                   {r.image ? <img src={r.image} alt={r.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 32 }}>🃏</span>}
                 </div>
                 <div style={{ padding: '8px 9px 10px' }}>
@@ -1288,10 +1283,15 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
                   {r.auto_sold ? (
                     <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted, marginTop: 2 }}>⚡ Auto-sold {formatUsd((r.buyback_amount ?? 0) / 1e6)}</div>
                   ) : st === 'sold' ? (
-                    <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: COLORS.green, fontWeight: 700, marginTop: 2 }}>Sold ✓ ~{formatUsd((r.insured_value ?? 0) * pct / 100)}</div>
+                    <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: COLORS.green, fontWeight: 700, marginTop: 2 }}>Sold ✓ {formatUsd(buyback)}</div>
                   ) : (
                     <>
-                      {r.insured_value != null && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green, fontWeight: 700, marginTop: 2 }}>{formatUsd(r.insured_value)}</div>}
+                      {r.insured_value != null && (
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6, marginTop: 2 }}>
+                          <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green, fontWeight: 700 }}>{formatUsd(r.insured_value)}</span>
+                          <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted }} title="Buyback value">↩ {formatUsd(buyback)}</span>
+                        </div>
+                      )}
                       {st === 'failed' && <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.red, marginTop: 2 }}>Sell failed — kept</div>}
                       {decidable && (
                         <div style={{ display: 'flex', marginTop: 7, borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
@@ -1310,6 +1310,19 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
             )
           })}
         </div>
+
+        {/* Claim — centered at the bottom; executes every card marked Sell */}
+        {sellable.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
+            <button onClick={claim} disabled={claiming || pending.length === 0}
+              style={{ padding: '13px 30px', borderRadius: 13, border: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 15,
+                cursor: (claiming || pending.length === 0) ? 'default' : 'pointer',
+                background: pending.length === 0 ? COLORS.panel2 : GRADIENT, color: pending.length === 0 ? COLORS.muted : '#06120c',
+                boxShadow: pending.length === 0 ? 'none' : '0 0 22px -6px rgba(47,226,138,.7)' }}>
+              {claiming ? 'Claiming…' : pending.length > 0 ? `Claim · sell ${pending.length} (~${formatUsd(estimate)})` : 'Claim'}
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   )
