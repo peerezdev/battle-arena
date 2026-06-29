@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
-import { COLORS, FONTS, formatUsd, rarityGlow } from '../../theme'
+import { COLORS, FONTS, formatUsd } from '../../theme'
 import { useIsWide } from '../../useIsWide'
 import { useReducedMotion } from '../../useReducedMotion'
 import type { OwnedCard } from '../../../inventory/useCollectorCryptNfts'
@@ -24,12 +24,6 @@ type BuybackState =
 
 function abbreviate(mint: string): string {
   return mint.length > 12 ? `${mint.slice(0, 6)}…${mint.slice(-6)}` : mint
-}
-
-/** #rrggbb → rgba(r,g,b,a). All rarity tokens are 6-digit hex. */
-function toRgba(hex: string, a: number): string {
-  const n = parseInt(hex.slice(1), 16)
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
 }
 
 export function InventoryCardModal({ card, onClose, onSold }: {
@@ -88,13 +82,8 @@ export function InventoryCardModal({ card, onClose, onSold }: {
     })
   }
 
-  // ── Rarity palette ─────────────────────────────────────────────────────────
-  const glow = rarityGlow(card.rarity)
-  const rarColor = glow ?? COLORS.muted          // common → muted gray
-  const haloColor = glow ?? toRgba(COLORS.muted, 0.45)
-  const rarSoft = toRgba(rarColor, 0.14)
-  const rarBd = toRgba(rarColor, 0.42)
-  const rarName = (card.rarity ?? 'common').toUpperCase()
+  // Neutral accent — no rarity distinction in the inventory; every card looks the same.
+  const haloColor = 'rgba(124,77,255,.45)'   // brand violet, identical for all cards
 
   const imgSrc = card.mint ? ccCardImageUrl(card.mint) : card.image
   const explorerUrl = ccAssetUrl(card.mint)
@@ -103,6 +92,8 @@ export function InventoryCardModal({ card, onClose, onSold }: {
   const offerAmount = (bb.kind === 'available' || bb.kind === 'confirming' || bb.kind === 'selling' || bb.kind === 'sold')
     ? buybackUsd(bb.amount) : null
   const offerPct = offerAmount != null && card.insuredValue ? Math.round((offerAmount / card.insuredValue) * 100) : null
+  const hasInsured = Number.isFinite(card.insuredValue)
+  const showValuePanel = hasInsured || offerAmount != null
 
   const gradingRows: Array<[string, string]> = []
   if (card.gradingCompany) gradingRows.push(['Grading company', card.gradingCompany])
@@ -203,14 +194,14 @@ export function InventoryCardModal({ card, onClose, onSold }: {
         style={{
           position: 'relative', width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto',
           borderRadius: 22, background: 'linear-gradient(180deg,#0e1118,#0a0c12)',
-          border: `1px solid ${rarBd}`, boxShadow: `0 48px 120px -40px #000, 0 0 70px -22px ${haloColor}`,
+          border: `1px solid ${COLORS.border}`, boxShadow: `0 48px 120px -40px #000, 0 0 70px -22px ${haloColor}`,
           padding: '22px clamp(20px,2.6vw,30px) 26px',
           animation: reduced ? 'none' : 'ca-pop .4s cubic-bezier(.2,.9,.25,1) both',
         }}
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 600, color: rarColor }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 600, color: COLORS.green }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 12l2 2 4-4" /></svg>
             Guaranteed authenticity
           </span>
@@ -220,7 +211,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
         </div>
 
         <div style={{ display: 'flex', flexDirection: wide ? 'row' : 'column', alignItems: wide ? 'flex-start' : 'center', gap: 'clamp(20px,2.8vw,30px)' }}>
-          {/* Left — graded slab with rarity halo + holo sweep */}
+          {/* Left — graded slab with neutral halo + holo sweep */}
           <div style={{ position: 'relative', flex: 'none', width: 'clamp(190px,42vw,230px)' }}>
             <div aria-hidden style={{ position: 'absolute', inset: '-8% 12%', zIndex: 0, borderRadius: '50%', background: `radial-gradient(circle,${haloColor},transparent 66%)`, filter: 'blur(26px)' }} />
             <div style={{ position: 'relative', zIndex: 1, aspectRatio: '.69', borderRadius: 13, background: 'linear-gradient(160deg,#d6dbe1,#9aa1ac)', padding: '9px 9px 11px', boxShadow: '0 30px 70px -28px #000, inset 0 1px 0 rgba(255,255,255,.7)' }}>
@@ -244,20 +235,19 @@ export function InventoryCardModal({ card, onClose, onSold }: {
 
           {/* Right — info */}
           <div style={{ flex: '1 1 auto', minWidth: 0, maxWidth: wide ? 360 : '100%', width: wide ? undefined : '100%' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 11px', borderRadius: 8, fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', color: rarColor, background: rarSoft, border: `1px solid ${rarBd}` }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: rarColor, boxShadow: `0 0 7px ${haloColor}` }} />{rarName}
-            </span>
-            <h2 style={{ margin: '13px 0 16px', fontSize: 'clamp(20px,2.4vw,25px)', fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.14, color: COLORS.text }}>{card.name}</h2>
+            <h2 style={{ margin: '2px 0 16px', fontSize: 'clamp(20px,2.4vw,25px)', fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.14, color: COLORS.text }}>{card.name}</h2>
 
-            {/* Value panel */}
-            {card.insuredValue != null && (
+            {/* Value panel — shows the insured value and/or the buyback offer */}
+            {showValuePanel && (
               <div style={{ borderRadius: 15, padding: '15px 17px', background: 'linear-gradient(135deg,rgba(124,77,255,.16),rgba(255,255,255,.02))', border: '1px solid rgba(124,77,255,.34)', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: offerAmount != null ? 11 : 0, borderBottom: offerAmount != null ? '1px solid rgba(255,255,255,.08)' : 'none' }}>
-                  <span style={{ ...labelMono, letterSpacing: '.14em' }}>INSURED VALUE</span>
-                  <span style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-.02em', color: '#c4adff' }}>{formatUsd(card.insuredValue)}</span>
-                </div>
+                {hasInsured && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: offerAmount != null ? 11 : 0, borderBottom: offerAmount != null ? '1px solid rgba(255,255,255,.08)' : 'none' }}>
+                    <span style={{ ...labelMono, letterSpacing: '.14em' }}>INSURED VALUE</span>
+                    <span style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-.02em', color: '#c4adff' }}>{formatUsd(card.insuredValue!)}</span>
+                  </div>
+                )}
                 {offerAmount != null && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 11 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: hasInsured ? 11 : 0 }}>
                     <span style={{ ...labelMono, letterSpacing: '.14em' }}>BUYBACK OFFER{offerPct != null ? ` · ${offerPct}%` : ''}</span>
                     <span style={{ fontSize: 17, fontWeight: 700, color: COLORS.green }}>{formatUsd(offerAmount)}</span>
                   </div>
