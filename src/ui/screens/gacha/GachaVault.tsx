@@ -467,12 +467,12 @@ export default function GachaVault() {
             index={phase.index}
             reduced={reduced}
             buybackPct={selected?.instantBuyback ?? null}
-            onAdvance={() => setPhase((p) =>
-              p.kind === 'yolo-reveal'
-                ? (p.index + 1 < p.results.length
-                    ? { kind: 'yolo-reveal', results: p.results, index: p.index + 1 }
-                    : { kind: 'yolo-summary', results: p.results })
-                : p)}
+            onAdvance={() => setPhase((p) => {
+              if (p.kind !== 'yolo-reveal') return p
+              if (p.index + 1 < p.results.length) return { kind: 'yolo-reveal', results: p.results, index: p.index + 1 }
+              // last pack: single open closes straight to the vault (no summary); multi → summary
+              return p.results.length === 1 ? { kind: 'machines' } : { kind: 'yolo-summary', results: p.results }
+            })}
             onSkipAll={() => setPhase((p) => p.kind === 'yolo-reveal' ? { kind: 'yolo-summary', results: p.results } : p)}
           />
         )}
@@ -625,9 +625,9 @@ function RevealOverlay({
         </div>
       )}
 
-      {/* Result — staged reveal */}
+      {/* Result — staged reveal (single open → inline Keep/Sell) */}
       {phase.kind === 'result' && (
-        <RevealResult result={phase.result} reduced={reduced} buybackPct={buybackPct ?? null} onClose={onClose} />
+        <RevealResult result={phase.result} reduced={reduced} buybackPct={buybackPct ?? null} single onNext={onClose} />
       )}
     </motion.div>
   )
@@ -639,13 +639,16 @@ function RevealResult({
   reduced,
   buybackPct,
   skipToCard,
-  onClose,
+  single = false,
+  onNext,
 }: {
   result: Extract<OpenPackResult, { pending: false }>
   reduced: boolean
   buybackPct: number | null
   skipToCard?: number
-  onClose: () => void
+  /** single open → inline Keep/Sell; multi → "Next pack". */
+  single?: boolean
+  onNext: () => void
 }) {
   const rarityColor = RARITY_COLOR[result.rarity] ?? COLORS.muted
 
@@ -749,7 +752,9 @@ function RevealResult({
           result={result}
           rarityColor={rarityColor}
           buybackPct={buybackPct}
-          onClose={onClose}
+          single={single}
+          reduced={reduced}
+          onNext={onNext}
         />
       </motion.div>
     </AnimatePresence>
@@ -761,18 +766,43 @@ function CardDetailsView({
   result,
   rarityColor,
   buybackPct,
-  onClose,
+  single,
+  reduced,
+  onNext,
 }: {
   result: Extract<OpenPackResult, { pending: false }>
   rarityColor: string
   buybackPct: number | null
-  onClose: () => void
+  /** single open → inline Keep/Sell; multi → just "Next pack". */
+  single: boolean
+  reduced: boolean
+  onNext: () => void
 }) {
+  const { identityToken } = useIdentityToken()
+  const { signTransactionBase64 } = useWallet()
   const [activeImg, setActiveImg] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [decision, setDecision] = useState<'kept' | 'sold' | null>(null)
+  const [selling, setSelling] = useState(false)
+  const [sellErr, setSellErr] = useState<string | null>(null)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current) }, [])
+
+  async function sell() {
+    if (!identityToken || selling) return
+    setSelling(true); setSellErr(null)
+    try {
+      const res = await requestBuyback(identityToken, result.nft_address)
+      const signed = await signTransactionBase64(res.serialized_transaction)
+      await submitTx(identityToken, signed)
+      setDecision('sold')
+    } catch (e) {
+      setSellErr(e instanceof Error ? e.message : 'Buyback failed')
+    } finally {
+      setSelling(false)
+    }
+  }
 
   // Build image list: prefer result.images, fallback to result.image
   const images: string[] = result.images.length > 0
@@ -782,6 +812,7 @@ function CardDetailsView({
       : []
 
   const mainImgSrc = images[activeImg] ?? null
+  const glow = rarityGlow(result.rarity)   // Recent-Drops-style beam (common = none)
 
   function handleCopy() {
     if (!navigator.clipboard) return
@@ -809,68 +840,39 @@ function CardDetailsView({
   if (result.authenticated != null) gradingRows.push({ label: 'Authenticated', value: result.authenticated ? 'Yes' : 'No' })
 
   return (
-    <div style={{ padding: '28px 24px 24px' }}>
-      {/* ── Authenticity line ────────────────────────────────────────────────── */}
-      {result.authenticated !== false && (
-        <div
-          style={{
-            fontFamily: FONTS.mono,
-            fontSize: 11,
-            color: COLORS.green,
-            letterSpacing: '.06em',
-            marginBottom: 10,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
-          }}
-        >
-          <span style={{ fontSize: 13 }}>&#10003;</span>
-          GUARANTEED AUTHENTICITY
-        </div>
-      )}
+    <div style={{ padding: '24px 22px 22px' }}>
+      {/* ── Top row: authenticity + rarity badge ─────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 600, color: rarityColor }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 12l2 2 4-4" /></svg>
+          Guaranteed authenticity
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 12px', borderRadius: 8, fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: rarityColor, background: `${rarityColor}1f`, border: `1px solid ${rarityColor}6b` }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: rarityColor, boxShadow: `0 0 7px ${rarityColor}` }} />{result.rarity}
+        </span>
+      </div>
 
-      {/* ── Card name + rarity badge ─────────────────────────────────────────── */}
-      <div
-        style={{
-          fontFamily: FONTS.display,
-          fontWeight: 900,
-          fontSize: 22,
-          color: COLORS.text,
-          marginBottom: 10,
-          lineHeight: 1.15,
-        }}
-      >
+      {/* ── Title ────────────────────────────────────────────────────────────── */}
+      <h1 style={{ margin: '0 0 18px', fontFamily: FONTS.display, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,24px)', letterSpacing: '-.02em', lineHeight: 1.14, color: COLORS.text }}>
         {result.name ?? 'Unknown Card'}
-      </div>
-      <div
-        style={{
-          display: 'inline-block',
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: '.1em',
-          textTransform: 'uppercase',
-          color: rarityColor,
-          border: `1px solid ${rarityColor}`,
-          borderRadius: 4,
-          padding: '3px 10px',
-          marginBottom: 20,
-          boxShadow: SHADOW.glow(rarityColor),
-        }}
-      >
-        {result.rarity}
-      </div>
+      </h1>
 
-      {/* ── Image area ──────────────────────────────────────────────────────── */}
+      {/* ── Image area — card hero with rarity halo + gentle float ───────────── */}
       {mainImgSrc ? (
         <div style={{ marginBottom: 16 }}>
-          <HoloCard
-            src={mainImgSrc}
-            alt={result.name ?? 'Card image'}
-            rarity={result.rarity}
-            accent={rarityColor}
-            radius={10}
-            imgStyle={{ maxHeight: 280, objectFit: 'contain' }}
-          />
+          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+            <div aria-hidden style={{ position: 'absolute', inset: '2% 16%', zIndex: 0, borderRadius: '50%', background: `radial-gradient(circle, ${glow ?? rarityColor}, transparent 66%)`, filter: 'blur(26px)', animation: reduced ? 'none' : 'ca-haloPulse 3.4s ease-in-out infinite' }} />
+            <div style={{ position: 'relative', zIndex: 1, width: '100%', animation: reduced ? 'none' : 'ca-pop .7s cubic-bezier(.2,.9,.25,1) both, ca-float 5.5s ease-in-out .7s infinite' }}>
+              <HoloCard
+                src={mainImgSrc}
+                alt={result.name ?? 'Card image'}
+                rarity={result.rarity}
+                accent={rarityColor}
+                radius={10}
+                imgStyle={{ maxHeight: 280, objectFit: 'contain' }}
+              />
+            </div>
+          </div>
           {/* Thumbnails — only when multiple images */}
           {images.length > 1 && (
             <div
@@ -1125,26 +1127,40 @@ function CardDetailsView({
         </div>
       )}
 
-      {/* ── Back to Vault ────────────────────────────────────────────────────── */}
-      <button
-        onClick={onClose}
-        style={{
-          width: '100%',
-          background: GRADIENT,
-          color: '#06120c',
-          border: 'none',
-          borderRadius: 10,
-          padding: '14px',
-          fontSize: 14,
-          fontWeight: 800,
-          cursor: 'pointer',
-          fontFamily: FONTS.display,
-          letterSpacing: '.03em',
-          boxShadow: SHADOW.glow(COLORS.green),
-        }}
-      >
-        Back to Vault
-      </button>
+      {/* ── Actions ──────────────────────────────────────────────────────────── */}
+      {single && decision === null ? (
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={() => setDecision('kept')} disabled={selling}
+            style={{ position: 'relative', overflow: 'hidden', flex: 1.4, padding: 15, borderRadius: 14, border: 0, cursor: selling ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(47,226,138,.6)' }}>
+            <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '38%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent)', animation: reduced ? 'none' : 'ba-sweep 3.6s infinite' }} />
+            <span style={{ position: 'relative' }}>Keep in Vault ✓</span>
+          </button>
+          <button onClick={sell} disabled={selling}
+            style={{ flex: 1, padding: 15, borderRadius: 14, border: `1px solid ${COLORS.green}66`, background: 'rgba(47,226,138,.07)', color: COLORS.green, cursor: selling ? 'wait' : 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 800 }}>
+            {selling ? 'Selling…' : `Sell · ${formatUsd(buybackOffer ?? 0)}`}
+          </button>
+        </div>
+      ) : single ? (
+        <div style={{ animation: 'ca-fade .3s ease-out both' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '14px 16px', borderRadius: 14, marginBottom: 12,
+            background: decision === 'kept' ? 'rgba(47,226,138,.10)' : 'rgba(124,77,255,.12)', border: `1px solid ${decision === 'kept' ? 'rgba(47,226,138,.34)' : 'rgba(124,77,255,.34)'}` }}>
+            <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: decision === 'kept' ? 'rgba(47,226,138,.16)' : 'rgba(124,77,255,.18)', color: decision === 'kept' ? COLORS.green : '#c4adff', fontSize: 17 }}>{decision === 'kept' ? '◆' : '↩'}</span>
+            <div>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: COLORS.text }}>{decision === 'kept' ? 'Kept in your vault' : `Sold · +${formatUsd(buybackOffer ?? 0)} USDC`}</div>
+              <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 1 }}>{decision === 'kept' ? 'The card stays in your insured inventory.' : 'Balance credited instantly.'}</div>
+            </div>
+          </div>
+          <button onClick={onNext}
+            style={{ width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(47,226,138,.6)' }}>Continue →</button>
+        </div>
+      ) : (
+        <button onClick={onNext}
+          style={{ position: 'relative', overflow: 'hidden', width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(47,226,138,.6)' }}>
+          <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '38%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent)', animation: reduced ? 'none' : 'ba-sweep 3.6s infinite' }} />
+          <span style={{ position: 'relative' }}>Next pack →</span>
+        </button>
+      )}
+      {sellErr && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, marginTop: 10, textAlign: 'center' }}>{sellErr}</div>}
     </div>
   )
 }
@@ -1187,7 +1203,7 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
       {result.auto_sold && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.green }}>⚡ Auto-sold {formatUsd((result.buyback_amount ?? 0) / 1e6)}</div>
       )}
-      <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} onClose={onAdvance} />
+      <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} single={results.length === 1 && !result.auto_sold} onNext={onAdvance} />
       <div style={{ display: 'flex', gap: 10 }}>
         <button onClick={() => setSkippedAt(index)}
           style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{results.length > 1 ? 'Skip pack ⏭' : 'Skip ⏭'}</button>
