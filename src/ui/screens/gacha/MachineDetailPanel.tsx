@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
+import { useIsWide } from '../../useIsWide'
 import type { GachaMachine } from '../../../onchain/gachaClient'
 import { yoloTotalCost, clampCount } from '../../../onchain/gachaClient'
 
@@ -25,11 +26,16 @@ const RARITY_COLOR: Record<string, string> = {
 
 export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
   const reduced = useReducedMotion()
+  const mobile = !useIsWide('(min-width: 760px)')   // bottom nav shows below 760 → use a sticky bar
 
   const [yoloCount, setYoloCount] = useState(1)
   const [turbo, setTurbo] = useState(false)
   const yoloTotal = yoloTotalCost(machine.price ?? 0, yoloCount)
   const yoloBlocked = !authed || machine.available === false || (usdc != null && usdc < yoloTotal)
+  const openLabel = !authed ? 'Log in to open'
+    : machine.available === false ? 'Currently unavailable'
+    : (usdc != null && usdc < yoloTotal) ? `Insufficient USDC · ${formatUsd(usdc ?? 0)}`
+    : `Open ×${yoloCount} · ${formatUsd(yoloTotal)}`
 
   const unavailable = machine.available === false
 
@@ -200,7 +206,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
         </div>
       )}
 
-      {onYolo && (
+      {onYolo && !mobile && (
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.1em', color: COLORS.muted, textTransform: 'uppercase' }}>YOLO · open multiple</div>
 
@@ -239,12 +245,42 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
             whileTap={reduced || yoloBlocked ? undefined : { scale: 0.97 }}
             style={{ width: '100%', borderRadius: 12, padding: '13px 18px', fontSize: 14, fontWeight: 800, fontFamily: FONTS.display, cursor: yoloBlocked ? 'not-allowed' : 'pointer',
               border: yoloBlocked ? `1px solid ${COLORS.border}` : 'none', background: yoloBlocked ? COLORS.panel2 : GRADIENT, color: yoloBlocked ? COLORS.muted : '#06120c' }}>
-            {!authed ? 'Log in to open'
-              : machine.available === false ? 'Currently unavailable'
-              : (usdc != null && usdc < yoloTotal) ? `Insufficient USDC · ${formatUsd(usdc ?? 0)}`
-              : `Open ×${yoloCount} · ${formatUsd(yoloTotal)}`}
+            {openLabel}
           </motion.button>
         </div>
+      )}
+
+      {/* Mobile: sticky action bar above the bottom nav (Open + turbo + counter), always on screen */}
+      {onYolo && mobile && (
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 60, zIndex: 90,
+            display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px calc(10px + env(safe-area-inset-bottom,0px))',
+            background: 'rgba(10,13,20,.96)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderTop: `1px solid ${COLORS.border}`,
+          }}>
+            {/* counter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, borderRadius: 11, background: COLORS.panel2, border: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
+              <button onClick={() => setYoloCount((n) => clampCount(n - 1))} aria-label="Less"
+                style={{ width: 30, height: 30, borderRadius: 8, border: 0, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>−</button>
+              <span style={{ minWidth: 22, textAlign: 'center', fontFamily: FONTS.display, fontWeight: 800, fontSize: 16, color: COLORS.text }}>{yoloCount}</span>
+              <button onClick={() => setYoloCount((n) => clampCount(n + 1))} aria-label="More"
+                style={{ width: 30, height: 30, borderRadius: 8, border: 0, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>+</button>
+            </div>
+            {/* turbo toggle (only if supported) */}
+            {machine.turboMode && (
+              <button onClick={() => setTurbo((t) => !t)} title="Turbo — auto-sell Commons" aria-pressed={turbo}
+                style={{ flexShrink: 0, width: 44, height: 36, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                  border: `1px solid ${turbo ? COLORS.green : COLORS.border}`, background: turbo ? 'rgba(47,226,138,.12)' : COLORS.panel2, color: turbo ? COLORS.green : COLORS.muted }}>⚡</button>
+            )}
+            {/* open */}
+            <motion.button
+              onClick={() => onYolo(yoloCount, machine.turboMode ? turbo : false)}
+              disabled={yoloBlocked}
+              whileTap={reduced || yoloBlocked ? undefined : { scale: 0.97 }}
+              style={{ flex: 1, borderRadius: 12, padding: '12px 14px', fontSize: 14, fontWeight: 800, fontFamily: FONTS.display, cursor: yoloBlocked ? 'not-allowed' : 'pointer',
+                border: yoloBlocked ? `1px solid ${COLORS.border}` : 'none', background: yoloBlocked ? COLORS.panel2 : GRADIENT, color: yoloBlocked ? COLORS.muted : '#06120c', whiteSpace: 'nowrap' }}>
+              {openLabel}
+            </motion.button>
+          </div>
       )}
 
       {/* Buyback meta */}

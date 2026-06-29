@@ -158,6 +158,7 @@ export default function GachaVault() {
     }
     const txs = resp.transactions
     const submitted: string[] = []
+    let lastErr: string | null = null
     for (let i = 0; i < txs.length; i++) {
       try {
         setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length })
@@ -165,12 +166,13 @@ export default function GachaVault() {
         setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length })
         await submitTx(identityToken, signed)
         submitted.push(txs[i].memo)
-      } catch {
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
         break
       }
     }
     if (submitted.length === 0) {
-      setOpenError('No packs were opened.')
+      setOpenError(lastErr ? `Couldn't open the pack: ${lastErr}` : 'No packs were opened.')
       setPhase({ kind: 'machines' })
       return
     }
@@ -227,12 +229,12 @@ export default function GachaVault() {
   return (
     <div
       style={{
-        padding: wideGacha ? '24px 28px 48px' : '16px 14px 40px',
+        padding: wideGacha ? '24px 28px 48px' : '16px 14px 96px',   // extra bottom on mobile clears the sticky action bar
         position: 'relative',
       }}
     >
       {/* ── HEADER ──────────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 28 }}>
+      {/* <div style={{ marginBottom: 28 }}>
         <div
           style={{
             fontFamily: FONTS.mono,
@@ -267,7 +269,7 @@ export default function GachaVault() {
         >
           Open packs solo — keep them or sell back.
         </div>
-      </div>
+      </div> */}
 
       {/* ── FETCH ERROR ─────────────────────────────────────────────────────── */}
       {fetchError && (
