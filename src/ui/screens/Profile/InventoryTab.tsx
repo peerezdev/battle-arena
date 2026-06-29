@@ -3,12 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { useCollectorCryptNfts, type OwnedCard } from '../../../inventory/useCollectorCryptNfts'
 import { usePublicInventory } from '../../../inventory/usePublicInventory'
+import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { InventoryCardModal } from './InventoryCardModal'
 
 const GRID: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(168px,1fr))', gap: 14 }
 
 // Uniform card — no rarity tint/border/glow/badge; every card looks the same.
 function CardTile({ card, onClick }: { card: OwnedCard; onClick: () => void }) {
+  const [imgErr, setImgErr] = useState(false)
+  // Prefer CC's front-image endpoint (reliable on devnet) like the rest of the app; fall back to the
+  // DAS metadata image, then a placeholder.
+  const imgSrc = (card.mint ? ccCardImageUrl(card.mint) : null) ?? card.image
   return (
     <div
       onClick={onClick}
@@ -26,7 +31,9 @@ function CardTile({ card, onClick }: { card: OwnedCard; onClick: () => void }) {
         </div>
       )}
       <div style={{ margin: card.grade ? '9px 11px' : '11px 11px 9px', height: 150, borderRadius: 8, overflow: 'hidden', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {card.image ? <img src={card.image} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 30 }}>🃏</span>}
+        {imgSrc && !imgErr
+          ? <img src={imgSrc} alt={card.name} onError={() => setImgErr(true)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          : <span style={{ fontSize: 30 }}>🃏</span>}
       </div>
       <div style={{ padding: '0 13px 14px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#e7ecf2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{card.name}</div>
