@@ -13,6 +13,7 @@ import {
   submitTx,
   openPack,
   pollOpenPack,
+  requestBuyback,
   GachaDisabledError,
   ccAssetUrl,
   type GachaMachine,
@@ -476,7 +477,7 @@ export default function GachaVault() {
           />
         )}
         {phase.kind === 'yolo-summary' && (
-          <YoloSummaryOverlay results={phase.results} onClose={() => setPhase({ kind: 'machines' })} />
+          <YoloSummaryOverlay results={phase.results} buybackPct={selected?.instantBuyback ?? null} onClose={() => setPhase({ kind: 'machines' })} />
         )}
       </AnimatePresence>
     </div>
@@ -1199,35 +1200,111 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
   )
 }
 
-function YoloSummaryOverlay({ results, onClose }: { results: YoloResult[]; onClose: () => void }) {
+function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloResult[]; buybackPct: number | null; onClose: () => void }) {
+  const { identityToken } = useIdentityToken()
+  const { signTransactionBase64 } = useWallet()
+  const pct = buybackPct ?? 90
+
   const totalValue = results.reduce((s, r) => s + (r.insured_value ?? 0), 0)
-  const sold = results.filter((r) => r.auto_sold)
-  const soldUsd = sold.reduce((s, r) => s + (r.buyback_amount ?? 0), 0) / 1e6
+  const autoSold = results.filter((r) => r.auto_sold)
+  const autoSoldUsd = autoSold.reduce((s, r) => s + (r.buyback_amount ?? 0), 0) / 1e6
+  // Cards the user kept (not auto-sold) can be kept or sold back here.
+  const sellable = results.filter((r) => !r.auto_sold && r.nft_address)
+
+  const [sell, setSell] = useState<Record<string, boolean>>({})       // mint → true = sell
+  const [status, setStatus] = useState<Record<string, 'sold' | 'failed'>>({})
+  const [claiming, setClaiming] = useState(false)
+
+  const pending = sellable.filter((r) => sell[r.nft_address!] && status[r.nft_address!] !== 'sold')
+  const estimate = pending.reduce((s, r) => s + (r.insured_value ?? 0) * pct / 100, 0)
+
+  function setAll(v: boolean) {
+    setSell(() => {
+      const m: Record<string, boolean> = {}
+      sellable.forEach((r) => { if (status[r.nft_address!] !== 'sold') m[r.nft_address!] = v })
+      return m
+    })
+  }
+
+  async function claim() {
+    if (!identityToken || claiming || pending.length === 0) return
+    setClaiming(true)
+    for (const r of pending) {
+      try {
+        const res = await requestBuyback(identityToken, r.nft_address!)
+        const signed = await signTransactionBase64(res.serialized_transaction)
+        await submitTx(identityToken, signed)
+        setStatus((s) => ({ ...s, [r.nft_address!]: 'sold' }))
+      } catch {
+        setStatus((s) => ({ ...s, [r.nft_address!]: 'failed' }))
+      }
+    }
+    setClaiming(false)
+  }
+
   return (
     <motion.div key="yolo-summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(11,14,20,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 22, maxWidth: 760, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: SHADOW.panel }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <span style={{ fontFamily: FONTS.display, fontWeight: 900, fontSize: 20, color: COLORS.text }}>You opened {results.length} packs</span>
+          <span style={{ fontFamily: FONTS.display, fontWeight: 900, fontSize: 20, color: COLORS.text }}>You opened {results.length} pack{results.length > 1 ? 's' : ''}</span>
           <button onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.muted, borderRadius: 8, width: 30, height: 30, cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 16 }}>
           <div><div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>TOTAL VALUE</div><div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: COLORS.green }}>{formatUsd(totalValue)}</div></div>
-          {sold.length > 0 && (<div><div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>AUTO-SOLD</div><div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: COLORS.text }}>{sold.length} · {formatUsd(soldUsd)}</div></div>)}
+          {autoSold.length > 0 && (<div><div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>AUTO-SOLD</div><div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: COLORS.text }}>{autoSold.length} · {formatUsd(autoSoldUsd)}</div></div>)}
         </div>
+
+        {/* Keep / sell controls — only when there are cards still in the wallet to decide on */}
+        {sellable.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 14 }}>
+            <button onClick={() => setAll(false)} disabled={claiming}
+              style={{ padding: '8px 14px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 13, fontWeight: 600 }}>Keep all</button>
+            <button onClick={() => setAll(true)} disabled={claiming}
+              style={{ padding: '8px 14px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 13, fontWeight: 600 }}>Sell all</button>
+            <button onClick={claim} disabled={claiming || pending.length === 0}
+              style={{ marginLeft: 'auto', padding: '9px 18px', borderRadius: 11, border: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 13.5,
+                cursor: (claiming || pending.length === 0) ? 'default' : 'pointer',
+                background: pending.length === 0 ? COLORS.panel2 : GRADIENT, color: pending.length === 0 ? COLORS.muted : '#06120c' }}>
+              {claiming ? 'Claiming…' : pending.length > 0 ? `Claim · sell ${pending.length} (~${formatUsd(estimate)})` : 'Claim'}
+            </button>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
           {results.map((r, i) => {
             const accent = RARITY_COLOR[r.rarity] ?? COLORS.muted
+            const mint = r.nft_address
+            const st = mint ? status[mint] : undefined
+            const isSell = mint ? !!sell[mint] : false
+            const decidable = !r.auto_sold && !!mint && st !== 'sold'
             return (
-              <div key={r.nft_address ?? i} style={{ background: COLORS.panel2, border: `1px solid ${accent}55`, borderRadius: 10, overflow: 'hidden' }}>
-                <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 }}>
+              <div key={mint ?? i} style={{ background: COLORS.panel2, border: `1px solid ${isSell && decidable ? `${COLORS.violet}aa` : `${accent}55`}`, borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8, opacity: isSell && decidable ? 0.6 : 1 }}>
                   {r.image ? <img src={r.image} alt={r.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 32 }}>🃏</span>}
                 </div>
                 <div style={{ padding: '8px 9px 10px' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name ?? '—'}</div>
-                  {r.auto_sold
-                    ? <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>Auto-sold {formatUsd((r.buyback_amount ?? 0) / 1e6)}</div>
-                    : r.insured_value != null && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green, fontWeight: 700 }}>{formatUsd(r.insured_value)}</div>}
+                  {r.auto_sold ? (
+                    <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted, marginTop: 2 }}>⚡ Auto-sold {formatUsd((r.buyback_amount ?? 0) / 1e6)}</div>
+                  ) : st === 'sold' ? (
+                    <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: COLORS.green, fontWeight: 700, marginTop: 2 }}>Sold ✓ ~{formatUsd((r.insured_value ?? 0) * pct / 100)}</div>
+                  ) : (
+                    <>
+                      {r.insured_value != null && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green, fontWeight: 700, marginTop: 2 }}>{formatUsd(r.insured_value)}</div>}
+                      {st === 'failed' && <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.red, marginTop: 2 }}>Sell failed — kept</div>}
+                      {decidable && (
+                        <div style={{ display: 'flex', marginTop: 7, borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
+                          <button onClick={() => mint && setSell((s) => ({ ...s, [mint]: false }))} disabled={claiming}
+                            style={{ flex: 1, padding: '6px 0', border: 0, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, fontFamily: FONTS.body,
+                              background: !isSell ? 'rgba(47,226,138,.16)' : 'transparent', color: !isSell ? COLORS.green : COLORS.muted }}>Keep</button>
+                          <button onClick={() => mint && setSell((s) => ({ ...s, [mint]: true }))} disabled={claiming}
+                            style={{ flex: 1, padding: '6px 0', border: 0, borderLeft: `1px solid ${COLORS.border}`, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, fontFamily: FONTS.body,
+                              background: isSell ? 'rgba(139,92,246,.18)' : 'transparent', color: isSell ? '#c4adff' : COLORS.muted }}>Sell</button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )
