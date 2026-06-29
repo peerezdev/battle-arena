@@ -1180,16 +1180,20 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
   return (
     <motion.div key="yolo-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(11,14,20,0.9)', zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20, gap: 14 }}>
-      <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, letterSpacing: '.1em' }}>PACK {index + 1} / {results.length}</div>
+      {results.length > 1 && (
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, letterSpacing: '.1em' }}>PACK {index + 1} / {results.length}</div>
+      )}
       {result.auto_sold && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.green }}>⚡ Auto-sold {formatUsd((result.buyback_amount ?? 0) / 1e6)}</div>
       )}
       <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} onClose={onAdvance} />
       <div style={{ display: 'flex', gap: 10 }}>
         <button onClick={() => setSkippedAt(index)}
-          style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip pack ⏭</button>
-        <button onClick={onSkipAll}
-          style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
+          style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{results.length > 1 ? 'Skip pack ⏭' : 'Skip ⏭'}</button>
+        {results.length > 1 && (
+          <button onClick={onSkipAll}
+            style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
+        )}
       </div>
     </motion.div>
   )
