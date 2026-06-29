@@ -37,6 +37,7 @@ from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc
+from .services.nft_transfer import submit_signed_tx
 from .services.reservations import reserve, reserved_total, release_reservations
 from .services.bots import load_bots, pick_bot
 
@@ -63,6 +64,10 @@ class WithdrawAddressBody(BaseModel):
 class WithdrawBody(BaseModel):
     address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # destination Solana wallet
     amount: float = Field(gt=0)  # USDC (dollars)
+
+
+class SignTxBody(BaseModel):
+    transaction: str = Field(min_length=1, max_length=8192)  # base64 (partially-)unsigned tx
 
 
 class GeneratePackBody(BaseModel):
@@ -570,6 +575,30 @@ def create_app(session_factory, chain: ChainSource,
         except Exception as exc:
             raise HTTPException(502, f"withdraw failed: {exc}")
         return {"signature": sig, "amount": body.amount, "address": body.address}
+
+    # ── Delegated signing — once the wallet is delegated, the server signs on the user's behalf
+    # (session signer) so gacha/buyback/arena don't pop a wallet prompt. Each endpoint only ever
+    # signs with the AUTHED user's own wallet_id, so it can never sign for anyone else. ──────────
+    @app.post("/wallet/sign")
+    async def wallet_sign(body: SignTxBody, wallet_id: str = Depends(current_user_id)):
+        if privy_signer is None:
+            raise HTTPException(503, "signing_unavailable")
+        try:
+            signed = await privy_signer.sign_solana(wallet_id, body.transaction)
+        except Exception as exc:
+            raise HTTPException(502, f"sign failed: {exc}")
+        return {"signed_transaction": signed}
+
+    @app.post("/wallet/sign-submit")
+    async def wallet_sign_submit(body: SignTxBody, wallet_id: str = Depends(current_user_id)):
+        if privy_signer is None:
+            raise HTTPException(503, "signing_unavailable")
+        try:
+            signed = await privy_signer.sign_solana(wallet_id, body.transaction)
+            sig = await submit_signed_tx(solana_rpc_url, signed)
+        except Exception as exc:
+            raise HTTPException(502, f"sign/submit failed: {exc}")
+        return {"signature": sig}
 
     @app.post("/pack-battles")
     async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),

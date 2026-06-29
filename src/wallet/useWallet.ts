@@ -1,11 +1,11 @@
-import { usePrivy } from '@privy-io/react-auth'
+import { usePrivy, useIdentityToken } from '@privy-io/react-auth'
 import { useWallets } from '@privy-io/react-auth/solana'
 import { Connection, PublicKey, Transaction } from '@solana/web3.js'
 import type { TransactionInstruction } from '@solana/web3.js'
-import bs58 from 'bs58'
 import { Buffer } from 'buffer'
 import { config } from '../onchain/config'
 import { useEmbeddedSolanaAddress } from './embedded'
+import { useDelegation } from './useDelegation'
 
 export interface WalletApi {
   publicKey: PublicKey | null
@@ -19,21 +19,11 @@ export interface WalletApi {
   signTransactionBase64: (txBase64: string) => Promise<string>
 }
 
-/**
- * Derive a Solana Wallet Standard chain identifier from the configured RPC URL.
- * Defaults to 'solana:devnet' when the URL contains 'devnet', 'mainnet' for mainnet-beta,
- * 'testnet' for testnet, and 'devnet' for anything else (localhost, custom RPCs).
- */
-function deriveChain(): `solana:${'mainnet' | 'devnet' | 'testnet'}` {
-  const rpc = config.rpcUrl.toLowerCase()
-  if (rpc.includes('mainnet')) return 'solana:mainnet'
-  if (rpc.includes('testnet')) return 'solana:testnet'
-  return 'solana:devnet'
-}
-
 export function useWallet(): WalletApi {
   // -- Account / connection state ----------------------------------------------------------
   const { authenticated, login } = usePrivy()
+  const { identityToken } = useIdentityToken()
+  const { delegated, enable } = useDelegation()
   const { wallets } = useWallets()
   // Firma/identidad SIEMPRE con la embedded (la wallet del juego), no wallets[0]
   // (que podría ser una externa conectada como Phantom).
@@ -49,6 +39,27 @@ export function useWallet(): WalletApi {
   // -- Connect (opens Privy login modal) ---------------------------------------------------
   const connect = (): void => {
     void login()
+  }
+
+  // -- Delegated signing -------------------------------------------------------------------
+  // Once the wallet is delegated (session signer added), the backend signs on the user's behalf
+  // so no action pops a wallet prompt. If not yet delegated, enable() prompts once (the "gate"),
+  // then we proceed via the backend. Each backend call signs ONLY the authed user's own wallet.
+  async function ensureDelegated(): Promise<void> {
+    if (delegated) return
+    try { await enable() } catch { /* if already added, the backend sign still succeeds */ }
+  }
+
+  async function backendSign(path: 'sign' | 'sign-submit', txBase64: string): Promise<string> {
+    if (!identityToken) throw new Error('Log in to sign')
+    const r = await fetch(`${config.backendUrl}/wallet/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${identityToken}`, 'ngrok-skip-browser-warning': 'true' },
+      body: JSON.stringify({ transaction: txBase64 }),
+    })
+    if (!r.ok) throw new Error(`${path} failed (${r.status})`)
+    const d = await r.json()
+    return (path === 'sign' ? d.signed_transaction : d.signature) as string
   }
 
   // -- signAndSendTransaction --------------------------------------------------------------
@@ -72,17 +83,11 @@ export function useWallet(): WalletApi {
     tx.recentBlockhash = blockhash
     tx.add(...ixs)
 
-    // Serialize without requiring signatures (wallet will sign)
+    // Serialize without requiring signatures (the server signs via the session signer).
     const serialized = tx.serialize({ requireAllSignatures: false })
 
-    const chain = deriveChain()
-    const { signature: sigBytes } = await wallet.signAndSendTransaction({
-      transaction: serialized,
-      chain,
-    })
-
-    // Privy returns signature as raw bytes; encode to base58 string
-    const signature = bs58.encode(sigBytes)
+    await ensureDelegated()
+    const signature = await backendSign('sign-submit', Buffer.from(serialized).toString('base64'))
 
     await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed')
 
@@ -118,16 +123,12 @@ export function useWallet(): WalletApi {
 
     const tx = Transaction.from(Buffer.from(txBase64, 'base64'))
 
-    // Serialize without requiring all signatures (tx may be partially signed by server)
+    // Serialize without requiring all signatures (tx may be partially signed by server/CC).
     const serialized = tx.serialize({ requireAllSignatures: false })
 
-    const chain = deriveChain()
-    const { signedTransaction } = await wallet.signTransaction({
-      transaction: serialized,
-      chain,
-    })
-
-    return Buffer.from(signedTransaction).toString('base64')
+    await ensureDelegated()
+    // Server adds the user's signature via the session signer; the caller submits as before.
+    return backendSign('sign', Buffer.from(serialized).toString('base64'))
   }
 
   return { publicKey, isConnected, connect, signAndSendTransaction, signMessage, signTransactionBase64 }
