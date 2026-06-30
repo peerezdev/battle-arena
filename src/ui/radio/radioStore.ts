@@ -75,6 +75,26 @@ export function createRadioStore(
   const listeners = new Set<() => void>()
   let audio: HTMLAudioElement | null = null
 
+  let armed = false
+  const GESTURES: Array<'pointerdown' | 'keydown' | 'touchstart'> = ['pointerdown', 'keydown', 'touchstart']
+
+  function disarm(): void {
+    if (!armed || typeof document === 'undefined') return
+    armed = false
+    GESTURES.forEach((g) => document.removeEventListener(g, onGesture))
+  }
+
+  function onGesture(): void {
+    disarm()
+    play()
+  }
+
+  function arm(): void {
+    if (armed || typeof document === 'undefined') return
+    armed = true
+    GESTURES.forEach((g) => document.addEventListener(g, onGesture))
+  }
+
   function emit(): void {
     snapshot = { ...internal }
     listeners.forEach((l) => l())
@@ -183,8 +203,26 @@ export function createRadioStore(
     emit()
   }
 
-  // Implemented in Task 4.
-  function tryAutoplay(): void { /* see Task 4 */ }
+  function tryAutoplay(): void {
+    if (internal.isPlaying || !tracks.length) return
+    // Arm the gesture fallback first so a blocked attempt is covered synchronously.
+    arm()
+    const el = ensureAudio()
+    if (!el) return
+    try {
+      const p = el.play()
+      if (p && typeof p.then === 'function') {
+        p.then(() => { internal.isPlaying = true; emit(); disarm() })
+         .catch(() => { /* blocked — stay armed until first gesture */ })
+      } else {
+        internal.isPlaying = true
+        emit()
+        disarm()
+      }
+    } catch {
+      /* stay armed */
+    }
+  }
 
   return {
     getState: () => snapshot,

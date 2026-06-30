@@ -194,3 +194,50 @@ describe('radioStore shuffle', () => {
     rnd.mockRestore()
   })
 })
+
+describe('radioStore autoplay', () => {
+  beforeEach(() => { try { localStorage.clear() } catch { /* ignore */ } })
+
+  it('starts playing on the first pointerdown when autoplay is blocked', () => {
+    // Fake whose play() rejects, simulating the browser autoplay policy.
+    class BlockedAudio extends FakeAudio {
+      play() { return Promise.reject(new Error('blocked')) as unknown as Promise<void> }
+    }
+    const fake = new BlockedAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    store.tryAutoplay()
+    // Blocked: not playing yet.
+    expect(store.getState().isPlaying).toBe(false)
+    // First user gesture anywhere starts it (play() now succeeds via the base behavior).
+    fake.play = FakeAudio.prototype.play.bind(fake)
+    document.dispatchEvent(new Event('pointerdown'))
+    expect(store.getState().isPlaying).toBe(true)
+    expect(fake.paused).toBe(false)
+  })
+
+  it('removes the gesture listener after it fires once', () => {
+    class BlockedAudio extends FakeAudio {
+      play() { return Promise.reject(new Error('blocked')) as unknown as Promise<void> }
+    }
+    const fake = new BlockedAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    store.tryAutoplay()
+    fake.play = FakeAudio.prototype.play.bind(fake)
+    document.dispatchEvent(new Event('pointerdown'))
+    store.pause()
+    expect(store.getState().isPlaying).toBe(false)
+    // A second gesture must NOT restart playback (listener already removed).
+    document.dispatchEvent(new Event('pointerdown'))
+    expect(store.getState().isPlaying).toBe(false)
+  })
+
+  it('does nothing when already playing', () => {
+    const fake = new FakeAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    store.play()
+    fake.paused = false
+    store.tryAutoplay()
+    // No gesture listener armed: a pointerdown changes nothing about isPlaying.
+    expect(store.getState().isPlaying).toBe(true)
+  })
+})
