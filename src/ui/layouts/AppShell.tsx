@@ -8,6 +8,7 @@ import { useProfile } from '../../hooks/useProfile'
 import { useReducedMotion } from '../useReducedMotion'
 import { useIsWide } from '../useIsWide'
 import { AuthButtons } from '../components/AuthButtons'
+import { RadioPlayer } from '../components/RadioPlayer'
 import { DepositModal } from '../components/DepositModal'
 import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
@@ -146,6 +147,9 @@ export function AppShell() {
 
           {/* Spacer */}
           <div style={{ flex: 1 }} />
+
+          {/* Radio — global player, lives above the router so audio survives navigation */}
+          <RadioPlayer />
 
           {/* Balance + Gimmighouls — labelled groups on desktop; one divided box on mobile */}
           {authenticated && (wideRail ? (
