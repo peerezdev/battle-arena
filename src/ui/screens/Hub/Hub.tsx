@@ -14,6 +14,7 @@ import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 import { CreateBattleModal } from './CreateBattleModal'
+import { DemoPicker } from './DemoPicker'
 import { loadMachineList } from '../../useMachines'
 
 export function Hub() {
@@ -24,6 +25,7 @@ export function Hub() {
   const { battles } = useOpenBattles()
   const gate = useDelegationGate()
   const [createOpen, setCreateOpen] = useState(false)
+  const [demoOpen, setDemoOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
   // Warm the machine catalogue cache on lobby load so Create Battle opens with machines ready.
@@ -79,8 +81,8 @@ export function Hub() {
         <QuickMatch
           selectedStake={stake}
           onStake={setStake}
-          onFindMatch={() => setCreateOpen(true)}
           onCreate={() => setCreateOpen(true)}
+          onPlayDemo={() => setDemoOpen(true)}
         />
         {actionError && (
           <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red, margin: '0 0 12px' }}>
@@ -95,6 +97,12 @@ export function Hub() {
         <CreateBattleModal
           onClose={() => setCreateOpen(false)}
           onCreated={(id) => { setCreateOpen(false); navigate('/play/battle/' + id) }}
+        />
+      )}
+      {demoOpen && (
+        <DemoPicker
+          onClose={() => setDemoOpen(false)}
+          onPick={(m) => { setDemoOpen(false); navigate('/play/demo/' + m) }}
         />
       )}
     </div>

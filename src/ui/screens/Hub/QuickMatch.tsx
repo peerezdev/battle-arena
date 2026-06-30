@@ -7,8 +7,8 @@ interface Props {
   stakes?: number[]
   selectedStake: number
   onStake: (n: number) => void
-  onFindMatch: () => void
   onCreate: () => void
+  onPlayDemo: () => void
   stats?: HubStat[]
 }
 
@@ -16,8 +16,8 @@ export function QuickMatch({
   stakes = STAKE_OPTIONS,
   selectedStake,
   onStake,
-  onFindMatch,
   onCreate,
+  onPlayDemo,
   stats = MOCK_STATS,
 }: Props) {
   const wide = useIsWide('(min-width: 620px)')
@@ -124,7 +124,7 @@ export function QuickMatch({
           {/* CTA row */}
           <div style={{ display: 'flex', gap: 10 }}>
             <button
-              onClick={onFindMatch}
+              onClick={onCreate}
               style={{
                 background: GRADIENT,
                 color: '#06120c',
@@ -137,10 +137,10 @@ export function QuickMatch({
                 cursor: 'pointer',
               }}
             >
-              Find match →
+              Create battle
             </button>
             <button
-              onClick={onCreate}
+              onClick={onPlayDemo}
               style={{
                 background: 'transparent',
                 border: `1px solid ${COLORS.border}`,
@@ -152,7 +152,7 @@ export function QuickMatch({
                 cursor: 'pointer',
               }}
             >
-              Create battle
+              Play demo
             </button>
           </div>
         </div>
