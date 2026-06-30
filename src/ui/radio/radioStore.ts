@@ -111,8 +111,19 @@ export function createRadioStore(
     emit()
   }
 
-  function pickNext(): number { return (internal.index + 1) % tracks.length }
-  function pickPrev(): number { return (internal.index - 1 + tracks.length) % tracks.length }
+  // Uniformly pick an index different from the current one.
+  function randomOther(): number {
+    if (tracks.length <= 1) return internal.index
+    const r = Math.floor(Math.random() * (tracks.length - 1))
+    return r >= internal.index ? r + 1 : r
+  }
+
+  function pickNext(): number {
+    return internal.shuffle ? randomOther() : (internal.index + 1) % tracks.length
+  }
+  function pickPrev(): number {
+    return internal.shuffle ? randomOther() : (internal.index - 1 + tracks.length) % tracks.length
+  }
 
   function play(): void {
     if (!tracks.length) return

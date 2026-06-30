@@ -155,3 +155,42 @@ describe('radioStore core', () => {
     expect(cb).not.toHaveBeenCalled()
   })
 })
+
+describe('radioStore shuffle', () => {
+  beforeEach(() => { try { localStorage.clear() } catch { /* ignore */ } })
+
+  it('toggleShuffle flips and persists', () => {
+    const fake = new FakeAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    store.toggleShuffle()
+    expect(store.getState().shuffle).toBe(true)
+    expect(localStorage.getItem('battlearena.radio.shuffle')).toBe('1')
+    store.toggleShuffle()
+    expect(store.getState().shuffle).toBe(false)
+  })
+
+  it('next() with shuffle jumps to a non-sequential index', () => {
+    const fake = new FakeAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    store.toggleShuffle()
+    // 3 tracks at index 0: sequential next would be 1. randomOther with
+    // Math.random()=0.99 -> floor(0.99*2)=1 -> 1>=0 -> index 2. So shuffle MUST
+    // give 2, which the sequential implementation never would here.
+    const rnd = vi.spyOn(Math, 'random').mockReturnValue(0.99)
+    store.next()
+    expect(store.getState().index).toBe(2)
+    rnd.mockRestore()
+  })
+
+  it('prev() with shuffle jumps to a non-sequential index', () => {
+    const fake = new FakeAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    store.toggleShuffle()
+    // 3 tracks at index 0: sequential prev would be 2. randomOther with
+    // Math.random()=0 -> floor(0)=0 -> 0>=0 -> index 1. So shuffle MUST give 1.
+    const rnd = vi.spyOn(Math, 'random').mockReturnValue(0)
+    store.prev()
+    expect(store.getState().index).toBe(1)
+    rnd.mockRestore()
+  })
+})
