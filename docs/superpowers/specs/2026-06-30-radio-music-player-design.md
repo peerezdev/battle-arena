@@ -111,8 +111,9 @@ tracks.ts ─► radioStore (dueño del Audio) ─► useRadio() ─► RadioPla
 
 - **Secuencial:** `next()` avanza `index + 1`; al pasar el último vuelve a `0`
   (loop infinito). `prev()` análogo hacia atrás.
-- **Shuffle on:** `next()` elige un índice aleatorio distinto del actual. Mantiene
-  el loop (nunca se "termina"). El toggle se persiste.
+- **Shuffle on:** `next()` y `prev()` eligen un índice aleatorio distinto del
+  actual (sin pila de historial, para mantenerlo simple). Mantiene el loop
+  (nunca se "termina"). El toggle se persiste.
 
 ## Autoplay (punto delicado)
 
