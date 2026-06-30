@@ -66,11 +66,11 @@ function DuelPanel({ wide }: { wide: boolean }) {
       <div
         style={{
           background: COLORS.panel2,
-          border: `1px solid #2fe28a55`,
+          border: `1px solid #00ffc455`,
           borderRadius: '12px',
           padding: '16px',
           marginBottom: '12px',
-          boxShadow: '0 0 16px #2fe28a22',
+          boxShadow: '0 0 16px #00ffc422',
         }}
       >
         <div
@@ -132,10 +132,10 @@ function DuelPanel({ wide }: { wide: boolean }) {
       <div
         style={{
           background: COLORS.panel2,
-          border: `1px solid #8b5cf655`,
+          border: `1px solid #ff2e9755`,
           borderRadius: '12px',
           padding: '16px',
-          boxShadow: '0 0 16px #8b5cf622',
+          boxShadow: '0 0 16px #ff2e9722',
         }}
       >
         <div
@@ -196,7 +196,7 @@ function GameCard({ icon, title, description, pill, onClick, reduced }: GameCard
   return (
     <motion.div
       onClick={onClick}
-      whileHover={reduced ? undefined : { y: -3, boxShadow: `0 8px 28px #8b5cf622` }}
+      whileHover={reduced ? undefined : { y: -3, boxShadow: `0 8px 28px #ff2e9722` }}
       whileTap={reduced ? undefined : { scale: 0.98 }}
       style={{
         background: COLORS.panel,
@@ -238,7 +238,7 @@ function GameCard({ icon, title, description, pill, onClick, reduced }: GameCard
           letterSpacing: '.1em',
           textTransform: 'uppercase',
           color: COLORS.violet,
-          border: `1px solid #8b5cf655`,
+          border: `1px solid #ff2e9755`,
           borderRadius: '4px',
           padding: '3px 10px',
         }}
@@ -347,11 +347,11 @@ export function Landing() {
               fontSize: '12px',
               fontFamily: FONTS.mono,
               color: COLORS.green,
-              border: `1px solid #2fe28a44`,
+              border: `1px solid #00ffc444`,
               borderRadius: '20px',
               padding: '5px 14px',
               marginBottom: '24px',
-              background: '#2fe28a0a',
+              background: '#00ffc40a',
             }}
           >
             <span style={{ fontSize: '8px' }}>●</span> Built on Solana
@@ -412,7 +412,7 @@ export function Landing() {
                 cursor: 'pointer',
                 fontFamily: FONTS.body,
                 letterSpacing: '.01em',
-                boxShadow: '0 0 20px #8b5cf633',
+                boxShadow: '0 0 20px #ff2e9733',
               }}
             >
               Launch App
@@ -563,7 +563,7 @@ export function Landing() {
       <section
         style={{
           padding: wide ? '72px 24px' : '52px 20px',
-          background: `linear-gradient(135deg, #8b5cf608 0%, #2fe28a08 100%)`,
+          background: `linear-gradient(135deg, #ff2e9708 0%, #00ffc408 100%)`,
         }}
       >
         <div

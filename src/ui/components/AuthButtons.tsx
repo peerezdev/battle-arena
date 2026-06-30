@@ -94,7 +94,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
           border: 'none',
           color: '#06120c',
           fontWeight: 800,
-          boxShadow: '0 0 14px #8b5cf633',
+          boxShadow: '0 0 14px #ff2e9733',
         }}
       >
         Log in

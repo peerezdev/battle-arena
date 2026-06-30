@@ -13,9 +13,9 @@ const MAX_BOXES = 10
 // Art/holo/ring per card, cycled by index (mirrors the gacha rarity palette).
 const TINTS = [
   { art: 'linear-gradient(160deg,#5a481c,#1a1206)', holo: 'linear-gradient(115deg,rgba(255,120,90,0) 22%,rgba(245,197,66,.6),rgba(255,120,90,0) 78%)', ring: 'rgba(245,197,66,.5)', accent: '#f5c542' },
-  { art: 'linear-gradient(160deg,#33245e,#160f2b)', holo: 'linear-gradient(115deg,rgba(196,173,255,0) 22%,rgba(196,173,255,.55),rgba(196,173,255,0) 78%)', ring: 'rgba(139,92,246,.5)', accent: '#c4adff' },
+  { art: 'linear-gradient(160deg,#33245e,#160f2b)', holo: 'linear-gradient(115deg,rgba(196,173,255,0) 22%,rgba(196,173,255,.55),rgba(196,173,255,0) 78%)', ring: 'rgba(255,46,151,.5)', accent: '#c4adff' },
   { art: 'linear-gradient(160deg,#1d3a5c,#0a1622)', holo: 'linear-gradient(115deg,rgba(124,193,255,0) 26%,rgba(124,193,255,.5),rgba(124,193,255,0) 74%)', ring: 'rgba(78,168,255,.45)', accent: '#7cc1ff' },
-  { art: 'linear-gradient(160deg,#173f32,#08160f)', holo: 'linear-gradient(115deg,rgba(92,224,180,0) 32%,rgba(92,224,180,.45),rgba(92,224,180,0) 68%)', ring: 'rgba(47,226,138,.45)', accent: '#5ce0b4' },
+  { art: 'linear-gradient(160deg,#173f32,#08160f)', holo: 'linear-gradient(115deg,rgba(92,224,180,0) 32%,rgba(92,224,180,.45),rgba(92,224,180,0) 68%)', ring: 'rgba(0,255,196,.45)', accent: '#5ce0b4' },
 ]
 
 const miniBtn: CSSProperties = {
@@ -97,7 +97,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
 
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px clamp(20px,2.6vw,28px) 18px', borderBottom: `1px solid ${COLORS.border}` }}>
-          <span style={{ flex: 'none', width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#8b5cf6,#2fe28a)', boxShadow: '0 0 22px -6px rgba(47,226,138,.7)' }}>
+          <span style={{ flex: 'none', width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#ff2e97,#00ffc4)', boxShadow: '0 0 22px -6px rgba(0,255,196,.7)' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#06170f" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" x2="19" y1="19" y2="13" /><line x1="16" x2="20" y1="16" y2="20" /><line x1="19" x2="21" y1="21" y2="19" /></svg>
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -126,8 +126,8 @@ export function CreateBattleModal({ onClose, onCreated }: {
               return (
                 <button key={k} onClick={() => setMode(k)}
                   style={{ flex: 1, textAlign: 'center', padding: '13px 16px', borderRadius: 13, cursor: 'pointer', fontFamily: FONTS.body,
-                    background: on ? 'linear-gradient(180deg,rgba(139,92,246,.22),rgba(139,92,246,.05))' : '#ffffff08',
-                    border: `1px solid ${on ? 'rgba(139,92,246,.55)' : COLORS.border}` }}>
+                    background: on ? 'linear-gradient(180deg,rgba(255,46,151,.22),rgba(255,46,151,.05))' : '#ffffff08',
+                    border: `1px solid ${on ? 'rgba(255,46,151,.55)' : COLORS.border}` }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: on ? COLORS.text : '#cdd4dd' }}>{label}</div>
                   <div style={{ fontSize: 11.5, color: on ? '#b3a3e6' : COLORS.muted, marginTop: 3 }}>{sub}</div>
                 </button>
@@ -166,9 +166,9 @@ export function CreateBattleModal({ onClose, onCreated }: {
                 const thumb = m.thumbnailUrl ?? m.image ?? null
                 const onCard = () => (isRoyale ? setMachineCode(m.code) : step(m.code, +1))
                 return (
-                  <div key={m.code} style={{ position: 'relative', overflow: 'hidden', borderRadius: 15, border: `1px solid ${selected ? 'rgba(47,226,138,.5)' : COLORS.border}`, background: 'linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01))' }}>
+                  <div key={m.code} style={{ position: 'relative', overflow: 'hidden', borderRadius: 15, border: `1px solid ${selected ? 'rgba(0,255,196,.5)' : COLORS.border}`, background: 'linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01))' }}>
                     {selected && (
-                      <span style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, minWidth: 22, height: 22, padding: '0 6px', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: COLORS.green, boxShadow: '0 0 14px -4px rgba(47,226,138,.9)' }}>{isRoyale ? '✓' : count}</span>
+                      <span style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, minWidth: 22, height: 22, padding: '0 6px', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: COLORS.green, boxShadow: '0 0 14px -4px rgba(0,255,196,.9)' }}>{isRoyale ? '✓' : count}</span>
                     )}
                     {/* art */}
                     <button onClick={onCard} style={{ display: 'block', width: '100%', border: 0, padding: 0, margin: 0, cursor: 'pointer', background: 'transparent' }}>
@@ -194,8 +194,8 @@ export function CreateBattleModal({ onClose, onCreated }: {
                         {isRoyale ? (
                           <button onClick={() => setMachineCode(m.code)}
                             style={{ padding: '6px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 12.5, fontWeight: 600,
-                              border: `1px solid ${selected ? 'rgba(47,226,138,.55)' : 'rgba(255,255,255,.12)'}`,
-                              background: selected ? 'linear-gradient(180deg,rgba(47,226,138,.20),rgba(47,226,138,.05))' : '#ffffff08',
+                              border: `1px solid ${selected ? 'rgba(0,255,196,.55)' : 'rgba(255,255,255,.12)'}`,
+                              background: selected ? 'linear-gradient(180deg,rgba(0,255,196,.20),rgba(0,255,196,.05))' : '#ffffff08',
                               color: selected ? COLORS.green : '#cdd4dd' }}>{selected ? 'Chosen' : 'Choose'}</button>
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 1, padding: 2, borderRadius: 9, background: '#ffffff0d', border: '1px solid #ffffff17' }}>
@@ -239,7 +239,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
           <button onClick={onClose} disabled={busy}
             style={{ padding: '13px 22px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 14.5, fontWeight: 600 }}>Cancel</button>
           <button onClick={submit} disabled={createDisabled}
-            style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 8, padding: '13px 28px', borderRadius: 13, border: 0, cursor: createDisabled ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: 'linear-gradient(120deg,#8b5cf6,#2fe28a)', boxShadow: '0 12px 34px -12px rgba(47,226,138,.6)', opacity: createDisabled ? 0.5 : 1 }}>
+            style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 8, padding: '13px 28px', borderRadius: 13, border: 0, cursor: createDisabled ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: 'linear-gradient(120deg,#ff2e97,#00ffc4)', boxShadow: '0 12px 34px -12px rgba(0,255,196,.6)', opacity: createDisabled ? 0.5 : 1 }}>
             {!createDisabled && <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '40%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent)', animation: 'ba-sweep 3.4s infinite' }} />}
             <span style={{ position: 'relative' }}>{busy ? 'Creating…' : 'Create battle'}</span>
           </button>

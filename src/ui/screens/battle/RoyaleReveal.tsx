@@ -13,7 +13,7 @@ export function shortWallet(w: string): string {
 // Rarity palette for the little card chips / loot.
 const RAR: Record<string, { tint: string; border: string; label: string }> = {
   common:    { tint: '#3a4250', border: 'rgba(255,255,255,.18)', label: 'COM' },
-  uncommon:  { tint: '#2f6b4a', border: 'rgba(47,226,138,.5)',   label: 'UNC' },
+  uncommon:  { tint: '#2f6b4a', border: 'rgba(0,255,196,.5)',   label: 'UNC' },
   rare:      { tint: '#2a5a8f', border: 'rgba(78,168,255,.55)',  label: 'RARE' },
   epic:      { tint: '#5a3a9f', border: 'rgba(169,139,255,.6)',  label: 'EPIC' },
   legendary: { tint: '#8a6a1f', border: 'rgba(245,197,66,.65)',  label: 'LEGEND' },
@@ -21,13 +21,13 @@ const RAR: Record<string, { tint: string; border: string; label: string }> = {
 }
 const rarOf = (r: string | null) => RAR[(r ?? '').toLowerCase()] ?? RAR.common
 
-const TINTS = ['linear-gradient(135deg,#a98bff,#6a44e0)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#2fe28a,#1aa0d8)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
+const TINTS = ['linear-gradient(135deg,#ff6bb5,#d4127a)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#00ffc4,#1aa0d8)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
 const tintFor = (w: string) => TINTS[Math.abs([...w].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % TINTS.length]
 const medalColor = (r: number) => (r === 1 ? '#f5c542' : r === 2 ? '#c8d0da' : r === 3 ? '#e8964e' : COLORS.muted)
 
 const TITLE = (
   <h1 style={{ margin: 0, fontFamily: FONTS.display, fontSize: 'clamp(22px,3vw,30px)', fontWeight: 700, letterSpacing: '-.02em' }}>
-    Battle <span style={{ color: '#a98bff' }}>Royale</span>
+    Battle <span style={{ color: '#ff6bb5' }}>Royale</span>
   </h1>
 )
 const screenStyle = { padding: '18px clamp(14px,2.4vw,28px) 28px', display: 'flex', flexDirection: 'column' as const, gap: 18 }
@@ -98,15 +98,15 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
       <section style={{
         position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap',
         padding: '16px 22px', borderRadius: 18, marginBottom: 22,
-        background: 'linear-gradient(135deg,rgba(139,92,246,.16),rgba(13,17,22,.55) 46%,rgba(47,226,138,.10))',
+        background: 'linear-gradient(135deg,rgba(255,46,151,.16),rgba(13,17,22,.55) 46%,rgba(0,255,196,.10))',
         border: `1px solid ${COLORS.border}`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
           <div style={{
             width: 50, height: 50, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(139,92,246,.5)', boxShadow: '0 0 24px -8px rgba(139,92,246,.7)',
+            background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(255,46,151,.5)', boxShadow: '0 0 24px -8px rgba(255,46,151,.7)',
           }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a98bff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6bb5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -130,7 +130,7 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
             <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>round <span style={{ color: COLORS.text, fontWeight: 700 }}>{Math.min(currentRound, totalRounds)}</span> / {totalRounds}</span>
           </div>
           <div style={{ height: 8, borderRadius: 8, background: '#ffffff10', overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
-            <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, borderRadius: 8, background: GRADIENT, boxShadow: '0 0 16px -2px rgba(47,226,138,.7)' }} />
+            <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, borderRadius: 8, background: GRADIENT, boxShadow: '0 0 16px -2px rgba(0,255,196,.7)' }} />
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
@@ -157,11 +157,11 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
           return (
             <div key={p.wallet} style={{
               position: 'relative', borderRadius: 18, padding: 16, overflow: 'hidden',
-              background: leader ? 'linear-gradient(180deg,rgba(47,226,138,.10),rgba(255,255,255,.012))'
+              background: leader ? 'linear-gradient(180deg,rgba(0,255,196,.10),rgba(255,255,255,.012))'
                 : atRisk ? 'linear-gradient(180deg,rgba(255,94,122,.08),rgba(255,255,255,.012))'
                 : 'linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))',
-              border: `1px solid ${leader ? 'rgba(47,226,138,.5)' : atRisk ? 'rgba(255,94,122,.5)' : COLORS.border}`,
-              boxShadow: leader ? '0 0 50px -16px rgba(47,226,138,.7)' : atRisk ? '0 0 40px -18px rgba(255,94,122,.7)' : 'none',
+              border: `1px solid ${leader ? 'rgba(0,255,196,.5)' : atRisk ? 'rgba(255,94,122,.5)' : COLORS.border}`,
+              boxShadow: leader ? '0 0 50px -16px rgba(0,255,196,.7)' : atRisk ? '0 0 40px -18px rgba(255,94,122,.7)' : 'none',
             }}>
               <div style={{ opacity: elim ? 0.4 : 1, filter: elim ? 'grayscale(.92)' : 'none' }}>
                 {/* top row */}
@@ -179,12 +179,12 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
                 {/* identity */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                   <span
-                    style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#06170f', background: tintFor(p.wallet), border: `2px solid ${p.isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}
+                    style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#06170f', background: tintFor(p.wallet), border: `2px solid ${p.isMe ? 'rgba(0,255,196,.7)' : 'rgba(255,255,255,.12)'}` }}
                   >{name(p).slice(0, 1).toUpperCase()}</span>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 14, fontWeight: 700, color: p.isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 96 }}>{name(p)}</span>
-                      {p.isMe && <span style={{ flex: 'none', padding: '1px 6px', borderRadius: 5, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
+                      {p.isMe && <span style={{ flex: 'none', padding: '1px 6px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
                     </div>
                     <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#6c7682', marginTop: 2 }}>{p.cards.length} cards</div>
                   </div>
@@ -193,7 +193,7 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
                 <div style={{ position: 'relative', width: '100%', height: 128, borderRadius: 14, overflow: 'hidden', background: 'linear-gradient(165deg,#161b24,#0a0d13)', border: `1px solid ${COLORS.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
                   <span style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(135deg,rgba(255,255,255,.04) 0 1px,transparent 1px 11px)', opacity: 0.7 }} />
                   <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '34%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)', animation: 'ba-sweep 3.8s infinite' }} />
-                  <span style={{ position: 'relative', width: 42, height: 42, borderRadius: '50%', background: 'radial-gradient(circle at 35% 30%,#a98bff,#6a44e0 55%,#2fe28a)', boxShadow: '0 0 24px -6px rgba(139,92,246,.8),inset 0 2px 5px rgba(255,255,255,.35)', animation: 'ba-orb 4s ease-in-out infinite', marginBottom: 8 }} />
+                  <span style={{ position: 'relative', width: 42, height: 42, borderRadius: '50%', background: 'radial-gradient(circle at 35% 30%,#ff6bb5,#d4127a 55%,#00ffc4)', boxShadow: '0 0 24px -6px rgba(255,46,151,.8),inset 0 2px 5px rgba(255,255,255,.35)', animation: 'ba-orb 4s ease-in-out infinite', marginBottom: 8 }} />
                   <span style={{ position: 'relative', fontFamily: FONTS.display, fontSize: 26, fontWeight: 700, lineHeight: 1, letterSpacing: '-.02em', color: COLORS.text }}>{year}</span>
                   <span style={{ position: 'relative', fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.36em', color: '#9aa4b2', marginTop: 4 }}>TCG</span>
                 </div>
@@ -242,7 +242,7 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
       {/* banner */}
       <section style={{
         position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(26px,3vw,40px)', marginBottom: 22, textAlign: 'center',
-        background: iWon ? 'linear-gradient(135deg,rgba(245,197,66,.14),rgba(13,17,22,.6) 50%,rgba(47,226,138,.12))' : 'linear-gradient(135deg,rgba(255,94,122,.10),rgba(13,17,22,.6) 50%,rgba(139,92,246,.08))',
+        background: iWon ? 'linear-gradient(135deg,rgba(245,197,66,.14),rgba(13,17,22,.6) 50%,rgba(0,255,196,.12))' : 'linear-gradient(135deg,rgba(255,94,122,.10),rgba(13,17,22,.6) 50%,rgba(255,46,151,.08))',
         border: `1px solid ${iWon ? 'rgba(245,197,66,.4)' : 'rgba(255,94,122,.32)'}`,
       }}>
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: '.3em', color: iWon ? '#f5c542' : '#ff8198', marginBottom: 12 }}>
@@ -270,11 +270,11 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
             <span style={{ width: 88, height: 88, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 700, color: '#06170f', background: tintFor(champ.wallet), border: '3px solid rgba(245,197,66,.7)', boxShadow: '0 0 40px -8px rgba(245,197,66,.8)' }}>{name(champ).slice(0, 1).toUpperCase()}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 24, fontWeight: 700, color: champ.isMe ? COLORS.green : COLORS.text }}>{name(champ)}</span>
-              {champ.isMe && <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 10, fontWeight: 700, color: COLORS.green }}>YOU</span>}
+              {champ.isMe && <span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontSize: 10, fontWeight: 700, color: COLORS.green }}>YOU</span>}
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>TAKES THE POT</div>
-              <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-.02em', background: 'linear-gradient(120deg,#f5c542,#3df0a0)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(lootTotal)}</div>
+              <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-.02em', background: 'linear-gradient(120deg,#f5c542,#5cffd8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(lootTotal)}</div>
             </div>
           </div>
           <div style={{ flex: '1 1 320px', minWidth: 280 }}>
@@ -298,12 +298,12 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
           const net = p.isMe || rank === 1 ? (rank === 1 ? vm.potValue - entry : -entry) : -entry
           const isWinnerRow = rank === 1
           return (
-            <div key={p.wallet} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 18px', borderBottom: `1px solid #ffffff0a`, background: p.isMe ? 'rgba(47,226,138,.06)' : 'transparent' }}>
+            <div key={p.wallet} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 18px', borderBottom: `1px solid #ffffff0a`, background: p.isMe ? 'rgba(0,255,196,.06)' : 'transparent' }}>
               <span style={{ flex: 'none', width: 30, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 15, fontWeight: 700, color: medalColor(rank) }}>#{rank}</span>
-              <span style={{ flex: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: tintFor(p.wallet), border: `2px solid ${p.isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{name(p).slice(0, 1).toUpperCase()}</span>
+              <span style={{ flex: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: tintFor(p.wallet), border: `2px solid ${p.isMe ? 'rgba(0,255,196,.7)' : 'rgba(255,255,255,.12)'}` }}>{name(p).slice(0, 1).toUpperCase()}</span>
               <div style={{ flex: '1 1 120px', minWidth: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: p.isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
-                {p.isMe && <span style={{ flex: 'none', padding: '1px 6px', borderRadius: 5, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
+                {p.isMe && <span style={{ flex: 'none', padding: '1px 6px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
               </div>
               <div style={{ flex: 'none', width: 74, textAlign: 'right' }}>
                 <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.12em', color: '#6c7682' }}>LOOT</div>
@@ -319,7 +319,7 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
 
       {/* actions */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18, justifyContent: 'center' }}>
-        <button onClick={onRematch} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 0 22px -6px rgba(47,226,138,.7)' }}>↻ Rematch</button>
+        <button onClick={onRematch} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 0 22px -6px rgba(0,255,196,.7)' }}>↻ Rematch</button>
         <button onClick={onVerify} style={{ padding: '13px 22px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.muted, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>Verify (Provably Fair)</button>
         <button onClick={onExit} style={{ padding: '13px 26px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 15, fontWeight: 600 }}>Back to lobby</button>
       </div>

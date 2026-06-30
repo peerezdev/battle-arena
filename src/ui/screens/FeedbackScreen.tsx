@@ -106,7 +106,7 @@ export function FeedbackScreen({ onSubmit, onPlayAgain }: { onSubmit: (rating: n
               fontSize: '15px',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 0 12px #2fe28a55',
+              boxShadow: '0 0 12px #00ffc455',
               marginBottom: '12px',
             }}
           >

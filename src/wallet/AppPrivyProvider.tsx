@@ -40,7 +40,7 @@ export function AppPrivyProvider({ children }: { children: ReactNode }) {
         appearance: {
           theme: 'dark',
           // Solana violet as primary accent
-          accentColor: '#8b5cf6',
+          accentColor: '#ff2e97',
           // Show both EVM and Solana wallets in the wallet connect modal
           walletChainType: 'ethereum-and-solana',
           // Botones de wallet a mostrar. Sin esto, Privy usa una lista por

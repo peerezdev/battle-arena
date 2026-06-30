@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-const DEFAULT_COLORS = ['#2fe28a', '#8b5cf6', '#e7ecf5', '#5ad1ff']
+const DEFAULT_COLORS = ['#00ffc4', '#ff2e97', '#e7ecf5', '#5ad1ff']
 
 interface Props {
   /** Confetti colors (defaults to the neon palette). */

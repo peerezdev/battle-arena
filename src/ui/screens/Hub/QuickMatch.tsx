@@ -27,14 +27,14 @@ export function QuickMatch({
       style={{
         borderRadius: 20,
         padding: 1,
-        background: 'linear-gradient(120deg,#8b5cf655,#2fe28a33,transparent 70%)',
+        background: 'linear-gradient(120deg,#ff2e9755,#00ffc433,transparent 70%)',
         marginBottom: 26,
       }}
     >
       <div
         style={{
           borderRadius: 19,
-          background: 'linear-gradient(135deg,rgba(139,92,246,.16),rgba(13,17,22,.6) 42%,rgba(47,226,138,.10))',
+          background: 'linear-gradient(135deg,rgba(255,46,151,.16),rgba(13,17,22,.6) 42%,rgba(0,255,196,.10))',
           padding: '26px 16px',
           display: 'flex',
           flexDirection: wide ? 'row' : 'column',
@@ -107,12 +107,12 @@ export function QuickMatch({
                     fontFamily: FONTS.display,
                     fontWeight: 700,
                     fontSize: 13,
-                    border: `1px solid ${active ? '#2fe28a66' : COLORS.border}`,
+                    border: `1px solid ${active ? '#00ffc466' : COLORS.border}`,
                     borderRadius: 10,
                     padding: '9px 15px',
                     cursor: 'pointer',
                     color: active ? COLORS.green : COLORS.muted,
-                    background: active ? '#2fe28a14' : 'transparent',
+                    background: active ? '#00ffc414' : 'transparent',
                   }}
                 >
                   ${n}
@@ -175,14 +175,14 @@ export function QuickMatch({
           <div style={{ position: 'relative', height: 196, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{
               ['--r' as string]: '-9deg', position: 'absolute', left: '15%', width: 116, height: 162, borderRadius: 15,
-              background: 'linear-gradient(160deg,#15351f,#0c2418)', border: '1px solid rgba(47,226,138,.45)',
-              boxShadow: '0 0 40px -12px rgba(47,226,138,.6),inset 0 1px 0 rgba(255,255,255,.12)',
+              background: 'linear-gradient(160deg,#15351f,#0c2418)', border: '1px solid rgba(0,255,196,.45)',
+              boxShadow: '0 0 40px -12px rgba(0,255,196,.6),inset 0 1px 0 rgba(255,255,255,.12)',
               transform: 'rotate(-9deg)', animation: reducedMotion ? 'none' : 'ba-float 5s ease-in-out infinite',
             } as React.CSSProperties} />
             <div style={{
               ['--r' as string]: '9deg', position: 'absolute', right: '15%', width: 116, height: 162, borderRadius: 15,
-              background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(139,92,246,.5)',
-              boxShadow: '0 0 40px -12px rgba(139,92,246,.6),inset 0 1px 0 rgba(255,255,255,.12)',
+              background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(255,46,151,.5)',
+              boxShadow: '0 0 40px -12px rgba(255,46,151,.6),inset 0 1px 0 rgba(255,255,255,.12)',
               transform: 'rotate(9deg)', animation: reducedMotion ? 'none' : 'ba-float 5s ease-in-out .6s infinite',
             } as React.CSSProperties} />
             <div style={{
@@ -191,7 +191,7 @@ export function QuickMatch({
               fontFamily: FONTS.mono, fontSize: 17, fontWeight: 700, color: '#fff', background: '#0b0f14',
               border: '2px solid transparent', backgroundImage: `linear-gradient(#0b0f14,#0b0f14),${GRADIENT}`,
               backgroundOrigin: 'border-box', backgroundClip: 'padding-box,border-box',
-              boxShadow: '0 0 30px -6px rgba(139,92,246,.7)',
+              boxShadow: '0 0 30px -6px rgba(255,46,151,.7)',
             }}>VS</div>
           </div>
 

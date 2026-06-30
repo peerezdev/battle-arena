@@ -9,7 +9,7 @@ import type { UserStats } from '../../../hooks/useUserStats'
 
 const RAR: Record<string, { tint: string; border: string; rc: string }> = {
   common: { tint: '#3a4250', border: 'rgba(255,255,255,.14)', rc: '#8b95a3' },
-  uncommon: { tint: '#2f6b4a', border: 'rgba(47,226,138,.5)', rc: '#2fe28a' },
+  uncommon: { tint: '#2f6b4a', border: 'rgba(0,255,196,.5)', rc: '#00ffc4' },
   rare: { tint: '#2a5a8f', border: 'rgba(78,168,255,.5)', rc: '#7fc0ff' },
   epic: { tint: '#5a3a9f', border: 'rgba(169,139,255,.55)', rc: '#bda6ff' },
   legendary: { tint: '#8a6a1f', border: 'rgba(245,197,66,.6)', rc: '#f5c542' },
@@ -88,14 +88,14 @@ export function OverviewTab({ wallet, stats }: { wallet?: string; stats: UserSta
         </section>
 
         {/* BEST VICTORY */}
-        <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 18, padding: 22, background: 'linear-gradient(135deg,rgba(47,226,138,.10),rgba(13,17,22,.5) 55%)', border: '1px solid rgba(47,226,138,.28)' }}>
+        <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 18, padding: 22, background: 'linear-gradient(135deg,rgba(0,255,196,.10),rgba(13,17,22,.5) 55%)', border: '1px solid rgba(0,255,196,.28)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <Eyebrow color={COLORS.green} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>}>BEST VICTORY</Eyebrow>
           </div>
           {bv ? (
             <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ flex: 'none', width: 175, height: 275, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,rgba(47,226,138,.18),rgba(8,10,14,.5))', border: '1px solid rgba(47,226,138,.4)', boxShadow: '0 0 30px -8px rgba(47,226,138,.6)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#3df0a0,#13c98a)', boxShadow: '0 6px 20px -6px rgba(47,226,138,.8)' }}>
+              <div style={{ flex: 'none', width: 175, height: 275, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,rgba(0,255,196,.18),rgba(8,10,14,.5))', border: '1px solid rgba(0,255,196,.4)', boxShadow: '0 0 30px -8px rgba(0,255,196,.6)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#5cffd8,#00c79a)', boxShadow: '0 6px 20px -6px rgba(0,255,196,.8)' }}>
                   <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#06170f" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
                 </span>
               </div>

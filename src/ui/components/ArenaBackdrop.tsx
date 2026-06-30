@@ -22,9 +22,9 @@ interface Particle {
   color: string
 }
 
-const PARTICLE_COLORS = ['#2fe28a', '#8b5cf6', '#5ad1ff', '#e7ecf5']
+const PARTICLE_COLORS = ['#00ffc4', '#ff2e97', '#5ad1ff', '#e7ecf5']
 
-export function ArenaBackdrop({ children, reducedMotion, accentA = '#2fe28a', accentB = '#8b5cf6' }: Props) {
+export function ArenaBackdrop({ children, reducedMotion, accentA = '#00ffc4', accentB = '#ff2e97' }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {

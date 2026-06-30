@@ -144,7 +144,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
       <button onClick={onClick} style={{
         position: 'relative', overflow: 'hidden', flex: 1.5, padding: 14, borderRadius: 13, border: 0, cursor: 'pointer',
         fontFamily: FONTS.body, fontSize: 14.5, fontWeight: 700, color: '#06170f',
-        background: 'linear-gradient(120deg,#8b5cf6,#2fe28a)', boxShadow: '0 14px 38px -14px rgba(47,226,138,.6)',
+        background: 'linear-gradient(120deg,#ff2e97,#00ffc4)', boxShadow: '0 14px 38px -14px rgba(0,255,196,.6)',
       }}>
         <span style={sweep} />
         <span style={{ position: 'relative' }}>{label}</span>
@@ -208,7 +208,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 200,
-        background: 'radial-gradient(1000px 700px at 20% -10%,rgba(139,92,246,.10),transparent 56%),rgba(4,6,9,.78)',
+        background: 'radial-gradient(1000px 700px at 20% -10%,rgba(255,46,151,.10),transparent 56%),rgba(4,6,9,.78)',
         backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(14px,2.5vw,32px)',
       }}
@@ -292,11 +292,11 @@ export function InventoryCardModal({ card, onClose, onSold }: {
                 <div style={{ fontFamily: FONTS.mono, fontSize: 13.5, fontWeight: 500, color: '#e7ecf2', marginTop: 3 }}>{abbreviate(card.mint)}</div>
               </div>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7 }}>
-                <button onClick={copyMint} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: `1px solid ${copied ? 'rgba(47,226,138,.4)' : COLORS.border}`, background: copied ? 'rgba(47,226,138,.12)' : 'rgba(255,255,255,.04)', color: copied ? COLORS.green : '#cdd4dd', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>
+                <button onClick={copyMint} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: `1px solid ${copied ? 'rgba(0,255,196,.4)' : COLORS.border}`, background: copied ? 'rgba(0,255,196,.12)' : 'rgba(255,255,255,.04)', color: copied ? COLORS.green : '#cdd4dd', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
-                <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: '1px solid rgba(139,92,246,.4)', background: 'rgba(139,92,246,.1)', color: '#c4adff', cursor: 'pointer', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>CollectorCrypt ↗</a>
+                <a href={explorerUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: '1px solid rgba(255,46,151,.4)', background: 'rgba(255,46,151,.1)', color: '#c4adff', cursor: 'pointer', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>CollectorCrypt ↗</a>
               </div>
             </div>
 

@@ -16,15 +16,15 @@ export interface LiveBattle {
 export interface HubStat { value: string; label: string; gradient?: boolean }
 
 export const MOCK_DROPS: DropItem[] = [
-  { id: 'd1', name: 'Charizard VMAX', set: 'Pokémon · 12s', ago: '12s', valueUsd: 320, emoji: '🔥', accent: '#2fe28a' },
-  { id: 'd2', name: 'Pikachu V', set: 'V Starter · 49s', ago: '49s', valueUsd: 55, emoji: '⚡', accent: '#8b5cf6' },
+  { id: 'd1', name: 'Charizard VMAX', set: 'Pokémon · 12s', ago: '12s', valueUsd: 320, emoji: '🔥', accent: '#00ffc4' },
+  { id: 'd2', name: 'Pikachu V', set: 'V Starter · 49s', ago: '49s', valueUsd: 55, emoji: '⚡', accent: '#ff2e97' },
   { id: 'd3', name: 'Blastoise', set: 'Base · 2m', ago: '2m', valueUsd: 20, emoji: '💧', accent: '#5ad1ff' },
 ]
 
 export const MOCK_CHAT: ChatMsg[] = [
   { id: 'm1', user: 'mole', color: '#b78cff', ts: '15:49', text: 'smacking the bot lol — 3-0 in $250s' },
-  { id: 'm2', user: 'Netti', mod: true, color: '#2fe28a', ts: '15:50', text: 'double rare 👀 that\'s a big win' },
-  { id: 'm3', user: 'shalev123', color: '#2fe28a', ts: '15:51', text: 'won a Charizard from a $50 pack 🔥' },
+  { id: 'm2', user: 'Netti', mod: true, color: '#00ffc4', ts: '15:50', text: 'double rare 👀 that\'s a big win' },
+  { id: 'm3', user: 'shalev123', color: '#00ffc4', ts: '15:51', text: 'won a Charizard from a $50 pack 🔥' },
   { id: 'm4', user: 'kappa', color: '#b78cff', ts: '15:52', text: 'anyone up for a royale?' },
 ]
 

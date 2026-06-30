@@ -501,9 +501,9 @@ function ConfirmOpenModal({ count, machineName, image, total, onYes, onNo, reduc
   const [imgErr, setImgErr] = useState(false)
   // Single fixed accent (no per-card rarity here — we're confirming an open, not revealing).
   const accent = COLORS.violet
-  const accentSoft = 'rgba(139,92,246,.13)'
-  const accentBd = 'rgba(139,92,246,.4)'
-  const accentGlow = 'rgba(139,92,246,.6)'
+  const accentSoft = 'rgba(255,46,151,.13)'
+  const accentBd = 'rgba(255,46,151,.4)'
+  const accentGlow = 'rgba(255,46,151,.6)'
   return (
     <motion.div
       key="confirm-open"
@@ -540,7 +540,7 @@ function ConfirmOpenModal({ count, machineName, image, total, onYes, onNo, reduc
         {/* pack icon */}
         <div style={{ position: 'relative', width: 96, height: 96, margin: '4px auto 20px' }}>
           <span style={{ position: 'absolute', inset: '-14%', borderRadius: '50%', background: `radial-gradient(circle,${accentGlow},transparent 66%)`, filter: 'blur(16px)', animation: reduced ? 'none' : 'ca-haloPulse 3.2s ease-in-out infinite' }} />
-          <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,rgba(139,92,246,.22),rgba(139,92,246,.06))', border: `1px solid ${accentBd}`, boxShadow: `inset 0 1px 0 rgba(255,255,255,.16),0 18px 44px -18px ${accentGlow}`, animation: reduced ? 'none' : 'ca-float 5s ease-in-out infinite' }}>
+          <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,rgba(255,46,151,.22),rgba(255,46,151,.06))', border: `1px solid ${accentBd}`, boxShadow: `inset 0 1px 0 rgba(255,255,255,.16),0 18px 44px -18px ${accentGlow}`, animation: reduced ? 'none' : 'ca-float 5s ease-in-out infinite' }}>
             {image && !imgErr
               ? <img src={image} alt={machineName} onError={() => setImgErr(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a8 8 0 0 1 16 0" /><rect x="3" y="10" width="18" height="9" rx="2" /><path d="M3 14h18" /><rect x="10.5" y="12" width="3" height="4" rx="1" fill={accent} stroke="none" /></svg>}
@@ -1221,31 +1221,31 @@ function CardDetailsView({
       {single && decision === null ? (
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={() => setDecision('kept')} disabled={selling}
-            style={{ position: 'relative', overflow: 'hidden', flex: 1.4, padding: 15, borderRadius: 14, border: 0, cursor: selling ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(47,226,138,.6)' }}>
+            style={{ position: 'relative', overflow: 'hidden', flex: 1.4, padding: 15, borderRadius: 14, border: 0, cursor: selling ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(0,255,196,.6)' }}>
             <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '38%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent)', animation: reduced ? 'none' : 'ba-sweep 3.6s infinite' }} />
             <span style={{ position: 'relative' }}>Keep in Vault ✓</span>
           </button>
           <button onClick={sell} disabled={selling}
-            style={{ flex: 1, padding: 15, borderRadius: 14, border: `1px solid ${COLORS.green}66`, background: 'rgba(47,226,138,.07)', color: COLORS.green, cursor: selling ? 'wait' : 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 800 }}>
+            style={{ flex: 1, padding: 15, borderRadius: 14, border: `1px solid ${COLORS.green}66`, background: 'rgba(0,255,196,.07)', color: COLORS.green, cursor: selling ? 'wait' : 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 800 }}>
             {selling ? 'Selling…' : `Sell · ${formatUsd(buybackOffer ?? 0)}`}
           </button>
         </div>
       ) : single ? (
         <div style={{ animation: 'ca-fade .3s ease-out both' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '14px 16px', borderRadius: 14, marginBottom: 12,
-            background: decision === 'kept' ? 'rgba(47,226,138,.10)' : 'rgba(124,77,255,.12)', border: `1px solid ${decision === 'kept' ? 'rgba(47,226,138,.34)' : 'rgba(124,77,255,.34)'}` }}>
-            <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: decision === 'kept' ? 'rgba(47,226,138,.16)' : 'rgba(124,77,255,.18)', color: decision === 'kept' ? COLORS.green : '#c4adff', fontSize: 17 }}>{decision === 'kept' ? '◆' : '↩'}</span>
+            background: decision === 'kept' ? 'rgba(0,255,196,.10)' : 'rgba(124,77,255,.12)', border: `1px solid ${decision === 'kept' ? 'rgba(0,255,196,.34)' : 'rgba(124,77,255,.34)'}` }}>
+            <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: decision === 'kept' ? 'rgba(0,255,196,.16)' : 'rgba(124,77,255,.18)', color: decision === 'kept' ? COLORS.green : '#c4adff', fontSize: 17 }}>{decision === 'kept' ? '◆' : '↩'}</span>
             <div>
               <div style={{ fontSize: 14.5, fontWeight: 700, color: COLORS.text }}>{decision === 'kept' ? 'Kept in your vault' : `Sold · +${formatUsd(buybackOffer ?? 0)} USDC`}</div>
               <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 1 }}>{decision === 'kept' ? 'The card stays in your insured inventory.' : 'Balance credited instantly.'}</div>
             </div>
           </div>
           <button onClick={onNext}
-            style={{ width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(47,226,138,.6)' }}>Continue →</button>
+            style={{ width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(0,255,196,.6)' }}>Continue →</button>
         </div>
       ) : (
         <button onClick={onNext}
-          style={{ position: 'relative', overflow: 'hidden', width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(47,226,138,.6)' }}>
+          style={{ position: 'relative', overflow: 'hidden', width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(0,255,196,.6)' }}>
           <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '38%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent)', animation: reduced ? 'none' : 'ba-sweep 3.6s infinite' }} />
           <span style={{ position: 'relative' }}>Next pack →</span>
         </button>
@@ -1403,10 +1403,10 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
                         <div style={{ display: 'flex', marginTop: 7, borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
                           <button onClick={() => mint && setSell((s) => ({ ...s, [mint]: false }))} disabled={claiming}
                             style={{ flex: 1, padding: '6px 0', border: 0, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, fontFamily: FONTS.body,
-                              background: !isSell ? 'rgba(47,226,138,.16)' : 'transparent', color: !isSell ? COLORS.green : COLORS.muted }}>Keep</button>
+                              background: !isSell ? 'rgba(0,255,196,.16)' : 'transparent', color: !isSell ? COLORS.green : COLORS.muted }}>Keep</button>
                           <button onClick={() => mint && setSell((s) => ({ ...s, [mint]: true }))} disabled={claiming}
                             style={{ flex: 1, padding: '6px 0', border: 0, borderLeft: `1px solid ${COLORS.border}`, cursor: 'pointer', fontSize: 11.5, fontWeight: 700, fontFamily: FONTS.body,
-                              background: isSell ? 'rgba(139,92,246,.18)' : 'transparent', color: isSell ? '#c4adff' : COLORS.muted }}>Sell</button>
+                              background: isSell ? 'rgba(255,46,151,.18)' : 'transparent', color: isSell ? '#c4adff' : COLORS.muted }}>Sell</button>
                         </div>
                       )}
                     </>
@@ -1424,7 +1424,7 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
               style={{ padding: '13px 30px', borderRadius: 13, border: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 15,
                 cursor: (claiming || pending.length === 0) ? 'default' : 'pointer',
                 background: pending.length === 0 ? COLORS.panel2 : GRADIENT, color: pending.length === 0 ? COLORS.muted : '#06120c',
-                boxShadow: pending.length === 0 ? 'none' : '0 0 22px -6px rgba(47,226,138,.7)' }}>
+                boxShadow: pending.length === 0 ? 'none' : '0 0 22px -6px rgba(0,255,196,.7)' }}>
               {claiming ? 'Claiming…' : pending.length > 0 ? `Claim · sell ${pending.length} (~${formatUsd(estimate)})` : 'Claim'}
             </button>
           </div>

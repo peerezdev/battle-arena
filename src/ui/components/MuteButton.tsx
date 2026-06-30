@@ -35,7 +35,7 @@ export function MuteButton() {
         color: muted ? COLORS.muted : COLORS.green,
         fontSize: '18px',
         cursor: 'pointer',
-        boxShadow: muted ? 'none' : '0 0 10px #2fe28a44',
+        boxShadow: muted ? 'none' : '0 0 10px #00ffc444',
       }}
     >
       {muted ? '🔇' : '🔊'}

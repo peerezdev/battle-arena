@@ -269,7 +269,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
             {machine.turboMode && (
               <button onClick={() => setTurbo((t) => !t)} title="Turbo — auto-sell Commons" aria-pressed={turbo}
                 style={{ flexShrink: 0, width: 44, height: 36, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-                  border: `1px solid ${turbo ? COLORS.green : COLORS.border}`, background: turbo ? 'rgba(47,226,138,.12)' : COLORS.panel2, color: turbo ? COLORS.green : COLORS.muted }}>⚡</button>
+                  border: `1px solid ${turbo ? COLORS.green : COLORS.border}`, background: turbo ? 'rgba(0,255,196,.12)' : COLORS.panel2, color: turbo ? COLORS.green : COLORS.muted }}>⚡</button>
             )}
             {/* open */}
             <motion.button

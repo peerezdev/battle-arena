@@ -37,8 +37,8 @@ body {
 }
 
 @keyframes orb-pulse {
-  0%, 100% { box-shadow: 0 0 6px var(--orb-color, #14F195), 0 0 12px var(--orb-color, #14F19544); }
-  50%       { box-shadow: 0 0 10px var(--orb-color, #14F195), 0 0 22px var(--orb-color, #14F19566); }
+  0%, 100% { box-shadow: 0 0 6px var(--orb-color, #00ffc4), 0 0 12px var(--orb-color, #00ffc444); }
+  50%       { box-shadow: 0 0 10px var(--orb-color, #00ffc4), 0 0 22px var(--orb-color, #00ffc466); }
 }
 
 /* Custom range slider — accent changes per player via CSS var */
@@ -58,8 +58,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--slider-color, #14F195);
-  box-shadow: 0 0 8px var(--slider-color, #14F195);
+  background: var(--slider-color, #00ffc4);
+  box-shadow: 0 0 8px var(--slider-color, #00ffc4);
   cursor: pointer;
   border: 2px solid #0a0e1a;
 }
@@ -68,8 +68,8 @@ input[type="range"]::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--slider-color, #14F195);
-  box-shadow: 0 0 8px var(--slider-color, #14F195);
+  background: var(--slider-color, #00ffc4);
+  box-shadow: 0 0 8px var(--slider-color, #00ffc4);
   cursor: pointer;
   border: 2px solid #0a0e1a;
 }
@@ -78,8 +78,8 @@ input[type="range"]::-moz-range-thumb {
 input[type="range"].slider-green {
   background: linear-gradient(
     to right,
-    #14F195 0%,
-    #14F195 var(--slider-pct, 0%),
+    #00ffc4 0%,
+    #00ffc4 var(--slider-pct, 0%),
     #121a30 var(--slider-pct, 0%),
     #121a30 100%
   );
@@ -88,8 +88,8 @@ input[type="range"].slider-green {
 input[type="range"].slider-violet {
   background: linear-gradient(
     to right,
-    #9945FF 0%,
-    #9945FF var(--slider-pct, 0%),
+    #ff2e97 0%,
+    #ff2e97 var(--slider-pct, 0%),
     #121a30 var(--slider-pct, 0%),
     #121a30 100%
   );
@@ -142,7 +142,7 @@ textarea::placeholder {
 
 /* Collector Arena hero animations (mockup) */
 @keyframes ba-float { 0%,100%{transform:rotate(var(--r)) translateY(0)} 50%{transform:rotate(var(--r)) translateY(-9px)} }
-@keyframes ba-glow { 0%,100%{box-shadow:0 0 0 1px rgba(139,92,246,.30),0 24px 80px -30px rgba(139,92,246,.55)} 50%{box-shadow:0 0 0 1px rgba(47,226,138,.30),0 24px 80px -28px rgba(47,226,138,.45)} }
+@keyframes ba-glow { 0%,100%{box-shadow:0 0 0 1px rgba(255,46,151,.30),0 24px 80px -30px rgba(255,46,151,.55)} 50%{box-shadow:0 0 0 1px rgba(0,255,196,.30),0 24px 80px -28px rgba(0,255,196,.45)} }
 @keyframes ba-sweep { 0%{transform:translateX(-130%) skewX(-20deg)} 60%,100%{transform:translateX(320%) skewX(-20deg)} }
 @keyframes ba-orb { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-4px) scale(1.05)} }
 @keyframes ba-dots { 0%{opacity:.2} 50%{opacity:1} 100%{opacity:.2} }

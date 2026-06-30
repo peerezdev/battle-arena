@@ -75,11 +75,11 @@ function OpenPacksTile() {
       style={{
         position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
         minHeight: 235, borderRadius: 14, cursor: 'pointer', fontFamily: FONTS.body,
-        background: 'linear-gradient(160deg,rgba(139,92,246,.16),rgba(47,226,138,.08) 60%,rgba(8,10,14,.5))',
-        border: '1px dashed rgba(47,226,138,.45)', color: COLORS.text,
+        background: 'linear-gradient(160deg,rgba(255,46,151,.16),rgba(0,255,196,.08) 60%,rgba(8,10,14,.5))',
+        border: '1px dashed rgba(0,255,196,.45)', color: COLORS.text,
       }}
     >
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#8b5cf6,#2fe28a)', boxShadow: '0 10px 30px -8px rgba(47,226,138,.7),inset 0 1px 0 rgba(255,255,255,.4)' }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#ff2e97,#00ffc4)', boxShadow: '0 10px 30px -8px rgba(0,255,196,.7),inset 0 1px 0 rgba(255,255,255,.4)' }}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#06170f" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
       </span>
       <div style={{ textAlign: 'center', lineHeight: 1.3 }}>

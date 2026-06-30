@@ -55,10 +55,10 @@ export function ProfilePage() {
       {/* ── hero ── */}
       <section style={{
         position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(22px,2.6vw,32px)', marginBottom: 22,
-        background: 'linear-gradient(135deg,rgba(139,92,246,.14),rgba(13,17,22,.55) 46%,rgba(47,226,138,.08))',
+        background: 'linear-gradient(135deg,rgba(255,46,151,.14),rgba(13,17,22,.55) 46%,rgba(0,255,196,.08))',
         border: `1px solid ${COLORS.border}`,
       }}>
-        <div style={{ position: 'absolute', top: '-45%', right: '-4%', width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle,rgba(139,92,246,.26),transparent 65%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '-45%', right: '-4%', width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle,rgba(255,46,151,.26),transparent 65%)', pointerEvents: 'none' }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
           {/* avatar */}
           <div style={{ flex: 'none', width: 110, height: 110, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.06)', border: `1px solid ${COLORS.border}` }}>

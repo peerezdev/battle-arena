@@ -63,7 +63,7 @@ export function HistoryTab({ wallet }: { wallet?: string }) {
           const machineName = machines[r.machineCode]?.name ?? r.machineCode
           return (
             <div key={r.battleId} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: `1px solid #ffffff0d` }}>
-              <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: win ? 'rgba(47,226,138,.12)' : 'rgba(255,94,122,.1)', color: win ? '#f5c542' : '#ff7a8f' }}>
+              <span style={{ flex: 'none', width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: win ? 'rgba(0,255,196,.12)' : 'rgba(255,94,122,.1)', color: win ? '#f5c542' : '#ff7a8f' }}>
                 {win ? TrophyIcon : LossIcon}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>

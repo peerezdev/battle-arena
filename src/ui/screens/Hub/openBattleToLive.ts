@@ -25,7 +25,7 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
     ? { statusText: 'Live', statusColor: '#ff5e7a' }
     : b.max_players > 2
       ? { statusText: 'Filling', statusColor: '#f5b73d' }
-      : { statusText: 'Waiting for opponent', statusColor: '#2fe28a' }
+      : { statusText: 'Waiting for opponent', statusColor: '#00ffc4' }
   return {
     id: b.id,
     mode: b.mode,

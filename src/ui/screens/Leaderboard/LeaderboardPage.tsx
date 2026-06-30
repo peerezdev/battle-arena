@@ -24,7 +24,7 @@ function fmtCompact(n: number): string {
   return `${sign}${a}`
 }
 
-const TINTS = ['linear-gradient(135deg,#a98bff,#6a44e0)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#2fe28a,#16a87a)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
+const TINTS = ['linear-gradient(135deg,#ff6bb5,#d4127a)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#00ffc4,#16a87a)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
 const tintFor = (w: string) => TINTS[Math.abs([...(w || 'x')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % TINTS.length]
 
 const MEDALS: Record<number, { medal: string; glow: string; accent: string; cardBg: string; cardBorder: string }> = {
@@ -116,8 +116,8 @@ export function LeaderboardPage() {
               position: 'relative', padding: '8px 16px', borderRadius: 9, border: 0, cursor: 'pointer',
               fontFamily: FONTS.body, fontSize: 13.5, fontWeight: 500,
               color: range === k ? COLORS.text : COLORS.muted,
-              background: range === k ? 'linear-gradient(180deg,rgba(47,226,138,.16),rgba(139,92,246,.10))' : 'transparent',
-              boxShadow: range === k ? 'inset 0 0 0 1px rgba(47,226,138,.32)' : 'none',
+              background: range === k ? 'linear-gradient(180deg,rgba(0,255,196,.16),rgba(255,46,151,.10))' : 'transparent',
+              boxShadow: range === k ? 'inset 0 0 0 1px rgba(0,255,196,.32)' : 'none',
             }}>{label}</button>
           ))}
         </div>
@@ -126,19 +126,19 @@ export function LeaderboardPage() {
       {/* your standing + creator code */}
       <section style={{
         position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(20px,2.4vw,30px)',
-        background: 'linear-gradient(135deg,rgba(47,226,138,.12),rgba(13,17,22,.55) 48%,rgba(139,92,246,.12))',
+        background: 'linear-gradient(135deg,rgba(0,255,196,.12),rgba(13,17,22,.55) 48%,rgba(255,46,151,.12))',
         border: `1px solid ${COLORS.border}`, animation: 'ba-leadglow 6s ease-in-out infinite',
       }}>
         <div style={{ position: 'relative', display: 'flex', gap: 30, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: '1 1 320px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: GRADIENT, color: '#06170f', fontFamily: FONTS.display, fontSize: 12, fontWeight: 700, boxShadow: '0 6px 22px -8px rgba(47,226,138,.8)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: GRADIENT, color: '#06170f', fontFamily: FONTS.display, fontSize: 12, fontWeight: 700, boxShadow: '0 6px 22px -8px rgba(0,255,196,.8)' }}>
                 🏆 {myIdx >= 0 ? `RANK #${myIdx + 1}` : 'UNRANKED'}
               </span>
               <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.2em', color: COLORS.muted }}>YOUR GIMMIGHOULS</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-              <div style={{ fontFamily: FONTS.display, fontSize: 'clamp(38px,6vw,58px)', fontWeight: 700, letterSpacing: '-.03em', lineHeight: .95, color: COLORS.green, textShadow: '0 4px 30px rgba(47,226,138,.35)' }}>
+              <div style={{ fontFamily: FONTS.display, fontSize: 'clamp(38px,6vw,58px)', fontWeight: 700, letterSpacing: '-.03em', lineHeight: .95, color: COLORS.green, textShadow: '0 4px 30px rgba(0,255,196,.35)' }}>
                 {myGh != null ? fmtN(myGh) : '—'}
               </div>
             </div>
@@ -151,7 +151,7 @@ export function LeaderboardPage() {
           {/* creator code */}
           <div style={{ flex: '1 1 300px', minWidth: 260, padding: 20, borderRadius: 18, background: 'rgba(8,10,14,.45)', border: `1px solid ${COLORS.border}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
-              <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,.14)', border: '1px solid rgba(139,92,246,.4)', color: '#a98bff' }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,46,151,.14)', border: '1px solid rgba(255,46,151,.4)', color: '#ff6bb5' }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
               </span>
               <span style={{ fontFamily: FONTS.display, fontSize: 15, fontWeight: 700 }}>Have a creator code?</span>
@@ -170,7 +170,7 @@ export function LeaderboardPage() {
                     style={{ flex: 1, minWidth: 0, padding: '12px 15px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, fontFamily: FONTS.mono, fontSize: 13.5, letterSpacing: '.04em', outline: 'none' }}
                   />
                   <button type="button" onClick={onApply} disabled={!myWallet || applying || !codeInput.trim()}
-                    style={{ flex: 'none', padding: '12px 22px', borderRadius: 12, border: 0, cursor: !myWallet || applying || !codeInput.trim() ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, color: '#06170f', background: GRADIENT, opacity: !myWallet || applying || !codeInput.trim() ? 0.5 : 1, boxShadow: '0 0 20px -6px rgba(47,226,138,.7)' }}>
+                    style={{ flex: 'none', padding: '12px 22px', borderRadius: 12, border: 0, cursor: !myWallet || applying || !codeInput.trim() ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, color: '#06170f', background: GRADIENT, opacity: !myWallet || applying || !codeInput.trim() ? 0.5 : 1, boxShadow: '0 0 20px -6px rgba(0,255,196,.7)' }}>
                     {applying ? 'Applying…' : 'Apply'}
                   </button>
                 </div>
@@ -199,7 +199,7 @@ export function LeaderboardPage() {
               }}>
                 <div style={{ width: first ? 54 : 46, height: first ? 54 : 46, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONTS.mono, fontWeight: 700, fontSize: first ? 20 : 17, color: '#06170f', background: m.medal, boxShadow: `0 8px 26px -8px ${m.glow}` }}>{rank}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: tintFor(d.wallet), border: `2px solid ${isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{(d.alias ?? d.wallet).slice(0, 1).toUpperCase()}</span>
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#06170f', background: tintFor(d.wallet), border: `2px solid ${isMe ? 'rgba(0,255,196,.7)' : 'rgba(255,255,255,.12)'}` }}>{(d.alias ?? d.wallet).slice(0, 1).toUpperCase()}</span>
                   <span style={{ fontSize: 15, fontWeight: 700, color: isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{d.alias ?? shortWallet(d.wallet)}</span>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: FONTS.display, fontSize: first ? 21 : 18, fontWeight: 700, letterSpacing: '-.02em', color: m.accent }}><Coin size={16} />{fmtN(d.gimmighouls)}</div>
@@ -226,16 +226,16 @@ export function LeaderboardPage() {
               return (
                 <div key={r.wallet} onClick={() => navigate(`/profile/${r.wallet}`)} style={{
                   position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px', borderRadius: 14, cursor: 'pointer',
-                  background: isMe ? 'linear-gradient(90deg,rgba(47,226,138,.10),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))',
-                  border: `1px solid ${isMe ? 'rgba(47,226,138,.45)' : COLORS.border}`,
-                  boxShadow: isMe ? '0 0 40px -16px rgba(47,226,138,.5)' : 'none',
+                  background: isMe ? 'linear-gradient(90deg,rgba(0,255,196,.10),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))',
+                  border: `1px solid ${isMe ? 'rgba(0,255,196,.45)' : COLORS.border}`,
+                  boxShadow: isMe ? '0 0 40px -16px rgba(0,255,196,.5)' : 'none',
                 }}>
                   {isMe && <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: GRADIENT }} />}
                   <span style={{ flex: 'none', width: 38, fontFamily: FONTS.mono, fontSize: 15, fontWeight: 700, color: i < 3 ? '#f5c542' : '#6c7682' }}>#{i + 1}</span>
-                  <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#06170f', background: tintFor(r.wallet), border: `2px solid ${isMe ? 'rgba(47,226,138,.7)' : 'rgba(255,255,255,.12)'}` }}>{(r.alias ?? r.wallet).slice(0, 1).toUpperCase()}</span>
+                  <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#06170f', background: tintFor(r.wallet), border: `2px solid ${isMe ? 'rgba(0,255,196,.7)' : 'rgba(255,255,255,.12)'}` }}>{(r.alias ?? r.wallet).slice(0, 1).toUpperCase()}</span>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9 }}>
                     <span style={{ fontSize: 15.5, fontWeight: 700, color: isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.alias ?? shortWallet(r.wallet)}</span>
-                    {isMe && <span style={{ flex: 'none', padding: '2px 8px', borderRadius: 6, background: 'rgba(47,226,138,.14)', border: '1px solid rgba(47,226,138,.4)', fontSize: 9.5, fontWeight: 700, color: COLORS.green }}>YOU</span>}
+                    {isMe && <span style={{ flex: 'none', padding: '2px 8px', borderRadius: 6, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontSize: 9.5, fontWeight: 700, color: COLORS.green }}>YOU</span>}
                   </div>
                   <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                     <Coin />

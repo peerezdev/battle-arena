@@ -53,7 +53,7 @@ export function LeftRail({ active, onProfile }: { active: HubNav; onProfile?: ()
           height: 44,
           borderRadius: 14,
           background: GRADIENT,
-          boxShadow: '0 0 26px -4px rgba(47,226,138,.6),inset 0 1px 0 rgba(255,255,255,.4)',
+          boxShadow: '0 0 26px -4px rgba(0,255,196,.6),inset 0 1px 0 rgba(255,255,255,.4)',
           marginBottom: 16,
           flexShrink: 0,
         }}
@@ -95,9 +95,9 @@ export function LeftRail({ active, onProfile }: { active: HubNav; onProfile?: ()
                     position: 'absolute',
                     inset: 0,
                     borderRadius: 14,
-                    background: 'linear-gradient(180deg,rgba(47,226,138,.18),rgba(47,226,138,.05))',
-                    border: '1px solid rgba(47,226,138,.45)',
-                    boxShadow: '0 0 22px -6px rgba(47,226,138,.7)',
+                    background: 'linear-gradient(180deg,rgba(0,255,196,.18),rgba(0,255,196,.05))',
+                    border: '1px solid rgba(0,255,196,.45)',
+                    boxShadow: '0 0 22px -6px rgba(0,255,196,.7)',
                   }}
                 />
               )}

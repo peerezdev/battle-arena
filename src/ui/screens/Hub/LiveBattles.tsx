@@ -54,12 +54,12 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
       >
         {MODE_TILES.map((tile) => {
           const green = tile.accent === 'green'
-          const icoColor = green ? '#2fe28a' : '#a98bff'
-          const icoBg = green ? 'rgba(47,226,138,.12)' : 'rgba(139,92,246,.14)'
-          const icoBd = green ? 'rgba(47,226,138,.35)' : 'rgba(139,92,246,.4)'
+          const icoColor = green ? '#00ffc4' : '#ff6bb5'
+          const icoBg = green ? 'rgba(0,255,196,.12)' : 'rgba(255,46,151,.14)'
+          const icoBd = green ? 'rgba(0,255,196,.35)' : 'rgba(255,46,151,.4)'
           const cardBg = green
-            ? 'linear-gradient(180deg,rgba(47,226,138,.06),rgba(255,255,255,.01))'
-            : 'linear-gradient(180deg,rgba(139,92,246,.07),rgba(255,255,255,.01))'
+            ? 'linear-gradient(180deg,rgba(0,255,196,.06),rgba(255,255,255,.01))'
+            : 'linear-gradient(180deg,rgba(255,46,151,.07),rgba(255,255,255,.01))'
           return (
           <button
             key={tile.mode}
@@ -146,9 +146,9 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
         </span>
         <span
           style={{
-            background: '#2fe28a18',
+            background: '#00ffc418',
             color: COLORS.green,
-            border: '1px solid #2fe28a33',
+            border: '1px solid #00ffc433',
             borderRadius: 20,
             fontFamily: FONTS.mono,
             fontSize: 11,
@@ -210,7 +210,7 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
               cursor: 'pointer',
               background:
                 activeFilter === i
-                  ? 'linear-gradient(90deg,#8b5cf633,#2fe28a22)'
+                  ? 'linear-gradient(90deg,#ff2e9733,#00ffc422)'
                   : 'transparent',
             }}
           >
@@ -231,9 +231,9 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
 
 function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
   const purple = b.mode === 'royale' || b.mode === 'mana'
-  const modeColor = purple ? '#a98bff' : '#2fe28a'
-  const modeBg = purple ? 'rgba(139,92,246,.14)' : 'rgba(47,226,138,.12)'
-  const modeBd = purple ? 'rgba(139,92,246,.4)' : 'rgba(47,226,138,.35)'
+  const modeColor = purple ? '#ff6bb5' : '#00ffc4'
+  const modeBg = purple ? 'rgba(255,46,151,.14)' : 'rgba(0,255,196,.12)'
+  const modeBd = purple ? 'rgba(255,46,151,.4)' : 'rgba(0,255,196,.35)'
   return (
     <div
       onClick={() => onOpen(b)}
@@ -306,7 +306,7 @@ function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBat
           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted }}>You're in</span>
         ) : (
           <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
-            style={{ background: GRADIENT, color: '#06120c', border: 'none', borderRadius: 11, padding: '9px 18px', fontWeight: 800, fontSize: 13.5, cursor: 'pointer', boxShadow: '0 0 18px -6px rgba(47,226,138,.7)' }}>
+            style={{ background: GRADIENT, color: '#06120c', border: 'none', borderRadius: 11, padding: '9px 18px', fontWeight: 800, fontSize: 13.5, cursor: 'pointer', boxShadow: '0 0 18px -6px rgba(0,255,196,.7)' }}>
             Join
           </button>
         )}

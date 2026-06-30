@@ -84,7 +84,7 @@ export function AppShell() {
         gridTemplateColumns: gridCols,
         gridTemplateRows: 'minmax(0, 1fr)', // cap the single row at the shell height so inner overflow:auto engages (instead of the auto row growing to content height and getting clipped)
         height: '100dvh',
-        background: `radial-gradient(1100px 700px at 14% -8%,rgba(139,92,246,.16),transparent 60%),radial-gradient(900px 600px at 100% 8%,rgba(47,226,138,.10),transparent 55%),${COLORS.bg}`,
+        background: `radial-gradient(1100px 700px at 14% -8%,rgba(255,46,151,.16),transparent 60%),radial-gradient(900px 600px at 100% 8%,rgba(0,255,196,.10),transparent 55%),${COLORS.bg}`,
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -136,7 +136,7 @@ export function AppShell() {
                 height: 13,
                 borderRadius: 4,
                 background: GRADIENT,
-                boxShadow: '0 0 10px #8b5cf688',
+                boxShadow: '0 0 10px #ff2e9788',
               }}
             />
             {wideRail && <span>Collector <span style={{ color: COLORS.green }}>Arena</span></span>}
@@ -208,7 +208,7 @@ export function AppShell() {
                 fontFamily: FONTS.display,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 0 18px -6px rgba(47,226,138,.7)',
+                boxShadow: '0 0 18px -6px rgba(0,255,196,.7)',
               }}
             >
               + Deposit
@@ -261,7 +261,7 @@ export function AppShell() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px #8b5cf655',
+            boxShadow: '0 4px 16px #ff2e9755',
           }}
         >
           💬

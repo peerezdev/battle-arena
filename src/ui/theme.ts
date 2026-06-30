@@ -6,12 +6,12 @@ export const COLORS = {
   border: '#ffffff14',
   muted: '#8b95a3',
   text: '#eef2f6',
-  green: '#2fe28a',    // player A / "you"
-  violet: '#8b5cf6',   // player B / opponent (accent purple)
+  green: '#00ffc4',    // player A / "you"
+  violet: '#ff2e97',   // player B / opponent (accent purple)
   red: '#ff5e7a',      // ONLY danger / loss / elimination
 } as const
 
-export const GRADIENT = 'linear-gradient(135deg,#8b5cf6,#2fe28a)'
+export const GRADIENT = 'linear-gradient(135deg,#ff2e97,#00ffc4)'
 
 export const SHADOW = {
   panel: '0 8px 24px #00000055',
@@ -21,19 +21,19 @@ export const SHADOW = {
 export const player = {
   a: {
     color: COLORS.green,
-    glow: '0 0 8px #2fe28a66',
-    glowLg: '0 0 16px #2fe28a33',
+    glow: '0 0 8px #00ffc466',
+    glowLg: '0 0 16px #00ffc433',
     gradient: 'linear-gradient(90deg,#0f2a1e,#06080b)',
-    borderColor: '#2fe28a55',
+    borderColor: '#00ffc455',
     label: '🟢',
     sliderClass: 'slider-green',
   },
   b: {
     color: COLORS.violet,
-    glow: '0 0 8px #8b5cf666',
-    glowLg: '0 0 16px #8b5cf633',
+    glow: '0 0 8px #ff2e9766',
+    glowLg: '0 0 16px #ff2e9733',
     gradient: 'linear-gradient(90deg,#1a1430,#06080b)',
-    borderColor: '#8b5cf655',
+    borderColor: '#ff2e9755',
     label: '🟣',
     sliderClass: 'slider-violet',
   },
@@ -43,15 +43,15 @@ export const RARITY = {
   common: COLORS.muted,
   uncommon: COLORS.green,
   rare: '#5ad1ff',
-  epic: '#a98bff',
+  epic: '#ff6bb5',
 } as const
 
 /** Beam-of-light glow color for a Live Drop by rarity. Common (or unknown) → null (no glow). */
 export function rarityGlow(rarity: string | null | undefined): string | null {
   switch ((rarity ?? '').toLowerCase()) {
-    case 'uncommon': return '#2fe28a'  // green
+    case 'uncommon': return '#00ffc4'  // green
     case 'rare': return '#4ea8ff'      // blue
-    case 'epic': return '#a98bff'      // purple
+    case 'epic': return '#ff6bb5'      // purple
     case 'legendary':
     case 'mythic': return '#f5c542'    // gold (above epic)
     default: return null               // common / unknown → no glow
