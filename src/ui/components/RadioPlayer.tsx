@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useRadio } from '../radio/useRadio'
 import { useIsWide } from '../useIsWide'
@@ -23,8 +23,8 @@ export function RadioPlayer() {
   const wide = useIsWide('(min-width: 760px)')
   const [open, setOpen] = useState(false)
 
-  // Attempt autoplay once; the store falls back to the first user gesture.
-  useEffect(() => { radio.tryAutoplay() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Starts paused by default (no autoplay-on-mount). The store still exposes
+  // tryAutoplay() for when real track URLs are in place — re-enable here then.
 
   if (radio.tracks.length === 0) return null
 

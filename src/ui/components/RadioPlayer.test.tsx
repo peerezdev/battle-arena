@@ -35,9 +35,9 @@ describe('RadioPlayer', () => {
     state.isPlaying = false
   })
 
-  it('calls tryAutoplay once on mount', () => {
+  it('does NOT autoplay on mount (starts paused by default)', () => {
     render(<RadioPlayer />)
-    expect(actions.tryAutoplay).toHaveBeenCalledTimes(1)
+    expect(actions.tryAutoplay).not.toHaveBeenCalled()
   })
 
   it('shows the current track title', () => {
