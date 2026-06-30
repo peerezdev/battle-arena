@@ -154,3 +154,6 @@ textarea::placeholder {
 @keyframes ca-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
 @keyframes ca-pop { 0%{transform:scale(.84) translateY(18px);opacity:0} 58%{opacity:1} 100%{transform:scale(1) translateY(0);opacity:1} }
 @keyframes ca-fade { 0%{opacity:0;transform:translateY(10px)} 100%{opacity:1;transform:translateY(0)} }
+/* Emote bubble thrown over a player */
+@keyframes ba-emote-in { 0%{transform:translateY(-50%) scale(.4);opacity:1} 55%{transform:translateY(-50%) scale(1.2);opacity:1} 72%{transform:translateY(-50%) scale(.95)} 100%{transform:translateY(-50%) scale(1);opacity:1} }
+@keyframes ba-emote-out { 0%{transform:translateY(-50%) scale(1);opacity:1} 100%{transform:translateY(-80%) scale(.9);opacity:0} }

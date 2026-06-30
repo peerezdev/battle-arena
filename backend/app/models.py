@@ -18,11 +18,20 @@ class User(Base):
     gimmighouls: Mapped[int] = mapped_column(Integer, default=0)
     referred_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # ReferralCode.code
     withdraw_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # USDC payout destination
+    emote_slots: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON list of up to 3 quick-access emote codes
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     __table_args__ = (
         Index("ux_users_alias_lower", func.lower(alias), unique=True),
     )
+
+
+class UserEmote(Base):
+    """An emote a user owns. Quick-access slots (which 3 show in the bar) live on User.emote_slots."""
+    __tablename__ = "user_emotes"
+    wallet: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    emote_code: Mapped[str] = mapped_column(String, primary_key=True)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class ReferralCode(Base):

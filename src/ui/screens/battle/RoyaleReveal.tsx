@@ -4,6 +4,7 @@ import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
 import { useAliases } from '../../useAliases'
+import { EmoteBar } from '../../emotes/EmoteBar'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
 export function shortWallet(w: string): string {
@@ -60,6 +61,7 @@ export function RoyaleReveal({ vm }: { vm: RevealVM; reducedMotion?: boolean }) 
         leaderWallet={leaderWallet} atRiskWallet={atRiskWallet} settled={settled}
         entry={entry} currentRound={vm.rounds.length} totalRounds={Math.max(1, vm.players.length - 1)}
       />
+      {vm.meWallet && <div style={{ display: 'flex' }}><EmoteBar meWallet={vm.meWallet} /></div>}
     </div>
   )
 }
@@ -155,7 +157,7 @@ function RoundView({ vm, name, ranked, alive, leaderWallet, atRiskWallet, settle
           const topCard = [...p.cards].sort((a, b) => (b.insuredValue ?? 0) - (a.insuredValue ?? 0))[0]
           const year = topCard?.year ?? '—'
           return (
-            <div key={p.wallet} style={{
+            <div key={p.wallet} data-player-anchor={p.wallet} style={{
               position: 'relative', borderRadius: 18, padding: 16, overflow: 'hidden',
               background: leader ? 'linear-gradient(180deg,rgba(0,255,196,.10),rgba(255,255,255,.012))'
                 : atRisk ? 'linear-gradient(180deg,rgba(255,94,122,.08),rgba(255,255,255,.012))'

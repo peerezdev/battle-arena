@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { RevealCard, rarityColor } from './RevealCard'
+import { EmoteBar } from '../../emotes/EmoteBar'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
 import { shortWallet } from './RoyaleReveal'
@@ -161,6 +162,7 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
 
       {/* ── action bar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
+        {vm.meWallet && <EmoteBar meWallet={vm.meWallet} />}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 9 }}>
           {onExit && (
             <button onClick={onExit} style={{ padding: '11px 20px', borderRadius: 12, border: '1px solid rgba(255,94,122,.3)', background: 'rgba(255,94,122,.08)', color: '#ff8198', cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>
@@ -193,7 +195,7 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
   const chip = compact ? { w: 30, h: 42, f: 7 } : { w: 42, h: 58, f: 8.5 }
 
   return (
-    <div style={{
+    <div data-player-anchor={player.wallet} style={{
       position: 'relative', flex: '0 0 auto', width: panelW,
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 11 : 16, padding: compact ? '16px 12px' : '22px 18px', borderRadius: compact ? 16 : 22,
       background: hot ? 'linear-gradient(180deg,rgba(0,255,196,.10),rgba(255,255,255,.012))' : 'linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012))',

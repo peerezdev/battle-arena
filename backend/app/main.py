@@ -39,6 +39,7 @@ from .services.pack_orchestration import (
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc
 from .services.nft_transfer import submit_signed_tx
 from .services.reservations import reserve, reserved_total, royale_locked_total, release_reservations
+from .services import emotes as emote_service
 from .services.bots import load_bots, pick_bot
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,10 @@ class WithdrawAddressBody(BaseModel):
 class WithdrawBody(BaseModel):
     address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # destination Solana wallet
     amount: float = Field(gt=0)  # USDC (dollars)
+
+
+class EmoteSlotsBody(BaseModel):
+    slots: list[str] = Field(max_length=8)  # up to 3 kept; codes not owned are dropped server-side
 
 
 class SignTxBody(BaseModel):
@@ -210,6 +215,19 @@ def create_app(session_factory, chain: ChainSource,
         set_withdraw_address(s, wallet, body.address or None)
         s.commit()
         return {"wallet": wallet, "withdraw_address": body.address or None}
+
+    # ── Emotes ──────────────────────────────────────────────────────────────
+    @app.get("/emotes/catalog")
+    async def emotes_catalog():
+        return emote_service.catalog()
+
+    @app.get("/users/me/emotes")
+    async def me_emotes(wallet: str = Depends(current_user), s: Session = Depends(db)):
+        return emote_service.read_user_emotes(s, wallet)
+
+    @app.put("/users/me/emotes/slots")
+    async def me_emote_slots(body: EmoteSlotsBody, wallet: str = Depends(current_user), s: Session = Depends(db)):
+        return emote_service.set_emote_slots(s, wallet, body.slots, elo_start)
 
     @app.get("/users/{wallet}/history")
     async def get_history(wallet: str, s: Session = Depends(db)):

@@ -22,6 +22,7 @@ _ENSURE_COLUMNS = [
     ("users", "gimmighouls", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "referred_by", "VARCHAR"),
     ("users", "withdraw_address", "VARCHAR"),
+    ("users", "emote_slots", "VARCHAR"),
     ("pack_battles", "gimmighouls_awarded", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
