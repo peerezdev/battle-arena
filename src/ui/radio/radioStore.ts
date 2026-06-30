@@ -208,7 +208,7 @@ export function createRadioStore(
     // Arm the gesture fallback first so a blocked attempt is covered synchronously.
     arm()
     const el = ensureAudio()
-    if (!el) return
+    if (!el) { disarm(); return }
     try {
       const p = el.play()
       if (p && typeof p.then === 'function') {
