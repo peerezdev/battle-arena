@@ -31,7 +31,7 @@ export function AppShell() {
   const { pathname } = useLocation()
   const reducedMotion = useReducedMotion()
   const { usdc } = useUsdcBalance()
-  const { reserved } = useReservedBalance()
+  const { reserved, locked } = useReservedBalance()
   const { gimmighouls } = useProfile()
   const { authenticated } = usePrivy()
 
@@ -157,8 +157,8 @@ export function AppShell() {
                     <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
                       {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
                     </span>
-                    {reserved != null && reserved > 0 && (
-                      <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(reserved)} reserved</span>
+                    {locked != null && locked > 0 && (
+                      <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(locked)} reserved</span>
                     )}
                   </div>
                 </div>

@@ -335,3 +335,58 @@ async def test_generate_pack_turbo_flag(monkeypatch):
 
     await g.generate_pack("P", "pokemon_50")
     assert "turbo" not in captured["json"]
+
+
+NFT_BASE = "https://nft-dev.test"
+_REAL_MINT = "A2xwMMppKbQaue6EW1tz4WD4jjBi1uwTVQtAHkAzyV2y"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_nft_metadata_parses_cc_attributes():
+    """nft_metadata fetches CC's per-mint metadata host and whitelists/parses the attributes.
+    The insured value arrives as a money string ('$5,000.00') and must parse to a float."""
+    respx.get(f"{NFT_BASE}/metadata/{_REAL_MINT}").mock(return_value=Response(200, json={
+        "name": "2023 #175 PSYDUCK PSA 10",
+        "image": "https://arweave.net/abc",
+        "attributes": [
+            {"trait_type": "Insured Value", "value": "$5,000.00"},
+            {"trait_type": "Grading Company", "value": "PSA"},
+            {"trait_type": "The Grade", "value": "GEM-MT 10"},
+            {"trait_type": "Grading ID", "value": "104199485"},
+            {"trait_type": "Year", "value": "2023"},
+            {"trait_type": "Authenticated", "value": "true"},
+            {"trait_type": "GradeNum", "value": "10"},
+        ],
+    }))
+    svc = GachaService(base_url=BASE, api_key="", nft_base_url=NFT_BASE)
+    out = await svc.nft_metadata(_REAL_MINT)
+    assert out["nft_address"] == _REAL_MINT
+    assert out["insured_value"] == 5000.0
+    assert out["grading_company"] == "PSA"
+    assert out["grade"] == "PSA GEM-MT 10"
+    assert out["grading_id"] == "104199485"
+    assert out["year"] == "2023"
+    assert out["authenticated"] is True
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_nft_metadata_missing_fields_default_to_none():
+    respx.get(f"{NFT_BASE}/metadata/{_REAL_MINT}").mock(
+        return_value=Response(200, json={"name": "1999 Pikachu", "attributes": []}))
+    svc = GachaService(base_url=BASE, api_key="", nft_base_url=NFT_BASE)
+    out = await svc.nft_metadata(_REAL_MINT)
+    assert out["insured_value"] is None
+    assert out["grade"] is None
+    assert out["year"] == "1999"  # derived from the name
+    assert out["authenticated"] is None
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_nft_metadata_upstream_error_raises():
+    respx.get(f"{NFT_BASE}/metadata/{_REAL_MINT}").mock(return_value=Response(502, text="bad gateway"))
+    svc = GachaService(base_url=BASE, api_key="", nft_base_url=NFT_BASE)
+    with pytest.raises(GachaUpstreamError):
+        await svc.nft_metadata(_REAL_MINT)

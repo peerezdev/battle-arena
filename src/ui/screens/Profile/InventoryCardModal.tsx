@@ -6,7 +6,7 @@ import { useReducedMotion } from '../../useReducedMotion'
 import type { OwnedCard } from '../../../inventory/useCollectorCryptNfts'
 import { useWallet } from '../../../wallet/useWallet'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
-import { fetchBuybackAvailable, requestBuyback, submitTx, ccAssetUrl, ccCardImageUrl } from '../../../onchain/gachaClient'
+import { fetchBuybackAvailable, requestBuyback, submitTx, ccAssetUrl, ccCardImageUrl, fetchCardMetadata, type NftMetadata } from '../../../onchain/gachaClient'
 
 /** USDC base units (6 decimals) → dollars. */
 export function buybackUsd(amountBaseUnits: number): number {
@@ -39,8 +39,20 @@ export function InventoryCardModal({ card, onClose, onSold }: {
   const [bb, setBb] = useState<BuybackState>({ kind: 'checking' })
   const [copied, setCopied] = useState(false)
   const [imgErr, setImgErr] = useState(false)
+  const [meta, setMeta] = useState<NftMetadata | null>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current) }, [])
+
+  // DAS metadata is null/broken on devnet, so the inventory card often arrives without
+  // insuredValue/grading. Pull the card's metadata by mint from CC (via our backend proxy —
+  // CC's metadata endpoint isn't CORS-enabled for direct browser fetches) to fill the gaps.
+  useEffect(() => {
+    let cancelled = false
+    setMeta(null)
+    if (!card.mint) return
+    fetchCardMetadata(card.mint).then((m) => { if (!cancelled) setMeta(m) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [card.mint])
 
   // Buyback is only meaningful for embedded-won cards.
   const eligibleWallet = card.source === 'embedded' ? embeddedAddress : null
@@ -88,19 +100,31 @@ export function InventoryCardModal({ card, onClose, onSold }: {
   const imgSrc = card.mint ? ccCardImageUrl(card.mint) : card.image
   const explorerUrl = ccAssetUrl(card.mint)
 
+  // Enriched view: prefer the card's own (DAS) fields, fall back to the CC metadata fetched
+  // by mint. On devnet the DAS fields are null, so `meta` is what actually fills the panel.
+  const v = {
+    name: (card.name && card.name !== 'Unnamed') ? card.name : (meta?.name ?? card.name),
+    insuredValue: card.insuredValue ?? meta?.insured_value ?? null,
+    grade: card.grade ?? meta?.grade ?? null,
+    gradingCompany: card.gradingCompany ?? meta?.grading_company ?? null,
+    gradingId: card.gradingId ?? meta?.grading_id ?? null,
+    year: card.year ?? meta?.year ?? null,
+    authenticated: card.authenticated ?? meta?.authenticated ?? null,
+  }
+
   // Buyback offer (only known once available): amount + % of insured value.
   const offerAmount = (bb.kind === 'available' || bb.kind === 'confirming' || bb.kind === 'selling' || bb.kind === 'sold')
     ? buybackUsd(bb.amount) : null
-  const offerPct = offerAmount != null && card.insuredValue ? Math.round((offerAmount / card.insuredValue) * 100) : null
-  const hasInsured = Number.isFinite(card.insuredValue)
+  const offerPct = offerAmount != null && v.insuredValue ? Math.round((offerAmount / v.insuredValue) * 100) : null
+  const hasInsured = v.insuredValue != null && Number.isFinite(v.insuredValue)
   const showValuePanel = hasInsured || offerAmount != null
 
   const gradingRows: Array<[string, string]> = []
-  if (card.gradingCompany) gradingRows.push(['Grading company', card.gradingCompany])
-  if (card.gradingId) gradingRows.push(['Grading ID', card.gradingId])
-  if (card.grade) gradingRows.push(['Grade', card.grade])
-  if (card.year) gradingRows.push(['Year', card.year])
-  if (card.authenticated != null) gradingRows.push(['Authenticated', card.authenticated ? 'Yes' : 'No'])
+  if (v.gradingCompany) gradingRows.push(['Grading company', v.gradingCompany])
+  if (v.gradingId) gradingRows.push(['Grading ID', v.gradingId])
+  if (v.grade) gradingRows.push(['Grade', v.grade])
+  if (v.year) gradingRows.push(['Year', v.year])
+  if (v.authenticated != null) gradingRows.push(['Authenticated', v.authenticated ? 'Yes' : 'No'])
 
   const labelMono = { fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.12em', color: COLORS.muted } as const
   const sweep: React.CSSProperties = {
@@ -147,7 +171,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
     actions = (
       <div>
         <div style={{ fontSize: 13, color: COLORS.text, marginBottom: 10, lineHeight: 1.45 }}>
-          Sell <b>{card.name}</b> for <b>{formatUsd(buybackUsd(bb.amount))}</b>? You return the card and get USDC. This can't be undone.
+          Sell <b>{v.name}</b> for <b>{formatUsd(buybackUsd(bb.amount))}</b>? You return the card and get USDC. This can't be undone.
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <PrimaryBtn label="Confirm" onClick={() => confirmSell(bb.amount)} />
@@ -216,15 +240,9 @@ export function InventoryCardModal({ card, onClose, onSold }: {
             <div aria-hidden style={{ position: 'absolute', inset: '-8% 12%', zIndex: 0, borderRadius: '50%', background: `radial-gradient(circle,${haloColor},transparent 66%)`, filter: 'blur(26px)' }} />
             <div style={{ position: 'relative', zIndex: 1, aspectRatio: '.69', borderRadius: 13, background: 'linear-gradient(160deg,#d6dbe1,#9aa1ac)', padding: '9px 9px 11px', boxShadow: '0 30px 70px -28px #000, inset 0 1px 0 rgba(255,255,255,.7)' }}>
               <div style={{ height: '100%', borderRadius: 7, overflow: 'hidden', background: '#0a0c10', display: 'flex', flexDirection: 'column', border: '1px solid rgba(0,0,0,.45)' }}>
-                {card.grade && (
-                  <div style={{ flex: 'none', display: 'flex', alignItems: 'stretch', gap: 8, background: '#e23b4e', padding: '5px 9px' }}>
-                    <span style={{ flex: 1, minWidth: 0, fontFamily: FONTS.mono, fontSize: 7.5, lineHeight: 1.4, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{card.name}</span>
-                    <span style={{ flex: 'none', alignSelf: 'center', textAlign: 'right', fontFamily: FONTS.mono, fontSize: 8, fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>{card.grade}{card.gradingId && <><br /><span style={{ fontWeight: 400, opacity: .85 }}>{card.gradingId}</span></>}</span>
-                  </div>
-                )}
                 <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
                   {imgSrc && !imgErr
-                    ? <img src={imgSrc} alt={card.name} onError={() => setImgErr(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <img src={imgSrc} alt={v.name} onError={() => setImgErr(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 }}>🃏</span>}
                   <span style={{ position: 'absolute', inset: 0, zIndex: 2, background: 'linear-gradient(115deg,rgba(255,255,255,0) 38%,rgba(255,255,255,.3),rgba(255,255,255,0) 62%)', backgroundSize: '220% 220%', mixBlendMode: 'color-dodge', opacity: .4, animation: reduced ? 'none' : 'ba-holo 7s ease-in-out infinite', pointerEvents: 'none' }} />
                   <span style={{ ...sweep, zIndex: 2, width: '32%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent)', animation: reduced ? 'none' : 'ba-sweep 4.6s infinite' }} />
@@ -235,7 +253,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
 
           {/* Right — info */}
           <div style={{ flex: '1 1 auto', minWidth: 0, maxWidth: wide ? 360 : '100%', width: wide ? undefined : '100%' }}>
-            <h2 style={{ margin: '2px 0 16px', fontSize: 'clamp(20px,2.4vw,25px)', fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.14, color: COLORS.text }}>{card.name}</h2>
+            <h2 style={{ margin: '2px 0 16px', fontSize: 'clamp(20px,2.4vw,25px)', fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.14, color: COLORS.text }}>{v.name}</h2>
 
             {/* Value panel — shows the insured value and/or the buyback offer */}
             {showValuePanel && (
@@ -243,7 +261,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
                 {hasInsured && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: offerAmount != null ? 11 : 0, borderBottom: offerAmount != null ? '1px solid rgba(255,255,255,.08)' : 'none' }}>
                     <span style={{ ...labelMono, letterSpacing: '.14em' }}>INSURED VALUE</span>
-                    <span style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-.02em', color: '#c4adff' }}>{formatUsd(card.insuredValue!)}</span>
+                    <span style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-.02em', color: '#c4adff' }}>{formatUsd(v.insuredValue!)}</span>
                   </div>
                 )}
                 {offerAmount != null && (

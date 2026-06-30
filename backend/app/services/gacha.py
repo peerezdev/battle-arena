@@ -5,6 +5,7 @@ reenvían crudas: cada método devuelve un dict con whitelist de campos.
 """
 from __future__ import annotations
 
+import re
 import time
 from typing import Any, Callable, Optional
 
@@ -28,11 +29,13 @@ _CACHE_TTL = 60.0
 
 class GachaService:
     def __init__(self, base_url: str, api_key: str,
-                 now_fn: Callable[[], float] = time.time, timeout: float = 15.0):
+                 now_fn: Callable[[], float] = time.time, timeout: float = 15.0,
+                 nft_base_url: str = "https://nft-dev.collectorcrypt.com"):
         self._base = base_url.rstrip("/")
         self._key = api_key
         self._now = now_fn
         self._timeout = timeout
+        self._nft_base = nft_base_url.rstrip("/")
         self._machines_cache: Optional[tuple[float, list[dict]]] = None
 
     @property
@@ -271,3 +274,53 @@ class GachaService:
             card["year"] = self._extract_year(attributes, n.get("name"))
             out.append(card)
         return out
+
+    @staticmethod
+    def _parse_insured_value(iv: Any) -> Optional[float]:
+        """CC's 'Insured Value' attribute can be a number or a money string like '$5,000.00'."""
+        if iv is None:
+            return None
+        if isinstance(iv, (int, float)):
+            return float(iv)
+        s = re.sub(r"[^0-9.\-]", "", str(iv))
+        if not s:
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+
+    async def nft_metadata(self, mint: str) -> dict:
+        """Fetch a single card's metadata BY MINT from CC's public, keyless metadata host
+        (devnet: nft-dev.collectorcrypt.com; mainnet: nft.collectorcrypt.com). DAS returns null
+        metadata on devnet, so this is the reliable source for the inventory card modal. The
+        upstream JSON is parsed/whitelisted here — never forwarded raw (same as get_nfts/open_pack)."""
+        self._check_enabled()
+        url = f"{self._nft_base}/metadata/{mint}"
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            try:
+                resp = await client.get(url, headers={"accept": "application/json"})
+                resp.raise_for_status()
+                raw = resp.json()
+            except (httpx.HTTPError, ValueError):
+                raise GachaUpstreamError("gacha upstream no disponible")
+        if not isinstance(raw, dict):
+            raise GachaUpstreamError("gacha upstream: metadata inválida")
+        attributes = raw.get("attributes") or []
+        attr = {t.get("trait_type"): t.get("value") for t in attributes if isinstance(t, dict)}
+        name = raw.get("name")
+        authed = attr.get("Authenticated")
+        authenticated = (str(authed).strip().lower() == "true") if authed is not None else None
+        rarity = attr.get("Rarity")
+        return {
+            "nft_address": mint,
+            "name": name,
+            "image": raw.get("image"),
+            "rarity": str(rarity).lower() if rarity is not None else None,
+            "insured_value": self._parse_insured_value(attr.get("Insured Value")),
+            "grade": self._extract_grade(attributes),
+            "grading_company": attr.get("Grading Company"),
+            "grading_id": attr.get("Grading ID"),
+            "year": self._extract_year(attributes, name),
+            "authenticated": authenticated,
+        }

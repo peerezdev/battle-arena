@@ -24,7 +24,7 @@ const MODE_TILES: ModeTile[] = [
 
 const MODE_LABEL: Record<BattleMode, string> = {
   pack:   'PACK BATTLE',
-  royale: 'ROYALE',
+  royale: 'BATTLE ROYALE',
   mana:   'MANA DUEL',
 }
 

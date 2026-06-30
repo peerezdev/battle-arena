@@ -67,6 +67,8 @@ export default function GachaVault() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [openError, setOpenError] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>({ kind: 'machines' })
+  // Pending open awaiting the user's YES/NO confirmation.
+  const [confirm, setConfirm] = useState<{ count: number; turbo: boolean } | null>(null)
 
   const [cards, setCards] = useState<MachineCard[]>([])
   const [cardsLoading, setCardsLoading] = useState(false)
@@ -381,15 +383,6 @@ export default function GachaVault() {
                   >
                     {m.shortName ?? m.name}
                   </div>
-                  <div
-                    style={{
-                      fontFamily: FONTS.mono,
-                      fontSize: 11,
-                      color: isActive ? COLORS.green : COLORS.muted,
-                    }}
-                  >
-                    ${m.price} USDC
-                  </div>
                 </div>
               </button>
             )
@@ -414,7 +407,7 @@ export default function GachaVault() {
               machine={selected}
               authed={!!identityToken}
               usdc={usdc}
-              onYolo={(c, t) => void handleYolo(c, t)}
+              onYolo={(c, t) => setConfirm({ count: c, turbo: t })}
             />
           </div>
         )
@@ -479,8 +472,105 @@ export default function GachaVault() {
         {phase.kind === 'yolo-summary' && (
           <YoloSummaryOverlay results={phase.results} buybackPct={selected?.instantBuyback ?? null} onClose={() => setPhase({ kind: 'machines' })} />
         )}
+        {confirm && selected && (
+          <ConfirmOpenModal
+            count={confirm.count}
+            machineName={selected.name}
+            image={selected.thumbnailUrl || selected.image || null}
+            total={(selected.price ?? 0) * confirm.count}
+            reduced={reduced}
+            onYes={() => { const c = confirm; setConfirm(null); void handleYolo(c.count, c.turbo) }}
+            onNo={() => setConfirm(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
+  )
+}
+
+// ── Open confirmation modal ───────────────────────────────────────────────────
+function ConfirmOpenModal({ count, machineName, image, total, onYes, onNo, reduced }: {
+  count: number
+  machineName: string
+  image: string | null
+  total: number
+  onYes: () => void
+  onNo: () => void
+  reduced: boolean
+}) {
+  const [imgErr, setImgErr] = useState(false)
+  // Single fixed accent (no per-card rarity here — we're confirming an open, not revealing).
+  const accent = COLORS.violet
+  const accentSoft = 'rgba(139,92,246,.13)'
+  const accentBd = 'rgba(139,92,246,.4)'
+  const accentGlow = 'rgba(139,92,246,.6)'
+  return (
+    <motion.div
+      key="confirm-open"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: reduced ? 0 : 0.16 }}
+      onClick={onNo}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'clamp(14px,2.5vw,32px)',
+        background: `radial-gradient(900px 640px at 50% -8%,${accentSoft},transparent 56%),rgba(4,6,9,.9)`,
+        backdropFilter: 'blur(9px)', WebkitBackdropFilter: 'blur(9px)',
+      }}
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        initial={{ scale: reduced ? 1 : 0.92, opacity: 0, y: reduced ? 0 : 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: reduced ? 1 : 0.96, opacity: 0 }}
+        transition={{ duration: reduced ? 0 : 0.42, ease: [0.2, 0.9, 0.25, 1] }}
+        style={{
+          position: 'relative', width: '100%', maxWidth: 380, borderRadius: 22,
+          background: 'linear-gradient(180deg,#10131a,#0a0c12)', border: `1px solid ${accentBd}`,
+          boxShadow: `0 0 0 1px rgba(0,0,0,.4),0 48px 120px -40px #000,0 0 80px -26px ${accentGlow}`,
+          padding: '34px 28px 24px', textAlign: 'center',
+        }}
+      >
+        {/* close */}
+        <button onClick={onNo} aria-label="Close" style={{ position: 'absolute', top: 16, right: 16, width: 30, height: 30, borderRadius: 9, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#9aa4b2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
+
+        {/* pack icon */}
+        <div style={{ position: 'relative', width: 96, height: 96, margin: '4px auto 20px' }}>
+          <span style={{ position: 'absolute', inset: '-14%', borderRadius: '50%', background: `radial-gradient(circle,${accentGlow},transparent 66%)`, filter: 'blur(16px)', animation: reduced ? 'none' : 'ca-haloPulse 3.2s ease-in-out infinite' }} />
+          <div style={{ position: 'relative', width: '100%', height: '100%', borderRadius: 20, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,rgba(139,92,246,.22),rgba(139,92,246,.06))', border: `1px solid ${accentBd}`, boxShadow: `inset 0 1px 0 rgba(255,255,255,.16),0 18px 44px -18px ${accentGlow}`, animation: reduced ? 'none' : 'ca-float 5s ease-in-out infinite' }}>
+            {image && !imgErr
+              ? <img src={image} alt={machineName} onError={() => setImgErr(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a8 8 0 0 1 16 0" /><rect x="3" y="10" width="18" height="9" rx="2" /><path d="M3 14h18" /><rect x="10.5" y="12" width="3" height="4" rx="1" fill={accent} stroke="none" /></svg>}
+          </div>
+        </div>
+
+        {/* title + subtitle */}
+        <h2 style={{ margin: '0 0 9px', fontFamily: FONTS.display, fontSize: 24, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: COLORS.text }}>
+          Open {count > 1 ? 'these packs' : 'this pack'}?
+        </h2>
+        <p style={{ margin: '0 0 22px', fontSize: 14, lineHeight: 1.5, color: '#9aa4b2' }}>
+          You're about to open <span style={{ color: COLORS.text, fontWeight: 600 }}>x{count} {machineName}</span>.
+        </p>
+
+        {/* total box */}
+        <div style={{ borderRadius: 13, border: `1px solid ${accentBd}`, background: accentSoft, padding: '14px 16px', marginBottom: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.16em', color: accent }}>TOTAL</span>
+          <span style={{ fontFamily: FONTS.display, fontSize: 20, fontWeight: 800, color: accent }}>{formatUsd(total)}</span>
+        </div>
+
+        {/* actions: No (secondary) · Yes (primary) */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onNo} style={{ flex: 1, padding: 14, borderRadius: 13, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.04)', color: '#cdd4dd', cursor: 'pointer', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, letterSpacing: '.02em' }}>No</button>
+          <button onClick={onYes} style={{ position: 'relative', overflow: 'hidden', flex: 1.4, padding: 14, borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 14.5, fontWeight: 700, letterSpacing: '.02em', color: '#06170f', background: GRADIENT, boxShadow: `0 14px 38px -14px ${accentGlow}` }}>
+            <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '40%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent)', animation: reduced ? 'none' : 'ba-sweep 3.6s infinite' }} />
+            <span style={{ position: 'relative' }}>Yes</span>
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 

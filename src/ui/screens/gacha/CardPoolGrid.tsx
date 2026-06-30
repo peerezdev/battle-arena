@@ -65,18 +65,6 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
 
       {/* Heading */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <span
-          style={{
-            fontFamily: FONTS.mono,
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '.08em',
-            color: COLORS.muted,
-            textTransform: 'uppercase',
-          }}
-        >
-          CARDS IN THIS PACK · {cards.length}
-        </span>
         {liveCount != null && (
           <span
             style={{
@@ -98,7 +86,7 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
                 display: 'inline-block',
               }}
             />
-            {liveCount} live in pool
+            {liveCount} - CARDS IN THIS MACHINE
           </span>
         )}
       </div>

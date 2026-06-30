@@ -8,6 +8,7 @@ export interface BestHit {
   rarity: string | null
   year: string | null
   valueUsd: number | null
+  nftAddress: string | null
 }
 export interface BestVictory {
   amountUsd: number

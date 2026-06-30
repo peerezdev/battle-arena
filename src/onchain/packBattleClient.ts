@@ -91,6 +91,6 @@ export function verifyBattle(id: string): Promise<Verification> {
   return battleFetch<Verification>(`/pack-battles/${encodeURIComponent(id)}/verify`)
 }
 
-export function fetchReservedBalance(token: string): Promise<{ reserved: number }> {
-  return battleFetch<{ reserved: number }>('/users/me/balance', { headers: authHeaders(token) })
+export function fetchReservedBalance(token: string): Promise<{ reserved: number; locked_royale?: number }> {
+  return battleFetch<{ reserved: number; locked_royale?: number }>('/users/me/balance', { headers: authHeaders(token) })
 }

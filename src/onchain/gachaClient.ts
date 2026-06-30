@@ -105,6 +105,34 @@ export function fetchMachineCards(
   )
 }
 
+export interface NftMetadata {
+  nft_address: string
+  name: string | null
+  image: string | null
+  rarity: string | null
+  insured_value: number | null
+  grade: string | null
+  grading_company: string | null
+  grading_id: string | null
+  year: string | null
+  authenticated: boolean | null
+}
+
+/** Per-mint card metadata from Collector Crypt, proxied by our backend (browser→backend→CC,
+ *  so no CORS and the host switches by cluster). DAS metadata is null on devnet, so this is the
+ *  reliable source for insuredValue + grading in the inventory.
+ *  Memoised by mint (metadata is effectively immutable per card) so the grid and the modal
+ *  share one fetch and revisiting is instant. Failures are not cached (they retry). */
+const _cardMetaCache = new Map<string, NftMetadata>()
+export function fetchCardMetadata(mint: string): Promise<NftMetadata> {
+  const cached = _cardMetaCache.get(mint)
+  if (cached) return Promise.resolve(cached)
+  return gachaFetch<NftMetadata>(`/gacha/nft/${encodeURIComponent(mint)}`).then((m) => {
+    _cardMetaCache.set(mint, m)
+    return m
+  })
+}
+
 export function generatePack(token: string, packType: string): Promise<GeneratePackResponse> {
   return gachaFetch<GeneratePackResponse>('/gacha/generate-pack', {
     method: 'POST', headers: authHeaders(token),

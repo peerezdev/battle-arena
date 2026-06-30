@@ -41,16 +41,27 @@ function attrMap(attrs: Array<{ trait_type?: string; value?: unknown }>): Record
   return m
 }
 
-/** Map a DAS asset to a display card, with safe fallbacks. */
-export function dasAssetToCard(a: DasAsset): InventoryCard {
-  const md = a.content?.metadata
-  const attrs = md?.attributes ?? []
+/** The attribute-derived display fields shared by a DAS asset and a CC metadata JSON
+ *  (both carry the same Metaplex `[{trait_type, value}]` attributes schema). */
+export type CardAttrFields = Pick<
+  InventoryCard,
+  'insuredValue' | 'rarity' | 'grade' | 'gradingCompany' | 'gradingId' | 'year' | 'authenticated'
+>
+
+/** Derive the card's display fields from a Metaplex attributes array. `name` is only used as a
+ *  fallback source for the year (e.g. "2020 Charizard" → 2020). Single source of truth for the
+ *  attribute parsing, reused by both the DAS path and the CC-metadata-by-mint path. */
+export function cardFieldsFromAttributes(
+  attrs: Array<{ trait_type?: string; value?: unknown }>,
+  name: string,
+): CardAttrFields {
   const m = attrMap(attrs)
-  const name = md?.name ?? 'Unnamed'
 
   const insuredAttr = attrs.find((t) => /insured/i.test(t.trait_type ?? ''))
   const rawInsured = insuredAttr?.value
-  const insuredValue = rawInsured == null || rawInsured === '' ? NaN : Number(rawInsured)
+  // CC sometimes formats the value as "$1,234.50" — strip currency/grouping before Number().
+  const insuredValue =
+    rawInsured == null || rawInsured === '' ? NaN : Number(String(rawInsured).replace(/[$,\s]/g, ''))
 
   const company = (m['Grading Company'] ?? '').trim()
   const gradeLabel = (m['The Grade'] ?? m['GradeNum'] ?? '').trim()
@@ -66,9 +77,6 @@ export function dasAssetToCard(a: DasAsset): InventoryCard {
   const authenticated = authRaw == null ? null : authRaw.trim().toLowerCase() === 'true'
 
   return {
-    mint: a.id,
-    name,
-    image: a.content?.links?.image ?? null,
     insuredValue: Number.isFinite(insuredValue) ? insuredValue : null,
     rarity: m['Rarity'] != null ? m['Rarity'].toLowerCase() : null,
     grade,
@@ -76,6 +84,18 @@ export function dasAssetToCard(a: DasAsset): InventoryCard {
     gradingId: m['Grading ID'] ?? null,
     year,
     authenticated,
+  }
+}
+
+/** Map a DAS asset to a display card, with safe fallbacks. */
+export function dasAssetToCard(a: DasAsset): InventoryCard {
+  const md = a.content?.metadata
+  const name = md?.name ?? 'Unnamed'
+  return {
+    mint: a.id,
+    name,
+    image: a.content?.links?.image ?? null,
+    ...cardFieldsFromAttributes(md?.attributes ?? [], name),
   }
 }
 

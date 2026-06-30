@@ -83,7 +83,7 @@ DUMMY_RPC = "https://api.devnet.solana.com"
 DUMMY_MINT = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
 
 
-def _build_client(signer=None):
+def _build_client(signer=None, dev_endpoints_enabled=False):
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -105,6 +105,7 @@ def _build_client(signer=None):
         privy_operator_wallet_id="op-wallet-id",
         privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
         escrow_seed_lamports=10_000_000,
+        dev_endpoints_enabled=dev_endpoints_enabled,
     )
     return TestClient(app, raise_server_exceptions=True), priv
 
@@ -627,12 +628,12 @@ def test_me_balance_returns_reserved(client_priv, monkeypatch):
 
     # no reservations yet
     r0 = c.get("/users/me/balance", headers=hdrs)
-    assert r0.status_code == 200 and r0.json() == {"reserved": 0}
+    assert r0.status_code == 200 and r0.json() == {"reserved": 0, "locked_royale": 0}
 
     # creating a pack battle reserves the price (50 * 1e6 base units)
     c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
     r1 = c.get("/users/me/balance", headers=hdrs)
-    assert r1.json() == {"reserved": 50_000_000}
+    assert r1.json() == {"reserved": 50_000_000, "locked_royale": 0}
 
 
 def test_me_balance_requires_auth(client_priv):
@@ -682,7 +683,7 @@ def test_create_multipack_bundle(client_priv, monkeypatch):
         {"machine_code": "m50", "sequence": 2, "price": 50_000_000},
         {"machine_code": "m50", "sequence": 3, "price": 50_000_000}]
     # the creator reserved the total
-    assert c.get("/users/me/balance", headers=hdrs).json() == {"reserved": 125_000_000}
+    assert c.get("/users/me/balance", headers=hdrs).json() == {"reserved": 125_000_000, "locked_royale": 0}
 
 
 def test_create_multipack_rejects_over_ten_boxes(client_priv, monkeypatch):
@@ -719,3 +720,68 @@ def test_create_legacy_single_machine_still_works(client_priv, monkeypatch):
     body = r.json()
     assert body["price"] == 50_000_000
     assert body["packs"] == [{"machine_code": "m50", "sequence": 1, "price": 50_000_000}]
+
+
+# ── A1: /pack-battles/{id}/join-bot must be disabled outside dev ───────────────
+
+def test_join_bot_disabled_by_default():
+    """SECURITY (A1): the unauthenticated, fund-moving join-bot endpoint must 404
+    when DEV_ENDPOINTS_ENABLED is off (the default), so it cannot be reached in prod.
+    The gate runs before the battle lookup, so the 404 detail is "Not Found" (not "no existe")."""
+    c, _priv = _build_client()  # dev_endpoints_enabled=False by default
+    r = c.post("/pack-battles/whatever-id/join-bot")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Not Found"
+
+
+def test_join_bot_enabled_passes_gate_in_dev():
+    """With DEV_ENDPOINTS_ENABLED on, the gate is open: the handler proceeds to the
+    battle lookup. A nonexistent battle then yields 404 "no existe" — proving the
+    request got PAST the dev gate (different detail than the disabled case)."""
+    c, _priv = _build_client(dev_endpoints_enabled=True)
+    r = c.post("/pack-battles/nonexistent/join-bot")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "no existe"
+
+
+# ── A2: /users/me/withdraw anti-drain (minimum amount + per-wallet rate limit) ─
+
+def test_withdraw_below_minimum_rejected():
+    """SECURITY (A2): a sub-minimum withdrawal is rejected (422) BEFORE any on-chain
+    work, so an attacker can't flood 1-base-unit withdrawals to fresh addresses and
+    drain the operator-paid destination-ATA rent. Default minimum is 1.0 USDC."""
+    c, priv = _build_client(signer=object())  # truthy signer passes the 503 gate
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 0.000001}, headers=hdrs)
+    assert r.status_code == 422, r.text
+    assert "mínimo" in r.json()["detail"]
+
+
+def test_withdraw_rate_limited(monkeypatch):
+    """SECURITY (A2): withdrawals are rate-limited per wallet. With the default limit of 5
+    per window, the 6th withdrawal is throttled (429) — the throttle fires before the
+    on-chain transfer, capping how fast the operator's gas/rent can be spent."""
+    c, priv = _build_client(signer=object())
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000  # plenty so _require_available always passes
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _wd(*a, **k):
+        return "sig-stub"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.withdraw_usdc", _wd)
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    body = {"address": WALLET_B, "amount": 1.0}  # at/above the minimum
+
+    for i in range(5):
+        r = c.post("/users/me/withdraw", json=body, headers=hdrs)
+        assert r.status_code == 200, f"call {i}: {r.text}"
+
+    r = c.post("/users/me/withdraw", json=body, headers=hdrs)
+    assert r.status_code == 429, r.text

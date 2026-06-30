@@ -48,7 +48,10 @@ export function ProfilePage() {
   const winRate = stats && stats.battles > 0 ? `${Math.round(stats.winRate * 100)}%` : '—'
 
   return (
-    <div style={{ maxWidth: 880, width: '100%', margin: '0 auto', padding: '28px 22px' }}>
+    // Uniform width across every tab (no jump when switching). It's a maxWidth inside the shell's
+    // `1fr` main column, so it already respects the left rail AND the chat dock (collapsed/expanded)
+    // — no viewport-width breakout that would slide under the chat.
+    <div style={{ maxWidth: 1320, width: '100%', margin: '0 auto', padding: '28px 22px' }}>
       {/* ── hero ── */}
       <section style={{
         position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(22px,2.6vw,32px)', marginBottom: 22,

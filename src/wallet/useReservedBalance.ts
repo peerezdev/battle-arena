@@ -9,9 +9,16 @@ export function availableUsd(usdc: number | null, reserved: number | null): numb
   return Math.max(0, usdc - reserved)
 }
 
-export function useReservedBalance(): { reserved: number | null } {
+/**
+ * `reserved` = pack-battle soft holds, in dollars — money still in the wallet, so it drives
+ * `available = on-chain − reserved`. `locked` = reserved + royale buy-ins already collected
+ * on-chain into escrow — for DISPLAY only ("funds tied up in open battles"); never feed it to
+ * availableUsd or royale money would be subtracted twice.
+ */
+export function useReservedBalance(): { reserved: number | null; locked: number | null } {
   const { identityToken } = useIdentityToken()
   const [reserved, setReserved] = useState<number | null>(null)
+  const [locked, setLocked] = useState<number | null>(null)
   const unmounted = useRef(false)
 
   useEffect(() => {
@@ -20,15 +27,18 @@ export function useReservedBalance(): { reserved: number | null } {
   }, [])
 
   useEffect(() => {
-    if (!identityToken) { setReserved(null); return }
+    if (!identityToken) { setReserved(null); setLocked(null); return }
     let timer: ReturnType<typeof setInterval> | null = null
 
     const poll = async () => {
       try {
-        const { reserved: base } = await fetchReservedBalance(identityToken)
-        if (!unmounted.current) setReserved(base / 1e6)   // base units → dollars
+        const { reserved: base, locked_royale = 0 } = await fetchReservedBalance(identityToken)
+        if (!unmounted.current) {
+          setReserved(base / 1e6)                    // base units → dollars (drives available)
+          setLocked((base + locked_royale) / 1e6)    // pack holds + royale escrow (display)
+        }
       } catch {
-        if (!unmounted.current) setReserved(null)          // never block the balance display
+        if (!unmounted.current) { setReserved(null); setLocked(null) }  // never block the balance display
       }
     }
 
@@ -37,5 +47,5 @@ export function useReservedBalance(): { reserved: number | null } {
     return () => { if (timer) clearInterval(timer) }
   }, [identityToken])
 
-  return { reserved }
+  return { reserved, locked }
 }

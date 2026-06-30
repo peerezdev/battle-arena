@@ -78,7 +78,8 @@ def read_user_stats(session: Session, wallet: str) -> dict:
     best_hit = None
     if best_pull is not None:
         best_hit = {"name": best_pull.name, "grade": best_pull.grade, "rarity": best_pull.rarity,
-                    "year": best_pull.year, "valueUsd": best_pull.insured_value}
+                    "year": best_pull.year, "valueUsd": best_pull.insured_value,
+                    "nftAddress": best_pull.nft_address}
 
     # best victory — biggest combined loot (all cards) of a battle this wallet won
     best_victory = None

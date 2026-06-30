@@ -6,7 +6,7 @@ import logging
 import time as _time
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import FastAPI, Depends, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, Header, HTTPException, Path, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
@@ -38,7 +38,7 @@ from .services.pack_orchestration import (
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc
 from .services.nft_transfer import submit_signed_tx
-from .services.reservations import reserve, reserved_total, release_reservations
+from .services.reservations import reserve, reserved_total, royale_locked_total, release_reservations
 from .services.bots import load_bots, pick_bot
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,11 @@ def create_app(session_factory, chain: ChainSource,
                cc_usdc_mint: str = "",
                privy_operator_wallet_id: str = "",
                privy_operator_address: str = "",
-               escrow_seed_lamports: int = 10_000_000) -> FastAPI:
+               escrow_seed_lamports: int = 10_000_000,
+               dev_endpoints_enabled: bool = False,
+               min_withdraw_usdc: float = 1.0,
+               withdraw_rate_limit: int = 5,
+               withdraw_rate_window_s: float = 60.0) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
 
     if cors_origins:
@@ -183,7 +187,10 @@ def create_app(session_factory, chain: ChainSource,
 
     @app.get("/users/me/balance")
     async def me_balance(wallet: str = Depends(current_user), s: Session = Depends(db)):
-        return {"reserved": reserved_total(s, wallet)}
+        # `reserved` = pack-battle soft holds (still in the wallet) → drives available balance.
+        # `locked_royale` = royale buy-ins already collected on-chain to escrow → display only,
+        # so the "reserved" UI reflects every open battle without double-debiting available.
+        return {"reserved": reserved_total(s, wallet), "locked_royale": royale_locked_total(s, wallet)}
 
     @app.get("/users/{wallet}")
     async def get_user(wallet: str, s: Session = Depends(db)):
@@ -295,6 +302,19 @@ def create_app(session_factory, chain: ChainSource,
         svc = _gacha_or_503()
         try:
             return await svc.get_nfts(code=code, rarity=rarity, page=page, limit=limit)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+
+    @app.get("/gacha/nft/{mint}")
+    async def gacha_nft(mint: str = Path(min_length=32, max_length=44,
+                                         pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")):
+        # Per-mint card metadata for the inventory modal. The mint is strictly validated (base58)
+        # before it's interpolated into the upstream URL, so it can't be used for path traversal/SSRF.
+        svc = _gacha_or_503()
+        try:
+            return await svc.nft_metadata(mint)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
@@ -557,6 +577,19 @@ def create_app(session_factory, chain: ChainSource,
                                 escrow_address, cc_usdc_mint, amount, blockhash)
             await asyncio.sleep(1)  # let the tx land before the next serialized collect
 
+    # Per-wallet withdraw throttle. The operator pays gas + the destination-ATA rent on every
+    # withdraw, so without a rate-limit + minimum a user could spam tiny withdrawals to fresh
+    # addresses and drain the operator's SOL (each new ATA ~0.002 SOL of rent the operator funds).
+    _withdraw_hits: dict[str, list[float]] = {}
+
+    def _withdraw_throttle(wallet: str) -> None:
+        now = _time.time()
+        hits = [t for t in _withdraw_hits.get(wallet, []) if now - t < withdraw_rate_window_s]
+        if len(hits) >= withdraw_rate_limit:
+            raise HTTPException(429, "demasiados retiros, inténtalo más tarde")
+        hits.append(now)
+        _withdraw_hits[wallet] = hits
+
     @app.post("/users/me/withdraw")
     async def me_withdraw(body: WithdrawBody, wallet: str = Depends(current_user),
                           wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
@@ -566,6 +599,12 @@ def create_app(session_factory, chain: ChainSource,
         amount = int(round(body.amount * 1_000_000))   # USDC base units
         if amount <= 0:
             raise HTTPException(422, "amount must be > 0")
+        # Enforce a minimum so the operator-paid ATA rent (~0.002 SOL/new dest) can't be drained
+        # by a flood of 1-base-unit withdrawals to fresh addresses.
+        min_base = int(round(min_withdraw_usdc * 1_000_000))
+        if amount < min_base:
+            raise HTTPException(422, f"el retiro mínimo es {min_withdraw_usdc} USDC")
+        _withdraw_throttle(wallet)                      # rate-limit per authed wallet
         await _require_available(wallet, amount, s)     # caps at on-chain balance − reserved
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         try:
@@ -704,7 +743,15 @@ def create_app(session_factory, chain: ChainSource,
 
     @app.post("/pack-battles/{battle_id}/join-bot")
     async def join_bot_pack_battle(battle_id: str, s: Session = Depends(db)):
-        """DEV/TEST: drop a random funded reserve bot into a lobby slot (no auth)."""
+        """DEV/TEST: drop a random funded reserve bot into a lobby slot (no auth).
+
+        SECURITY: this endpoint is unauthenticated and moves real USDC on-chain (it
+        collects a bot's buy-in into the escrow and can start the battle). It MUST stay
+        disabled in production — it is only mounted-effectively when DEV_ENDPOINTS_ENABLED
+        is set. Otherwise it 404s as if it did not exist.
+        """
+        if not dev_endpoints_enabled:
+            raise HTTPException(404, "Not Found")
         b = s.get(PackBattle, battle_id)
         if b is None:
             raise HTTPException(404, "no existe")
@@ -873,7 +920,7 @@ def build_default_app() -> FastAPI:
     init_db(engine)
     session_factory = make_session_factory(engine)
     chain: ChainSource = MockChainSource()  # 'solana' se cablea cuando el lector real esté validado
-    gacha = GachaService(base_url=s.gacha_base_url, api_key=s.gacha_api_key)
+    gacha = GachaService(base_url=s.gacha_base_url, api_key=s.gacha_api_key, nft_base_url=s.cc_nft_base_url)
     privy = PrivyVerifier(app_id=s.privy_app_id, jwks_url=s.privy_jwks_url.format(app_id=s.privy_app_id)) if s.privy_app_id else None
     privy_signer = PrivySigner(app_id=s.privy_app_id, app_secret=s.privy_app_secret,
                                auth_key_pem=s.privy_auth_key, cluster_caip2=s.privy_solana_caip2,
@@ -889,7 +936,11 @@ def build_default_app() -> FastAPI:
                       solana_rpc_url=s.solana_rpc_url, cc_usdc_mint=s.cc_usdc_mint,
                       privy_operator_wallet_id=s.privy_operator_wallet_id,
                       privy_operator_address=s.privy_operator_address,
-                      escrow_seed_lamports=s.escrow_seed_lamports)
+                      escrow_seed_lamports=s.escrow_seed_lamports,
+                      dev_endpoints_enabled=s.dev_endpoints_enabled,
+                      min_withdraw_usdc=s.min_withdraw_usdc,
+                      withdraw_rate_limit=s.withdraw_rate_limit,
+                      withdraw_rate_window_s=s.withdraw_rate_window_s)
 
 
 app = build_default_app()
