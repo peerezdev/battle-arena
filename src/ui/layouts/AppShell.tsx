@@ -84,7 +84,9 @@ export function AppShell() {
         gridTemplateColumns: gridCols,
         gridTemplateRows: 'minmax(0, 1fr)', // cap the single row at the shell height so inner overflow:auto engages (instead of the auto row growing to content height and getting clipped)
         height: '100dvh',
-        background: `radial-gradient(1100px 700px at 14% -8%,rgba(255,46,151,.16),transparent 60%),radial-gradient(900px 600px at 100% 8%,rgba(0,255,196,.10),transparent 55%),${COLORS.bg}`,
+        // Ambient colour wash (from the mockup): magenta + cyan + gold radials spread across the whole
+        // viewport so the background reads coloured, not black. The shell is 100dvh so it stays put.
+        background: 'radial-gradient(900px 620px at 12% 0%,rgba(255,46,151,.28),transparent 62%),radial-gradient(840px 580px at 92% 4%,rgba(0,255,196,.18),transparent 60%),radial-gradient(820px 660px at 82% 56%,rgba(52,211,224,.17),transparent 62%),radial-gradient(900px 680px at 4% 92%,rgba(255,46,151,.22),transparent 62%),radial-gradient(760px 560px at 56% 116%,rgba(245,197,66,.11),transparent 62%),#0a0710',
         position: 'relative',
         overflow: 'hidden',
       }}
