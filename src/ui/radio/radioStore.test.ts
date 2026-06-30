@@ -240,4 +240,21 @@ describe('radioStore autoplay', () => {
     // No gesture listener armed: a pointerdown changes nothing about isPlaying.
     expect(store.getState().isPlaying).toBe(true)
   })
+
+  it('a manual pause disarms the autoplay fallback (spec: no re-arm after manual pause)', () => {
+    class BlockedAudio extends FakeAudio {
+      play() { return Promise.reject(new Error('blocked')) as unknown as Promise<void> }
+    }
+    const fake = new BlockedAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    store.tryAutoplay()
+    expect(store.getState().isPlaying).toBe(false)
+    // User manually pauses before the first gesture -> fallback must be cancelled.
+    store.pause()
+    // If play were (wrongly) re-triggered, this would let it succeed.
+    fake.play = FakeAudio.prototype.play.bind(fake)
+    document.dispatchEvent(new Event('pointerdown'))
+    expect(store.getState().isPlaying).toBe(false)
+    expect(fake.paused).toBe(true)
+  })
 })

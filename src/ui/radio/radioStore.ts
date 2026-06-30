@@ -162,6 +162,7 @@ export function createRadioStore(
   function pause(): void {
     internal.isPlaying = false
     emit()
+    disarm()   // a manual pause cancels any armed autoplay fallback (per spec)
     try { audio?.pause() } catch { /* ignore */ }
   }
 
