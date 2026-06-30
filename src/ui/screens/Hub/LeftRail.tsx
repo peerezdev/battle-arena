@@ -24,10 +24,7 @@ export const NAV_ICONS: Record<HubNav, ReactNode> = {
 
 const ITEMS: { id: HubNav; label: string }[] = [
   { id: 'lobby', label: 'Lobby' },
-  { id: 'pack', label: 'Pack' },
-  { id: 'royale', label: 'Royale' },
   { id: 'gacha', label: 'Gacha' },
-  { id: 'mana', label: 'Mana' },
   { id: 'ranks', label: 'Leaderboard' },
 ]
 

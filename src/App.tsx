@@ -4,9 +4,6 @@ import { COLORS } from './ui/theme'
 import { Landing } from './ui/screens/Landing'
 import { Hub } from './ui/screens/Hub/Hub'
 import { AppShell } from './ui/layouts/AppShell'
-import { ManaDuelFlow } from './ui/flows/ManaDuelFlow'
-import { RoyaleFlow } from './ui/flows/RoyaleFlow'
-import { OnchainFlow } from './ui/flows/OnchainFlow'
 import { BattleFlow } from './ui/flows/BattleFlow'
 import { DemoFlow } from './ui/flows/DemoFlow'
 import { ProfilePage } from './ui/screens/Profile/ProfilePage'
@@ -21,9 +18,6 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route element={<AppShell />}>
           <Route path="/app" element={<Hub />} />
-          <Route path="/play/mana" element={<ManaDuelFlow />} />
-          <Route path="/play/royale" element={<RoyaleFlow />} />
-          <Route path="/play/arena" element={<OnchainFlow />} />
           <Route path="/play/battle/:battleId" element={<BattleFlow />} />
           <Route path="/play/demo/:mode" element={<DemoFlow />} />
           <Route

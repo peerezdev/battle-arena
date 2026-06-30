@@ -78,7 +78,7 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
       {TITLE}
       <ResultView
         vm={vm} name={name} ranked={ranked} entry={entry}
-        onRematch={() => navigate('/play/royale')} onExit={onExit} onVerify={() => setVerifyOpen(true)}
+        onRematch={() => navigate('/app')} onExit={onExit} onVerify={() => setVerifyOpen(true)}
       />
       {verifyOpen && battleId && <VerifyPanel battleId={battleId} onClose={() => setVerifyOpen(false)} />}
     </div>

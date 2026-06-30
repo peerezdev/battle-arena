@@ -34,10 +34,8 @@ export function Hub() {
   const liveBattles = battles.map((b) => openBattleToLive(b, meWallet))
 
   function go(id: HubNav) {
-    if (id === 'mana')   return navigate('/play/mana')
-    if (id === 'royale') return navigate('/play/royale')
-    if (id === 'pack')   return navigate('/play/arena')
     if (id === 'gacha')  return navigate('/play/gacha')
+    // Pack/Royale/Mana are disabled for now — no route to navigate to.
   }
 
   function onCancel(b: LiveBattle) {

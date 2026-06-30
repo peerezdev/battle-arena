@@ -70,7 +70,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
         )}
 
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 18, flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/play/arena')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 12px 34px -10px rgba(0,255,196,.7)' }}>↻ Rematch</button>
+          <button onClick={() => navigate('/app')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 12px 34px -10px rgba(0,255,196,.7)' }}>↻ Rematch</button>
           <button onClick={() => setVerifyOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 22px', borderRadius: 13, border: '1px solid rgba(0,255,196,.32)', background: 'rgba(0,255,196,.08)', color: COLORS.green, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>Verify · Provably Fair</button>
           <button onClick={onExit} style={{ padding: '13px 22px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.muted, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>Back to lobby</button>
         </div>

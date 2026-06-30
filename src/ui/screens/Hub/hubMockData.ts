@@ -39,9 +39,6 @@ export const STAKE_OPTIONS = [10, 50, 125, 250]
 // ─── Bottom-nav / LeftRail items — shared between Hub and AppShell ────────────
 export const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
   { id: 'lobby',  icon: '⌂',  label: 'Lobby'  },
-  { id: 'pack',   icon: '⚔️', label: 'Pack'   },
-  { id: 'royale', icon: '👑', label: 'Royale' },
   { id: 'gacha',  icon: '🎰', label: 'Gacha'  },
-  { id: 'mana',   icon: '🎯', label: 'Mana'   },
   { id: 'ranks',  icon: '🏆', label: 'Leaderboard'  },
 ]

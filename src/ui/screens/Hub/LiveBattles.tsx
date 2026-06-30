@@ -9,17 +9,12 @@ function Svg({ children }: { children: ReactNode }) {
   )
 }
 
-const SWORDS = <Svg><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" x2="19" y1="19" y2="13" /><line x1="16" x2="20" y1="16" y2="20" /><line x1="19" x2="21" y1="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" x2="9" y1="14" y2="18" /><line x1="7" x2="4" y1="17" y2="20" /><line x1="3" x2="5" y1="19" y2="21" /></Svg>
-const CROWN = <Svg><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></Svg>
 const GACHA = <Svg><rect x="3" y="3" width="12" height="17" rx="1.2" /><path d="M3 9h12M3 15h12M7 9v6M11 9v6" /><path d="M5.5 5.5h7M5.5 7h7" /><path d="M15 11h2v3h-2" /><circle cx="19.5" cy="6" r="2" /><path d="M19.5 8v3" /></Svg>
-const TARGET = <Svg><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></Svg>
 
+// Pack/Royale/Mana modes are disabled for now — only Gacha remains as a mode entry.
 type ModeTile = { mode: 'pack' | 'royale' | 'gacha' | 'mana'; icon: ReactNode; name: string; sub: string; accent: 'green' | 'purple' }
 const MODE_TILES: ModeTile[] = [
-  { mode: 'pack',   icon: SWORDS, name: 'Pack Battle',   sub: '1v1 · winner takes both',  accent: 'green' },
-  { mode: 'royale', icon: CROWN,  name: 'Battle Royale',  sub: '2–10 · last one wins',     accent: 'purple' },
   { mode: 'gacha',  icon: GACHA,  name: 'Gacha',          sub: 'Open packs · pull & play', accent: 'green' },
-  { mode: 'mana',   icon: TARGET, name: 'Mana Duel',      sub: 'Skill · value = edge',     accent: 'purple' },
 ]
 
 const MODE_LABEL: Record<BattleMode, string> = {
