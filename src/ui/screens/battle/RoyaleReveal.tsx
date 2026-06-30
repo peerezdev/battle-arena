@@ -13,7 +13,7 @@ export function shortWallet(w: string): string {
 // Rarity palette for the little card chips / loot.
 const RAR: Record<string, { tint: string; border: string; label: string }> = {
   common:    { tint: '#3a4250', border: 'rgba(255,255,255,.18)', label: 'COM' },
-  uncommon:  { tint: '#2f6b4a', border: 'rgba(0,255,196,.5)',   label: 'UNC' },
+  uncommon:  { tint: '#2f6b4a', border: 'rgba(47,226,138,.5)',   label: 'UNC' },
   rare:      { tint: '#2a5a8f', border: 'rgba(78,168,255,.55)',  label: 'RARE' },
   epic:      { tint: '#5a3a9f', border: 'rgba(169,139,255,.6)',  label: 'EPIC' },
   legendary: { tint: '#8a6a1f', border: 'rgba(245,197,66,.65)',  label: 'LEGEND' },

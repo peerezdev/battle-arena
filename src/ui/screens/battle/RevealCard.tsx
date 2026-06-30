@@ -5,7 +5,7 @@ import type { RevealCardVM } from './battleReveal'
 
 export function rarityColor(rarity: string | null): string {
   const key = (rarity ?? '').toLowerCase()
-  if (key === 'epic') return '#ff6bb5' // reveal Epic = purple
+  if (key === 'epic') return '#a98bff' // reveal Epic = purple
   return (RARITY as Record<string, string>)[key] ?? COLORS.muted
 }
 

@@ -16,7 +16,7 @@ const ROUND_HOLD_MS = 3000
 
 const RAR: Record<string, { tint: string; border: string }> = {
   common:    { tint: '#3a4250', border: 'rgba(255,255,255,.18)' },
-  uncommon:  { tint: '#2f6b4a', border: 'rgba(0,255,196,.5)' },
+  uncommon:  { tint: '#2f6b4a', border: 'rgba(47,226,138,.5)' },
   rare:      { tint: '#2a5a8f', border: 'rgba(78,168,255,.55)' },
   epic:      { tint: '#5a3a9f', border: 'rgba(169,139,255,.6)' },
   legendary: { tint: '#8a6a1f', border: 'rgba(245,197,66,.65)' },

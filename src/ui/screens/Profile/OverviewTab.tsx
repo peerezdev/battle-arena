@@ -9,7 +9,7 @@ import type { UserStats } from '../../../hooks/useUserStats'
 
 const RAR: Record<string, { tint: string; border: string; rc: string }> = {
   common: { tint: '#3a4250', border: 'rgba(255,255,255,.14)', rc: '#8b95a3' },
-  uncommon: { tint: '#2f6b4a', border: 'rgba(0,255,196,.5)', rc: '#00ffc4' },
+  uncommon: { tint: '#2f6b4a', border: 'rgba(47,226,138,.5)', rc: '#2fe28a' },
   rare: { tint: '#2a5a8f', border: 'rgba(78,168,255,.5)', rc: '#7fc0ff' },
   epic: { tint: '#5a3a9f', border: 'rgba(169,139,255,.55)', rc: '#bda6ff' },
   legendary: { tint: '#8a6a1f', border: 'rgba(245,197,66,.6)', rc: '#f5c542' },

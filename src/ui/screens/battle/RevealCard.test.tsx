@@ -35,7 +35,7 @@ describe('RevealCard', () => {
   })
 
   it('maps rarity case-insensitively, unknown → muted', () => {
-    expect(rarityColor('Epic')).toBe('#ff6bb5')   // reveal Epic is purple (overrides RARITY.epic)
+    expect(rarityColor('Epic')).toBe('#a98bff')   // reveal Epic is purple (overrides RARITY.epic)
     expect(rarityColor('Rare')).toBe(RARITY.rare)
     expect(rarityColor('common')).toBe(RARITY.common)
     expect(rarityColor(null)).toBe(COLORS.muted)

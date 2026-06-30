@@ -39,19 +39,21 @@ export const player = {
   },
 } as const
 
+// Rarity colours are SEMANTIC and independent of the brand palette: uncommon=green, rare=blue,
+// epic=purple, legendary=gold. They intentionally do NOT follow the Neón Cyber recolor.
 export const RARITY = {
   common: COLORS.muted,
-  uncommon: COLORS.green,
+  uncommon: '#2fe28a',
   rare: '#5ad1ff',
-  epic: '#ff6bb5',
+  epic: '#a98bff',
 } as const
 
 /** Beam-of-light glow color for a Live Drop by rarity. Common (or unknown) → null (no glow). */
 export function rarityGlow(rarity: string | null | undefined): string | null {
   switch ((rarity ?? '').toLowerCase()) {
-    case 'uncommon': return '#00ffc4'  // green
+    case 'uncommon': return '#2fe28a'  // green
     case 'rare': return '#4ea8ff'      // blue
-    case 'epic': return '#ff6bb5'      // purple
+    case 'epic': return '#a98bff'      // purple
     case 'legendary':
     case 'mythic': return '#f5c542'    // gold (above epic)
     default: return null               // common / unknown → no glow
