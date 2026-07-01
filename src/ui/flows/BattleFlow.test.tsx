@@ -11,11 +11,17 @@ vi.mock('../../onchain/packBattleClient', async (orig) => ({
 }))
 vi.mock('../emotes/useBattleEmotes', () => ({ useBattleEmotes: vi.fn() }))
 vi.mock('../emotes/useEmotes', () => ({ useEmotes: () => ({ byCode: {}, owned: [], slots: [], loading: false, updateSlots: vi.fn() }) }))
+// Defaults to `false` (same as jsdom's real behavior, since jsdom has no window.matchMedia) so
+// every test except the settled/result one below keeps exercising the normal animated reveal
+// path; only that test overrides this to skip the real ~900ms DWELL_MS timer.
+vi.mock('../useReducedMotion', () => ({ useReducedMotion: vi.fn(() => false) }))
 import { cancelBattle } from '../../onchain/packBattleClient'
 import { useBattle } from '../../onchain/useBattle'
+import { useReducedMotion } from '../useReducedMotion'
 import { BattleFlow } from './BattleFlow'
 
 const mockUseBattle = useBattle as unknown as ReturnType<typeof vi.fn>
+const mockUseReducedMotion = useReducedMotion as unknown as ReturnType<typeof vi.fn>
 const royaleRunning = {
   id: 'b1', mode: 'royale', machine_code: 'm', price: 50, max_players: 3, status: 'running',
   winner: null, creator_wallet: 'A', server_seed_hash: 'h',
@@ -26,6 +32,7 @@ const royaleRunning = {
 describe('BattleFlow', () => {
   beforeEach(() => {
     mockUseBattle.mockReset()
+    mockUseReducedMotion.mockReset().mockReturnValue(false)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
   })
 
@@ -43,6 +50,10 @@ describe('BattleFlow', () => {
 
   it('shows the result once settled', async () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'settled', winner: 'A' }, loading: false, error: null })
+    // Force the reduced-motion fast path here only: useRoyaleReveal jumps straight to phase='done'
+    // (via effect) once settled, firing onComplete synchronously-ish instead of racing the real
+    // ~900ms DWELL_MS setTimeout against waitFor's 1000ms default polling deadline (flaky under load).
+    mockUseReducedMotion.mockReturnValue(true)
     render(<BattleFlow />)
     await waitFor(() => expect(screen.getByText(/victory/i)).toBeTruthy())
   })
