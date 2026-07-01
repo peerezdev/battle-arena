@@ -125,6 +125,13 @@ export function useRoyaleReveal(
     }
     const t = setTimeout(() => { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }, ELIM_BEAT_MS)
     return () => clearTimeout(t)
+  // `round` and `card` must stay in these deps even though the effect body never reads them
+  // directly for branching logic: after `setCard(c => c+1)` advances to a card that is ALSO
+  // already resolved (e.g. a fast poll delivered several resolved cards at once), none of the
+  // other derived deps (phase, countdown, roundComplete, targetResolved, isLastRound, settled)
+  // change value on that render — they're recomputed from the new round/card but can land on
+  // the same values. Without round/card here, the effect would not re-run and the reveal would
+  // stall after the first card.
   }, [reducedMotion, phase, countdown, round, card, roundComplete, targetResolved, isLastRound, settled])
 
   if (reducedMotion) {

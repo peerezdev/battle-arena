@@ -99,4 +99,21 @@ describe('useRoyaleReveal', () => {
     act(() => { vi.advanceTimersByTime(1000) })
     expect(result.current.countdown).toBe(4)
   })
+
+  it('a poll (new vm object, same data) does not reset the in-flight dwell timer', () => {
+    const onComplete = vi.fn()
+    const { result, rerender } = renderHook(
+      ({ vm }) => useRoyaleReveal(vm, { reducedMotion: false, onComplete }),
+      { initialProps: { vm: vm3 } },
+    )
+    // A dwell timer for card 0 (A) is scheduled on mount (DWELL_MS = 900). Advance part of it.
+    act(() => { vi.advanceTimersByTime(500) })
+    // A poll arrives mid-dwell: a fresh vm object with the same relevant fields.
+    rerender({ vm: { ...vm3, players: [...vm3.players], rounds: [...vm3.rounds] } })
+    // Advance only the REMAINDER of the original 900ms. If the rerender had reset the timer,
+    // it would need a fresh 900ms and would NOT have fired by now.
+    act(() => { vi.advanceTimersByTime(400) })
+    const a = result.current.projection.players.find((p) => p.wallet === 'A')
+    expect(a?.cards.length).toBe(1)   // A's card revealed → the original timer survived the poll
+  })
 })
