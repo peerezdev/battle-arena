@@ -19,7 +19,7 @@ from app.services.users import leaderboard
 
 def test_award_no_code_base_only(Session):
     s = Session()
-    award_gimmighouls(s, "alice", 100.0)
+    award_gimmighouls(s, "alice", 100_000_000)   # $100 in base units
     s.commit()
     assert s.get(User, "alice").gimmighouls == 100
 
@@ -27,7 +27,7 @@ def test_award_no_code_base_only(Session):
 def test_award_custom_ratio_for_gacha(Session):
     """A lower ratio (gacha) credits proportionally fewer gimmighouls than the default battles rate."""
     s = Session()
-    award_gimmighouls(s, "alice", 100.0, ratio=0.5)   # gacha rate
+    award_gimmighouls(s, "alice", 100_000_000, ratio=0.5)   # $100 at the gacha rate
     s.commit()
     assert s.get(User, "alice").gimmighouls == 50      # half of the 100 a battle would give
 
@@ -37,7 +37,7 @@ def test_award_with_code_boost_and_referrer_cut_to_owner(Session):
     create_referral_code(s, "CREATOR", "Creator", boost_pct=0.10, referrer_pct=0.10,
                          owner_wallet="owner")
     apply_referral_code(s, "bob", "CREATOR")
-    credited = award_gimmighouls(s, "bob", 100.0)
+    credited = award_gimmighouls(s, "bob", 100_000_000)   # $100
     s.commit()
     assert credited == 110
     assert s.get(User, "bob").gimmighouls == 110
@@ -48,7 +48,7 @@ def test_award_with_code_fallback_to_earned_when_no_owner(Session):
     s = Session()
     create_referral_code(s, "NOOWNER", "NoOwner", boost_pct=0.0, referrer_pct=0.20)
     apply_referral_code(s, "carol", "NOOWNER")
-    credited = award_gimmighouls(s, "carol", 50.0)
+    credited = award_gimmighouls(s, "carol", 50_000_000)   # $50
     s.commit()
     assert credited == 50
     assert get_referral_code(s, "NOOWNER").earned == 10  # round(50 * 0.20)
@@ -58,7 +58,7 @@ def test_award_rounding(Session):
     s = Session()
     create_referral_code(s, "ODD", "Odd", boost_pct=0.105, referrer_pct=0.0)
     apply_referral_code(s, "dave", "ODD")
-    credited = award_gimmighouls(s, "dave", 33.0)  # 33 * 1.105 = 36.465 -> 36
+    credited = award_gimmighouls(s, "dave", 33_000_000)  # $33 · 33 * 1.105 = 36.465 -> 36
     s.commit()
     assert credited == 36
 
@@ -68,7 +68,7 @@ def test_award_respects_config_ratio(Session, monkeypatch):
     from app.config import Settings
     monkeypatch.setattr(refmod, "get_settings", lambda: Settings(gimmighoul_per_usdc=2.0))
     s = Session()
-    credited = award_gimmighouls(s, "erin", 10.0)
+    credited = award_gimmighouls(s, "erin", 10_000_000)   # $10 at 2x
     s.commit()
     assert credited == 20
 
@@ -170,8 +170,8 @@ def test_settle_award_idempotent_guard(Session):
             award_gimmighouls(s, w, buyin)
         battle.gimmighouls_awarded = True
 
-    settle_award_once(b, ["p1", "p2"], 25.0)
-    settle_award_once(b, ["p1", "p2"], 25.0)  # re-run must not double-credit
+    settle_award_once(b, ["p1", "p2"], 25_000_000)   # $25 in base units
+    settle_award_once(b, ["p1", "p2"], 25_000_000)  # re-run must not double-credit
     s.commit()
     assert s.get(User, "p1").gimmighouls == 25
     assert s.get(User, "p2").gimmighouls == 25
