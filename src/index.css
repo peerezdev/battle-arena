@@ -157,3 +157,6 @@ textarea::placeholder {
 /* Emote bubble thrown over a player */
 @keyframes ba-emote-in { 0%{transform:translateY(-50%) scale(.4);opacity:1} 55%{transform:translateY(-50%) scale(1.2);opacity:1} 72%{transform:translateY(-50%) scale(.95)} 100%{transform:translateY(-50%) scale(1);opacity:1} }
 @keyframes ba-emote-out { 0%{transform:translateY(-50%) scale(1);opacity:1} 100%{transform:translateY(-80%) scale(.9);opacity:0} }
+/* Radio widget: spinning disc + equalizer bars */
+@keyframes ca-eq { 0%,100%{transform:scaleY(.28)} 50%{transform:scaleY(1)} }
+@keyframes ca-spin { to { transform: rotate(360deg) } }

@@ -57,22 +57,22 @@ describe('RadioPlayer', () => {
 
   it('opens the panel and selecting a track plays it', () => {
     render(<RadioPlayer />)
-    fireEvent.click(screen.getByLabelText('Lista de canciones'))
+    fireEvent.click(screen.getByLabelText('Cambiar emisora'))
     const entry = screen.getByRole('button', { name: /Track B/ })
     fireEvent.click(entry)
     expect(actions.select).toHaveBeenCalledWith(1)
   })
 
-  it('volume slider calls setVolume', () => {
+  it('volume popover slider calls setVolume', () => {
     render(<RadioPlayer />)
-    fireEvent.click(screen.getByLabelText('Lista de canciones'))
-    fireEvent.change(screen.getByLabelText('Volumen'), { target: { value: '0.2' } })
-    expect(actions.setVolume).toHaveBeenCalledWith(0.2)
+    fireEvent.click(screen.getByLabelText('Volumen'))                 // open the popover
+    fireEvent.change(screen.getByLabelText('Nivel de volumen'), { target: { value: '40' } })
+    expect(actions.setVolume).toHaveBeenCalledWith(0.4)               // 0–100 slider → 0–1 store
   })
 
   it('shuffle toggle calls toggleShuffle', () => {
     render(<RadioPlayer />)
-    fireEvent.click(screen.getByLabelText('Lista de canciones'))
+    fireEvent.click(screen.getByLabelText('Cambiar emisora'))
     fireEvent.click(screen.getByLabelText('Mezclar'))
     expect(actions.toggleShuffle).toHaveBeenCalled()
   })
