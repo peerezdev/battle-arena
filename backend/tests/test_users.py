@@ -67,6 +67,27 @@ def test_royale_wager_and_history_use_buyin(Session):
         assert rows[0]["result"] == "loss" and rows[0]["amountUsd"] == -buyin
 
 
+def test_gacha_tracked_in_wager_and_history(Session):
+    """Opened gacha packs count toward the wager (spend) and appear in history (net = value − cost)."""
+    from datetime import datetime, timezone
+    from app.models import GachaPack
+    with Session() as s:
+        s.add(GachaPack(memo="g1", wallet="W1", pack_type="pokemon_50",
+                        opened_at=datetime.now(timezone.utc), nft_address="N1",
+                        price=50_000_000, insured_value=180.0, name="Charizard"))
+        s.add(GachaPack(memo="g2", wallet="W1", pack_type="pokemon_50"))  # generated, not opened → ignored
+        s.commit()
+
+        st = read_user_stats(s, "W1")
+        assert st["totalWageredUsd"] == 50.0        # only the opened pack's cost
+
+        rows = read_user_battles(s, "W1")
+        gacha = [r for r in rows if r["kind"] == "gacha"]
+        assert len(gacha) == 1
+        assert gacha[0]["amountUsd"] == 130.0       # 180 pulled − 50 spent
+        assert gacha[0]["pullName"] == "Charizard" and gacha[0]["machineCode"] == "pokemon_50"
+
+
 def test_read_user_view_default_and_existing(Session):
     with Session() as s:
         assert read_user_view(s, "GHOST", 1200) == {"wallet": "GHOST", "alias": None, "elo": 1200,

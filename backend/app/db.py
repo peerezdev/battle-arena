@@ -25,6 +25,9 @@ _ENSURE_COLUMNS = [
     ("users", "emote_slots", "VARCHAR"),
     ("pack_battles", "gimmighouls_awarded", "BOOLEAN NOT NULL DEFAULT 0"),
     ("pack_battles", "rematch_battle_id", "VARCHAR"),
+    ("gacha_packs", "price", "INTEGER"),
+    ("gacha_packs", "insured_value", "FLOAT"),
+    ("gacha_packs", "name", "VARCHAR"),
 ]
 
 
@@ -40,8 +43,28 @@ def _ensure_columns(engine):
                 conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {ddl}'))
 
 
+def _backfill_gacha_price(engine):
+    """Best-effort: set price for already-opened gacha packs (opened before price tracking) from the
+    number in pack_type (e.g. 'pokemon_50' → $50), so past gacha spend still counts toward the wager.
+    Only fills NULLs → idempotent. Packs with no number in the code (e.g. 'pokemon_cnft') stay null."""
+    import re
+    insp = inspect(engine)
+    if "gacha_packs" not in set(insp.get_table_names()):
+        return
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT memo, pack_type FROM gacha_packs WHERE opened_at IS NOT NULL AND price IS NULL"
+        )).fetchall()
+        for memo, pack_type in rows:
+            m = re.search(r"(\d+)", pack_type or "")
+            if m:
+                conn.execute(text("UPDATE gacha_packs SET price = :p WHERE memo = :m"),
+                             {"p": int(m.group(1)) * 1_000_000, "m": memo})
+
+
 def init_db(engine):
     # importa los modelos para registrarlos en Base.metadata antes de create_all
     from . import models  # noqa: F401
     Base.metadata.create_all(engine)
     _ensure_columns(engine)
+    _backfill_gacha_price(engine)

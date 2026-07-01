@@ -80,6 +80,9 @@ class GachaPack(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     nft_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)           # USDC base units spent to open
+    insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # value of the card pulled (dollars)
+    name: Mapped[Optional[str]] = mapped_column(String, nullable=True)             # pulled card name
 
 
 class PackBattle(Base):

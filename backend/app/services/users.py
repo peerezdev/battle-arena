@@ -66,7 +66,7 @@ def read_user_stats(session: Session, wallet: str) -> dict:
     """Aggregate profile stats from settled battles + pulls. Computed on read (no schema):
     battles/wins/win_rate/total_wagered, the best single card pulled, and the biggest loot
     (combined insured value) of a battle the wallet won."""
-    from ..models import PackBattle, BattlePlayer, BattlePull
+    from ..models import PackBattle, BattlePlayer, BattlePull, GachaPack
     USDC = 1_000_000  # USDC base units → dollars
 
     battles = list(session.scalars(
@@ -76,7 +76,12 @@ def read_user_stats(session: Session, wallet: str) -> dict:
     ))
     n_battles = len(battles)
     wins = sum(1 for b in battles if b.winner == wallet)
-    wagered_usd = sum(_entry_base_units(b) for b in battles) / USDC
+    # Wager = battle stakes + gacha spend (opened packs).
+    gacha_spend = session.scalar(
+        select(func.coalesce(func.sum(GachaPack.price), 0))
+        .where(GachaPack.wallet == wallet, GachaPack.opened_at.isnot(None), GachaPack.price.isnot(None))
+    ) or 0
+    wagered_usd = (sum(_entry_base_units(b) for b in battles) + gacha_spend) / USDC
 
     # best hit — the single highest-value card this wallet ever pulled
     best_pull = session.scalars(
@@ -119,9 +124,10 @@ def read_user_stats(session: Session, wallet: str) -> dict:
 
 
 def read_user_battles(session: Session, wallet: str, limit: int = 20) -> list[dict]:
-    """The wallet's most recent settled battles for the History tab. amountUsd is signed:
-    a win = the battle's combined loot (all cards won); a loss = minus the entry buy-in."""
-    from ..models import PackBattle, BattlePlayer, BattlePull
+    """The wallet's most recent activity for the History tab: settled battles + gacha opens, newest
+    first. amountUsd is signed — battle win = combined loot, battle loss = minus the entry buy-in,
+    gacha = the pulled card's value minus what the pack cost."""
+    from ..models import PackBattle, BattlePlayer, BattlePull, GachaPack
     USDC = 1_000_000
 
     battles = list(session.scalars(
@@ -150,12 +156,35 @@ def read_user_battles(session: Session, wallet: str, limit: int = 20) -> list[di
             .where(BattlePlayer.battle_id == b.id, BattlePlayer.player_wallet != wallet)
         )]
         out.append({
+            "kind": "battle",
             "battleId": b.id, "mode": b.mode, "machineCode": b.machine_code,
             "result": "win" if won else "loss", "amountUsd": amount,
             "cards": cards, "opponents": opponents,
             "ts": (b.settled_at or b.created_at).timestamp() if (b.settled_at or b.created_at) else None,
         })
-    return out
+
+    # Gacha opens — amount = pulled card value minus what the pack cost. Only opens where we captured
+    # the card value show in history (older, pre-tracking opens still count toward the wager).
+    gacha = list(session.scalars(
+        select(GachaPack)
+        .where(GachaPack.wallet == wallet, GachaPack.opened_at.isnot(None), GachaPack.insured_value.isnot(None))
+        .order_by(desc(GachaPack.opened_at)).limit(limit)
+    ))
+    for g in gacha:
+        value = g.insured_value or 0.0
+        spent = (g.price or 0) / USDC
+        out.append({
+            "kind": "gacha",
+            "battleId": g.memo, "mode": "gacha", "machineCode": g.pack_type,
+            "result": "gacha", "amountUsd": value - spent,
+            "pullName": g.name, "pullValue": value, "spentUsd": spent,
+            "cards": 1, "opponents": [],
+            "ts": g.opened_at.timestamp() if g.opened_at else None,
+        })
+
+    # Merge battles + gacha, newest first, cap at `limit`.
+    out.sort(key=lambda r: r["ts"] or 0, reverse=True)
+    return out[:limit]
 
 
 def set_withdraw_address(session: Session, wallet: str, address: Optional[str]) -> None:

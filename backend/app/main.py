@@ -418,6 +418,13 @@ def create_app(session_factory, chain: ChainSource,
         if not out.get("pending") and out.get("nft_address"):
             pack.opened_at = datetime.now(timezone.utc)
             pack.nft_address = out["nft_address"]
+            # Persist what it cost + what came out so the profile can track gacha (wager + history).
+            pack.insured_value = out.get("insured_value")
+            pack.name = out.get("name")
+            try:
+                pack.price = await _machine_price(pack.pack_type)
+            except Exception:
+                pass  # best-effort; the open already succeeded
             s.commit()
             username = read_user_view(s, wallet, elo_start).get("alias")
             drop = {
