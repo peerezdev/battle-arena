@@ -8,10 +8,7 @@ import { RevealCard } from './RevealCard'
 import { useAliases } from '../../useAliases'
 import { EmoteBar } from '../../emotes/EmoteBar'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
-
-export function shortWallet(w: string): string {
-  return w.length > 9 ? `${w.slice(0, 4)}…${w.slice(-4)}` : w
-}
+import { shortWallet, tintFor, medalColor } from './royaleShared'
 
 // Rarity palette for the little card chips / loot.
 const RAR: Record<string, { tint: string; border: string; label: string }> = {
@@ -23,10 +20,6 @@ const RAR: Record<string, { tint: string; border: string; label: string }> = {
   mythic:    { tint: '#8a6a1f', border: 'rgba(245,197,66,.65)',  label: 'MYTHIC' },
 }
 const rarOf = (r: string | null) => RAR[(r ?? '').toLowerCase()] ?? RAR.common
-
-const TINTS = ['linear-gradient(135deg,#ff6bb5,#d4127a)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#00ffc4,#1aa0d8)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
-const tintFor = (w: string) => TINTS[Math.abs([...w].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % TINTS.length]
-const medalColor = (r: number) => (r === 1 ? '#f5c542' : r === 2 ? '#c8d0da' : r === 3 ? '#e8964e' : COLORS.muted)
 
 const TITLE = (
   <h1 style={{ margin: 0, fontFamily: FONTS.display, fontSize: 'clamp(22px,3vw,30px)', fontWeight: 700, letterSpacing: '-.02em' }}>
@@ -343,3 +336,5 @@ function CardChips({ cards }: { cards: RevealCardVM[] }) {
     </div>
   )
 }
+
+export { shortWallet }
