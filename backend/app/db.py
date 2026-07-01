@@ -24,6 +24,7 @@ _ENSURE_COLUMNS = [
     ("users", "withdraw_address", "VARCHAR"),
     ("users", "emote_slots", "VARCHAR"),
     ("pack_battles", "gimmighouls_awarded", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("pack_battles", "rematch_battle_id", "VARCHAR"),
 ]
 
 

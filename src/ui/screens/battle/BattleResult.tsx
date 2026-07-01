@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { shortWallet } from './RoyaleReveal'
 import { RevealCard } from './RevealCard'
 import { VerifyPanel } from './VerifyPanel'
 import { useAliases } from '../../useAliases'
+import { startRematch } from '../../battle/startRematch'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
 const TINTS = ['linear-gradient(135deg,#5cffd8,#00c79a)', 'linear-gradient(135deg,#ff6bb5,#d4127a)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
@@ -19,6 +21,7 @@ const CONF = ['#5cffd8', '#ff2e97', '#f5c542', '#4ea8ff', '#ff6e8a']
 export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId: string; onExit: () => void }) {
   const [verifyOpen, setVerifyOpen] = useState(false)
   const navigate = useNavigate()
+  const { identityToken } = useIdentityToken()
   const aliases = useAliases(vm.players.map((p) => p.wallet))
 
   const iAmPlayer = vm.players.some((p) => p.isMe)
@@ -70,7 +73,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
         )}
 
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 18, flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/app')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 12px 34px -10px rgba(0,255,196,.7)' }}>↻ Rematch</button>
+          <button onClick={() => startRematch({ battleId, mode: 'pack', token: identityToken, navigate })} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 12px 34px -10px rgba(0,255,196,.7)' }}>↻ Rematch</button>
           <button onClick={() => setVerifyOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 22px', borderRadius: 13, border: '1px solid rgba(0,255,196,.32)', background: 'rgba(0,255,196,.08)', color: COLORS.green, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>Verify · Provably Fair</button>
           <button onClick={onExit} style={{ padding: '13px 22px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.muted, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>Back to lobby</button>
         </div>

@@ -13,6 +13,7 @@ import { DepositModal } from '../components/DepositModal'
 import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
 import { useChat } from '../../hooks/useChat'
+import { useRematchInvites } from '../../hooks/useRematchInvites'
 import { LiveDropsStrip } from '../screens/Hub/LiveDropsStrip'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
@@ -57,6 +58,7 @@ export function AppShell() {
   // ── Mobile chat unread dot ─────────────────────────────────────────────────
   // On mobile the chat is only mounted while open, so keep a persistent connection here to know
   // when a new message arrives while it's closed. Mark everything seen when the chat is open.
+  useRematchInvites()   // app-wide rematch toast, even after leaving the result screen
   const { messages: chatMessages } = useChat(!wideRail)
   const [seenChat, setSeenChat] = useState(0)
   const seenInit = useRef(false)

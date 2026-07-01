@@ -142,6 +142,31 @@ def test_create_battle_returns_hash_not_seed(client_priv, monkeypatch):
     assert body["status"] == "lobby"
 
 
+def test_rematch_guards(client_priv, monkeypatch):
+    """Rematch requires a participant and a finished battle."""
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+    hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    bid = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a).json()["id"]
+
+    # battle still in lobby (not finished) → 409, even for a participant
+    assert c.post(f"/pack-battles/{bid}/rematch", headers=hdrs_a).status_code == 409
+    # non-participant → 403
+    hdrs_b = _auth_headers(priv, WALLET_B, WALLET_ID_B)
+    assert c.post(f"/pack-battles/{bid}/rematch", headers=hdrs_b).status_code == 403
+    # unknown battle → 404
+    assert c.post("/pack-battles/does-not-exist/rematch", headers=hdrs_a).status_code == 404
+
+
 def test_second_player_join_schedules_run(client_priv, monkeypatch):
     """Second player joining a 2-player lobby fills it → run_pack_battle_live is scheduled."""
     c, priv = client_priv

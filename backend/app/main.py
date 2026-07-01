@@ -26,7 +26,7 @@ from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
-from .models import GachaPack, PackBattle, BattlePlayer
+from .models import GachaPack, PackBattle, BattlePlayer, BattlePack
 from .chat import ConnectionManager, ChatBuffer, abbreviate
 from .services.pack_lobby import (
     create_battle, join_battle,
@@ -758,6 +758,57 @@ def create_app(session_factory, chain: ChainSource,
         if filled:
             asyncio.create_task(_run_bg(battle_id))
         return get_battle(s, battle_id)
+
+    def _rematch_body(fin: PackBattle, s: Session) -> CreateBattleBody:
+        """Rebuild the create-battle body from a finished battle so the rematch has the same config."""
+        if fin.mode == "royale":
+            return CreateBattleBody(machine_code=fin.machine_code, max_players=fin.max_players, mode="royale")
+        packs = s.query(BattlePack).filter_by(battle_id=fin.id).order_by(BattlePack.sequence).all()
+        if packs:
+            counts: dict[str, int] = {}
+            order: list[str] = []
+            for p in packs:
+                if p.machine_code not in counts:
+                    order.append(p.machine_code); counts[p.machine_code] = 0
+                counts[p.machine_code] += 1
+            return CreateBattleBody(max_players=fin.max_players, mode="pack",
+                                    packs=[PackSel(machine_code=m, count=counts[m]) for m in order])
+        return CreateBattleBody(machine_code=fin.machine_code, max_players=fin.max_players, mode="pack")
+
+    @app.post("/pack-battles/{battle_id}/rematch")
+    async def rematch_pack_battle(battle_id: str, wallet: str = Depends(current_user),
+                                  wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        """Create-or-join the rematch for a finished battle. The first participant to ask creates a new
+        lobby with the same config (real stake — same funds path as a normal create) and the others
+        auto-join it. Other participants are invited over the WS in case they left the result screen."""
+        finished = s.get(PackBattle, battle_id)
+        if finished is None:
+            raise HTTPException(404, "no existe")
+        participants = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()}
+        if wallet not in participants:
+            raise HTTPException(403, "solo los participantes pueden pedir revancha")
+        if finished.status not in ("settled", "voided"):
+            raise HTTPException(409, "la batalla aún no ha terminado")
+
+        # An open rematch lobby already exists → auto-join it (funds handled by the join path).
+        rm = s.get(PackBattle, finished.rematch_battle_id) if finished.rematch_battle_id else None
+        if rm is not None and rm.status == "lobby":
+            rm_players = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=rm.id).all()}
+            if wallet in rm_players:
+                return {"battle_id": rm.id, "created": False, "joined": False}
+            await join_pack_battle(rm.id, wallet=wallet, wallet_id=wallet_id, s=s)
+            return {"battle_id": rm.id, "created": False, "joined": True}
+
+        # Otherwise create a fresh rematch lobby with the same config (same funds path as create).
+        created = await create_pack_battle(body=_rematch_body(finished, s), wallet=wallet, wallet_id=wallet_id, s=s)
+        new_id = created["id"]
+        finished.rematch_battle_id = new_id
+        s.commit()
+        await _chat_mgr.broadcast({
+            "type": "rematch", "finished_battle_id": battle_id, "rematch_battle_id": new_id,
+            "from": wallet, "players": sorted(participants), "mode": finished.mode,
+        })
+        return {"battle_id": new_id, "created": True, "joined": True}
 
     @app.post("/pack-battles/{battle_id}/join-bot")
     async def join_bot_pack_battle(battle_id: str, s: Session = Depends(db)):

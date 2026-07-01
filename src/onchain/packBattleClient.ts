@@ -74,6 +74,13 @@ export function cancelBattle(token: string, id: string): Promise<Battle> {
   })
 }
 
+/** Create-or-join the rematch for a finished battle. Returns the battle to navigate to. */
+export function rematchBattle(token: string, id: string): Promise<{ battle_id: string; created: boolean; joined: boolean }> {
+  return battleFetch(`/pack-battles/${encodeURIComponent(id)}/rematch`, {
+    method: 'POST', headers: authHeaders(token),
+  })
+}
+
 /** DEV/TEST: drop a random funded reserve bot into a lobby slot (no auth). */
 export function joinBot(id: string): Promise<Battle> {
   return battleFetch<Battle>(`/pack-battles/${encodeURIComponent(id)}/join-bot`, { method: 'POST' })

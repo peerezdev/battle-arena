@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useIdentityToken } from '@privy-io/react-auth'
+import { startRematch } from '../../battle/startRematch'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
@@ -69,6 +71,7 @@ export function RoyaleReveal({ vm }: { vm: RevealVM; reducedMotion?: boolean }) 
 // Separate result screen — shown once every round has finished (battle settled).
 export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?: string; onExit?: () => void }) {
   const navigate = useNavigate()
+  const { identityToken } = useIdentityToken()
   const aliases = useAliases(vm.players.map((p) => p.wallet))
   const [verifyOpen, setVerifyOpen] = useState(false)
   const name = nameOf(aliases)
@@ -80,7 +83,7 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
       {TITLE}
       <ResultView
         vm={vm} name={name} ranked={ranked} entry={entry}
-        onRematch={() => navigate('/app')} onExit={onExit} onVerify={() => setVerifyOpen(true)}
+        onRematch={() => startRematch({ battleId, mode: 'royale', token: identityToken, navigate })} onExit={onExit} onVerify={() => setVerifyOpen(true)}
       />
       {verifyOpen && battleId && <VerifyPanel battleId={battleId} onClose={() => setVerifyOpen(false)} />}
     </div>

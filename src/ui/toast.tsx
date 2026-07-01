@@ -57,6 +57,12 @@ export function Toaster() {
               {t.action.label}
             </button>
           )}
+          {t.action && (
+            <button onClick={() => dismiss(t.id)} aria-label="Dismiss"
+              style={{ flexShrink: 0, background: 'transparent', border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: '6px 10px', color: COLORS.muted, fontFamily: FONTS.body, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+              ✕
+            </button>
+          )}
         </div>
       ))}
     </div>

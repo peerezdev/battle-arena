@@ -92,6 +92,7 @@ class PackBattle(Base):
     status: Mapped[str] = mapped_column(String, default="lobby", index=True)  # lobby|running|settled|voided
     winner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     creator_wallet: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    rematch_battle_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # link → the rematch lobby
     escrow_wallet_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     escrow_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     server_seed: Mapped[Optional[str]] = mapped_column(String, nullable=True)
