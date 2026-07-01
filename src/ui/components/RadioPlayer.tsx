@@ -85,18 +85,21 @@ export function RadioPlayer() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5l11 7-11 7z" /></svg>
         </button>
 
-        {/* Volume — speaker toggles a small popover with the slider (closes on mouse leave) */}
-        <span style={{ position: 'relative', display: 'inline-flex' }} onMouseLeave={() => setVolOpen(false)}>
+        {/* Volume — speaker toggles a popover with the slider; click anywhere else closes it */}
+        <span style={{ position: 'relative', display: 'inline-flex' }}>
           <button type="button" aria-label="Volumen" onClick={() => setVolOpen((o) => !o)} style={iconBtn}>
             <SpeakerIcon level={pct} muted={muted} />
           </button>
           {volOpen && (
-            <span style={{ position: 'absolute', top: 'calc(100% + 9px)', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px', borderRadius: 12, background: '#10151d', border: `1px solid ${COLORS.border}`, boxShadow: '0 16px 34px -12px rgba(0,0,0,.8)', zIndex: 140, whiteSpace: 'nowrap' }}>
-              <input type="range" aria-label="Nivel de volumen" min={0} max={100} value={pct}
-                onChange={(e) => radio.setVolume(Number(e.target.value) / 100)}
-                style={{ width: 92, accentColor: AC, cursor: 'pointer' }} />
-              <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#9aa4b2', width: 26, textAlign: 'right' }}>{pct}</span>
-            </span>
+            <>
+              <span onClick={() => setVolOpen(false)} style={{ position: 'fixed', inset: 0, display: 'block', zIndex: 135 }} />
+              <span style={{ position: 'absolute', top: 'calc(100% + 9px)', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 9, padding: '10px 13px', borderRadius: 12, background: '#10151d', border: `1px solid ${COLORS.border}`, boxShadow: '0 16px 34px -12px rgba(0,0,0,.8)', zIndex: 140, whiteSpace: 'nowrap' }}>
+                <input type="range" aria-label="Nivel de volumen" min={0} max={100} value={pct}
+                  onChange={(e) => radio.setVolume(Number(e.target.value) / 100)}
+                  style={{ width: 92, accentColor: AC, cursor: 'pointer' }} />
+                <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#9aa4b2', width: 26, textAlign: 'right' }}>{pct}</span>
+              </span>
+            </>
           )}
         </span>
 
