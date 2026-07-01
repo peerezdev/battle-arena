@@ -105,19 +105,3 @@ export function buildRoyaleDemo(pool: MachineCard[], odds: Record<string, number
     players, rounds, server_seed_hash: null, pulls,
   }
 }
-
-/** A partial snapshot of a settled royale Battle showing only the first `revealed` rounds — used to
- *  animate the reveal round-by-round (the real flow grows the VM via polling). */
-export function royaleSnapshot(full: Battle, revealed: number): Battle {
-  const pulls = (full.pulls ?? []).filter((p) => p.round_number <= revealed)
-  const rounds = full.rounds.filter((r) => r.round_number <= revealed)
-  const acc: Record<string, number> = {}
-  for (const p of pulls) acc[p.player_wallet] = (acc[p.player_wallet] ?? 0) + (p.insured_value ?? 0)
-  const players: BattlePlayerState[] = full.players.map((p) => ({
-    wallet: p.wallet,
-    eliminated_round: p.eliminated_round != null && p.eliminated_round <= revealed ? p.eliminated_round : null,
-    accumulated_value: acc[p.wallet] ?? 0,
-  }))
-  const settled = revealed >= full.rounds.length
-  return { ...full, pulls, rounds, players, status: settled ? 'settled' : 'running', winner: settled ? full.winner : null }
-}

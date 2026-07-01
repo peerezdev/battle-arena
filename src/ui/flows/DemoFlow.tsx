@@ -4,7 +4,7 @@ import { COLORS, FONTS } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
 import { fetchMachines, fetchMachineCards, type MachineCard, type GachaMachine } from '../../onchain/gachaClient'
 import type { Battle } from '../../onchain/packBattleClient'
-import { buildPackDemo, buildRoyaleDemo, royaleSnapshot, DEMO_ME } from '../../demo/demoBattle'
+import { buildPackDemo, buildRoyaleDemo, DEMO_ME } from '../../demo/demoBattle'
 import { battleToReveal } from '../screens/battle/battleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
@@ -15,7 +15,6 @@ import { throwEmote } from '../emotes/throwEmote'
 const DEMO_MACHINE = 'pokemon_50'
 const ROYALE_PLAYERS = 10
 const RIVAL_EMOTE_MS = 3200
-const ROUND_MS = 1700
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -45,15 +44,15 @@ export function DemoFlow() {
 
   const [battle, setBattle] = useState<Battle | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // pack: reveal animation → result. royale: reveal rounds one by one → result.
+  // pack: reveal animation → result. royale: the cinematic reveal (RoyaleReveal + useRoyaleReveal)
+  // paces the whole thing and calls onComplete when the last round finishes → show the result.
   const [revealDone, setRevealDone] = useState(false)
-  const [revealed, setRevealed] = useState(1)
   const [done, setDone] = useState(false)
 
   // Build the simulated battle from a real machine's card pool (read-only — no funds).
   useEffect(() => {
     let cancelled = false
-    setBattle(null); setError(null); setRevealDone(false); setRevealed(1); setDone(false)
+    setBattle(null); setError(null); setRevealDone(false); setDone(false)
     ;(async () => {
       try {
         const machines: GachaMachine[] = await fetchMachines()
@@ -76,15 +75,6 @@ export function DemoFlow() {
     })()
     return () => { cancelled = true }
   }, [isRoyale])
-
-  // Royale: advance one round per tick, then settle into the result screen.
-  const totalRounds = battle && isRoyale ? battle.rounds.length : 0
-  useEffect(() => {
-    if (!battle || !isRoyale || done) return
-    if (revealed >= totalRounds) { const t = setTimeout(() => setDone(true), ROUND_MS); return () => clearTimeout(t) }
-    const t = setTimeout(() => setRevealed((r) => r + 1), ROUND_MS)
-    return () => clearTimeout(t)
-  }, [battle, isRoyale, revealed, done, totalRounds])
 
   // Flavour: the bots throw random emotes during the demo (there's no real broadcast to receive).
   const { catalog } = useEmotes()
@@ -120,7 +110,7 @@ export function DemoFlow() {
         {isRoyale ? (
           done
             ? <RoyaleResult vm={battleToReveal(battle, DEMO_ME)} battleId="demo" onExit={exit} />
-            : <RoyaleReveal vm={battleToReveal(royaleSnapshot(battle, revealed), DEMO_ME)} reducedMotion={!!reduced} />
+            : <RoyaleReveal vm={battleToReveal(battle, DEMO_ME)} reducedMotion={!!reduced} battleId="demo" onComplete={() => setDone(true)} />
         ) : (
           revealDone
             ? <BattleResult vm={battleToReveal(battle, DEMO_ME)} battleId="demo" onExit={exit} />
