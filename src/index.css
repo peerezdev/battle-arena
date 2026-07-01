@@ -160,3 +160,7 @@ textarea::placeholder {
 /* Radio widget: spinning disc + equalizer bars */
 @keyframes ca-eq { 0%,100%{transform:scaleY(.28)} 50%{transform:scaleY(1)} }
 @keyframes ca-spin { to { transform: rotate(360deg) } }
+
+/* Royale round-break countdown number pop */
+@keyframes ca-count-pop { 0%{transform:scale(.6);opacity:0} 45%{transform:scale(1.12);opacity:1} 100%{transform:scale(1);opacity:1} }
+.ca-count-pop { animation: ca-count-pop .5s cubic-bezier(.2,.8,.2,1) both; }
