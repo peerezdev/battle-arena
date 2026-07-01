@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { config } from '../onchain/config'
 import { useEmbeddedSolanaAddress } from '../wallet/embedded'
+import { rematchBattle } from '../onchain/packBattleClient'
 import { showToast } from '../ui/toast'
 
 function wsUrl(token: string | null | undefined): string {
@@ -22,6 +23,7 @@ export function useRematchInvites(): void {
   const navigate = useNavigate()
   const navRef = useRef(navigate); navRef.current = navigate
   const meRef = useRef(meWallet); meRef.current = meWallet
+  const tokenRef = useRef(identityToken); tokenRef.current = identityToken
 
   useEffect(() => {
     if (!meWallet) return
@@ -39,7 +41,18 @@ export function useRematchInvites(): void {
           const me = meRef.current
           if (!me || m.from === me || !Array.isArray(m.players) || !m.players.includes(me)) return
           showToast('Rematch — a player wants a rematch', 'info', {
-            label: 'Join', onClick: () => navRef.current(`/play/battle/${m.rematch_battle_id}`),
+            label: 'Join',
+            onClick: async () => {
+              // Auto-join the rematch (funds handled by the join path), then go to it. If the join
+              // fails (e.g. insufficient funds) still take them there so they can see it / deposit.
+              try {
+                const r = await rematchBattle(tokenRef.current!, m.finished_battle_id)
+                navRef.current(`/play/battle/${r.battle_id}`)
+              } catch (e) {
+                navRef.current(`/play/battle/${m.rematch_battle_id}`)
+                showToast(e instanceof Error ? e.message : 'Could not join the rematch')
+              }
+            },
           })
         } catch { /* ignore non-JSON / unrelated messages */ }
       }

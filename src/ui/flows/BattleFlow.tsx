@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT } from '../theme'
 import { useBattle } from '../../onchain/useBattle'
-import { cancelBattle, joinBot } from '../../onchain/packBattleClient'
+import { cancelBattle, joinBot, joinBattle } from '../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
 import { useReducedMotion } from '../useReducedMotion'
 import { battleToReveal } from '../screens/battle/battleReveal'
@@ -34,7 +34,17 @@ export function BattleFlow() {
   const [revealDone, setRevealDone] = useState(false)
   const [joiningBot, setJoiningBot] = useState(false)
   const [botError, setBotError] = useState<string | null>(null)
+  const [joiningSelf, setJoiningSelf] = useState(false)
   const exit = () => navigate('/app')
+
+  function onJoinSelf() {
+    if (!battle) return
+    if (!identityToken) { showToast('Sign in to join'); return }
+    setJoiningSelf(true)
+    joinBattle(identityToken, battle.id)
+      .catch((e) => showToast(e instanceof Error ? e.message : String(e)))   // e.g. insufficient funds
+      .finally(() => setJoiningSelf(false))
+  }
 
   function onCancelLobby() {
     if (!battle || !identityToken) return
@@ -68,6 +78,8 @@ export function BattleFlow() {
 
   if (battle.status === 'lobby') {
     const isCreator = !!meWallet && battle.creator_wallet === meWallet
+    const isParticipant = !!meWallet && battle.players.some((p) => p.wallet === meWallet)
+    const spaceAvailable = battle.players.length < battle.max_players
     const slots = Array.from({ length: battle.max_players }, (_, i) => battle.players[i] ?? null)
     return (
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
@@ -75,6 +87,15 @@ export function BattleFlow() {
         <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
           {battle.players.length}/{battle.max_players} · {battle.mode.toUpperCase()}
         </div>
+        {!isParticipant && spaceAvailable && (
+          <button onClick={onJoinSelf} disabled={joiningSelf} style={{
+            padding: '13px 30px', borderRadius: 13, border: 0, cursor: joiningSelf ? 'default' : 'pointer',
+            fontFamily: FONTS.display, fontWeight: 800, fontSize: 15, color: '#06170f', background: GRADIENT,
+            boxShadow: '0 0 26px -6px rgba(0,255,196,.7)', opacity: joiningSelf ? 0.7 : 1,
+          }}>
+            {joiningSelf ? 'Joining…' : 'Join battle'}
+          </button>
+        )}
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 680 }}>
           {slots.map((p, i) => {
             const isMe = !!p && !!meWallet && p.wallet === meWallet
