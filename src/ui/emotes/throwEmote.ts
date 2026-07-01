@@ -20,9 +20,10 @@ function duckEnd(): void {
 
 const OUT_AT = 2700, GONE_AT = 3150, SIZE = 72
 
-/** Throw an emote bubble over the player with the given wallet. muted=true for incoming emotes that
- *  the browser would block from auto-playing audio (no prior user gesture). */
-export function throwEmote(wallet: string, videoUrl: string, opts?: { muted?: boolean }): void {
+/** Throw an emote bubble over the player with the given wallet. Tries to play with sound; if the
+ *  browser blocks unmuted autoplay (no user gesture yet — e.g. an incoming emote) it retries muted so
+ *  the video always shows. The radio is only ducked while an audible emote is playing. */
+export function throwEmote(wallet: string, videoUrl: string): void {
   if (typeof document === 'undefined') return
   const anchor = [...document.querySelectorAll('[data-player-anchor]')]
     .find((a) => a.getAttribute('data-player-anchor') === wallet) as HTMLElement | undefined
@@ -34,10 +35,9 @@ export function throwEmote(wallet: string, videoUrl: string, opts?: { muted?: bo
   })
 
   const r = anchor.getBoundingClientRect()
-  const muted = !!opts?.muted
   const v = document.createElement('video')
   v.src = videoUrl; v.loop = true; v.autoplay = true; v.playsInline = true
-  v.setAttribute('playsinline', ''); v.muted = muted
+  v.setAttribute('playsinline', ''); v.muted = false
   v.setAttribute('data-ba-emote-bubble', wallet)
   const left = Math.min(r.right + 8, window.innerWidth - SIZE - 8)
   Object.assign(v.style, {
@@ -50,12 +50,14 @@ export function throwEmote(wallet: string, videoUrl: string, opts?: { muted?: bo
   })
   document.body.appendChild(v)
 
-  const ducked = !muted
-  if (ducked) duckStart()
-  v.play().catch(() => {})
+  let ducked = false
+  let removed = false
+  v.play().then(() => {
+    if (!removed) { ducked = true; duckStart() }   // played with sound → duck the radio
+  }).catch(() => {
+    v.muted = true; v.play().catch(() => {})        // blocked → play muted (video only)
+  })
 
-  let cleaned = false
-  const cleanup = () => { if (cleaned) return; cleaned = true; if (ducked) duckEnd() }
   setTimeout(() => { v.style.animation = 'ba-emote-out .4s ease forwards' }, OUT_AT)
-  setTimeout(() => { v.remove(); cleanup() }, GONE_AT)
+  setTimeout(() => { removed = true; v.remove(); if (ducked) duckEnd() }, GONE_AT)
 }

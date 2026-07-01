@@ -45,7 +45,7 @@ const nameOf = (aliases: Record<string, string | null>) => (p: RevealPlayerVM) =
   p.isMe ? aliases[p.wallet] ?? 'You' : aliases[p.wallet] ?? shortWallet(p.wallet)
 
 // Round-by-round view — shown while the royale is running.
-export function RoyaleReveal({ vm }: { vm: RevealVM; reducedMotion?: boolean }) {
+export function RoyaleReveal({ vm, battleId }: { vm: RevealVM; reducedMotion?: boolean; battleId?: string }) {
   const aliases = useAliases(vm.players.map((p) => p.wallet))
   const settled = vm.status === 'settled'
   const name = nameOf(aliases)
@@ -63,7 +63,7 @@ export function RoyaleReveal({ vm }: { vm: RevealVM; reducedMotion?: boolean }) 
         leaderWallet={leaderWallet} atRiskWallet={atRiskWallet} settled={settled}
         entry={entry} currentRound={vm.rounds.length} totalRounds={Math.max(1, vm.players.length - 1)}
       />
-      {vm.meWallet && <div style={{ display: 'flex' }}><EmoteBar meWallet={vm.meWallet} /></div>}
+      {vm.meWallet && <div style={{ display: 'flex' }}><EmoteBar meWallet={vm.meWallet} battleId={battleId} /></div>}
     </div>
   )
 }

@@ -71,6 +71,10 @@ class EmoteSlotsBody(BaseModel):
     slots: list[str] = Field(max_length=8)  # up to 3 kept; codes not owned are dropped server-side
 
 
+class EmoteThrowBody(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+
+
 class SignTxBody(BaseModel):
     transaction: str = Field(min_length=1, max_length=8192)  # base64 (partially-)unsigned tx
 
@@ -809,6 +813,30 @@ def create_app(session_factory, chain: ChainSource,
             "from": wallet, "players": sorted(participants), "mode": finished.mode,
         })
         return {"battle_id": new_id, "created": True, "joined": True}
+
+    _emote_last: dict[str, float] = {}   # wallet → last emote monotonic ts (rate-limit)
+
+    @app.post("/pack-battles/{battle_id}/emote")
+    async def throw_battle_emote(battle_id: str, body: EmoteThrowBody, wallet: str = Depends(current_user),
+                                 s: Session = Depends(db)):
+        """Broadcast an emote to everyone in a battle. Requires the caller to own the emote and be a
+        participant; rate-limited to ~1/s per wallet. Delivery is via the WS hub (clients filter by
+        battle_id)."""
+        b = s.get(PackBattle, battle_id)
+        if b is None:
+            raise HTTPException(404, "no existe")
+        participants = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()}
+        if wallet not in participants:
+            raise HTTPException(403, "solo los participantes pueden lanzar emotes")
+        if not emote_service.owns(s, wallet, body.code):
+            raise HTTPException(403, "no posees ese emote")
+        now = _time.monotonic()
+        last = _emote_last.get(wallet)
+        if last is not None and now - last < 1.0:
+            raise HTTPException(429, "demasiado rápido")
+        _emote_last[wallet] = now
+        await _chat_mgr.broadcast({"type": "emote", "battle_id": battle_id, "from": wallet, "code": body.code})
+        return {"ok": True}
 
     @app.post("/pack-battles/{battle_id}/join-bot")
     async def join_bot_pack_battle(battle_id: str, s: Session = Depends(db)):

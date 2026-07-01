@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../theme'
 import { useEmotes } from './useEmotes'
 import { throwEmote } from './throwEmote'
-import type { Emote } from '../../onchain/emotesClient'
+import { throwEmoteToBattle, type Emote } from '../../onchain/emotesClient'
 
 const MAX_SLOTS = 3
 
@@ -14,14 +15,22 @@ function VideoThumb({ url, size }: { url: string; size: number }) {
 }
 
 /** Quick-access emote bar shown in a battle's action bar. `meWallet` is the wallet of the panel the
- *  thrown emote pops over (in the demo this is the simulated 'You'). Phase 1: local throw only. */
-export function EmoteBar({ meWallet }: { meWallet: string }) {
+ *  thrown emote pops over (in the demo this is the simulated 'You'). When `battleId` is a real battle
+ *  the emote is also broadcast to the other players; in the demo it's local only. */
+export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: string }) {
   const { byCode, owned, slots, loading, updateSlots } = useEmotes()
+  const { identityToken } = useIdentityToken()
   const [menuOpen, setMenuOpen] = useState(false)
 
   if (loading && !owned.length) return null
 
-  const throwIt = (e: Emote | undefined) => { if (e) throwEmote(meWallet, e.video_url, { muted: false }) }
+  const throwIt = (e: Emote | undefined) => {
+    if (!e) return
+    throwEmote(meWallet, e.video_url)   // local + audible (user gesture)
+    if (battleId && battleId !== 'demo' && identityToken) {
+      throwEmoteToBattle(identityToken, battleId, e.code).catch(() => { /* broadcast is best-effort */ })
+    }
+  }
   const slotEmotes = slots.map((c) => byCode[c]).filter(Boolean) as Emote[]
 
   const toggleSlot = (code: string) => {

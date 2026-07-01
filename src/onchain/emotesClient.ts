@@ -38,3 +38,10 @@ export function setEmoteSlots(token: string, slots: string[]): Promise<MyEmotes>
     method: 'PUT', headers: authHeaders(token), body: JSON.stringify({ slots }),
   })
 }
+
+/** Broadcast an emote to everyone in a battle (server validates ownership + participation). */
+export function throwEmoteToBattle(token: string, battleId: string, code: string): Promise<{ ok: boolean }> {
+  return emoteFetch(`/pack-battles/${encodeURIComponent(battleId)}/emote`, {
+    method: 'POST', headers: authHeaders(token), body: JSON.stringify({ code }),
+  })
+}

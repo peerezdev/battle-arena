@@ -167,6 +167,34 @@ def test_rematch_guards(client_priv, monkeypatch):
     assert c.post("/pack-battles/does-not-exist/rematch", headers=hdrs_a).status_code == 404
 
 
+def test_battle_emote_guards(client_priv, monkeypatch):
+    """Emote broadcast requires owning the emote + being a participant, and is rate-limited."""
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+    hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    bid = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a).json()["id"]
+    c.get("/users/me/emotes", headers=hdrs_a)  # grants the default emotes to A
+
+    # owns + participant → 200
+    assert c.post(f"/pack-battles/{bid}/emote", json={"code": "charmander"}, headers=hdrs_a).status_code == 200
+    # not owned → 403 (checked before the rate-limit)
+    assert c.post(f"/pack-battles/{bid}/emote", json={"code": "ghost"}, headers=hdrs_a).status_code == 403
+    # owned but too soon → 429 rate-limit
+    assert c.post(f"/pack-battles/{bid}/emote", json={"code": "bulbasaur"}, headers=hdrs_a).status_code == 429
+    # non-participant → 403
+    hdrs_b = _auth_headers(priv, WALLET_B, WALLET_ID_B)
+    assert c.post(f"/pack-battles/{bid}/emote", json={"code": "charmander"}, headers=hdrs_b).status_code == 403
+
+
 def test_second_player_join_schedules_run(client_priv, monkeypatch):
     """Second player joining a 2-player lobby fills it → run_pack_battle_live is scheduled."""
     c, priv = client_priv

@@ -7,6 +7,7 @@ import { cancelBattle, joinBot, joinBattle } from '../../onchain/packBattleClien
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
 import { useReducedMotion } from '../useReducedMotion'
 import { battleToReveal } from '../screens/battle/battleReveal'
+import { useBattleEmotes } from '../emotes/useBattleEmotes'
 import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
@@ -30,6 +31,8 @@ export function BattleFlow() {
   const reduced = useReducedMotion()
   const { battle, error } = useBattle(battleId ?? null, 1500)
   const { identityToken } = useIdentityToken()
+  useBattleEmotes(battleId)   // render emotes thrown by other players in this battle
+
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [revealDone, setRevealDone] = useState(false)
   const [joiningBot, setJoiningBot] = useState(false)
@@ -157,7 +160,7 @@ export function BattleFlow() {
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {battle.status === 'settled' && revealDone
           ? <BattleResult vm={vm} battleId={battle.id} onExit={exit} />
-          : <PackReveal vm={vm} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} onExit={exit} />}
+          : <PackReveal vm={vm} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} onExit={exit} battleId={battle.id} />}
       </div>
     )
   }
@@ -168,7 +171,7 @@ export function BattleFlow() {
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       {battle.status === 'settled'
         ? <RoyaleResult vm={vm} battleId={battle.id} onExit={exit} />
-        : <RoyaleReveal vm={vm} reducedMotion={!!reduced} />}
+        : <RoyaleReveal vm={vm} reducedMotion={!!reduced} battleId={battle.id} />}
     </div>
   )
 }

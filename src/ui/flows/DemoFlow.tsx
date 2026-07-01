@@ -9,9 +9,12 @@ import { battleToReveal } from '../screens/battle/battleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
+import { useEmotes } from '../emotes/useEmotes'
+import { throwEmote } from '../emotes/throwEmote'
 
 const DEMO_MACHINE = 'pokemon_50'
 const ROYALE_PLAYERS = 10
+const RIVAL_EMOTE_MS = 3200
 const ROUND_MS = 1700
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -82,6 +85,20 @@ export function DemoFlow() {
     const t = setTimeout(() => setRevealed((r) => r + 1), ROUND_MS)
     return () => clearTimeout(t)
   }, [battle, isRoyale, revealed, done, totalRounds])
+
+  // Flavour: the bots throw random emotes during the demo (there's no real broadcast to receive).
+  const { catalog } = useEmotes()
+  useEffect(() => {
+    if (!battle || catalog.length === 0) return
+    const rivals = battle.players.map((p) => p.wallet).filter((w) => w !== DEMO_ME)
+    if (!rivals.length) return
+    const t = setInterval(() => {
+      const w = rivals[Math.floor(Math.random() * rivals.length)]
+      const e = catalog[Math.floor(Math.random() * catalog.length)]
+      throwEmote(w, e.video_url)
+    }, RIVAL_EMOTE_MS)
+    return () => clearInterval(t)
+  }, [battle, catalog])
 
   if (error) {
     return (

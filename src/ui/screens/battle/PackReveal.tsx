@@ -35,8 +35,8 @@ function layoutFor(n: number, wide: boolean): { panelW: number; cardW: number; c
   return { panelW: 178, cardW: 110, compact: true }
 }
 
-export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
-  vm: RevealVM; reducedMotion: boolean; onComplete?: () => void; onExit?: () => void
+export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: {
+  vm: RevealVM; reducedMotion: boolean; onComplete?: () => void; onExit?: () => void; battleId?: string
 }) {
   const wide = useIsWide('(min-width: 560px)')
   const { panelW, cardW, compact } = layoutFor(vm.players.length, wide)
@@ -162,7 +162,7 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit }: {
 
       {/* ── action bar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
-        {vm.meWallet && <EmoteBar meWallet={vm.meWallet} />}
+        {vm.meWallet && <EmoteBar meWallet={vm.meWallet} battleId={battleId} />}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 9 }}>
           {onExit && (
             <button onClick={onExit} style={{ padding: '11px 20px', borderRadius: 12, border: '1px solid rgba(255,94,122,.3)', background: 'rgba(255,94,122,.08)', color: '#ff8198', cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>
