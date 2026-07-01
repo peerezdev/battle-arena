@@ -43,15 +43,16 @@ def _get_or_create_user(session: Session, wallet: str) -> User:
     return u
 
 
-def award_gimmighouls(session: Session, wallet: str, buyin_usdc: float) -> int:
-    """Credit a participant their loyalty points for a completed (settled) battle.
+def award_gimmighouls(session: Session, wallet: str, buyin_usdc: float, ratio: float | None = None) -> int:
+    """Credit a participant their loyalty points for a completed spend (settled battle or gacha open).
 
-    base = buyin_usdc * gimmighoul_per_usdc. If the user has a valid referral code,
-    they earn round(base * (1 + boost_pct)) and the referrer earns round(base * referrer_pct)
-    (credited to owner_wallet's User, or to ReferralCode.earned as a fallback). Returns the
-    amount credited to the user.
+    base = buyin_usdc * ratio (ratio defaults to the battles rate; gacha passes its own lower rate).
+    If the user has a valid referral code, they earn round(base * (1 + boost_pct)) and the referrer
+    earns round(base * referrer_pct) (credited to owner_wallet's User, or to ReferralCode.earned as a
+    fallback). Returns the amount credited to the user.
     """
-    ratio = get_settings().gimmighoul_per_usdc
+    if ratio is None:
+        ratio = get_settings().gimmighoul_per_usdc
     base = buyin_usdc * ratio
 
     user = _get_or_create_user(session, wallet)

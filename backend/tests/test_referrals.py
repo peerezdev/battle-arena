@@ -24,6 +24,14 @@ def test_award_no_code_base_only(Session):
     assert s.get(User, "alice").gimmighouls == 100
 
 
+def test_award_custom_ratio_for_gacha(Session):
+    """A lower ratio (gacha) credits proportionally fewer gimmighouls than the default battles rate."""
+    s = Session()
+    award_gimmighouls(s, "alice", 100.0, ratio=0.5)   # gacha rate
+    s.commit()
+    assert s.get(User, "alice").gimmighouls == 50      # half of the 100 a battle would give
+
+
 def test_award_with_code_boost_and_referrer_cut_to_owner(Session):
     s = Session()
     create_referral_code(s, "CREATOR", "Creator", boost_pct=0.10, referrer_pct=0.10,

@@ -416,6 +416,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream no disponible")
         if not out.get("pending") and out.get("nft_address"):
+            first_open = pack.opened_at is None
             pack.opened_at = datetime.now(timezone.utc)
             pack.nft_address = out["nft_address"]
             # Persist what it cost + what came out so the profile can track gacha (wager + history).
@@ -425,6 +426,10 @@ def create_app(session_factory, chain: ChainSource,
                 pack.price = await _machine_price(pack.pack_type)
             except Exception:
                 pass  # best-effort; the open already succeeded
+            # Loyalty: award gimmighouls once, at the gacha rate (lower than battles).
+            if first_open and pack.price:
+                from .services.referrals import award_gimmighouls
+                award_gimmighouls(s, wallet, float(pack.price), ratio=get_settings().gimmighoul_per_usdc_gacha)
             s.commit()
             username = read_user_view(s, wallet, elo_start).get("alias")
             drop = {
