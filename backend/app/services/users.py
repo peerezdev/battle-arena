@@ -53,6 +53,15 @@ def history(session: Session, wallet: str) -> list[RatingHistory]:
     ))
 
 
+def _entry_base_units(b) -> int:
+    """USDC (base units) each player wagered in a battle: the pack price for a pack battle, but the
+    full buy-in for a royale (b.price is only the per-box price there, not what the player paid)."""
+    if b.mode == "royale":
+        from .royale_funding import royale_buyin  # lazy: keep solana deps out of module import
+        return royale_buyin(b.max_players, b.price)
+    return b.price
+
+
 def read_user_stats(session: Session, wallet: str) -> dict:
     """Aggregate profile stats from settled battles + pulls. Computed on read (no schema):
     battles/wins/win_rate/total_wagered, the best single card pulled, and the biggest loot
@@ -67,7 +76,7 @@ def read_user_stats(session: Session, wallet: str) -> dict:
     ))
     n_battles = len(battles)
     wins = sum(1 for b in battles if b.winner == wallet)
-    wagered_usd = sum(b.price for b in battles) / USDC
+    wagered_usd = sum(_entry_base_units(b) for b in battles) / USDC
 
     # best hit — the single highest-value card this wallet ever pulled
     best_pull = session.scalars(
@@ -131,7 +140,7 @@ def read_user_battles(session: Session, wallet: str, limit: int = 20) -> list[di
                 .where(BattlePull.battle_id == b.id)
             ) or 0.0
         else:
-            amount = -(b.price / USDC)
+            amount = -(_entry_base_units(b) / USDC)
         cards = session.scalar(
             select(func.count()).select_from(BattlePull)
             .where(BattlePull.battle_id == b.id, BattlePull.player_wallet == wallet)

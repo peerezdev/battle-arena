@@ -49,6 +49,24 @@ def test_read_user_stats(Session):
         assert st["bestVictory"]["opponents"] == ["W2"]
 
 
+def test_royale_wager_and_history_use_buyin(Session):
+    """Royale wager/history use the per-player buy-in, not b.price (the per-box price)."""
+    from app.services.royale_funding import royale_buyin
+    with Session() as s:
+        s.add(PackBattle(id="r1", mode="royale", machine_code="pokemon_50", price=50_000_000, max_players=4, status="settled", winner="W2"))
+        s.add_all([BattlePlayer(battle_id="r1", player_wallet="W1"), BattlePlayer(battle_id="r1", player_wallet="W2")])
+        s.commit()
+        buyin = royale_buyin(4, 50_000_000) / 1_000_000    # 112.5, not 50
+        assert buyin > 50.0
+
+        st = read_user_stats(s, "W1")
+        assert st["battles"] == 1
+        assert st["totalWageredUsd"] == buyin
+
+        rows = read_user_battles(s, "W1")
+        assert rows[0]["result"] == "loss" and rows[0]["amountUsd"] == -buyin
+
+
 def test_read_user_view_default_and_existing(Session):
     with Session() as s:
         assert read_user_view(s, "GHOST", 1200) == {"wallet": "GHOST", "alias": None, "elo": 1200,
