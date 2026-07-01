@@ -35,6 +35,7 @@ export function BattleFlow() {
 
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [revealDone, setRevealDone] = useState(false)
+  const [royaleRevealDone, setRoyaleRevealDone] = useState(false)
   const [joiningBot, setJoiningBot] = useState(false)
   const [botError, setBotError] = useState<string | null>(null)
   const [joiningSelf, setJoiningSelf] = useState(false)
@@ -165,13 +166,14 @@ export function BattleFlow() {
     )
   }
 
-  // royale: round-by-round grid while running; once every round is done (settled) the
-  // separate result screen (champion + standings) replaces it — like the pack reveal.
+  // royale: cinematic round-by-round reveal while running AND until the final round finishes
+  // animating (onComplete). Only then does the champion/standings result screen replace it —
+  // like the pack reveal's revealDone gate.
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-      {battle.status === 'settled'
+      {battle.status === 'settled' && royaleRevealDone
         ? <RoyaleResult vm={vm} battleId={battle.id} onExit={exit} />
-        : <RoyaleReveal vm={vm} reducedMotion={!!reduced} battleId={battle.id} />}
+        : <RoyaleReveal vm={vm} reducedMotion={!!reduced} battleId={battle.id} onComplete={() => setRoyaleRevealDone(true)} />}
     </div>
   )
 }

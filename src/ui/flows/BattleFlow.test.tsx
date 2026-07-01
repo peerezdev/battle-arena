@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 vi.mock('../../onchain/useBattle', () => ({ useBattle: vi.fn() }))
 vi.mock('../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'A' }))
@@ -9,6 +9,8 @@ vi.mock('../../onchain/packBattleClient', async (orig) => ({
   ...(await orig<typeof import('../../onchain/packBattleClient')>()),
   cancelBattle: vi.fn().mockResolvedValue({}),
 }))
+vi.mock('../emotes/useBattleEmotes', () => ({ useBattleEmotes: vi.fn() }))
+vi.mock('../emotes/useEmotes', () => ({ useEmotes: () => ({ byCode: {}, owned: [], slots: [], loading: false, updateSlots: vi.fn() }) }))
 import { cancelBattle } from '../../onchain/packBattleClient'
 import { useBattle } from '../../onchain/useBattle'
 import { BattleFlow } from './BattleFlow'
@@ -39,10 +41,10 @@ describe('BattleFlow', () => {
     expect(screen.getByText(/ALIVE/i)).toBeTruthy()
   })
 
-  it('shows the result once settled', () => {
+  it('shows the result once settled', async () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'settled', winner: 'A' }, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/victory/i)).toBeTruthy()
+    await waitFor(() => expect(screen.getByText(/victory/i)).toBeTruthy())
   })
 
   it('shows the voided message', () => {
