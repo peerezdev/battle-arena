@@ -3,7 +3,8 @@ import { config } from './config'
 export interface Emote {
   code: string
   name: string
-  video_url: string
+  video_url: string        // VP9+alpha WebM (Chrome/Firefox/Edge)
+  video_mov?: string       // HEVC+alpha .mov (Safari/iOS) — optional fallback source
 }
 
 export interface MyEmotes {

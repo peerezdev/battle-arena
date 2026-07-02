@@ -23,7 +23,7 @@ const OUT_AT = 2700, GONE_AT = 3150, SIZE = 72
 /** Throw an emote bubble over the player with the given wallet. Tries to play with sound; if the
  *  browser blocks unmuted autoplay (no user gesture yet — e.g. an incoming emote) it retries muted so
  *  the video always shows. The radio is only ducked while an audible emote is playing. */
-export function throwEmote(wallet: string, videoUrl: string): void {
+export function throwEmote(wallet: string, emote: { video_url: string; video_mov?: string }): void {
   if (typeof document === 'undefined') return
   const anchor = [...document.querySelectorAll('[data-player-anchor]')]
     .find((a) => a.getAttribute('data-player-anchor') === wallet) as HTMLElement | undefined
@@ -36,9 +36,15 @@ export function throwEmote(wallet: string, videoUrl: string): void {
 
   const r = anchor.getBoundingClientRect()
   const v = document.createElement('video')
-  v.src = videoUrl; v.loop = true; v.autoplay = true; v.playsInline = true
+  v.loop = true; v.autoplay = true; v.playsInline = true
   v.setAttribute('playsinline', ''); v.muted = false
   v.setAttribute('data-ba-emote-bubble', wallet)
+  // Two alpha-capable sources; the browser picks: HEVC .mov (Safari) then VP9 .webm (rest).
+  const addSource = (src: string, type: string) => {
+    const s = document.createElement('source'); s.src = src; s.type = type; v.appendChild(s)
+  }
+  if (emote.video_mov) addSource(emote.video_mov, 'video/quicktime')
+  addSource(emote.video_url, 'video/webm')
   const left = Math.min(r.right + 8, window.innerWidth - SIZE - 8)
   Object.assign(v.style, {
     position: 'fixed', left: `${left}px`, top: `${r.top + r.height / 2}px`,

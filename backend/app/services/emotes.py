@@ -9,14 +9,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models import User, UserEmote
 
-# video_url is served by the frontend (public/). Codes are stable identifiers.
+# Videos are served by the frontend (public/). Transparent-background emotes ship in two
+# alpha-capable formats: video_url = VP9+alpha WebM (Chrome/Firefox/Edge), video_mov =
+# HEVC+alpha .mov (Safari/iOS). Codes are stable identifiers.
 EMOTE_CATALOG: list[dict] = [
-    {"code": "charmander", "name": "Charmander", "video_url": "/charmander.mp4"},
-    {"code": "bulbasaur",  "name": "Bulbasaur",  "video_url": "/bulbasaur.mp4"},
-    {"code": "squirtle",   "name": "Squirtle",   "video_url": "/squirtle.MP4"},
+    {"code": "charmander",        "name": "Charmander",        "video_url": "/stickers/charmander.webm",        "video_mov": "/stickers/charmander.mov"},
+    {"code": "bulbasaur",         "name": "Bulbasaur",         "video_url": "/stickers/bulbasaur.webm",         "video_mov": "/stickers/bulbasaur.mov"},
+    {"code": "squirtle",          "name": "Squirtle",          "video_url": "/stickers/squirtle.webm",          "video_mov": "/stickers/squirtle.mov"},
+    {"code": "pikachu",           "name": "Pikachu",           "video_url": "/stickers/pikachu.webm",           "video_mov": "/stickers/pikachu.mov"},
+    {"code": "scizor-vs-kleavor", "name": "Scizor vs Kleavor", "video_url": "/stickers/scizor-vs-kleavor.webm", "video_mov": "/stickers/scizor-vs-kleavor.mov"},
+    {"code": "scizor-sandwich",   "name": "Scizor Sandwich",   "video_url": "/stickers/scizor-sandwich.webm",   "video_mov": "/stickers/scizor-sandwich.mov"},
+    {"code": "scizor-scared",     "name": "Scizor Scared",     "video_url": "/stickers/scizor-scared.webm",     "video_mov": "/stickers/scizor-scared.mov"},
+    {"code": "scizor-card",       "name": "Scizor Card",       "video_url": "/stickers/scizor-card.webm",       "video_mov": "/stickers/scizor-card.mov"},
 ]
 _BY_CODE = {e["code"]: e for e in EMOTE_CATALOG}
-DEFAULT_EMOTES = ["charmander", "bulbasaur", "squirtle"]   # granted to every new user
+DEFAULT_EMOTES = [e["code"] for e in EMOTE_CATALOG]   # all emotes granted to every new user (no unlock flow yet)
 MAX_SLOTS = 3
 
 

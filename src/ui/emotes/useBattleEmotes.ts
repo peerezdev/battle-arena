@@ -14,6 +14,6 @@ export function useBattleEmotes(battleId: string | undefined): void {
     const m = msg as { type?: string; battle_id?: string; from?: string; code?: string }
     if (m?.type !== 'emote' || m.battle_id !== bidRef.current) return
     const e = m.code ? byCodeRef.current[m.code] : undefined
-    if (e && m.from) throwEmote(m.from, e.video_url)
+    if (e && m.from) throwEmote(m.from, e)
   }, !!battleId && battleId !== 'demo')
 }

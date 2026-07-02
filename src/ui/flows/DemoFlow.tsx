@@ -85,7 +85,7 @@ export function DemoFlow() {
     const t = setInterval(() => {
       const w = rivals[Math.floor(Math.random() * rivals.length)]
       const e = catalog[Math.floor(Math.random() * catalog.length)]
-      throwEmote(w, e.video_url)
+      throwEmote(w, e)
     }, RIVAL_EMOTE_MS)
     return () => clearInterval(t)
   }, [battle, catalog])
