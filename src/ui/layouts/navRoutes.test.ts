@@ -25,3 +25,8 @@ describe('activeNavFromPath', () => {
     expect(activeNavFromPath('/')).toBeNull()
   })
 })
+
+it('maps help nav to /help and back', () => {
+  expect(NAV_ROUTES.help).toBe('/help')
+  expect(activeNavFromPath('/help')).toBe('help')
+})

@@ -20,15 +20,17 @@ export const NAV_ICONS: Record<HubNav, ReactNode> = {
   gacha: <Svg><rect x="3" y="3" width="12" height="17" rx="1.2" /><path d="M3 9h12M3 15h12M7 9v6M11 9v6" /><path d="M5.5 5.5h7M5.5 7h7" /><path d="M15 11h2v3h-2" /><circle cx="19.5" cy="6" r="2" /><path d="M19.5 8v3" /></Svg>,
   mana: <Svg><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></Svg>,
   ranks: <Svg><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></Svg>,
+  help: <Svg><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></Svg>,
 }
 
 const ITEMS: { id: HubNav; label: string }[] = [
   { id: 'lobby', label: 'Lobby' },
   { id: 'gacha', label: 'Gacha' },
   { id: 'ranks', label: 'Leaderboard' },
+  { id: 'help', label: 'Help' },
 ]
 
-export function LeftRail({ active, onProfile }: { active: HubNav; onProfile?: () => void }) {
+export function LeftRail({ active }: { active: HubNav }) {
   const [hovered, setHovered] = useState<HubNav | null>(null)
   return (
     <nav
@@ -109,28 +111,6 @@ export function LeftRail({ active, onProfile }: { active: HubNav; onProfile?: ()
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
-
-      {/* Settings */}
-      <button
-        style={{
-          width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: 'none', background: 'transparent', color: COLORS.muted, cursor: 'pointer', borderRadius: 12,
-        }}
-        title="Settings"
-      >
-        <Svg><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Svg>
-      </button>
-
-      {/* Profile avatar */}
-      <button
-        onClick={onProfile}
-        title="Profile"
-        style={{
-          width: 38, height: 38, marginTop: 4, borderRadius: '50%', cursor: 'pointer',
-          background: 'linear-gradient(135deg,#f5c542,#e8732c)',
-          border: '2px solid rgba(255,255,255,.12)',
-        }}
-      />
     </nav>
   )
 }

@@ -8,6 +8,7 @@ export const NAV_ROUTES: Record<HubNav, string> = {
   royale: '/play/royale',
   gacha: '/play/gacha',
   mana: '/play/mana',
+  help: '/help',
 }
 
 /** Which sidebar item is active for a given pathname (null = none highlighted). */
@@ -19,5 +20,6 @@ export function activeNavFromPath(pathname: string): HubNav | null {
   if (pathname.startsWith('/play/mana')) return 'mana'
   if (pathname.startsWith('/leaderboard')) return 'ranks'
   if (pathname === '/app' || pathname.startsWith('/app')) return 'lobby'
+  if (pathname.startsWith('/help')) return 'help'
   return null
 }

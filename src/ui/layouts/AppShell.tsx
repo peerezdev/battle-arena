@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import { usePrivy } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd } from '../theme'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
@@ -29,7 +29,6 @@ function fmtGh(n: number): string {
 }
 
 export function AppShell() {
-  const navigate = useNavigate()
   const { pathname } = useLocation()
   const reducedMotion = useReducedMotion()
   const { usdc } = useUsdcBalance()
@@ -96,7 +95,7 @@ export function AppShell() {
     >
       {/* ── LEFT RAIL (desktop/tablet) o BOTTOM NAV (móvil) ───────────────── */}
       {wideRail ? (
-        <LeftRail active={active} onProfile={() => navigate('/profile')} />
+        <LeftRail active={active} />
       ) : (
         <BottomNav
           active={active}
