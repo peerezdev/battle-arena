@@ -108,7 +108,7 @@ export function AuthButtons({ variant = 'nav' }: AuthButtonsProps) {
   const idLine = emailAddr ?? (walletAddr ? abbrevAddr(walletAddr) : null)
   const displayName = username ?? idLine ?? 'Account'
   const initial = (username ?? emailAddr ?? walletAddr ?? '?').slice(0, 1).toUpperCase()
-  const showName = wide
+  const showName = wide && !isCompact   // compact header trigger is icon-only (avatar + caret)
   const avatar = isCompact ? 30 : 34
 
   return (
