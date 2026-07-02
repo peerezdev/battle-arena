@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     cc_usdc_mint: str = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
     gimmighoul_per_usdc: float = 0.1  # battles/royale loyalty rate; env: GIMMIGHOUL_PER_USDC
     gimmighoul_per_usdc_gacha: float = 0.05  # gacha loyalty rate (half of battles); env: GIMMIGHOUL_PER_USDC_GACHA
+    # Platform fee on battles: pct per player over the buyback value of the winner's loot,
+    # capped at battle_fee_pct_cap total. Collected in USDC from the winner's wallet after
+    # settle. fee_wallet_address empty → falls back to privy_operator_address; both empty →
+    # collection is skipped (kill-switch). env: BATTLE_FEE_PCT_PER_PLAYER / BATTLE_FEE_PCT_CAP
+    # / FEE_WALLET_ADDRESS
+    battle_fee_pct_per_player: float = 0.005
+    battle_fee_pct_cap: float = 0.03
+    fee_wallet_address: str = ""
     privy_operator_wallet_id: str = ""
     privy_operator_address: str = ""
     escrow_seed_lamports: int = 10_000_000

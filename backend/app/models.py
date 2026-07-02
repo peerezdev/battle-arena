@@ -103,6 +103,9 @@ class PackBattle(Base):
     client_seed: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     tie_break_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     gimmighouls_awarded: Mapped[bool] = mapped_column(Boolean, default=False)  # idempotency guard for loyalty points
+    fee_base_units: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # fee actually charged (USDC base units)
+    fee_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)         # total pct applied (post-cap)
+    fee_charged: Mapped[bool] = mapped_column(Boolean, default=False)              # idempotency guard
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
