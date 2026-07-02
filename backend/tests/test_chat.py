@@ -56,10 +56,14 @@ def test_ws_chat_history_and_broadcast():
     with client.websocket_connect("/ws/chat") as reader:
         first = reader.receive_json()
         assert first["type"] == "history"
+        dh = reader.receive_json()  # drops_history tras la history del chat
+        assert dh["type"] == "drops_history"
+        assert dh["drops"] == []
         reader.receive_json()  # presence(1) tras conectar
 
         with client.websocket_connect(f"/ws/chat?token={token}") as poster:
             poster.receive_json()  # history (poster)
+            poster.receive_json()  # drops_history (poster)
             poster.receive_json()  # presence(2) para poster
             reader.receive_json()  # presence(2) broadcast a reader
             poster.send_json({"text": "hello"})
@@ -75,6 +79,7 @@ def test_ws_unauthenticated_post_returns_error_and_no_broadcast():
 
     with client.websocket_connect("/ws/chat") as anon:
         anon.receive_json()  # history
+        anon.receive_json()  # drops_history
         anon.receive_json()  # presence(1)
         anon.send_json({"text": "intruso"})
         err = anon.receive_json()
@@ -88,6 +93,7 @@ def test_ws_chat_truncates_to_280_chars():
     client = TestClient(app)
     with client.websocket_connect(f"/ws/chat?token={token}") as ws:
         ws.receive_json()  # history
+        ws.receive_json()  # drops_history
         ws.receive_json()  # presence(1)
         ws.send_json({"text": "a" * 500})
         msg = ws.receive_json()
@@ -102,6 +108,7 @@ def test_ws_chat_rate_limits_after_5_in_10s():
     client = TestClient(app)
     with client.websocket_connect(f"/ws/chat?token={token}") as ws:
         ws.receive_json()  # history
+        ws.receive_json()  # drops_history
         ws.receive_json()  # presence(1)
         for i in range(5):
             ws.send_json({"text": f"m{i}"})
@@ -117,10 +124,12 @@ def test_ws_chat_presence_reflects_connections():
     client = TestClient(app)
     with client.websocket_connect("/ws/chat") as a:
         a.receive_json()                      # history
+        a.receive_json()                      # drops_history
         p1 = a.receive_json()                 # presence tras history
         assert p1["type"] == "presence" and p1["online"] == 1
         with client.websocket_connect("/ws/chat") as b:
             b.receive_json()                  # history (b)
+            b.receive_json()                  # drops_history (b)
             # b recibe presence(2) y a también recibe broadcast de presencia con online == 2
             pb = b.receive_json()
             assert pb["type"] == "presence" and pb["online"] == 2
@@ -141,6 +150,7 @@ def test_ws_chat_shows_alias_when_set():
 
     with client.websocket_connect(f"/ws/chat?token={token}") as ws:
         ws.receive_json()  # history
+        ws.receive_json()  # drops_history
         ws.receive_json()  # presence(1)
         ws.send_json({"text": "hi"})
         msg = ws.receive_json()
@@ -155,6 +165,7 @@ def test_ws_chat_falls_back_to_abbreviated_wallet():
     client = TestClient(app)
     with client.websocket_connect(f"/ws/chat?token={token}") as ws:
         ws.receive_json()  # history
+        ws.receive_json()  # drops_history
         ws.receive_json()  # presence(1)
         ws.send_json({"text": "hi"})
         msg = ws.receive_json()

@@ -450,6 +450,7 @@ def create_app(session_factory, chain: ChainSource,
         # Hold the drop so it never spoils the opener's own reveal.
         try:
             await asyncio.sleep(LIVE_DROP_DELAY_S)
+            _drops_buf.add(drop)
             await _chat_mgr.broadcast(drop)
         except Exception:
             logger.exception("live drop broadcast failed")
@@ -488,6 +489,7 @@ def create_app(session_factory, chain: ChainSource,
             finally:
                 s3.close()
             for d in drops:
+                _drops_buf.add(d)
                 await _chat_mgr.broadcast(d)
                 await asyncio.sleep(0.5)
         except Exception:
@@ -966,6 +968,10 @@ def create_app(session_factory, chain: ChainSource,
     # ── Chat de lobby por WebSocket ───────────────────────────────────────────
     _chat_mgr = ConnectionManager()
     _chat_buf = ChatBuffer()
+    # Generic ring buffer reused for the global Recent Drops feed. Replayed to
+    # every client on connect so the feed is consistent across origins/devices
+    # (localStorage is per-origin, so it can't be the shared source of truth).
+    _drops_buf = ChatBuffer(maxlen=20)
     _chat_hits: dict[str, list[float]] = {}
     _CHAT_RATE_LIMIT = 5
     _CHAT_RATE_WINDOW = 10.0
@@ -997,6 +1003,7 @@ def create_app(session_factory, chain: ChainSource,
                     alias = read_user_view(s, wallet, elo_start).get("alias")
                 display_name = alias or abbreviate(wallet)
             await ws.send_json({"type": "history", "messages": _chat_buf.history()})
+            await ws.send_json({"type": "drops_history", "drops": _drops_buf.history()})
             await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
             while True:
                 data = await ws.receive_json()

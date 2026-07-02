@@ -144,6 +144,31 @@ def test_drop_username_null_when_no_alias(monkeypatch):
 
 
 @respx.mock
+def test_recent_drops_replayed_on_connect(monkeypatch):
+    """A drop broadcast is buffered server-side and replayed to a freshly-connected
+    client via `drops_history`, so the feed doesn't depend on per-origin localStorage."""
+    captured: list = []
+    sleeps: list = []
+    tasks: list = []
+    _mock_open(monkeypatch, captured=captured, sleeps=sleeps, tasks=tasks)
+    _setup_routes()
+    c, priv = _client(alias="neo")
+    hdrs = _hdrs(priv, WALLET_A)
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
+    c.post("/gacha/open-pack", json={"memo": "m-drop"}, headers=hdrs)
+    _drain(tasks)  # runs the delayed broadcast → buffers the drop
+
+    # A client connecting AFTER the drop still sees it in its recent-drops backlog.
+    with c.websocket_connect("/ws/chat") as ws:
+        ws.receive_json()  # chat history
+        dh = ws.receive_json()  # drops_history
+        assert dh["type"] == "drops_history"
+        assert len(dh["drops"]) == 1
+        assert dh["drops"][0]["name"] == "Pika"
+        assert dh["drops"][0]["wallet"] == WALLET_A
+
+
+@respx.mock
 def test_pending_open_does_not_broadcast(monkeypatch):
     captured: list = []
     sleeps: list = []

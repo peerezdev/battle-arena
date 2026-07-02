@@ -36,6 +36,20 @@ export function addDrop(d: LiveDrop): void {
   listeners.forEach((l) => l())
 }
 
+// Merge a batch of drops (the server's recent-drops backlog, replayed on WS
+// connect) into the store: dedupe by id (incoming wins), sort newest-first, cap
+// to MAX. Lets a freshly-connected client converge on the same feed regardless
+// of what its origin's localStorage happened to hold.
+export function seedDrops(incoming: LiveDrop[]): void {
+  if (incoming.length === 0) return
+  const byId = new Map<string, LiveDrop>()
+  for (const d of drops) byId.set(d.id, d)
+  for (const d of incoming) byId.set(d.id, d) // incoming wins on id collision
+  drops = [...byId.values()].sort((a, b) => b.ts - a.ts).slice(0, MAX)
+  persist()
+  listeners.forEach((l) => l())
+}
+
 export function getDrops(): LiveDrop[] {
   return drops
 }

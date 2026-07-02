@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { config } from '../onchain/config'
-import { addDrop } from '../ui/drops/dropsStore'
+import { addDrop, seedDrops, type LiveDrop } from '../ui/drops/dropsStore'
 
 export interface ChatLine { user: string; text: string; ts: number }
 
@@ -10,6 +10,22 @@ function buildWsUrl(identityToken: string | null | undefined): string {
   const base = config.backendUrl.replace(/^http/, 'ws')
   const path = `${base}/ws/chat`
   return identityToken ? `${path}?token=${encodeURIComponent(identityToken)}` : path
+}
+
+// Map a backend drop frame → LiveDrop. Backend emits ts in epoch SECONDS; the
+// drops store + ago() use ms.
+function dropFromMsg(msg: Record<string, unknown>): LiveDrop {
+  return {
+    id: (msg.id as string) ?? (msg.wallet as string) + ':' + (msg.ts as number),
+    name: (msg.name as string) ?? 'Card',
+    valueUsd: (msg.valueUsd as number | null) ?? null,
+    rarity: (msg.rarity as string | null) ?? null,
+    image: (msg.image as string | null) ?? null,
+    source: 'gacha',
+    wallet: msg.wallet as string,
+    username: (msg.username as string | null) ?? null,
+    ts: (msg.ts as number) * 1000,
+  }
 }
 
 export function useChat(enabled = true): {
@@ -74,18 +90,12 @@ export function useChat(enabled = true): {
           } else if (msg.type === 'drop') {
             // Global Live Drop broadcast by the backend (delayed ~30s so the
             // opener never sees their own drop spoil the reveal).
-            addDrop({
-              id: (msg.id as string) ?? (msg.wallet as string) + ':' + (msg.ts as number),
-              name: (msg.name as string) ?? 'Card',
-              valueUsd: (msg.valueUsd as number | null) ?? null,
-              rarity: (msg.rarity as string | null) ?? null,
-              image: (msg.image as string | null) ?? null,
-              source: 'gacha',
-              wallet: msg.wallet as string,
-              username: (msg.username as string | null) ?? null,
-              // Backend emits ts in epoch SECONDS; the drops store + ago() use ms.
-              ts: (msg.ts as number) * 1000,
-            })
+            addDrop(dropFromMsg(msg))
+          } else if (msg.type === 'drops_history' && Array.isArray(msg.drops)) {
+            // Recent-drops backlog the server replays on connect, so the feed is
+            // consistent across origins/devices instead of depending on this
+            // origin's localStorage.
+            seedDrops((msg.drops as Record<string, unknown>[]).map(dropFromMsg))
           } else if (msg.type === 'error') {
             console.warn('[useChat] server error:', msg.error)
           }
