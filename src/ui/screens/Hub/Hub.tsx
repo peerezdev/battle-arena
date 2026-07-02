@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../../theme'
-import type { HubNav, LiveBattle } from './hubMockData'
+import type { LiveBattle } from './hubMockData'
 import { STAKE_OPTIONS } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
@@ -36,11 +36,6 @@ export function Hub() {
   useEffect(() => { void loadMachineList() }, [])
 
   const liveBattles = battles.map((b) => openBattleToLive(b, meWallet))
-
-  function go(id: HubNav) {
-    if (id === 'gacha')  return navigate('/play/gacha')
-    // Pack/Royale/Mana are disabled for now — no route to navigate to.
-  }
 
   function onCancel(b: LiveBattle) {
     setActionError(null)
@@ -92,7 +87,7 @@ export function Hub() {
         <NewsCarousel />
         <ModeGuide />
         {actionError && (<div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red, margin: '0 0 12px' }}>{actionError}</div>)}
-        <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
+        <LiveBattles battles={liveBattles} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
       </div>
 
       <DelegationGate gate={gate} />

@@ -1,21 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import type { LiveBattle, BattleMode } from './hubMockData'
-
-function Svg({ children }: { children: ReactNode }) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
-  )
-}
-
-const GACHA = <Svg><rect x="3" y="3" width="12" height="17" rx="1.2" /><path d="M3 9h12M3 15h12M7 9v6M11 9v6" /><path d="M5.5 5.5h7M5.5 7h7" /><path d="M15 11h2v3h-2" /><circle cx="19.5" cy="6" r="2" /><path d="M19.5 8v3" /></Svg>
-
-// Pack/Royale/Mana modes are disabled for now — only Gacha remains as a mode entry.
-type ModeTile = { mode: 'pack' | 'royale' | 'gacha' | 'mana'; icon: ReactNode; name: string; sub: string; accent: 'green' | 'purple' }
-const MODE_TILES: ModeTile[] = [
-  { mode: 'gacha',  icon: GACHA,  name: 'Gacha',          sub: 'Open packs · pull & play', accent: 'green' },
-]
 
 const MODE_LABEL: Record<BattleMode, string> = {
   pack:   'PACK BATTLE',
@@ -27,97 +12,16 @@ const FILTERS = ['All', 'Ready to join', 'Mine', 'Recent']
 
 interface Props {
   battles: LiveBattle[]
-  onSelectMode: (mode: 'pack' | 'royale' | 'gacha' | 'mana') => void
   onBattleAction: (b: LiveBattle) => void
   onCancel?: (b: LiveBattle) => void
   onOpen: (b: LiveBattle) => void
 }
 
-export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, onOpen }: Props) {
+export function LiveBattles({ battles, onBattleAction, onCancel, onOpen }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
 
   return (
     <div>
-      {/* (a) Mode strip */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-          gap: 12,
-          marginBottom: 28,
-        }}
-      >
-        {MODE_TILES.map((tile) => {
-          const green = tile.accent === 'green'
-          const icoColor = green ? '#00ffc4' : '#ff6bb5'
-          const icoBg = green ? 'rgba(0,255,196,.12)' : 'rgba(255,46,151,.14)'
-          const icoBd = green ? 'rgba(0,255,196,.35)' : 'rgba(255,46,151,.4)'
-          const cardBg = green
-            ? 'linear-gradient(180deg,rgba(0,255,196,.06),rgba(255,255,255,.01))'
-            : 'linear-gradient(180deg,rgba(255,46,151,.07),rgba(255,255,255,.01))'
-          return (
-          <button
-            key={tile.mode}
-            onClick={() => onSelectMode(tile.mode)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              background: cardBg,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 18,
-              padding: 18,
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'border-color 0.12s, transform 0.12s',
-            }}
-            onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = icoBd
-              ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-4px)'
-            }}
-            onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = COLORS.border
-              ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'
-            }}
-          >
-            {/* icon badge */}
-            <div
-              style={{
-                width: 46,
-                height: 46,
-                borderRadius: 13,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: icoColor,
-                background: icoBg,
-                border: `1px solid ${icoBd}`,
-                boxShadow: `0 0 22px -8px ${icoColor}`,
-                flexShrink: 0,
-              }}
-            >
-              {tile.icon}
-            </div>
-            <div>
-              <div
-                style={{
-                  fontFamily: FONTS.display,
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: COLORS.text,
-                }}
-              >
-                {tile.name}
-              </div>
-              <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
-                {tile.sub}
-              </div>
-            </div>
-          </button>
-          )
-        })}
-      </div>
-
       {/* (b) Live battles header */}
       <div
         style={{

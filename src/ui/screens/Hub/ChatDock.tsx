@@ -253,9 +253,10 @@ export function ChatDock({
           </div>
         ) : (
           drops.map((drop) => {
-            const glow = rarityGlow(drop.rarity) ?? COLORS.green
+            const glow = rarityGlow(drop.rarity)             // null for common → no box
+            const accent = glow ?? COLORS.muted              // dot / image tint for common
             const isMine = !!username && !!drop.username && drop.username === username
-            const isBigPull = (drop.valueUsd ?? 0) >= 1000
+            const isEpic = (drop.rarity ?? '').toLowerCase() === 'epic'
             return (
               <div
                 key={drop.id}
@@ -266,11 +267,9 @@ export function ChatDock({
                   padding: '8px 10px',
                   margin: '3px 0',
                   borderRadius: 12,
-                  border: `1px solid ${isMine ? COLORS.green : glow}55`,
-                  background: isMine ? `${COLORS.green}12` : `${glow}0d`,
-                  boxShadow: isMine
-                    ? `0 0 16px -4px ${COLORS.green}, inset 0 0 10px -6px ${COLORS.green}`
-                    : `0 0 14px -6px ${glow}`,
+                  border: glow ? `1px solid ${glow}55` : '1px solid transparent',
+                  background: glow ? `${glow}0d` : 'transparent',
+                  boxShadow: glow ? `0 0 14px -6px ${glow}` : 'none',
                   animation: reducedMotion ? undefined : 'ba-dropin .32s ease-out both',
                 }}
               >
@@ -280,8 +279,8 @@ export function ChatDock({
                     width: 7,
                     height: 7,
                     borderRadius: '50%',
-                    background: glow,
-                    boxShadow: `0 0 8px ${glow}`,
+                    background: accent,
+                    boxShadow: `0 0 8px ${accent}`,
                     flexShrink: 0,
                   }}
                 />
@@ -292,7 +291,7 @@ export function ChatDock({
                     width: 28,
                     height: 38,
                     borderRadius: 6,
-                    background: `radial-gradient(circle at 40% 30%,${glow}33,#10141c)`,
+                    background: `radial-gradient(circle at 40% 30%,${accent}33,#10141c)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -333,7 +332,7 @@ export function ChatDock({
                     >
                       {drop.name}
                     </span>
-                    {isBigPull && (
+                    {isEpic && (
                       <span
                         style={{
                           fontFamily: FONTS.mono,
@@ -381,7 +380,7 @@ export function ChatDock({
                       fontFamily: FONTS.display,
                       fontWeight: 800,
                       fontSize: 12,
-                      color: isBigPull ? '#f5c542' : COLORS.green,
+                      color: isEpic ? '#f5c542' : COLORS.green,
                     }}
                   >
                     {drop.valueUsd != null ? formatUsd(drop.valueUsd) : ''}

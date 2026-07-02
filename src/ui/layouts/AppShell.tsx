@@ -122,29 +122,30 @@ export function AppShell() {
             background: 'transparent',
           }}
         >
-          {/* Brand */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              fontFamily: FONTS.display,
-              fontWeight: 700,
-              fontSize: 19,
-              letterSpacing: '-.01em',
-            }}
-          >
-            <span
+          {/* Brand — mobile only; on desktop the left rail already carries the logo */}
+          {!wideRail && (
+            <div
               style={{
-                width: 13,
-                height: 13,
-                borderRadius: 4,
-                background: GRADIENT,
-                boxShadow: '0 0 10px #ff2e9788',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                fontFamily: FONTS.display,
+                fontWeight: 700,
+                fontSize: 19,
+                letterSpacing: '-.01em',
               }}
-            />
-            {wideRail && <span>Collector <span style={{ color: COLORS.green }}>Arena</span></span>}
-          </div>
+            >
+              <span
+                style={{
+                  width: 13,
+                  height: 13,
+                  borderRadius: 4,
+                  background: GRADIENT,
+                  boxShadow: '0 0 10px #ff2e9788',
+                }}
+              />
+            </div>
+          )}
 
           {/* Spacer */}
           <div style={{ flex: 1 }} />
@@ -160,14 +161,12 @@ export function AppShell() {
                 <img src="/usdc.svg" alt="" style={{ height: 20, width: 'auto', display: 'block' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1.1 }}>
                   <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.18em', color: COLORS.muted, paddingBottom: '1px' }}>USDC</span>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
-                      {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
-                    </span>
-                    {locked != null && locked > 0 && (
-                      <span style={{ fontSize: 9, color: COLORS.muted }}>· {formatUsd(locked)} reserved</span>
-                    )}
-                  </div>
+                  <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 15 }}>
+                    {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
+                  </span>
+                  {locked != null && locked > 0 && (
+                    <span style={{ fontSize: 9, color: COLORS.muted }}>{formatUsd(locked)} reserved</span>
+                  )}
                 </div>
               </div>
               <span style={{ width: 1, background: COLORS.border }} />
