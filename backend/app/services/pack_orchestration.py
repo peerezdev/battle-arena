@@ -406,6 +406,8 @@ async def run_royale_live(
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
         price_base=price_base, now_fn=now_fn, build_usdc_sweep_tx=build_usdc_sweep_tx,
         escrow_usdc_balance=escrow_usdc_balance, operator_wallet_id=operator_wallet_id,
+        # escrow_usdc_balance is a generic balance-by-address closure (not escrow-scoped):
+        # the fee collector calls it with the WINNER's address.
         usdc_balance=escrow_usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
     )
     if result == "voided":
