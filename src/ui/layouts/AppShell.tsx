@@ -79,12 +79,19 @@ export function AppShell() {
   else if (wideRail)         gridCols = '92px 1fr'
   else                       gridCols = '1fr'
 
+  // ── Grid placement — the topbar (row 1) spans the full content width so it sits
+  //    over the dock and pushes Recent Drops (row 2) down. Rail spans both rows.
+  const contentStart = wideRail ? 2 : 1
+  const totalCols = showDock ? 3 : (wideRail ? 2 : 1)
+  const headerColumn = `${contentStart} / ${totalCols + 1}`
+  const contentColumn = `${contentStart} / ${contentStart + 1}`
+
   return (
     <div
       style={{
         display: 'grid',
         gridTemplateColumns: gridCols,
-        gridTemplateRows: 'minmax(0, 1fr)', // cap the single row at the shell height so inner overflow:auto engages (instead of the auto row growing to content height and getting clipped)
+        gridTemplateRows: 'auto minmax(0, 1fr)', // row 1 = full-width topbar, row 2 = content + dock (capped so inner overflow:auto engages)
         height: '100dvh',
         // Ambient colour wash (from the mockup): magenta + cyan + gold radials spread across the whole
         // viewport so the background reads coloured, not black. The shell is 100dvh so it stays put.
@@ -95,7 +102,9 @@ export function AppShell() {
     >
       {/* ── LEFT RAIL (desktop/tablet) o BOTTOM NAV (móvil) ───────────────── */}
       {wideRail ? (
-        <LeftRail active={active} />
+        <div style={{ gridColumn: '1 / 2', gridRow: '1 / 3', minHeight: 0 }}>
+          <LeftRail active={active} />
+        </div>
       ) : (
         <BottomNav
           active={active}
@@ -106,12 +115,11 @@ export function AppShell() {
         />
       )}
 
-      {/* ── COLUMNA PRINCIPAL ─────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-        {/* Global topbar — brand + balance + auth + deposit + mute */}
+        {/* Global topbar (row 1) — spans the full content width, over the dock, so Recent Drops sits below it */}
         <header
           style={{
-            flexShrink: 0,
+            gridColumn: headerColumn,
+            gridRow: '1 / 2',
             display: 'flex',
             alignItems: 'center',
             flexWrap: 'wrap',
@@ -122,19 +130,13 @@ export function AppShell() {
             background: 'transparent',
           }}
         >
-          {/* Brand — mobile only; on desktop the left rail already carries the logo */}
-          {!wideRail && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                fontFamily: FONTS.display,
-                fontWeight: 700,
-                fontSize: 19,
-                letterSpacing: '-.01em',
-              }}
-            >
+          {/* Brand — "Collector Arena" wordmark on desktop; logo dot on mobile (no rail there) */}
+          {wideRail ? (
+            <span style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 19, letterSpacing: '-.01em', whiteSpace: 'nowrap' }}>
+              Collector <span style={{ color: COLORS.green }}>Arena</span>
+            </span>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               <span
                 style={{
                   width: 13,
@@ -226,10 +228,12 @@ export function AppShell() {
 
         </header>
 
-        {/* Routed page content */}
+        {/* Routed page content (row 2, content column) */}
         <main
           style={{
-            flex: 1,
+            gridColumn: contentColumn,
+            gridRow: '2 / 3',
+            minWidth: 0,
             minHeight: 0,
             overflowY: 'auto',
             display: 'flex',
@@ -241,10 +245,13 @@ export function AppShell() {
           {!wideRail && <LiveDropsStrip />}
           <Outlet />
         </main>
-      </div>
 
-      {/* ── CHAT DOCK (ancho completo — desktop) ──────────────────────────── */}
-      {showDock && <ChatDock collapsed={dockCollapsed} onToggle={toggleDock} />}
+      {/* ── CHAT DOCK (row 2, right column — desktop) ─────────────────────── */}
+      {showDock && (
+        <div style={{ gridColumn: '3 / 4', gridRow: '2 / 3', minHeight: 0 }}>
+          <ChatDock collapsed={dockCollapsed} onToggle={toggleDock} />
+        </div>
+      )}
 
       {/* ── FLOATING CHAT BUTTON (tablet only — mobile opens chat from the bottom nav) ── */}
       {wideRail && !wideDock && (

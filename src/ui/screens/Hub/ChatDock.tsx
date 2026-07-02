@@ -123,7 +123,7 @@ export function ChatDock({
         style={{
           background: '#0c1019',
           borderLeft: `1px solid ${COLORS.border}`,
-          height: '100vh',
+          height: '100%',
           width: 36,
           display: 'flex',
           flexDirection: 'column',
@@ -172,7 +172,7 @@ export function ChatDock({
         borderLeft: chatOnly ? 'none' : `1px solid ${COLORS.border}`,
         display: 'flex',
         flexDirection: 'column',
-        height: chatOnly ? '100%' : '100vh',
+        height: '100%',
       }}
     >
       {!chatOnly && (<>
