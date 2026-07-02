@@ -48,9 +48,10 @@ export function throwEmote(wallet: string, emote: { video_url: string; video_mov
   const left = Math.min(r.right + 8, window.innerWidth - SIZE - 8)
   Object.assign(v.style, {
     position: 'fixed', left: `${left}px`, top: `${r.top + r.height / 2}px`,
-    width: `${SIZE}px`, height: `${SIZE}px`, borderRadius: '50%', objectFit: 'cover',
-    background: 'rgba(14,17,23,.92)', border: '2px solid rgba(255,255,255,.18)',
-    boxShadow: '0 12px 30px -8px rgba(0,0,0,.85),0 0 26px -6px rgba(255,46,151,.45)',
+    width: `${SIZE}px`, height: `${SIZE}px`, objectFit: 'contain',
+    background: 'transparent',
+    // drop-shadow follows the alpha silhouette (box-shadow would frame the square)
+    filter: 'drop-shadow(0 8px 14px rgba(0,0,0,.55))',
     pointerEvents: 'none', zIndex: '9999', transform: 'translateY(-50%) scale(1)',
     animation: 'ba-emote-in .42s cubic-bezier(.2,.9,.25,1.25) forwards',
   })

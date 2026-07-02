@@ -45,10 +45,12 @@ def _grant(session: Session, wallet: str, codes: list[str]) -> None:
 
 
 def read_user_emotes(session: Session, wallet: str) -> dict:
-    """Owned codes + quick-access slots; grants the default emotes on first access."""
+    """Owned codes + quick-access slots. Grants any not-yet-owned default emotes, so newly
+    added defaults backfill to existing users too (not only on a user's first access)."""
     owned = _owned_codes(session, wallet)
-    if not owned:
-        _grant(session, wallet, DEFAULT_EMOTES)
+    missing = [c for c in DEFAULT_EMOTES if c not in owned]
+    if missing:
+        _grant(session, wallet, missing)
         session.commit()
         owned = _owned_codes(session, wallet)
     user = session.get(User, wallet)

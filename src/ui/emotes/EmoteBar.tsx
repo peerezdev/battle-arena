@@ -11,7 +11,7 @@ const MAX_SLOTS = 3
 function VideoThumb({ emote, size }: { emote: Emote; size: number }) {
   return (
     <AlphaVideo webm={emote.video_url} mov={emote.video_mov}
-      style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', background: '#160f1d', pointerEvents: 'none' }} />
+      style={{ width: size, height: size, objectFit: 'contain', pointerEvents: 'none' }} />
   )
 }
 
@@ -74,7 +74,7 @@ export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: 
                   <div key={code} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
                     <button onClick={() => { throwIt(e); setMenuOpen(false) }} title={`Throw ${e.name}`}
                       style={{ width: 60, height: 60, padding: 3, borderRadius: 14, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', cursor: 'pointer', overflow: 'hidden' }}>
-                      <AlphaVideo webm={e.video_url} mov={e.video_mov} style={{ width: '100%', height: '100%', borderRadius: 11, objectFit: 'cover', pointerEvents: 'none' }} />
+                      <AlphaVideo webm={e.video_url} mov={e.video_mov} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
                     </button>
                     <button onClick={() => toggleSlot(code)} title={pinned ? 'Remove from quick' : 'Pin to quick'}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 7, border: `1px solid ${pinned ? COLORS.green + '88' : COLORS.border}`, background: pinned ? 'rgba(0,255,196,.12)' : 'transparent', color: pinned ? COLORS.green : COLORS.muted, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>
