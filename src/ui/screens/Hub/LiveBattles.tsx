@@ -321,9 +321,12 @@ function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBat
         )}
       </div>
 
-      {b.statusText === 'Filling' && openSeats > 0 && (
-        <div style={{ marginTop: 12, fontSize: 11.5, color: COLORS.muted }}>
-          {openSeats} seat{openSeats === 1 ? '' : 's'} left · starts when full
+      {openSeats > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 13, paddingTop: 12, borderTop: '1px dashed rgba(245,197,66,.25)' }}>
+          <span style={{ flex: 'none', width: 6, height: 6, borderRadius: '50%', background: '#f5c542', boxShadow: '0 0 6px #f5c542', animation: 'ba-pulse 1.4s infinite' }} />
+          <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: '#f5c542' }}>
+            {openSeats} seat{openSeats === 1 ? '' : 's'} left · starts when full
+          </span>
         </div>
       )}
     </div>

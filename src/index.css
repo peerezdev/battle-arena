@@ -174,3 +174,6 @@ textarea::placeholder {
 
 /* Recent-drops row entrance */
 @keyframes ba-dropin { 0% { opacity: 0; transform: translateY(-10px) } 100% { opacity: 1; transform: translateY(0) } }
+
+/* Filling-lobby "seats left" pulse dot */
+@keyframes ba-pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }

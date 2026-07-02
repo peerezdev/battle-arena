@@ -19,22 +19,7 @@ export function QuickMatch({
 }: Props) {
   const reducedMotion = useReducedMotion()
   return (
-    <div
-      style={{
-        borderRadius: 20,
-        padding: 1,
-        background: 'linear-gradient(120deg,#ff2e9755,#00ffc433,transparent 70%)',
-        marginBottom: 26,
-      }}
-    >
-      <div
-        style={{
-          borderRadius: 19,
-          background: 'linear-gradient(135deg,rgba(255,46,151,.16),rgba(13,17,22,.6) 42%,rgba(0,255,196,.10))',
-          padding: '32px 28px',
-          animation: reducedMotion ? 'none' : 'ba-glow 7s ease-in-out infinite',
-        }}
-      >
+    <div style={{ padding: 'clamp(6px,1vw,14px) 2px' }}>
         {/* Kicker */}
         <div
           style={{
@@ -158,7 +143,6 @@ export function QuickMatch({
             or try a free demo →
           </button>
         </div>
-      </div>
     </div>
   )
 }
