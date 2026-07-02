@@ -11,6 +11,11 @@ type Props = {
   className?: string
 }
 
+// Only WebKit (Safari, iOS) renders HEVC's alpha channel. Chromium *decodes* HEVC (via the OS on
+// macOS) but drops the alpha → the video shows up opaque; canPlayType can't distinguish that case,
+// so we pick the source by engine: WebKit gets the .mov, everyone else the VP9+alpha WebM.
+const IS_WEBKIT = typeof navigator !== 'undefined' && /apple/i.test(navigator.vendor || '')
+
 export function AlphaVideo({ webm, mov, loop = true, muted = true, style, className }: Props) {
   const ref = useRef<HTMLVideoElement>(null)
 
@@ -30,9 +35,7 @@ export function AlphaVideo({ webm, mov, loop = true, muted = true, style, classN
       className={className}
       style={{ display: 'block', ...style }}
     >
-      {/* Safari / iOS / macOS: HEVC with alpha */}
-      {mov && <source src={mov} type="video/quicktime" />}
-      {/* Chrome / Firefox / Edge / Android: VP9 with alpha */}
+      {IS_WEBKIT && mov && <source src={mov} type="video/quicktime" />}
       <source src={webm} type="video/webm" />
     </video>
   )

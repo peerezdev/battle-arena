@@ -39,11 +39,13 @@ export function throwEmote(wallet: string, emote: { video_url: string; video_mov
   v.loop = true; v.autoplay = true; v.playsInline = true
   v.setAttribute('playsinline', ''); v.muted = false
   v.setAttribute('data-ba-emote-bubble', wallet)
-  // Two alpha-capable sources; the browser picks: HEVC .mov (Safari) then VP9 .webm (rest).
+  // Only WebKit (Safari/iOS) renders HEVC alpha; Chromium decodes HEVC but drops it (→ opaque),
+  // so give the .mov to WebKit only and the VP9+alpha WebM to everyone else.
   const addSource = (src: string, type: string) => {
     const s = document.createElement('source'); s.src = src; s.type = type; v.appendChild(s)
   }
-  if (emote.video_mov) addSource(emote.video_mov, 'video/quicktime')
+  const isWebKit = /apple/i.test(navigator.vendor || '')
+  if (isWebKit && emote.video_mov) addSource(emote.video_mov, 'video/quicktime')
   addSource(emote.video_url, 'video/webm')
   const left = Math.min(r.right + 8, window.innerWidth - SIZE - 8)
   Object.assign(v.style, {
