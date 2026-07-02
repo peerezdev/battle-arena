@@ -8,6 +8,7 @@ from typing import Optional
 
 from app.services.provably_fair import pick_index, client_seed_from_nfts
 from app.services.nft_transfer import UnsupportedNftStandard
+from app.services.battle_fees import collect_battle_fee
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,8 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                      sponsor: bool = False,
                      open_max_attempts: int = 20, open_delay: float = 3.0,
                      escrow_max_attempts: int = 20, escrow_delay: float = 3.0,
-                     sleep_fn=None, build_usdc_sweep_tx=None, operator_wallet_id="") -> str:
+                     sleep_fn=None, build_usdc_sweep_tx=None, operator_wallet_id="",
+                     usdc_balance=None, build_usdc_transfer_tx=None) -> str:
     # sponsor=False → user-pays (the fee-payer wallet needs SOL). sponsor=True requires
     # Privy "App pays" gas sponsorship to be enabled for the cluster.
     # NOTE: sponsor is no longer used in settle (transfers go via our-RPC submit_tx);
@@ -192,6 +194,14 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
         sleep_fn=sleep_fn, wait_max_attempts=escrow_max_attempts, wait_delay=escrow_delay,
         operator_wallet_id=operator_wallet_id,
     )
+
+    if usdc_balance is not None and build_usdc_transfer_tx is not None:
+        await collect_battle_fee(
+            session, battle, winner, len(players), gacha=gacha, signer=signer,
+            resolve_wallet_id=resolve_wallet_id, submit_tx=submit_tx,
+            usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
+            operator_wallet_id=operator_wallet_id, sleep_fn=sleep_fn,
+        )
 
     battle.winner = winner; battle.status = "settled"; battle.settled_at = now_fn()
     # Loyalty points: award each participant their buy-in (per-player = battle.price for pack).

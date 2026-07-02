@@ -476,3 +476,71 @@ async def test_run_battle_turbo_autosold_common_not_transferred(session):
     a_pull = session.query(BattlePull).filter_by(battle_id="bt", player_wallet="A").first()
     assert a_pull.auto_sold is True and a_pull.transferred is False
     assert a_pull.buyback_amount == 42_500_000
+
+
+@pytest.mark.asyncio
+async def test_run_battle_invokes_fee_collection_on_settle(session, monkeypatch):
+    """After settle, the engine calls collect_battle_fee with the winner and player count —
+    only when the wiring provided the two fee closures."""
+    calls = []
+    async def fake_collect(session, battle, winner, n_players, **kw):
+        calls.append((battle.id, winner, n_players)); return 0
+    import app.services.pack_engine as pe
+    monkeypatch.setattr(pe, "collect_battle_fee", fake_collect)
+
+    b = PackBattle(id="b1", mode="pack", machine_code="pokemon_50", price=50, max_players=2, status="running", server_seed="ab"*32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="b1", player_wallet="A"),
+                     BattlePlayer(battle_id="b1", player_wallet="B")])
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
+                    "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
+    signer = _Signer()
+    async def build_transfer_tx(esc, dest, mint): return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
+    async def prepare_escrow(addr): pass
+    async def usdc_balance(addr): return 0
+    async def build_usdc_transfer_tx(src, dest, amount): return "tx"
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
+                           prepare_escrow=prepare_escrow,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
+                           usdc_balance=usdc_balance,
+                           build_usdc_transfer_tx=build_usdc_transfer_tx)
+    assert out == "settled"
+    assert len(calls) == 1
+    assert calls[0][1] == b.winner and calls[0][2] == 2
+
+
+@pytest.mark.asyncio
+async def test_run_battle_no_fee_deps_no_fee_call(session, monkeypatch):
+    """Without the fee closures (legacy callers, existing tests) collection is never invoked."""
+    calls = []
+    async def fake_collect(*a, **kw):
+        calls.append(1); return 0
+    import app.services.pack_engine as pe
+    monkeypatch.setattr(pe, "collect_battle_fee", fake_collect)
+
+    b = PackBattle(id="b2", mode="pack", machine_code="pokemon_50", price=50, max_players=2, status="running", server_seed="ab"*32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="b2", player_wallet="A"),
+                     BattlePlayer(battle_id="b2", player_wallet="B")])
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
+                    "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
+    signer = _Signer()
+    async def build_transfer_tx(esc, dest, mint): return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
+    async def prepare_escrow(addr): pass
+    out = await run_battle(session, b, gacha=gacha, signer=signer,
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                           confirm_in_escrow=confirm_in_escrow,
+                           prepare_escrow=prepare_escrow,
+                           can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+    assert out == "settled"
+    assert calls == []
