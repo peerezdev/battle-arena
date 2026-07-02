@@ -224,11 +224,25 @@ export function LiveBattles({ battles, onSelectMode, onBattleAction, onCancel, o
   )
 }
 
+const MODE_COLOR: Record<BattleMode, string> = {
+  pack: COLORS.green,
+  royale: '#ff6bb5',
+  mana: '#a98bff',
+}
+
+// Parses a "x/y" slots string into { filled, total }. Falls back to 0/0 on malformed input.
+function parseSlots(slots: string): { filled: number; total: number } {
+  const m = /^(\d+)\s*\/\s*(\d+)$/.exec(slots.trim())
+  if (!m) return { filled: 0, total: 0 }
+  return { filled: Number(m[1]), total: Number(m[2]) }
+}
+
 function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
-  const purple = b.mode === 'royale' || b.mode === 'mana'
-  const modeColor = purple ? '#ff6bb5' : '#00ffc4'
-  const modeBg = purple ? 'rgba(255,46,151,.14)' : 'rgba(0,255,196,.12)'
-  const modeBd = purple ? 'rgba(255,46,151,.4)' : 'rgba(0,255,196,.35)'
+  const modeColor = MODE_COLOR[b.mode]
+  const modeBg = `${modeColor}22`
+  const modeBd = `${modeColor}66`
+  const { filled, total } = parseSlots(b.slots)
+  const openSeats = Math.max(0, total - filled)
   return (
     <div
       onClick={() => onOpen(b)}
@@ -283,7 +297,7 @@ function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBat
       {/* players + action */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <PlayerAvatars players={b.players} extra={b.extra} />
+          <PlayerAvatars players={b.players} extra={b.extra} openSeats={openSeats} />
           <span style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>{b.slots}</span>
         </div>
 
@@ -306,6 +320,12 @@ function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBat
           </button>
         )}
       </div>
+
+      {b.statusText === 'Filling' && openSeats > 0 && (
+        <div style={{ marginTop: 12, fontSize: 11.5, color: COLORS.muted }}>
+          {openSeats} seat{openSeats === 1 ? '' : 's'} left · starts when full
+        </div>
+      )}
     </div>
   )
 }
@@ -313,9 +333,11 @@ function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBat
 function PlayerAvatars({
   players,
   extra,
+  openSeats = 0,
 }: {
   players: { violet: boolean }[]
   extra?: string
+  openSeats?: number
 }) {
   const hasVS = players.length === 2
 
@@ -331,6 +353,21 @@ function PlayerAvatars({
             border: `2px solid ${p.violet ? COLORS.violet : COLORS.green}`,
             background: p.violet ? '#1a1430' : '#0f2018',
             marginLeft: !hasVS && i > 0 ? -13 : 0,
+          }}
+        />
+      ))}
+      {/* Open seats — pulsing empty rings, only meaningful for fillable (non-1v1) lobbies */}
+      {!hasVS && Array.from({ length: openSeats }, (_, i) => (
+        <div
+          key={`seat-${i}`}
+          className="ba-slotpulse"
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            border: '2px dashed rgba(245,197,66,.5)',
+            background: 'transparent',
+            marginLeft: -13,
           }}
         />
       ))}

@@ -167,3 +167,7 @@ textarea::placeholder {
 
 /* Lobby big-pull ticker */
 @keyframes ba-ticker { 0% { transform: translateX(0) } 100% { transform: translateX(-50%) } }
+
+/* Live-games empty-seat pulse */
+@keyframes ba-slotpulse { 0%,100% { border-color: rgba(245,197,66,.5); box-shadow: 0 0 0 0 rgba(245,197,66,.3) } 50% { border-color: rgba(245,197,66,.9); box-shadow: 0 0 10px -2px rgba(245,197,66,.6) } }
+.ba-slotpulse { animation: ba-slotpulse 1.6s ease-in-out infinite; }
