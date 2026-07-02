@@ -13,7 +13,6 @@ export interface LiveBattle {
   alreadyJoined?: boolean
   entry: number; pot: number; slots: string; statusText: string; statusColor: string
 }
-export interface HubStat { value: string; label: string; gradient?: boolean }
 
 export const MOCK_DROPS: DropItem[] = [
   { id: 'd1', name: 'Charizard VMAX', set: 'Pokémon · 12s', ago: '12s', valueUsd: 320, emoji: '🔥', accent: '#00ffc4' },
@@ -26,12 +25,6 @@ export const MOCK_CHAT: ChatMsg[] = [
   { id: 'm2', user: 'Netti', mod: true, color: '#00ffc4', ts: '15:50', text: 'double rare 👀 that\'s a big win' },
   { id: 'm3', user: 'shalev123', color: '#00ffc4', ts: '15:51', text: 'won a Charizard from a $50 pack 🔥' },
   { id: 'm4', user: 'kappa', color: '#b78cff', ts: '15:52', text: 'anyone up for a royale?' },
-]
-
-export const MOCK_STATS: HubStat[] = [
-  { value: '—', label: 'Live battles', gradient: true },
-  { value: '$2.4k', label: 'Biggest pull today' },
-  { value: '312', label: 'Packs opened 24h' },
 ]
 
 export const STAKE_OPTIONS = [10, 50, 125, 250]

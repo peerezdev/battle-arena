@@ -1,5 +1,5 @@
 import { COLORS, GRADIENT, FONTS } from '../../theme'
-import { STAKE_OPTIONS, type HubStat } from './hubMockData'
+import { STAKE_OPTIONS } from './hubMockData'
 import { useReducedMotion } from '../../useReducedMotion'
 
 interface Props {
@@ -8,7 +8,6 @@ interface Props {
   onStake: (n: number) => void
   onCreate: () => void
   onPlayDemo: () => void
-  stats?: HubStat[]
 }
 
 export function QuickMatch({
