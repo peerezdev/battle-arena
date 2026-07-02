@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     privy_solana_caip2: str = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"  # devnet default
     privy_quorum_id: str = ""
     cc_usdc_mint: str = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
-    gimmighoul_per_usdc: float = 1.0  # battles/royale loyalty rate; env: GIMMIGHOUL_PER_USDC
-    gimmighoul_per_usdc_gacha: float = 0.5  # gacha loyalty rate (half of battles); env: GIMMIGHOUL_PER_USDC_GACHA
+    gimmighoul_per_usdc: float = 0.1  # battles/royale loyalty rate; env: GIMMIGHOUL_PER_USDC
+    gimmighoul_per_usdc_gacha: float = 0.05  # gacha loyalty rate (half of battles); env: GIMMIGHOUL_PER_USDC_GACHA
     privy_operator_wallet_id: str = ""
     privy_operator_address: str = ""
     escrow_seed_lamports: int = 10_000_000
