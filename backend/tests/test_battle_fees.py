@@ -108,3 +108,147 @@ async def test_base_survives_machines_api_failure(Session):
                      buyback_amount=34_000_000))
     s.commit()
     assert await compute_fee_base_units(s, b, _BrokenGacha()) == 34_000_000
+
+
+from app.services.battle_fees import collect_battle_fee
+
+
+class _Signer:
+    def __init__(self):
+        self.signed = []
+    async def sign_solana(self, wallet_id, tx):
+        self.signed.append(wallet_id)
+        return f"signed:{tx}"
+
+
+def _fee_env(monkeypatch, **over):
+    import app.services.battle_fees as bf
+    defaults = dict(battle_fee_pct_per_player=0.005, battle_fee_pct_cap=0.03,
+                    fee_wallet_address="FEEWALLET")
+    defaults.update(over)
+    monkeypatch.setattr(bf, "get_settings", lambda: Settings(**defaults))
+
+
+def _collect_kwargs(signer, submitted, balance=1_000_000_000, transfers=None):
+    async def usdc_balance(addr):
+        return balance
+    async def build_usdc_transfer_tx(src, dest, amount):
+        if transfers is not None:
+            transfers.append((src, dest, amount))
+        return f"tx:{src}->{dest}:{amount}"
+    async def submit_tx(signed):
+        submitted.append(signed)
+    return dict(signer=signer, resolve_wallet_id=lambda w: f"{w}-id", submit_tx=submit_tx,
+                usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
+                operator_wallet_id="op-id", sleep_fn=_nosleep, delay=0.0)
+
+
+async def _nosleep(_):
+    return None
+
+
+def _loot(s, bid, insured=100.0):
+    """One kept-NFT card worth `insured` from machine m50 (85%)."""
+    s.add(BattlePull(battle_id=bid, player_wallet="WIN", memo="a", round_number=1,
+                     nft_address="n1", insured_value=insured, auto_sold=False))
+    s.commit()
+
+
+GACHA85 = _MachGacha([{"code": "m50", "instantBuyback": 85}])
+
+
+@pytest.mark.asyncio
+async def test_collect_full_charge_and_persist(Session, monkeypatch):
+    _fee_env(monkeypatch)
+    s = Session()
+    b = _battle(s, "bc1"); _loot(s, "bc1")            # base $85
+    signer, submitted, transfers = _Signer(), [], []
+    charged = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85,
+                                       **_collect_kwargs(signer, submitted, transfers=transfers))
+    assert charged == 850_000                          # $85 × 1% = $0.85
+    assert transfers == [("WIN", "FEEWALLET", 850_000)]
+    assert signer.signed == ["WIN-id", "op-id"]        # winner signs, operator pays gas
+    assert len(submitted) == 1
+    got = s.get(PackBattle, "bc1")
+    assert got.fee_charged is True and got.fee_base_units == 850_000
+    assert got.fee_pct == pytest.approx(0.01)
+
+
+@pytest.mark.asyncio
+async def test_collect_caps_at_winner_balance(Session, monkeypatch):
+    _fee_env(monkeypatch)
+    s = Session()
+    b = _battle(s, "bc2"); _loot(s, "bc2")            # fee would be 850_000
+    signer, submitted, transfers = _Signer(), [], []
+    charged = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85,
+                                       **_collect_kwargs(signer, submitted, balance=300_000, transfers=transfers))
+    assert charged == 300_000                          # only what the winner holds
+    assert transfers == [("WIN", "FEEWALLET", 300_000)]
+    assert s.get(PackBattle, "bc2").fee_base_units == 300_000
+
+
+@pytest.mark.asyncio
+async def test_collect_zero_balance_marks_charged_no_transfer(Session, monkeypatch):
+    _fee_env(monkeypatch)
+    s = Session()
+    b = _battle(s, "bc3"); _loot(s, "bc3")
+    signer, submitted = _Signer(), []
+    charged = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85,
+                                       **_collect_kwargs(signer, submitted, balance=0))
+    assert charged == 0 and submitted == []
+    got = s.get(PackBattle, "bc3")
+    assert got.fee_charged is True and got.fee_base_units == 0
+
+
+@pytest.mark.asyncio
+async def test_collect_idempotent_second_call_noop(Session, monkeypatch):
+    _fee_env(monkeypatch)
+    s = Session()
+    b = _battle(s, "bc4"); _loot(s, "bc4")
+    signer, submitted = _Signer(), []
+    kw = _collect_kwargs(signer, submitted)
+    await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85, **kw)
+    again = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85, **kw)
+    assert again == 0 and len(submitted) == 1          # no double transfer
+
+
+@pytest.mark.asyncio
+async def test_collect_transfer_failure_never_raises_flag_stays_false(Session, monkeypatch, caplog):
+    _fee_env(monkeypatch)
+    s = Session()
+    b = _battle(s, "bc5"); _loot(s, "bc5")
+    signer = _Signer()
+    async def usdc_balance(addr): return 1_000_000_000
+    async def build_usdc_transfer_tx(src, dest, amount): return "tx"
+    async def submit_tx(signed): raise RuntimeError("rpc down")
+    charged = await collect_battle_fee(
+        s, b, "WIN", 2, gacha=GACHA85, signer=signer, resolve_wallet_id=lambda w: f"{w}-id",
+        submit_tx=submit_tx, usdc_balance=usdc_balance,
+        build_usdc_transfer_tx=build_usdc_transfer_tx, operator_wallet_id="op-id",
+        sleep_fn=_nosleep, delay=0.0)
+    assert charged == 0
+    assert s.get(PackBattle, "bc5").fee_charged is False   # retryable later
+    assert any(r.levelname == "ERROR" for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_collect_skips_when_no_fee_wallet_configured(Session, monkeypatch):
+    _fee_env(monkeypatch, fee_wallet_address="", privy_operator_address="")
+    s = Session()
+    b = _battle(s, "bc6"); _loot(s, "bc6")
+    signer, submitted = _Signer(), []
+    charged = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85,
+                                       **_collect_kwargs(signer, submitted))
+    assert charged == 0 and submitted == []
+    assert s.get(PackBattle, "bc6").fee_charged is False
+
+
+@pytest.mark.asyncio
+async def test_collect_rate_zero_is_kill_switch(Session, monkeypatch):
+    _fee_env(monkeypatch, battle_fee_pct_per_player=0.0)
+    s = Session()
+    b = _battle(s, "bc7"); _loot(s, "bc7")
+    signer, submitted = _Signer(), []
+    charged = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85,
+                                       **_collect_kwargs(signer, submitted))
+    assert charged == 0 and submitted == []

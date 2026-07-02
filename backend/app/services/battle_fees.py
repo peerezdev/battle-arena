@@ -49,3 +49,70 @@ async def compute_fee_base_units(session, battle, gacha) -> int:
             continue
         base += int(round(p.insured_value * (ib / 100.0) * USDC))
     return base
+
+
+async def collect_battle_fee(session, battle, winner, n_players, *, gacha, signer,
+                             resolve_wallet_id, submit_tx, usdc_balance,
+                             build_usdc_transfer_tx, operator_wallet_id="",
+                             sleep_fn=None, max_attempts=3, delay=1.0) -> int:
+    """Charge the platform fee from the winner's wallet (post-sweep) into the fee wallet.
+    charged = min(fee, winner balance); zero balance still flips the idempotency flag.
+    NEVER raises and never blocks the settle: exhausted retries → fee_charged stays False
+    (retryable) + ERROR log. Returns the base units actually charged."""
+    sleep_fn = sleep_fn or asyncio.sleep
+    try:
+        if battle.fee_charged:
+            return 0
+        s = get_settings()
+        fee_wallet = s.fee_wallet_address or s.privy_operator_address
+        if not fee_wallet:
+            logger.warning("fee: no fee wallet configured — skipping battle %s", battle.id)
+            return 0
+        pct = fee_pct_total(n_players)
+        if pct <= 0:
+            return 0
+        base = await compute_fee_base_units(session, battle, gacha)
+        fee = int(round(base * pct))
+        if fee <= 0:
+            battle.fee_charged = True
+            battle.fee_base_units = 0
+            battle.fee_pct = pct
+            session.commit()
+            return 0
+
+        balance = await usdc_balance(winner)
+        charged = min(fee, balance)
+        if charged < fee:
+            logger.warning("fee: winner %s balance %s < fee %s in battle %s — charging balance",
+                           winner, balance, fee, battle.id)
+        if charged <= 0:
+            battle.fee_charged = True
+            battle.fee_base_units = 0
+            battle.fee_pct = pct
+            session.commit()
+            return 0
+
+        for attempt in range(max_attempts):
+            try:
+                tx = await build_usdc_transfer_tx(winner, fee_wallet, charged)
+                signed = await signer.sign_solana(resolve_wallet_id(winner), tx)
+                if operator_wallet_id:
+                    signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays gas
+                await submit_tx(signed)
+                battle.fee_charged = True
+                battle.fee_base_units = charged
+                battle.fee_pct = pct
+                session.commit()
+                logger.info("fee: charged %s from %s in battle %s (pct=%s)",
+                            charged, winner, battle.id, pct)
+                return charged
+            except Exception as exc:
+                logger.warning("fee: transfer attempt %s/%s failed in battle %s: %s",
+                               attempt + 1, max_attempts, battle.id, exc)
+                await sleep_fn(delay)
+        logger.error("fee: UNCOLLECTED after %s attempts in battle %s (winner %s, amount %s)",
+                     max_attempts, battle.id, winner, charged)
+        return 0
+    except Exception as exc:  # money path: absolutely never break the caller's settle
+        logger.error("fee: unexpected error in battle %s: %s — skipping", battle.id, exc)
+        return 0
