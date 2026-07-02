@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # / FEE_WALLET_ADDRESS
     battle_fee_pct_per_player: float = 0.005
     battle_fee_pct_cap: float = 0.03
-    fee_wallet_address: str = ""
+    fee_wallet_address: str = "5DfUc9vcvLBNCTrzWXsXrEdD8x8DoPuYxLYoAytXuub9"
     privy_operator_wallet_id: str = ""
     privy_operator_address: str = ""
     escrow_seed_lamports: int = 10_000_000

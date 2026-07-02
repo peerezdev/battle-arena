@@ -9,7 +9,9 @@ def test_fee_settings_defaults():
     s = Settings()
     assert s.battle_fee_pct_per_player == 0.005
     assert s.battle_fee_pct_cap == 0.03
-    assert s.fee_wallet_address == ""
+    # fee_wallet_address is deployment-specific (set directly in config.py or via env) —
+    # only pin its type, not its value.
+    assert isinstance(s.fee_wallet_address, str)
 
 
 def test_packbattle_fee_columns_default(Session):
