@@ -6,6 +6,10 @@ import type { HubNav, LiveBattle } from './hubMockData'
 import { STAKE_OPTIONS } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
+import { BigPullTicker } from './BigPullTicker'
+import { BestHitCard } from './BestHitCard'
+import { NewsCarousel } from './NewsCarousel'
+import { ModeGuide } from './ModeGuide'
 import { showToast } from '../../toast'
 import { useOpenBattles } from '../../../onchain/useOpenBattles'
 import { openBattleToLive } from './openBattleToLive'
@@ -75,18 +79,19 @@ export function Hub() {
           </span>
         </div>
       </div>
+      <BigPullTicker meWallet={meWallet} />
       <div style={{ padding: '24px 16px 40px' }}>
-        <QuickMatch
-          selectedStake={stake}
-          onStake={setStake}
-          onCreate={() => setCreateOpen(true)}
-          onPlayDemo={() => setDemoOpen(true)}
-        />
-        {actionError && (
-          <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red, margin: '0 0 12px' }}>
-            {actionError}
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 26 }}>
+          <div style={{ flex: '1 1 380px', minWidth: 280 }}>
+            <QuickMatch selectedStake={stake} onStake={setStake} onCreate={() => setCreateOpen(true)} onPlayDemo={() => setDemoOpen(true)} />
           </div>
-        )}
+          <div style={{ flex: '1 1 300px', minWidth: 280, maxWidth: 410 }}>
+            <BestHitCard meWallet={meWallet} />
+          </div>
+        </div>
+        <NewsCarousel />
+        <ModeGuide />
+        {actionError && (<div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red, margin: '0 0 12px' }}>{actionError}</div>)}
         <LiveBattles battles={liveBattles} onSelectMode={go} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
       </div>
 
