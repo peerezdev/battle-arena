@@ -7,7 +7,6 @@ vi.mock('../../drops/useDrops', () => ({ useDrops: () => drops.value }))
 vi.mock('../../useReducedMotion', () => ({ useReducedMotion: () => reduced.value }))
 
 import { BigPullTicker } from './BigPullTicker'
-import { COLORS } from '../../theme'
 
 describe('BigPullTicker', () => {
   beforeEach(() => {
