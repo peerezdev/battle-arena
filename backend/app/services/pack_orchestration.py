@@ -281,6 +281,9 @@ async def run_pack_battle_live(
         bh = await fetch_latest_blockhash(rpc_url)
         return build_token_transfer(src, dest, usdc_mint, bh, amount=amount, decimals=6, fee_payer=operator_address)
 
+    async def usdc_balance(addr):
+        return await usdc_balance_base_units(rpc_url, addr, usdc_mint)
+
     def can_play(wallet: str) -> bool:
         return wallet in playable
 
@@ -292,6 +295,7 @@ async def run_pack_battle_live(
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
         confirm_in_escrow=confirm_in_escrow, can_play=can_play, now_fn=now_fn, sponsor=sponsor,
         build_usdc_sweep_tx=build_usdc_sweep_tx, operator_wallet_id=operator_wallet_id,
+        usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
     )
     if result == "voided":
         await refund_pack_void(
@@ -402,6 +406,7 @@ async def run_royale_live(
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
         price_base=price_base, now_fn=now_fn, build_usdc_sweep_tx=build_usdc_sweep_tx,
         escrow_usdc_balance=escrow_usdc_balance, operator_wallet_id=operator_wallet_id,
+        usdc_balance=escrow_usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
     )
     if result == "voided":
         await refund_royale_void(

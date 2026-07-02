@@ -706,3 +706,64 @@ async def test_run_royale_live_no_refund_on_settled(session, monkeypatch):
         rpc_url="x", usdc_mint=USDC_MINT, price_base=50_000_000)
 
     assert out == "settled" and refunded == []   # no refund on settle
+
+
+# ---------------------------------------------------------------------------
+# Test 10/11: live wiring forwards the fee closures into run_battle/run_royale
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_pack_wiring_passes_fee_closures(session, monkeypatch):
+    """The live wiring forwards usdc_balance + build_usdc_transfer_tx into run_battle."""
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePlayer
+
+    b = PackBattle(id="b-fee-closures", mode="pack", machine_code="pokemon_50", price=50,
+                   max_players=2, status="lobby")
+    session.add(b)
+    session.add(BattlePlayer(battle_id="b-fee-closures", player_wallet=WALLET_A, wallet_id=WALLET_ID_A))
+    session.commit()
+
+    seen = {}
+    async def fake_run_battle(session, battle, **kw):
+        seen["usdc_balance"] = kw.get("usdc_balance")
+        seen["build_usdc_transfer_tx"] = kw.get("build_usdc_transfer_tx")
+        return "settled"
+    monkeypatch.setattr(po, "run_battle", fake_run_battle)
+    async def _bal(*a, **k): return 0
+    monkeypatch.setattr(po, "usdc_balance_base_units", _bal)
+
+    await po.run_pack_battle_live(session, b, gacha=None, signer=None, rpc_url="x",
+        usdc_mint="Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr", min_usdc_base_units=0)
+
+    assert seen["usdc_balance"] is not None
+    assert seen["build_usdc_transfer_tx"] is not None
+
+
+@pytest.mark.asyncio
+async def test_royale_wiring_passes_fee_closures(session, monkeypatch):
+    """The live wiring forwards usdc_balance + build_usdc_transfer_tx into run_royale."""
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePlayer
+
+    b = PackBattle(id="r-fee-closures", mode="royale", machine_code="pokemon_50", price=50,
+                   max_players=2, status="lobby",
+                   escrow_wallet_id=ESCROW_WALLET_ID, escrow_address=ESCROW_ADDRESS)
+    session.add(b)
+    session.add(BattlePlayer(battle_id="r-fee-closures", player_wallet=WALLET_A, wallet_id=WALLET_ID_A))
+    session.commit()
+
+    seen = {}
+    async def fake_run_royale(session, battle, **kw):
+        seen["usdc_balance"] = kw.get("usdc_balance")
+        seen["build_usdc_transfer_tx"] = kw.get("build_usdc_transfer_tx")
+        return "settled"
+    monkeypatch.setattr(po, "run_royale", fake_run_royale)
+    async def _bal(*a, **k): return 0
+    monkeypatch.setattr(po, "usdc_balance_base_units", _bal)
+
+    await po.run_royale_live(session, b, gacha=_Gacha({}), signer=_Signer(),
+        rpc_url="x", usdc_mint=USDC_MINT, price_base=50_000_000)
+
+    assert seen["usdc_balance"] is not None
+    assert seen["build_usdc_transfer_tx"] is not None
