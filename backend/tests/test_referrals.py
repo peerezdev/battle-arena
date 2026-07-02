@@ -17,7 +17,16 @@ from app.services.referrals import (
 from app.services.users import leaderboard
 
 
-def test_award_no_code_base_only(Session):
+@pytest.fixture
+def unit_rate(monkeypatch):
+    """Pin the battles loyalty rate to 1 G/USDC so the expected amounts read literally
+    (the production default is 0.1; these tests document the mechanism, not the rate)."""
+    import app.services.referrals as refmod
+    from app.config import Settings
+    monkeypatch.setattr(refmod, "get_settings", lambda: Settings(gimmighoul_per_usdc=1.0))
+
+
+def test_award_no_code_base_only(Session, unit_rate):
     s = Session()
     award_gimmighouls(s, "alice", 100_000_000)   # $100 in base units
     s.commit()
@@ -32,7 +41,7 @@ def test_award_custom_ratio_for_gacha(Session):
     assert s.get(User, "alice").gimmighouls == 50      # half of the 100 a battle would give
 
 
-def test_award_with_code_boost_and_referrer_cut_to_owner(Session):
+def test_award_with_code_boost_and_referrer_cut_to_owner(Session, unit_rate):
     s = Session()
     create_referral_code(s, "CREATOR", "Creator", boost_pct=0.10, referrer_pct=0.10,
                          owner_wallet="owner")
@@ -44,7 +53,7 @@ def test_award_with_code_boost_and_referrer_cut_to_owner(Session):
     assert s.get(User, "owner").gimmighouls == 10
 
 
-def test_award_with_code_fallback_to_earned_when_no_owner(Session):
+def test_award_with_code_fallback_to_earned_when_no_owner(Session, unit_rate):
     s = Session()
     create_referral_code(s, "NOOWNER", "NoOwner", boost_pct=0.0, referrer_pct=0.20)
     apply_referral_code(s, "carol", "NOOWNER")
@@ -54,7 +63,7 @@ def test_award_with_code_fallback_to_earned_when_no_owner(Session):
     assert get_referral_code(s, "NOOWNER").earned == 10  # round(50 * 0.20)
 
 
-def test_award_rounding(Session):
+def test_award_rounding(Session, unit_rate):
     s = Session()
     create_referral_code(s, "ODD", "Odd", boost_pct=0.105, referrer_pct=0.0)
     apply_referral_code(s, "dave", "ODD")
@@ -155,7 +164,7 @@ def test_leaderboard_endpoint_shape_and_order(Session):
     assert set(rows[0].keys()) == {"wallet", "alias", "gimmighouls", "elo"}
 
 
-def test_settle_award_idempotent_guard(Session):
+def test_settle_award_idempotent_guard(Session, unit_rate):
     """The guard: award only when not yet awarded, then flip the flag → second pass no-ops."""
     s = Session()
     b = PackBattle(id="b1", mode="pack", machine_code="m", price=25, max_players=2,
