@@ -252,3 +252,28 @@ async def test_collect_rate_zero_is_kill_switch(Session, monkeypatch):
     charged = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85,
                                        **_collect_kwargs(signer, submitted))
     assert charged == 0 and submitted == []
+
+
+@pytest.mark.asyncio
+async def test_collect_commit_failure_after_submit_never_resubmits(Session, monkeypatch, caplog):
+    """If persisting the flag fails AFTER the transfer was submitted, we must NOT retry the
+    transfer (double charge on-chain) — log ERROR and report the charge as made."""
+    _fee_env(monkeypatch)
+    s = Session()
+    b = _battle(s, "bc8"); _loot(s, "bc8")
+    signer, submitted = _Signer(), []
+    real_commit, boom = s.commit, {"armed": False}
+
+    def flaky_commit():
+        if boom["armed"]:
+            boom["armed"] = False
+            raise RuntimeError("db gone")
+        real_commit()
+
+    monkeypatch.setattr(s, "commit", flaky_commit)
+    boom["armed"] = True   # only the post-submit persistence commit fails
+    charged = await collect_battle_fee(s, b, "WIN", 2, gacha=GACHA85,
+                                       **_collect_kwargs(signer, submitted))
+    assert charged == 850_000
+    assert len(submitted) == 1                          # ONE submission — never re-sent
+    assert any(r.levelname == "ERROR" for r in caplog.records)

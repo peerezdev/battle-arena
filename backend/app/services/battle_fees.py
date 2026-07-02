@@ -99,17 +99,25 @@ async def collect_battle_fee(session, battle, winner, n_players, *, gacha, signe
                 if operator_wallet_id:
                     signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays gas
                 await submit_tx(signed)
-                battle.fee_charged = True
-                battle.fee_base_units = charged
-                battle.fee_pct = pct
-                session.commit()
-                logger.info("fee: charged %s from %s in battle %s (pct=%s)",
-                            charged, winner, battle.id, pct)
-                return charged
             except Exception as exc:
                 logger.warning("fee: transfer attempt %s/%s failed in battle %s: %s",
                                attempt + 1, max_attempts, battle.id, exc)
                 await sleep_fn(delay)
+                continue
+            # Transfer submitted — persist OUTSIDE the retry path: a persistence failure must
+            # never re-submit the transfer (that would double-charge the winner on-chain).
+            try:
+                battle.fee_charged = True
+                battle.fee_base_units = charged
+                battle.fee_pct = pct
+                session.commit()
+            except Exception as exc:
+                logger.error("fee: charged %s in battle %s but persistence FAILED: %s — "
+                             "flag not saved; do NOT re-run collection blindly",
+                             charged, battle.id, exc)
+            logger.info("fee: charged %s from %s in battle %s (pct=%s)",
+                        charged, winner, battle.id, pct)
+            return charged
         logger.error("fee: UNCOLLECTED after %s attempts in battle %s (winner %s, amount %s)",
                      max_attempts, battle.id, winner, charged)
         return 0
