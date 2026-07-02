@@ -1,8 +1,9 @@
 import { useState, useRef, useReducer, useEffect } from 'react'
-import { COLORS, FONTS, RARITY, formatUsd, rarityGlow } from '../../theme'
+import { COLORS, FONTS, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useChat } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
 import { useProfile } from '../../../hooks/useProfile'
+import { useReducedMotion } from '../../useReducedMotion'
 import { showToast } from '../../toast'
 import { UsernameModal } from '../../components/UsernameModal'
 import type { LiveDrop } from '../../drops/dropsStore'
@@ -46,10 +47,6 @@ function ago(ts: number): string {
   return `${Math.floor(h / 24)}d ago`
 }
 
-const RARITY_ACCENT: Record<string, string> = {
-  epic: RARITY.epic, rare: RARITY.rare, uncommon: RARITY.uncommon, common: RARITY.common,
-}
-
 export function ChatDock({
   collapsed = false,
   onToggle,
@@ -66,6 +63,7 @@ export function ChatDock({
   const drops = useDrops()
   const { messages, send, canPost, online } = useChat()
   const { username } = useProfile()
+  const reducedMotion = useReducedMotion()
   const [draft, setDraft] = useState('')
   const [nameModal, setNameModal] = useState(false)
   const promptedName = useRef(false)
@@ -202,8 +200,9 @@ export function ChatDock({
             style={{
               fontFamily: FONTS.mono,
               fontSize: 10.5,
+              fontWeight: 700,
               letterSpacing: '0.16em',
-              color: COLORS.muted,
+              color: COLORS.text,
               display: 'flex',
               alignItems: 'center',
               gap: 7,
@@ -254,8 +253,9 @@ export function ChatDock({
           </div>
         ) : (
           drops.map((drop) => {
-            const accent = RARITY_ACCENT[(drop.rarity ?? '').toLowerCase()] ?? COLORS.green
-            const glow = rarityGlow(drop.rarity)
+            const glow = rarityGlow(drop.rarity) ?? COLORS.green
+            const isMine = !!username && !!drop.username && drop.username === username
+            const isBigPull = (drop.valueUsd ?? 0) >= 1000
             return (
               <div
                 key={drop.id}
@@ -266,18 +266,33 @@ export function ChatDock({
                   padding: '8px 10px',
                   margin: '3px 0',
                   borderRadius: 12,
-                  border: `1px solid ${glow ?? 'transparent'}`,
-                  background: glow ? `${glow}14` : 'transparent',
-                  boxShadow: glow ? `0 0 16px -3px ${glow}, inset 0 0 10px -6px ${glow}` : undefined,
+                  border: `1px solid ${isMine ? COLORS.green : glow}55`,
+                  background: isMine ? `${COLORS.green}12` : `${glow}0d`,
+                  boxShadow: isMine
+                    ? `0 0 16px -4px ${COLORS.green}, inset 0 0 10px -6px ${COLORS.green}`
+                    : `0 0 14px -6px ${glow}`,
+                  animation: reducedMotion ? undefined : 'ba-dropin .32s ease-out both',
                 }}
               >
+                {/* Rarity-glow dot */}
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: glow,
+                    boxShadow: `0 0 8px ${glow}`,
+                    flexShrink: 0,
+                  }}
+                />
+
                 {/* Card image / emoji */}
                 <div
                   style={{
                     width: 28,
                     height: 38,
                     borderRadius: 6,
-                    background: `radial-gradient(circle at 40% 30%,${accent}33,#10141c)`,
+                    background: `radial-gradient(circle at 40% 30%,${glow}33,#10141c)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -301,27 +316,52 @@ export function ChatDock({
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div
                     style={{
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      color: COLORS.text,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                   >
-                    {drop.name}
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: COLORS.text,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {drop.name}
+                    </span>
+                    {isBigPull && (
+                      <span
+                        style={{
+                          fontFamily: FONTS.mono,
+                          fontSize: 8,
+                          fontWeight: 800,
+                          letterSpacing: '0.06em',
+                          color: '#1a1305',
+                          background: 'linear-gradient(135deg,#ffe28a,#f5c542)',
+                          borderRadius: 5,
+                          padding: '1.5px 5px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        BIG PULL
+                      </span>
+                    )}
                   </div>
                   <div
                     style={{
                       fontSize: 9,
-                      color: userColor(drop.username ?? drop.wallet),
+                      color: isMine ? COLORS.green : userColor(drop.username ?? drop.wallet),
                       fontWeight: 700,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                     }}
                   >
-                    {dropOpener(drop)}
+                    {isMine ? 'you' : dropOpener(drop)}
                   </div>
                   <div style={{ fontSize: 9, color: COLORS.muted }}>{drop.rarity ?? ''}</div>
                 </div>
@@ -341,7 +381,7 @@ export function ChatDock({
                       fontFamily: FONTS.display,
                       fontWeight: 800,
                       fontSize: 12,
-                      color: COLORS.green,
+                      color: isBigPull ? '#f5c542' : COLORS.green,
                     }}
                   >
                     {drop.valueUsd != null ? formatUsd(drop.valueUsd) : ''}
@@ -419,8 +459,9 @@ export function ChatDock({
             style={{
               fontFamily: FONTS.mono,
               fontSize: 10.5,
+              fontWeight: 700,
               letterSpacing: '0.16em',
-              color: COLORS.muted,
+              color: COLORS.text,
             }}
           >
             CHAT
@@ -482,7 +523,7 @@ export function ChatDock({
                       width: 21,
                       height: 21,
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg,#ff2e97,#00ffc4)',
+                      background: GRADIENT,
                       flexShrink: 0,
                     }}
                   />
@@ -498,7 +539,7 @@ export function ChatDock({
                     {msg.user}
                   </span>
                   {/* Timestamp */}
-                  <span style={{ fontSize: 9, color: '#5d6781', marginLeft: 'auto' }}>
+                  <span style={{ fontSize: 9, color: COLORS.muted, marginLeft: 'auto' }}>
                     {formatTs(msg.ts)}
                   </span>
                 </div>
@@ -506,7 +547,7 @@ export function ChatDock({
                 <div
                   style={{
                     fontSize: 12,
-                    color: '#cdd5e6',
+                    color: COLORS.text,
                     paddingLeft: 28,
                     lineHeight: 1.35,
                     fontFamily: FONTS.body,
@@ -556,7 +597,7 @@ export function ChatDock({
               width: 38,
               borderRadius: 10,
               border: 'none',
-              background: 'linear-gradient(135deg,#ff2e97,#00ffc4)',
+              background: GRADIENT,
               color: '#06120c',
               cursor: canPost ? 'pointer' : 'not-allowed',
               opacity: canPost ? 1 : 0.5,

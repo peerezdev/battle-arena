@@ -61,4 +61,16 @@ describe('ChatDock live drops', () => {
     expect(screen.getByText('Squirtle')).toBeTruthy()
     expect(screen.getByText('anon')).toBeTruthy()
   })
+
+  // Lobby v2: a drop worth $1000+ gets a "BIG PULL" badge next to its name.
+  it('shows a BIG PULL badge for a drop worth >= $1000', () => {
+    addDrop({
+      id: 'mint-bigpull', name: 'Mewtwo', valueUsd: 1500, rarity: 'Epic',
+      image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'ash',
+      ts: Date.now(),
+    })
+    render(<ChatDock />)
+    expect(screen.getByText('Mewtwo')).toBeTruthy()
+    expect(screen.getByText('BIG PULL')).toBeTruthy()
+  })
 })
