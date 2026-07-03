@@ -213,6 +213,17 @@ async def _finalize_pack_battle(session, battle, outcomes, players, *, escrow_wa
         operator_wallet_id=operator_wallet_id,
     )
 
+    # Visibility: a kept (non-auto-sold) card that never transferred is stuck in the escrow — e.g. a
+    # devnet cNFT, or any UnsupportedNftStandard. Mainnet gacha has 0 cNFTs (all SPL), so this should
+    # never fire in prod; if it does, shout so the card is recoverable instead of failing silently.
+    from app.models import BattlePull
+    stuck = [p for p in session.query(BattlePull).filter_by(battle_id=battle.id).all()
+             if p.nft_address and not p.auto_sold and not p.transferred]
+    if stuck:
+        logger.error("battle %s settled to %s but %d kept card(s) NOT delivered (stuck in escrow %s): %s",
+                     battle.id, winner, len(stuck), escrow_address,
+                     ", ".join(f"{p.nft_address}(iv={p.insured_value})" for p in stuck))
+
     if usdc_balance is not None and build_usdc_transfer_tx is not None:
         await collect_battle_fee(
             session, battle, winner, len(players), gacha=gacha, signer=signer,

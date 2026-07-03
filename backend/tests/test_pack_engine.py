@@ -599,3 +599,31 @@ async def test_resume_pack_battle_voids_when_pulls_incomplete(session):
                                    now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "voided" and b.status == "voided" and b.winner is None
     assert gacha.pulled == []                                    # never re-pulled
+
+
+@pytest.mark.asyncio
+async def test_finalize_logs_undelivered_card_loudly(session, caplog):
+    """A kept card that can't transfer (e.g. a devnet cNFT) is logged at ERROR, not swallowed."""
+    import logging as _logging
+    from app.services.pack_engine import resume_pack_battle
+    from app.services.nft_transfer import UnsupportedNftStandard
+    b = PackBattle(id="rz3", mode="pack", machine_code="pokemon_50", price=50, max_players=2,
+                   status="running", server_seed="ab"*32, escrow_wallet_id="esc-id", escrow_address="ESC")
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="rz3", player_wallet="A"),
+                     BattlePlayer(battle_id="rz3", player_wallet="B")])
+    session.add_all([
+        BattlePull(battle_id="rz3", player_wallet="A", memo="mA", round_number=1, nft_address="nA", insured_value=100, auto_sold=False),
+        BattlePull(battle_id="rz3", player_wallet="B", memo="mB", round_number=1, nft_address="cNFTasset", insured_value=300, auto_sold=False),
+    ])
+    session.commit()
+    async def build_transfer_tx(esc, dest, mint): raise UnsupportedNftStandard("standard='cnft' is not supported")
+    async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
+    with caplog.at_level(_logging.ERROR, logger="app.services.pack_engine"):
+        out = await resume_pack_battle(session, b, gacha=_Gacha({}), signer=_Signer(), resolve_wallet_id=lambda w: f"{w}-id",
+                                       build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                                       confirm_in_escrow=confirm_in_escrow,
+                                       now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+    assert out == "settled"                                      # settle is resilient — battle still settles
+    assert "NOT delivered" in caplog.text and "cNFTasset" in caplog.text

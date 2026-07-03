@@ -44,6 +44,20 @@ from .services.bots import load_bots, pick_bot
 
 logger = logging.getLogger(__name__)
 
+
+def _configure_app_logging() -> None:
+    """Make app.* logs (INFO+) visible on stderr. Uvicorn configures only its own loggers, so
+    without this the engine's warnings (e.g. an undelivered card at settle) never surface — which
+    is exactly what hid the cNFT settle failure. Idempotent. Left to propagate so pytest's caplog
+    still sees these records (uvicorn adds no root handler, so there is no double line)."""
+    applog = logging.getLogger("app")
+    if applog.handlers:
+        return
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    applog.addHandler(h)
+    applog.setLevel(logging.INFO)
+
 # Live Drops are broadcast to everyone with a delay so a drop never spoils the
 # opener's own reveal (the delay applies to the opener too).
 LIVE_DROP_DELAY_S = 30
@@ -1166,6 +1180,7 @@ def create_app(session_factory, chain: ChainSource,
 
 def build_default_app() -> FastAPI:
     s = get_settings()
+    _configure_app_logging()
     engine = make_engine(s.database_url)
     init_db(engine)
     session_factory = make_session_factory(engine)
