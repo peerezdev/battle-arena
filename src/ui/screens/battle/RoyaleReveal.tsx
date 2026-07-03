@@ -13,6 +13,7 @@ import { shortWallet, tintFor, medalColor } from './royaleShared'
 import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
 import { LiveLeaderboard } from './LiveLeaderboard'
 import { RoundBreakOverlay } from './RoundBreakOverlay'
+import { TieBreakRoulette } from './TieBreakRoulette'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
 const TITLE = (
@@ -42,7 +43,7 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
   const proj = rv.projection
   const alive = proj.players.filter((p) => p.eliminatedRound == null).length
   const entry = vm.players.length ? vm.potValue / vm.players.length : 0
-  const blurred = rv.phase === 'roundBreak' && !reducedMotion
+  const blurred = (rv.phase === 'roundBreak' || rv.phase === 'tieBreak') && !reducedMotion
 
   // The one card revealing right now — shown big + centered in the spotlight while the grid
   // below tracks standings. openingWallet = its pull hasn't resolved yet; stagingWallet = its
@@ -51,6 +52,10 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
   const activePlayer = activeWallet ? proj.players.find((p) => p.wallet === activeWallet) ?? null : null
   const activeName = activePlayer ? name(activePlayer) : null
   const isOpening = !!rv.openingWallet && !rv.stagingWallet
+  const nameByWallet = (w: string) => {
+    const p = vm.players.find((x) => x.wallet === w)
+    return p ? name(p) : shortWallet(w)
+  }
 
   return (
     <div style={{ ...screenStyle, position: 'relative' }}>
@@ -72,7 +77,8 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
           </div>
         </div>
       </div>
-      {blurred && <RoundBreakOverlay vm={proj} name={name} upcomingRound={rv.upcomingRound} countdown={rv.countdown} />}
+      {rv.phase === 'roundBreak' && !reducedMotion && <RoundBreakOverlay vm={proj} name={name} upcomingRound={rv.upcomingRound} countdown={rv.countdown} />}
+      {rv.phase === 'tieBreak' && !reducedMotion && <TieBreakRoulette tied={rv.tiedWallets} eliminated={rv.tieEliminated} nameOf={nameByWallet} reducedMotion={reducedMotion} />}
       {vm.meWallet && <div style={{ display: 'flex', marginTop: 4 }}><EmoteBar meWallet={vm.meWallet} battleId={battleId} /></div>}
     </div>
   )

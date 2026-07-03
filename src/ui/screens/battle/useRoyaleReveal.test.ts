@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useRoyaleReveal, project, revealOrderWallets, totalRounds } from './useRoyaleReveal'
+import { useRoyaleReveal, project, revealOrderWallets, totalRounds, tiedLosers, ELIM_BEAT_MS, ROULETTE_MS } from './useRoyaleReveal'
 import type { RevealVM, RevealCardVM } from './battleReveal'
 
 const card = (wallet: string, isMe: boolean, val: number | null, addr: string | null): RevealCardVM => ({
@@ -33,7 +33,27 @@ const vm3: RevealVM = {
   potValue: 490, machines: ['m'], buybackTotal: 0,
 }
 
+// 3 players, round 1 ends in a tie for last: B and C both at 40 → C is the (pre-decided) loser.
+const vmTie: RevealVM = {
+  mode: 'royale', status: 'settled', winner: 'A', meWallet: 'A',
+  players: [
+    { wallet: 'A', isMe: true, accumulatedValue: 100, eliminatedRound: null, cards: [], total: 100 },
+    { wallet: 'B', isMe: false, accumulatedValue: 40, eliminatedRound: 2, cards: [], total: 40 },
+    { wallet: 'C', isMe: false, accumulatedValue: 40, eliminatedRound: 1, cards: [], total: 40 },
+  ],
+  rounds: [
+    { roundNumber: 1, eliminatedWallet: 'C', cards: [card('A', true, 100, 'nA1'), card('B', false, 40, 'nB1'), card('C', false, 40, 'nC1')] },
+    { roundNumber: 2, eliminatedWallet: 'B', cards: [card('A', true, 0, 'nA2'), card('B', false, 0, 'nB2')] },
+  ],
+  potValue: 280, machines: ['m'], buybackTotal: 0,
+}
+
 describe('pure helpers', () => {
+  it('tiedLosers returns everyone tied for last (min accumulated), else the single lowest', () => {
+    expect([...tiedLosers(vmTie, 1)].sort()).toEqual(['B', 'C'])   // 40 == 40 tie
+    expect(tiedLosers(vm3, 1)).toEqual(['C'])                      // C alone at 40
+  })
+
   it('revealOrderWallets keeps players alive at the start of the round, in seating order', () => {
     expect(revealOrderWallets(vm3, 1)).toEqual(['A', 'B', 'C'])
     expect(revealOrderWallets(vm3, 2)).toEqual(['A', 'B'])   // C already out
@@ -138,5 +158,24 @@ describe('useRoyaleReveal', () => {
     const pending = renderHook(() => useRoyaleReveal(pendingVm, { reducedMotion: false, onComplete: vi.fn() }))
     expect(pending.result.current.openingWallet).toBe('A')
     expect(pending.result.current.stagingWallet).toBeNull()
+  })
+
+  it('runs the tie-break roulette before the round break, holding the elimination until it lands', () => {
+    const { result } = renderHook(() => useRoyaleReveal(vmTie, { reducedMotion: false, onComplete: vi.fn() }))
+    act(() => { result.current.onCardShown() })   // reveal A
+    act(() => { result.current.onCardShown() })   // reveal B
+    act(() => { result.current.onCardShown() })   // reveal C → round 1 complete, B & C tie at 40
+    expect(result.current.justEliminated).toBeNull()          // not revealed yet — roulette first
+
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })        // → tieBreak
+    expect(result.current.phase).toBe('tieBreak')
+    expect([...result.current.tiedWallets].sort()).toEqual(['B', 'C'])
+    expect(result.current.tieEliminated).toBe('C')
+    expect(result.current.justEliminated).toBeNull()          // still hidden while the roulette spins
+
+    act(() => { vi.advanceTimersByTime(ROULETTE_MS) })         // roulette lands → round break
+    expect(result.current.phase).toBe('roundBreak')
+    expect(result.current.justEliminated).toBe('C')           // now revealed
+    expect(result.current.tiedWallets).toEqual([])
   })
 })
