@@ -3,7 +3,14 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { config } from '../onchain/config'
 import { addDrop, seedDrops, type LiveDrop } from '../ui/drops/dropsStore'
 
-export interface ChatLine { user: string; text: string; ts: number }
+export interface ChatAction { label: string; battleId: string; mode: string }
+export interface ChatLine {
+  user: string
+  text: string
+  ts: number
+  kind?: 'system'            // system announcements (battle created, big hit, winner)
+  action?: ChatAction        // optional button (quick-join / view)
+}
 
 function buildWsUrl(identityToken: string | null | undefined): string {
   // Replace leading http(s) with ws(s), then append /ws/chat
@@ -74,16 +81,24 @@ export function useChat(enabled = true): {
           const msg = JSON.parse(event.data as string)
           if (msg.type === 'history' && Array.isArray(msg.messages)) {
             setMessages(
-              (msg.messages as Array<{ user: string; text: string; ts: number }>).map((m) => ({
-                user: m.user,
-                text: m.text,
-                ts: m.ts,
+              (msg.messages as Array<Record<string, unknown>>).map((m) => ({
+                user: m.user as string,
+                text: m.text as string,
+                ts: m.ts as number,
+                kind: m.kind as 'system' | undefined,
+                action: m.action as ChatAction | undefined,
               })),
             )
           } else if (msg.type === 'message') {
             setMessages((prev) => [
               ...prev,
-              { user: msg.user as string, text: msg.text as string, ts: msg.ts as number },
+              {
+                user: msg.user as string,
+                text: msg.text as string,
+                ts: msg.ts as number,
+                kind: msg.kind as 'system' | undefined,
+                action: msg.action as ChatAction | undefined,
+              },
             ])
           } else if (msg.type === 'presence') {
             setOnline(msg.online as number)

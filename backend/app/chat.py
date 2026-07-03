@@ -1,6 +1,8 @@
 """Chat de lobby: historial persistido en DB (últimos 50) + gestor de conexiones."""
 from __future__ import annotations
+import json
 from collections import deque
+from typing import Optional
 from fastapi import WebSocket
 
 
@@ -13,10 +15,13 @@ def abbreviate(addr: str) -> str:
 CHAT_KEEP = 50   # how many recent messages to retain / replay
 
 
-def save_chat_message(session, author: str, text: str, ts: int, keep: int = CHAT_KEEP) -> None:
-    """Persist one chat message and prune to the newest `keep` (so the table stays bounded)."""
+def save_chat_message(session, author: str, text: str, ts: int, *, kind: str = "user",
+                      action: Optional[dict] = None, keep: int = CHAT_KEEP) -> None:
+    """Persist one chat message and prune to the newest `keep` (so the table stays bounded).
+    kind='system' + optional action={label, battleId, mode} for announcements with a button."""
     from app.models import ChatMessage
-    session.add(ChatMessage(author=author, text=text, ts=ts))
+    session.add(ChatMessage(author=author, text=text, ts=ts, kind=kind,
+                            action=json.dumps(action) if action else None))
     session.commit()
     old = [r[0] for r in session.query(ChatMessage.id)
            .order_by(ChatMessage.id.desc()).offset(keep).all()]
@@ -26,11 +31,34 @@ def save_chat_message(session, author: str, text: str, ts: int, keep: int = CHAT
 
 
 def recent_chat_messages(session, limit: int = CHAT_KEEP) -> list[dict]:
-    """Newest `limit` messages in chronological order, in the wire format {user, text, ts}."""
+    """Newest `limit` messages in chronological order. Wire format {user, text, ts} for normal
+    messages; system announcements also carry {kind:'system', action}."""
     from app.models import ChatMessage
     rows = session.query(ChatMessage).order_by(ChatMessage.id.desc()).limit(limit).all()
     rows.reverse()
-    return [{"user": r.author, "text": r.text, "ts": r.ts} for r in rows]
+    out = []
+    for r in rows:
+        m = {"user": r.author, "text": r.text, "ts": r.ts}
+        if (r.kind or "user") != "user":
+            m["kind"] = r.kind
+            if r.action:
+                try:
+                    m["action"] = json.loads(r.action)
+                except (ValueError, TypeError):
+                    pass
+        out.append(m)
+    return out
+
+
+def big_hit_multiple(insured_value: Optional[float], cost_base_units: Optional[int]) -> Optional[float]:
+    """How many times the pull cost a hit is worth (insured_value in $, cost in USDC base units).
+    Returns None when it can't be computed (missing/zero cost or value)."""
+    if not cost_base_units or not insured_value or insured_value <= 0:
+        return None
+    cost = cost_base_units / 1_000_000
+    if cost <= 0:
+        return None
+    return insured_value / cost
 
 
 class ChatBuffer:

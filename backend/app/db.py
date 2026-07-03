@@ -31,6 +31,8 @@ _ENSURE_COLUMNS = [
     ("gacha_packs", "price", "INTEGER"),
     ("gacha_packs", "insured_value", "FLOAT"),
     ("gacha_packs", "name", "VARCHAR"),
+    ("chat_messages", "kind", "VARCHAR NOT NULL DEFAULT 'user'"),
+    ("chat_messages", "action", "VARCHAR"),
 ]
 
 

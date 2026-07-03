@@ -177,3 +177,5 @@ class ChatMessage(Base):
     author: Mapped[str] = mapped_column(String)   # display name (alias or abbreviated wallet)
     text: Mapped[str] = mapped_column(String)
     ts: Mapped[int] = mapped_column(Integer, index=True)   # unix seconds
+    kind: Mapped[str] = mapped_column(String, default="user")            # "user" | "system" (announcements)
+    action: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON {label, battleId, mode} for a button

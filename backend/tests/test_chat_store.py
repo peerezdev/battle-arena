@@ -1,6 +1,6 @@
 import pytest
 from app.db import make_engine, make_session_factory, init_db
-from app.chat import save_chat_message, recent_chat_messages
+from app.chat import save_chat_message, recent_chat_messages, big_hit_multiple
 from app.models import ChatMessage
 
 
@@ -42,3 +42,36 @@ def test_recent_limit_is_respected(session):
 
 def test_empty_history_is_empty_list(session):
     assert recent_chat_messages(session) == []
+
+
+def test_normal_message_carries_no_kind_or_action(session):
+    save_chat_message(session, "alice", "hey", ts=1)
+    (m,) = recent_chat_messages(session)
+    assert m == {"user": "alice", "text": "hey", "ts": 1}   # no kind/action for plain chat
+
+
+def test_system_announcement_persists_kind_and_action(session):
+    action = {"label": "Unirse", "battleId": "b1", "mode": "pack"}
+    save_chat_message(session, "📢 Arena", "Nueva Pack Battle", ts=5, kind="system", action=action)
+    save_chat_message(session, "📢 Arena", "🔥 big hit", ts=6, kind="system")   # no action
+    hist = recent_chat_messages(session)
+    assert hist[0] == {"user": "📢 Arena", "text": "Nueva Pack Battle", "ts": 5,
+                       "kind": "system", "action": action}
+    assert hist[1] == {"user": "📢 Arena", "text": "🔥 big hit", "ts": 6, "kind": "system"}
+
+
+@pytest.mark.parametrize("value,cost_base,expected", [
+    (150.0, 50_000_000, 3.0),     # $150 hit on a $50 pull → x3
+    (500.0, 50_000_000, 10.0),
+    (49.0, 50_000_000, 0.98),     # below x1
+    (None, 50_000_000, None),     # missing value
+    (100.0, None, None),          # missing cost
+    (100.0, 0, None),             # zero cost
+    (0.0, 50_000_000, None),      # zero value
+])
+def test_big_hit_multiple(value, cost_base, expected):
+    got = big_hit_multiple(value, cost_base)
+    if expected is None:
+        assert got is None
+    else:
+        assert got == pytest.approx(expected)

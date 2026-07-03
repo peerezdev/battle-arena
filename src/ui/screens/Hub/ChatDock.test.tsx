@@ -1,16 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 
-// Mock the chat hook so ChatDock doesn't open a real WebSocket.
+// Mock the chat hook so ChatDock doesn't open a real WebSocket. `chatState.messages` is
+// mutable so individual tests can inject system announcements.
+const { chatState } = vi.hoisted(() => ({ chatState: { messages: [] as any[] } }))
 vi.mock('../../../hooks/useChat', () => ({
-  useChat: () => ({ messages: [], send: vi.fn(), canPost: false, online: 0 }),
+  useChat: () => ({ messages: chatState.messages, send: vi.fn(), canPost: false, online: 0 }),
 }))
 
 import { ChatDock } from './ChatDock'
 import { addDrop } from '../../drops/dropsStore'
 
+// ChatDock uses useNavigate (system-announcement buttons), so it needs a Router.
+const renderDock = () => render(<MemoryRouter><ChatDock /></MemoryRouter>)
+
 beforeEach(() => {
   localStorage.clear()
+  chatState.messages = []
 })
 
 describe('ChatDock live drops', () => {
@@ -20,7 +27,7 @@ describe('ChatDock live drops', () => {
       image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'neo',
       ts: Date.now(),
     })
-    render(<ChatDock />)
+    renderDock()
     expect(screen.getByText('Pikachu')).toBeTruthy()
     expect(screen.getByText('neo')).toBeTruthy()
   })
@@ -31,7 +38,7 @@ describe('ChatDock live drops', () => {
       image: null, source: 'gacha', wallet: 'So1anaAAAAAAAAAAAAAAZZZZ', username: null,
       ts: Date.now(),
     })
-    render(<ChatDock />)
+    renderDock()
     expect(screen.getByText('Charizard')).toBeTruthy()
     expect(screen.getByText('So1a…ZZZZ')).toBeTruthy()
   })
@@ -44,7 +51,7 @@ describe('ChatDock live drops', () => {
       image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'kai',
       ts: Math.floor(Date.now() / 1000), // seconds, like the backend emits
     })
-    render(<ChatDock />)
+    renderDock()
     expect(screen.getByText('Mew')).toBeTruthy()
     // no drop should render a decades-old age from misreading seconds as ms
     expect(screen.queryByText(/\d{3,}d ago/)).toBeNull()
@@ -57,7 +64,7 @@ describe('ChatDock live drops', () => {
       id: 'mint-legacy', name: 'Squirtle', valueUsd: 10, rarity: 'Common',
       image: null, source: 'gacha', ts: Date.now(),
     } as any)
-    render(<ChatDock />)
+    renderDock()
     expect(screen.getByText('Squirtle')).toBeTruthy()
     expect(screen.getByText('anon')).toBeTruthy()
   })
@@ -70,10 +77,32 @@ describe('ChatDock live drops', () => {
       image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'ash',
       ts: Date.now(),
     })
-    render(<ChatDock />)
+    renderDock()
     expect(screen.getByText('Mewtwo')).toBeTruthy()
     // The dropsStore accumulates in-memory across tests, so earlier Epics may also
     // carry the badge — assert at least one is present.
     expect(screen.getAllByText('BIG PULL').length).toBeGreaterThanOrEqual(1)
+  })
+
+  // System announcements (battle created / big hit / winner) render as a highlighted row,
+  // and carry their action button when present.
+  it('renders a system announcement with its action button', () => {
+    chatState.messages = [{
+      user: '📢 Arena', text: 'Nueva Pack Battle · entrada $50 USDC', ts: Date.now(),
+      kind: 'system', action: { label: 'Unirse', battleId: 'b1', mode: 'pack' },
+    }]
+    renderDock()
+    expect(screen.getByText('Nueva Pack Battle · entrada $50 USDC')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Unirse' })).toBeTruthy()
+  })
+
+  it('renders a system announcement without an action (no button)', () => {
+    chatState.messages = [{
+      user: '📢 Arena', text: '🔥 neo sacó Charizard · $300 (x6.0 la tirada)', ts: Date.now(),
+      kind: 'system',
+    }]
+    renderDock()
+    expect(screen.getByText(/neo sacó Charizard/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Unirse' })).toBeNull()
   })
 })

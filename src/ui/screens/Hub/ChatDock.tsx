@@ -1,4 +1,5 @@
 import { useState, useRef, useReducer, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useChat } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
@@ -60,6 +61,7 @@ export function ChatDock({
   /** When provided, shows a close (✕) button in the chat header (mobile drawer). */
   onClose?: () => void
 }) {
+  const navigate = useNavigate()
   const drops = useDrops()
   const { messages, send, canPost, online } = useChat()
   const { username } = useProfile()
@@ -159,7 +161,7 @@ export function ChatDock({
             marginTop: 8,
           }}
         >
-          LIVE · CHAT
+          RECENT DROPS · CHAT
         </div>
       </aside>
     )
@@ -505,7 +507,25 @@ export function ChatDock({
               Be the first to write…
             </div>
           ) : (
-            messages.map((msg, idx) => (
+            messages.map((msg, idx) => msg.kind === 'system' ? (
+              /* System announcement: battle created / big hit / winner */
+              <div key={`${msg.ts}-${idx}`} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'rgba(0,255,196,0.06)', border: `1px solid ${COLORS.border}`,
+                borderLeft: `3px solid ${COLORS.green}`, borderRadius: 8, padding: '7px 10px',
+              }}>
+                <span style={{ flex: 1, fontSize: 12, color: COLORS.text, fontFamily: FONTS.body, lineHeight: 1.3 }}>
+                  {msg.text}
+                </span>
+                {msg.action && (
+                  <button onClick={() => navigate(`/play/battle/${msg.action!.battleId}`)} style={{
+                    flexShrink: 0, background: COLORS.green, border: 'none', borderRadius: 7,
+                    padding: '5px 11px', color: '#06120c', fontFamily: FONTS.display, fontWeight: 800,
+                    fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}>{msg.action.label}</button>
+                )}
+              </div>
+            ) : (
               <div key={`${msg.ts}-${idx}`}>
                 {/* Row: avatar + name + timestamp */}
                 <div

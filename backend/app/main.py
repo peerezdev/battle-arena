@@ -27,7 +27,8 @@ from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack
-from .chat import ConnectionManager, ChatBuffer, abbreviate, save_chat_message, recent_chat_messages
+from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
+                   recent_chat_messages, big_hit_multiple)
 from .services.pack_lobby import (
     create_battle, join_battle,
     list_open as lobby_list_open,
@@ -170,7 +171,9 @@ def create_app(session_factory, chain: ChainSource,
                withdraw_rate_limit: int = 5,
                withdraw_rate_window_s: float = 60.0,
                withdraw_fee_pct: float = 0.0,
-               fee_wallet_address: str = "") -> FastAPI:
+               fee_wallet_address: str = "",
+               hit_announce_mult: float = 3.0,
+               winner_announce_mult: float = 4.0) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
 
     if cors_origins:
@@ -465,15 +468,21 @@ def create_app(session_factory, chain: ChainSource,
                 "image": out.get("image"),
                 "ts": int(_time.time()),
             }
-            asyncio.create_task(_broadcast_drop_later(drop))
+            asyncio.create_task(_broadcast_drop_later(drop, cost_base=pack.price))
         return out
 
-    async def _broadcast_drop_later(drop: dict) -> None:
+    async def _broadcast_drop_later(drop: dict, cost_base: Optional[int] = None) -> None:
         # Hold the drop so it never spoils the opener's own reveal.
         try:
             await asyncio.sleep(LIVE_DROP_DELAY_S)
             _drops_buf.add(drop)
             await _chat_mgr.broadcast(drop)
+            mult = big_hit_multiple(drop.get("valueUsd"), cost_base)
+            if mult is not None and mult >= hit_announce_mult:
+                who = drop.get("username") or abbreviate(drop.get("wallet") or "")
+                name = drop.get("name") or "una carta"
+                await _announce(f"🔥 {who} sacó {name} · ${drop['valueUsd']:,.0f} (x{mult:.1f} la tirada)",
+                                persist=True)
         except Exception:
             logger.exception("live drop broadcast failed")
 
@@ -516,6 +525,30 @@ def create_app(session_factory, chain: ChainSource,
                 await asyncio.sleep(0.5)
         except Exception:
             logger.exception("battle drops broadcast failed")
+
+    async def _maybe_announce_winner(battle_id: str) -> None:
+        """Highlight (persisted) a battle whose winner's haul >= winner_announce_mult × the entry.
+        Take = total insured value of all pulls (the winner's pot); entry = per-player buy-in."""
+        try:
+            from .models import BattlePull
+            with session_factory() as s:
+                b = s.get(PackBattle, battle_id)
+                if not b or b.status != "settled" or not b.winner:
+                    return
+                mode = b.mode
+                entry_base = royale_buyin(b.max_players, b.price) if mode == "royale" else b.price
+                entry = (entry_base or 0) / 1_000_000
+                take = sum(p.insured_value or 0
+                           for p in s.query(BattlePull).filter_by(battle_id=battle_id).all())
+                if entry <= 0 or take < winner_announce_mult * entry:
+                    return
+                mult = take / entry
+                who = read_user_view(s, b.winner, elo_start).get("alias") or abbreviate(b.winner)
+            label = "Battle Royale" if mode == "royale" else "Pack Battle"
+            await _announce(f"🏆 {who} se llevó ${take:,.0f} en {label} (x{mult:.1f} la entrada)",
+                            action={"label": "Ver", "battleId": battle_id, "mode": mode}, persist=True)
+        except Exception:
+            logger.exception("winner announce failed")
 
     @app.post("/gacha/yolo")
     async def gacha_yolo(body: YoloBody,
@@ -590,6 +623,7 @@ def create_app(session_factory, chain: ChainSource,
                 min_usdc_base_units=b.price, operator_wallet_id=privy_operator_wallet_id,
                 operator_address=privy_operator_address, seed_lamports=escrow_seed_lamports)
             asyncio.create_task(_broadcast_battle_drops(battle_id))
+            asyncio.create_task(_maybe_announce_winner(battle_id))
         except Exception:
             logger.warning("background run failed for %s", battle_id)
         finally:
@@ -613,6 +647,7 @@ def create_app(session_factory, chain: ChainSource,
                 seed_lamports=escrow_seed_lamports,
                 price_base=b.price)
             asyncio.create_task(_broadcast_battle_drops(battle_id))
+            asyncio.create_task(_maybe_announce_winner(battle_id))
         except Exception:
             logger.warning("background royale run failed for %s", battle_id)
         finally:
@@ -773,6 +808,7 @@ def create_app(session_factory, chain: ChainSource,
             resp = get_battle(s, b.id)
             resp["buyin"] = buyin
             resp["escrow_address"] = b.escrow_address
+            await _announce_created(b, buyin, "royale")
             return resp
 
         # Default: pack mode — build the bundle (1..10 boxes), reserve the total
@@ -798,6 +834,7 @@ def create_app(session_factory, chain: ChainSource,
         except LobbyError as e:
             raise HTTPException(409, str(e))
         reserve(s, wallet, b.id, total)
+        await _announce_created(b, total, mode)
         return get_battle(s, b.id)
 
     @app.post("/pack-battles/{battle_id}/join")
@@ -1085,6 +1122,32 @@ def create_app(session_factory, chain: ChainSource,
     _CHAT_RATE_LIMIT = 5
     _CHAT_RATE_WINDOW = 10.0
 
+    _ANNOUNCER = "📢 Arena"
+
+    async def _announce(text: str, *, action: Optional[dict] = None, persist: bool = False) -> None:
+        """Post a system announcement into the lobby chat. `persist=True` stores it in history
+        (highlights: big hits, winners); battle-created pings are live-only. Never raises."""
+        try:
+            msg = {"type": "message", "kind": "system", "user": _ANNOUNCER,
+                   "text": text, "ts": int(_time.time())}
+            if action:
+                msg["action"] = action
+            if persist:
+                with session_factory() as s:
+                    save_chat_message(s, _ANNOUNCER, text, msg["ts"], kind="system", action=action)
+            await _chat_mgr.broadcast(msg)
+        except Exception:
+            logger.exception("chat announce failed")
+
+    async def _announce_created(battle, stake_base: int, mode: str) -> None:
+        """Live-only ping when a joinable battle is created, with a quick-join button."""
+        if (battle.max_players or 0) <= 1:
+            return   # no open seat → nobody to invite
+        label = "Battle Royale" if mode == "royale" else "Pack Battle"
+        stake = (stake_base or 0) / 1_000_000
+        await _announce(f"Nueva {label} · entrada ${stake:,.0f} USDC",
+                        action={"label": "Unirse", "battleId": battle.id, "mode": mode})
+
     def _chat_allow(wallet: str) -> bool:
         now = _time.time()
         hits = [t for t in _chat_hits.get(wallet, []) if now - t < _CHAT_RATE_WINDOW]
@@ -1211,7 +1274,9 @@ def build_default_app() -> FastAPI:
                       withdraw_rate_limit=s.withdraw_rate_limit,
                       withdraw_rate_window_s=s.withdraw_rate_window_s,
                       withdraw_fee_pct=s.withdraw_fee_pct,
-                      fee_wallet_address=s.fee_wallet_address)
+                      fee_wallet_address=s.fee_wallet_address,
+                      hit_announce_mult=s.hit_announce_mult,
+                      winner_announce_mult=s.winner_announce_mult)
 
 
 app = build_default_app()

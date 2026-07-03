@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # / FEE_WALLET_ADDRESS
     battle_fee_pct_per_player: float = 0.005
     battle_fee_pct_cap: float = 0.03
+    # Chat announcements: a gacha hit >= this multiple of the pull cost, and a battle winner whose
+    # haul >= this multiple of the entry, get a highlight in the lobby chat. env: HIT/WINNER_ANNOUNCE_MULT
+    hit_announce_mult: float = 3.0
+    winner_announce_mult: float = 4.0
     fee_wallet_address: str = "5DfUc9vcvLBNCTrzWXsXrEdD8x8DoPuYxLYoAytXuub9"
     privy_operator_wallet_id: str = ""
     privy_operator_address: str = ""
