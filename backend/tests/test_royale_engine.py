@@ -461,7 +461,7 @@ async def test_run_royale_turbo_persists_rarity_and_resilient_settle(session):
 
     opens = {
         "A": {"nft_address": "nftA", "insured_value": 50, "grade": None, "rarity": "Common", "auto_sold": True, "buyback_amount": 42_500_000},
-        "B": {"nft_address": "nftB", "insured_value": 500, "grade": 9, "rarity": "Epic", "auto_sold": False},
+        "B": {"nft_address": "nftB", "insured_value": 500, "grade": 9, "rarity": "Epic", "auto_sold": False, "year": "1999", "name": "Charizard"},
     }
     gacha = _RoyaleGacha(opens)          # existing fake in this test module
     signer = _RoyaleSigner()
@@ -487,6 +487,8 @@ async def test_run_royale_turbo_persists_rarity_and_resilient_settle(session):
     a_pull = session.query(BattlePull).filter_by(battle_id="r1", player_wallet="A").first()
     assert a_pull.rarity == "Common" and a_pull.auto_sold is True
     assert a_pull.buyback_amount == 42_500_000
+    b_pull = session.query(BattlePull).filter_by(battle_id="r1", player_wallet="B").first()
+    assert b_pull.year == "1999" and b_pull.name == "Charizard"  # staged reveal needs year+name
 
 
 # ════════════════════════════════════════════════════════════════════════════
