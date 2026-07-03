@@ -5,13 +5,14 @@ import { startRematch } from '../../battle/startRematch'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
+import { StagedCardReveal } from './StagedCardReveal'
 import { useAliases } from '../../useAliases'
 import { EmoteBar } from '../../emotes/EmoteBar'
 import { shortWallet, tintFor, medalColor } from './royaleShared'
 import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
 import { LiveLeaderboard } from './LiveLeaderboard'
 import { RoundBreakOverlay } from './RoundBreakOverlay'
-import type { RevealVM, RevealPlayerVM } from './battleReveal'
+import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
 const TITLE = (
   <h1 style={{ margin: 0, fontFamily: FONTS.display, fontSize: 'clamp(22px,3vw,30px)', fontWeight: 700, letterSpacing: '-.02em' }}>
@@ -52,7 +53,11 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
           <div style={{ flex: '1 1 520px', minWidth: 280, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>
             {proj.players.map((p) => (
               <PlayerRevealCard key={p.wallet} p={p} name={name} reducedMotion={reducedMotion}
-                opening={p.wallet === rv.openingWallet} eliminatedBeat={p.wallet === rv.justEliminated} />
+                opening={p.wallet === rv.openingWallet}
+                staging={p.wallet === rv.stagingWallet}
+                stagingCard={p.wallet === rv.stagingWallet ? rv.stagingCard : null}
+                onCardShown={rv.onCardShown}
+                eliminatedBeat={p.wallet === rv.justEliminated} />
             ))}
           </div>
           <div style={{ flex: '0 1 300px', minWidth: 240 }}>
@@ -144,8 +149,9 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
 }
 
 // ─────────────────────────── PLAYER CARD ───────────────────────────
-function PlayerRevealCard({ p, name, reducedMotion, opening, eliminatedBeat }: {
-  p: RevealPlayerVM; name: (p: RevealPlayerVM) => string; reducedMotion: boolean; opening: boolean; eliminatedBeat: boolean
+function PlayerRevealCard({ p, name, reducedMotion, opening, staging, stagingCard, onCardShown, eliminatedBeat }: {
+  p: RevealPlayerVM; name: (p: RevealPlayerVM) => string; reducedMotion: boolean
+  opening: boolean; staging: boolean; stagingCard: RevealCardVM | null; onCardShown: () => void; eliminatedBeat: boolean
 }) {
   const elim = p.eliminatedRound != null
   const latest = p.cards[p.cards.length - 1] ?? null
@@ -170,9 +176,17 @@ function PlayerRevealCard({ p, name, reducedMotion, opening, eliminatedBeat }: {
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12, minHeight: 128 }}>
-          {opening || !latest
+          {opening
             ? <RevealCard card={pending} reducedMotion={reducedMotion} />
-            : <RevealCard key={latest.nftAddress} card={latest} reducedMotion={reducedMotion} />}
+            : staging && stagingCard
+              ? <StagedCardReveal key={stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
+                  rarity={stagingCard.rarity} reduced={reducedMotion} width={92} height={128} stepMs={1100}
+                  onCardShown={onCardShown}>
+                  <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={92} h={128} />
+                </StagedCardReveal>
+              : latest
+                ? <RevealCard key={latest.nftAddress} card={latest} reducedMotion={reducedMotion} />
+                : <RevealCard card={pending} reducedMotion={reducedMotion} />}
         </div>
         <div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.16em', color: COLORS.muted }}>TOTAL</div>

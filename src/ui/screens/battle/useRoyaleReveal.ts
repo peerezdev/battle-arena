@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RevealVM, RevealCardVM, RevealPlayerVM } from './battleReveal'
 
-export const DWELL_MS = 900
 export const ELIM_BEAT_MS = 800
 export const COUNTDOWN_FROM = 5
 
@@ -14,6 +13,9 @@ export interface RoyaleRevealState {
   countdown: number
   upcomingRound: number
   openingWallet: string | null   // slot currently waiting for its pull to resolve ("abriendo…")
+  stagingWallet: string | null   // player whose card is playing its year→grade→rarity→card ceremony now
+  stagingCard: RevealCardVM | null  // the card that stagingWallet is revealing
+  onCardShown: () => void        // the staged ceremony calls this when it lands → advance to the next card
   justEliminated: string | null  // player eliminated in the just-finished round (beat + break)
 }
 
@@ -70,12 +72,12 @@ export function useRoyaleReveal(
   const [countdown, setCountdown] = useState(COUNTDOWN_FROM)
   const firedRef = useRef(false)
 
-  // Minimal derived signals so the scheduler's timers reset only on meaningful changes
-  // (NOT on every 1.5s poll, which would restart an in-flight dwell timer forever).
+  // Derived signals — the current target card and whether its pull has resolved on-chain.
   const order = revealOrderWallets(vm, round)
   const roundData = vm.rounds.find((r) => r.roundNumber === round)
   const targetWallet = phase === 'revealing' && card < order.length ? order[card] : null
-  const targetResolved = !!(targetWallet && roundData?.cards.find((c) => c.wallet === targetWallet)?.nftAddress)
+  const targetCard = targetWallet ? (roundData?.cards.find((c) => c.wallet === targetWallet) ?? null) : null
+  const targetResolved = !!targetCard?.nftAddress
   const roundComplete = phase === 'revealing' && order.length > 0 && card >= order.length
   const isLastRound = vm.players.length - round <= 1
   const settled = vm.status === 'settled'
@@ -94,7 +96,13 @@ export function useRoyaleReveal(
     if (settled && phase !== 'done') setPhase('done')
   }, [reducedMotion, settled, phase])
 
-  // Scheduler: exactly one scheduled transition at a time.
+  // Advance the reveal cursor by one card. Driven by the staged ceremony's onCardShown, so each
+  // card plays its full year→grade→rarity→card reveal before the next begins (instead of a fixed
+  // dwell timer racing the animation). Stable identity → a poll never disturbs it.
+  const onCardShown = useCallback(() => setCard((c) => c + 1), [])
+
+  // Scheduler: only ROUND-level transitions are timed here. Per-card advance is driven by
+  // onCardShown (the animation), so a 1.5s poll can never restart an in-flight reveal.
   useEffect(() => {
     if (reducedMotion || phase === 'done') return
 
@@ -109,14 +117,9 @@ export function useRoyaleReveal(
       return () => clearTimeout(t)
     }
 
-    // phase === 'revealing'
-    if (!roundComplete) {
-      if (targetResolved) {
-        const t = setTimeout(() => setCard((c) => c + 1), DWELL_MS)
-        return () => clearTimeout(t)
-      }
-      return   // waiting for the next pull to resolve; re-runs when targetResolved flips
-    }
+    // phase === 'revealing' — waiting on the current card (its pull to resolve, then its
+    // ceremony to land via onCardShown). Nothing to schedule until the round completes.
+    if (!roundComplete) return
 
     // round fully revealed
     if (isLastRound) {
@@ -125,24 +128,23 @@ export function useRoyaleReveal(
     }
     const t = setTimeout(() => { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }, ELIM_BEAT_MS)
     return () => clearTimeout(t)
-  // `round` and `card` must stay in these deps even though the effect body never reads them
-  // directly for branching logic: after `setCard(c => c+1)` advances to a card that is ALSO
-  // already resolved (e.g. a fast poll delivered several resolved cards at once), none of the
-  // other derived deps (phase, countdown, roundComplete, targetResolved, isLastRound, settled)
-  // change value on that render — they're recomputed from the new round/card but can land on
-  // the same values. Without round/card here, the effect would not re-run and the reveal would
-  // stall after the first card.
-  }, [reducedMotion, phase, countdown, round, card, roundComplete, targetResolved, isLastRound, settled])
+  }, [reducedMotion, phase, countdown, round, card, roundComplete, isLastRound, settled])
 
   if (reducedMotion) {
     return {
       phase, projection: vm, revealRound: round, countdown,
-      upcomingRound: round + 1, openingWallet: null, justEliminated: null,
+      upcomingRound: round + 1, openingWallet: null, stagingWallet: null, stagingCard: null,
+      onCardShown, justEliminated: null,
     }
   }
 
   const projection = project(vm, round, card)
   const openingWallet = targetWallet && !targetResolved ? targetWallet : null
+  const stagingWallet = targetWallet && targetResolved ? targetWallet : null
+  const stagingCard = stagingWallet ? targetCard : null
   const justEliminated = roundComplete || phase === 'roundBreak' ? (roundData?.eliminatedWallet ?? null) : null
-  return { phase, projection, revealRound: round, countdown, upcomingRound: round + 1, openingWallet, justEliminated }
+  return {
+    phase, projection, revealRound: round, countdown, upcomingRound: round + 1,
+    openingWallet, stagingWallet, stagingCard, onCardShown, justEliminated,
+  }
 }

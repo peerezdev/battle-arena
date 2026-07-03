@@ -74,13 +74,15 @@ describe('useRoyaleReveal', () => {
     expect(result.current.phase).toBe('done')
   })
 
-  it('reveals cards one by one and reaches done on the settled final round', () => {
+  it('reveals cards one by one (advancing on each staged card) and reaches done on the settled final round', () => {
     const onComplete = vi.fn()
     const { result } = renderHook(() => useRoyaleReveal(vm2, { reducedMotion: false, onComplete }))
     expect(result.current.phase).toBe('revealing')
-    act(() => { vi.advanceTimersByTime(900) })   // reveal A
-    act(() => { vi.advanceTimersByTime(900) })   // reveal B -> round complete, last, settled -> done
-    act(() => { vi.advanceTimersByTime(0) })
+    expect(result.current.stagingWallet).toBe('A')                 // A's card is staging first
+    act(() => { result.current.onCardShown() })                    // A's ceremony lands → reveal A
+    expect(result.current.stagingWallet).toBe('B')                 // then B
+    act(() => { result.current.onCardShown() })                    // B lands → round complete, last, settled
+    act(() => { vi.advanceTimersByTime(0) })                       // effect runs → done
     expect(result.current.phase).toBe('done')
     expect(onComplete).toHaveBeenCalledTimes(1)
   })
@@ -88,10 +90,10 @@ describe('useRoyaleReveal', () => {
   it('enters a round break with a countdown between rounds', () => {
     const onComplete = vi.fn()
     const { result } = renderHook(() => useRoyaleReveal(vm3, { reducedMotion: false, onComplete }))
-    act(() => { vi.advanceTimersByTime(900) })   // reveal A
-    act(() => { vi.advanceTimersByTime(900) })   // reveal B
-    act(() => { vi.advanceTimersByTime(900) })   // reveal C -> round 1 complete
-    act(() => { vi.advanceTimersByTime(800) })       // elimination beat -> round break
+    act(() => { result.current.onCardShown() })   // reveal A
+    act(() => { result.current.onCardShown() })   // reveal B
+    act(() => { result.current.onCardShown() })   // reveal C -> round 1 complete
+    act(() => { vi.advanceTimersByTime(800) })    // elimination beat -> round break
     expect(result.current.phase).toBe('roundBreak')
     expect(result.current.countdown).toBe(5)
     expect(result.current.upcomingRound).toBe(2)
@@ -100,20 +102,41 @@ describe('useRoyaleReveal', () => {
     expect(result.current.countdown).toBe(4)
   })
 
-  it('a poll (new vm object, same data) does not reset the in-flight dwell timer', () => {
+  it('a poll (new vm object, same data) does not reset the in-flight round-break countdown timer', () => {
     const onComplete = vi.fn()
     const { result, rerender } = renderHook(
       ({ vm }) => useRoyaleReveal(vm, { reducedMotion: false, onComplete }),
       { initialProps: { vm: vm3 } },
     )
-    // A dwell timer for card 0 (A) is scheduled on mount (DWELL_MS = 900). Advance part of it.
-    act(() => { vi.advanceTimersByTime(500) })
-    // A poll arrives mid-dwell: a fresh vm object with the same relevant fields.
+    // Reveal round 1 fully, then the beat drops us into the round break (countdown 5, 1s ticks).
+    act(() => { result.current.onCardShown() })   // A
+    act(() => { result.current.onCardShown() })   // B
+    act(() => { result.current.onCardShown() })   // C -> round complete
+    act(() => { vi.advanceTimersByTime(800) })    // beat -> roundBreak
+    expect(result.current.phase).toBe('roundBreak')
+    // Part of the way through the 1000ms tick, a poll arrives (fresh vm object, same data).
+    act(() => { vi.advanceTimersByTime(600) })
     rerender({ vm: { ...vm3, players: [...vm3.players], rounds: [...vm3.rounds] } })
-    // Advance only the REMAINDER of the original 900ms. If the rerender had reset the timer,
-    // it would need a fresh 900ms and would NOT have fired by now.
+    // Advance only the REMAINDER of the tick. If the poll reset the timer it would need a fresh
+    // 1000ms and the countdown would still read 5.
     act(() => { vi.advanceTimersByTime(400) })
-    const a = result.current.projection.players.find((p) => p.wallet === 'A')
-    expect(a?.cards.length).toBe(1)   // A's card revealed → the original timer survived the poll
+    expect(result.current.countdown).toBe(4)   // the original tick survived the poll
+  })
+
+  it('exposes the current card as staging once its pull resolves, and opening while it is pending', () => {
+    // Fully resolved → A (cursor 0) is staging.
+    const resolved = renderHook(() => useRoyaleReveal(vm2, { reducedMotion: false, onComplete: vi.fn() }))
+    expect(resolved.result.current.stagingWallet).toBe('A')
+    expect(resolved.result.current.stagingCard?.nftAddress).toBe('nA1')
+    expect(resolved.result.current.openingWallet).toBeNull()
+
+    // A's pull not resolved yet (no nftAddress) → A is "opening", nothing staging.
+    const pendingVm: RevealVM = {
+      ...vm2, status: 'running',
+      rounds: [{ ...vm2.rounds[0], cards: [card('A', true, null, null), card('B', false, 40, 'nB1')] }],
+    }
+    const pending = renderHook(() => useRoyaleReveal(pendingVm, { reducedMotion: false, onComplete: vi.fn() }))
+    expect(pending.result.current.openingWallet).toBe('A')
+    expect(pending.result.current.stagingWallet).toBeNull()
   })
 })
