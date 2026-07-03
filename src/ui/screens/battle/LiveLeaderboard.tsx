@@ -5,7 +5,10 @@ import type { RevealVM, RevealPlayerVM } from './battleReveal'
 export function LiveLeaderboard({ vm, name, title = 'LEADERBOARD' }: {
   vm: RevealVM; name: (p: RevealPlayerVM) => string; title?: string
 }) {
-  const ranked = [...vm.players].sort((a, b) => (b.total - a.total) || a.wallet.localeCompare(b.wallet))
+  // Alive players on top (by total desc); eliminated sink to the bottom, most-recently
+  // eliminated first. A living player must never rank below an eliminated one.
+  const ranked = [...vm.players].sort((a, b) =>
+    ((b.eliminatedRound ?? 1e9) - (a.eliminatedRound ?? 1e9)) || (b.total - a.total) || a.wallet.localeCompare(b.wallet))
   const aliveCount = vm.players.filter((p) => p.eliminatedRound == null).length
   const leader = ranked.find((p) => p.eliminatedRound == null)?.wallet ?? null
   const atRisk = aliveCount > 1 ? [...ranked].reverse().find((p) => p.eliminatedRound == null)?.wallet ?? null : null
