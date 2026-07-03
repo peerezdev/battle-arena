@@ -86,6 +86,11 @@ export function joinBot(id: string): Promise<Battle> {
   return battleFetch<Battle>(`/pack-battles/${encodeURIComponent(id)}/join-bot`, { method: 'POST' })
 }
 
+/** DEV/TEST: fill every empty lobby slot with funded reserve bots (no auth). */
+export function joinAllBots(id: string): Promise<Battle> {
+  return battleFetch<Battle>(`/pack-battles/${encodeURIComponent(id)}/join-all-bots`, { method: 'POST' })
+}
+
 export function listOpenBattles(): Promise<OpenBattle[]> {
   return battleFetch<OpenBattle[]>('/pack-battles/open')
 }

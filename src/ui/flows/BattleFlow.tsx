@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT } from '../theme'
 import { useBattle } from '../../onchain/useBattle'
-import { cancelBattle, joinBot, joinBattle } from '../../onchain/packBattleClient'
+import { cancelBattle, joinBot, joinAllBots, joinBattle } from '../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
 import { useReducedMotion } from '../useReducedMotion'
 import { battleToReveal } from '../screens/battle/battleReveal'
@@ -37,6 +37,7 @@ export function BattleFlow() {
   const [revealDone, setRevealDone] = useState(false)
   const [royaleRevealDone, setRoyaleRevealDone] = useState(false)
   const [joiningBot, setJoiningBot] = useState(false)
+  const [joiningAll, setJoiningAll] = useState(false)
   const [botError, setBotError] = useState<string | null>(null)
   const [joiningSelf, setJoiningSelf] = useState(false)
   const exit = () => navigate('/app')
@@ -71,6 +72,19 @@ export function BattleFlow() {
       .finally(() => setJoiningBot(false))
   }
 
+  function onJoinAllBots() {
+    if (!battle) return
+    setBotError(null)
+    setJoiningAll(true)
+    joinAllBots(battle.id)
+      .catch((e) => {
+        const m = e instanceof Error ? e.message : String(e)
+        setBotError(m)
+        showToast(m)
+      })
+      .finally(() => setJoiningAll(false))
+  }
+
   if (!battle) {
     return <Centered>
       <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
@@ -91,6 +105,11 @@ export function BattleFlow() {
         <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
           {battle.players.length}/{battle.max_players} · {battle.mode.toUpperCase()}
         </div>
+        {spaceAvailable && (
+          <button onClick={onJoinAllBots} disabled={joiningAll} style={joinAllBotsBtn}>
+            {joiningAll ? 'Adding bots…' : 'Join All Bots'}
+          </button>
+        )}
         {!isParticipant && spaceAvailable && (
           <button onClick={onJoinSelf} disabled={joiningSelf} style={{
             padding: '13px 30px', borderRadius: 13, border: 0, cursor: joiningSelf ? 'default' : 'pointer',
@@ -186,4 +205,10 @@ const backBtn: CSSProperties = {
 const joinBotBtn: CSSProperties = {
   background: GRADIENT, color: '#06120c', border: 'none', borderRadius: 10,
   padding: '8px 14px', fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: FONTS.display,
+}
+
+const joinAllBotsBtn: CSSProperties = {
+  padding: '10px 22px', borderRadius: 12, border: `1px solid ${COLORS.violet}`,
+  background: 'transparent', color: COLORS.violet, fontFamily: FONTS.display,
+  fontWeight: 800, fontSize: 13, cursor: 'pointer',
 }
