@@ -167,3 +167,13 @@ class Reservation(Base):
     status: Mapped[str] = mapped_column(String, default="active", index=True)  # active|released
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ChatMessage(Base):
+    """Persisted lobby chat. Only the newest ~50 are kept (pruned on insert) so a user who
+    wasn't connected still sees recent history, and it survives a backend restart."""
+    __tablename__ = "chat_messages"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    author: Mapped[str] = mapped_column(String)   # display name (alias or abbreviated wallet)
+    text: Mapped[str] = mapped_column(String)
+    ts: Mapped[int] = mapped_column(Integer, index=True)   # unix seconds

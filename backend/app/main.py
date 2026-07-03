@@ -27,7 +27,7 @@ from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack
-from .chat import ConnectionManager, ChatBuffer, abbreviate
+from .chat import ConnectionManager, ChatBuffer, abbreviate, save_chat_message, recent_chat_messages
 from .services.pack_lobby import (
     create_battle, join_battle,
     list_open as lobby_list_open,
@@ -1075,7 +1075,8 @@ def create_app(session_factory, chain: ChainSource,
 
     # ── Chat de lobby por WebSocket ───────────────────────────────────────────
     _chat_mgr = ConnectionManager()
-    _chat_buf = ChatBuffer()
+    # Chat history is persisted in the DB (last 50) — survives restarts and is the shared source
+    # of truth across workers. See save_chat_message / recent_chat_messages.
     # Generic ring buffer reused for the global Recent Drops feed. Replayed to
     # every client on connect so the feed is consistent across origins/devices
     # (localStorage is per-origin, so it can't be the shared source of truth).
@@ -1110,7 +1111,9 @@ def create_app(session_factory, chain: ChainSource,
                 with session_factory() as s:
                     alias = read_user_view(s, wallet, elo_start).get("alias")
                 display_name = alias or abbreviate(wallet)
-            await ws.send_json({"type": "history", "messages": _chat_buf.history()})
+            with session_factory() as s:
+                chat_history = recent_chat_messages(s)
+            await ws.send_json({"type": "history", "messages": chat_history})
             await ws.send_json({"type": "drops_history", "drops": _drops_buf.history()})
             await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
             while True:
@@ -1126,7 +1129,8 @@ def create_app(session_factory, chain: ChainSource,
                     await ws.send_json({"type": "error", "error": "rate_limited"})
                     continue
                 msg = {"user": display_name, "text": text, "ts": int(_time.time())}
-                _chat_buf.add(msg)
+                with session_factory() as s:
+                    save_chat_message(s, display_name, text, msg["ts"])
                 await _chat_mgr.broadcast({"type": "message", **msg})
         except WebSocketDisconnect:
             _chat_mgr.disconnect(ws)
