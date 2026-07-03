@@ -19,6 +19,9 @@ function duckEnd(): void {
 }
 
 const OUT_AT = 2700, GONE_AT = 3150, SIZE = 72
+// How far the bubble dips into the top of the card, so it sits just above the name while staying
+// visually attached to the box (rather than floating off to the side).
+const OVERLAP = 16
 
 /** Throw an emote bubble over the player with the given wallet. Tries to play with sound; if the
  *  browser blocks unmuted autoplay (no user gesture yet — e.g. an incoming emote) it retries muted so
@@ -47,9 +50,12 @@ export function throwEmote(wallet: string, emote: { video_url: string; video_mov
   const isWebKit = /apple/i.test(navigator.vendor || '')
   if (isWebKit && emote.video_mov) addSource(emote.video_mov, 'video/quicktime')
   addSource(emote.video_url, 'video/webm')
-  const left = Math.min(r.right + 8, window.innerWidth - SIZE - 8)
+  // Centered over the card, popping just above the player's name (the bubble's vertical center — the
+  // style uses translateY(-50%) — lands a touch above the card's top edge so it overlaps the box).
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - SIZE / 2, window.innerWidth - SIZE - 8))
+  const top = Math.max(SIZE / 2 + 8, r.top - SIZE / 2 + OVERLAP)
   Object.assign(v.style, {
-    position: 'fixed', left: `${left}px`, top: `${r.top + r.height / 2}px`,
+    position: 'fixed', left: `${left}px`, top: `${top}px`,
     width: `${SIZE}px`, height: `${SIZE}px`, objectFit: 'contain',
     background: 'transparent',
     // drop-shadow follows the alpha silhouette (box-shadow would frame the square)
