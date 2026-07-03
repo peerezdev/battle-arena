@@ -6,6 +6,7 @@ import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
 import { StagedCardReveal } from './StagedCardReveal'
+import { CardBack } from './CardBack'
 import { useAliases } from '../../useAliases'
 import { EmoteBar } from '../../emotes/EmoteBar'
 import { shortWallet, tintFor, medalColor } from './royaleShared'
@@ -43,21 +44,27 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
   const entry = vm.players.length ? vm.potValue / vm.players.length : 0
   const blurred = rv.phase === 'roundBreak' && !reducedMotion
 
+  // The one card revealing right now — shown big + centered in the spotlight while the grid
+  // below tracks standings. openingWallet = its pull hasn't resolved yet; stagingWallet = its
+  // year→grade→rarity→card ceremony is playing.
+  const activeWallet = rv.stagingWallet ?? rv.openingWallet
+  const activePlayer = activeWallet ? proj.players.find((p) => p.wallet === activeWallet) ?? null : null
+  const activeName = activePlayer ? name(activePlayer) : null
+  const isOpening = !!rv.openingWallet && !rv.stagingWallet
+
   return (
     <div style={{ ...screenStyle, position: 'relative' }}>
       {TITLE}
       <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
         <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
           revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
+        <Spotlight stagingCard={rv.stagingCard} activeName={activeName} isOpening={isOpening}
+          reducedMotion={reducedMotion} onCardShown={rv.onCardShown} />
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 520px', minWidth: 280, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>
+          <div style={{ flex: '1 1 520px', minWidth: 280, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
             {proj.players.map((p) => (
               <PlayerRevealCard key={p.wallet} p={p} name={name} reducedMotion={reducedMotion}
-                opening={p.wallet === rv.openingWallet}
-                staging={p.wallet === rv.stagingWallet}
-                stagingCard={p.wallet === rv.stagingWallet ? rv.stagingCard : null}
-                onCardShown={rv.onCardShown}
-                eliminatedBeat={p.wallet === rv.justEliminated} />
+                active={p.wallet === activeWallet} eliminatedBeat={p.wallet === rv.justEliminated} />
             ))}
           </div>
           <div style={{ flex: '0 1 300px', minWidth: 240 }}>
@@ -148,20 +155,48 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
   )
 }
 
+// ─────────────────────────── SPOTLIGHT ───────────────────────────
+// The single card revealing right now — big + centered, playing the full staged ceremony
+// (year → grade → rarity → card). The player grid below only tracks standings.
+function Spotlight({ stagingCard, activeName, isOpening, reducedMotion, onCardShown }: {
+  stagingCard: RevealCardVM | null; activeName: string | null; isOpening: boolean
+  reducedMotion: boolean; onCardShown: () => void
+}) {
+  const W = 172, H = 240
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 22, minHeight: H + 44 }}>
+      {activeName ? (
+        <>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: '.16em', color: COLORS.muted }}>
+            {isOpening ? 'OPENING' : 'REVEALING'} · <span style={{ color: COLORS.text, fontWeight: 700 }}>{activeName}</span>
+          </div>
+          {stagingCard
+            ? <StagedCardReveal key={stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
+                rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} onCardShown={onCardShown}>
+                <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
+              </StagedCardReveal>
+            : <CardBack width={W} height={H} accent={COLORS.muted} label="opening…" />}
+        </>
+      ) : (
+        <div style={{ width: W, height: H }} />
+      )}
+    </div>
+  )
+}
+
 // ─────────────────────────── PLAYER CARD ───────────────────────────
-function PlayerRevealCard({ p, name, reducedMotion, opening, staging, stagingCard, onCardShown, eliminatedBeat }: {
-  p: RevealPlayerVM; name: (p: RevealPlayerVM) => string; reducedMotion: boolean
-  opening: boolean; staging: boolean; stagingCard: RevealCardVM | null; onCardShown: () => void; eliminatedBeat: boolean
+function PlayerRevealCard({ p, name, reducedMotion, active, eliminatedBeat }: {
+  p: RevealPlayerVM; name: (p: RevealPlayerVM) => string; reducedMotion: boolean; active: boolean; eliminatedBeat: boolean
 }) {
   const elim = p.eliminatedRound != null
   const latest = p.cards[p.cards.length - 1] ?? null
   const pending = { wallet: p.wallet, isMe: p.isMe, nftAddress: null, rarity: null, insuredValue: null, autoSold: false, grade: null, year: null, name: null }
   return (
     <div data-player-anchor={p.wallet} style={{
-      position: 'relative', borderRadius: 18, padding: 14, overflow: 'hidden',
+      position: 'relative', borderRadius: 18, padding: 12, overflow: 'hidden',
       background: 'linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))',
-      border: `1px solid ${eliminatedBeat ? 'rgba(255,94,122,.6)' : COLORS.border}`,
-      boxShadow: eliminatedBeat ? '0 0 40px -14px rgba(255,94,122,.8)' : 'none',
+      border: `1px solid ${eliminatedBeat ? 'rgba(255,94,122,.6)' : active ? 'rgba(0,255,196,.6)' : COLORS.border}`,
+      boxShadow: eliminatedBeat ? '0 0 40px -14px rgba(255,94,122,.8)' : active ? '0 0 30px -12px rgba(0,255,196,.7)' : 'none',
       transition: 'box-shadow .3s, border-color .3s',
     }}>
       <div style={{ opacity: elim ? 0.45 : 1, filter: elim ? 'grayscale(.9)' : 'none' }}>
@@ -176,17 +211,9 @@ function PlayerRevealCard({ p, name, reducedMotion, opening, staging, stagingCar
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12, minHeight: 128 }}>
-          {opening
-            ? <RevealCard card={pending} reducedMotion={reducedMotion} />
-            : staging && stagingCard
-              ? <StagedCardReveal key={stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
-                  rarity={stagingCard.rarity} reduced={reducedMotion} width={92} height={128} stepMs={1100}
-                  onCardShown={onCardShown}>
-                  <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={92} h={128} />
-                </StagedCardReveal>
-              : latest
-                ? <RevealCard key={latest.nftAddress} card={latest} reducedMotion={reducedMotion} />
-                : <RevealCard card={pending} reducedMotion={reducedMotion} />}
+          {latest
+            ? <RevealCard key={latest.nftAddress} card={latest} reducedMotion={reducedMotion} />
+            : <RevealCard card={pending} reducedMotion={reducedMotion} />}
         </div>
         <div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.16em', color: COLORS.muted }}>TOTAL</div>
