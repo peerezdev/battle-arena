@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { pollOpenPack, defaultDelayMs, type OpenPackResult } from './gachaClient'
-import { fetchBuybackAvailable, requestBuyback } from './gachaClient'
+import { fetchBuybackAvailable, requestBuyback, withdrawNft } from './gachaClient'
 import { generateYoloPacks, yoloTotalCost, clampCount } from './gachaClient'
 import { config } from './config'
 import { ccAssetUrl, ccCardImageUrl } from './gachaClient'
@@ -64,6 +64,27 @@ describe('requestBuyback', () => {
   it('propaga el detail del backend en error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({ detail: 'outside 72-hour window' }) }))
     await expect(requestBuyback('TOKEN', 'NFT1')).rejects.toThrow('72-hour')
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('withdrawNft', () => {
+  it('hace POST a /users/me/nft/withdraw con Bearer y body {nft_address, address}', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ signature: 'SIG', nft_address: 'NFT1', address: 'DEST' }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const out = await withdrawNft('TOKEN', 'NFT1', 'DEST')
+    expect(out).toEqual({ signature: 'SIG', nft_address: 'NFT1', address: 'DEST' })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${config.backendUrl}/users/me/nft/withdraw`)
+    expect(init.method).toBe('POST')
+    expect(init.headers.Authorization).toBe('Bearer TOKEN')
+    expect(JSON.parse(init.body)).toEqual({ nft_address: 'NFT1', address: 'DEST' })
+    vi.unstubAllGlobals()
+  })
+
+  it('propaga el detail del backend en error (p.ej. no eres dueño)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ detail: 'no eres dueño de este NFT' }) }))
+    await expect(withdrawNft('TOKEN', 'NFT1', 'DEST')).rejects.toThrow('dueño')
     vi.unstubAllGlobals()
   })
 })

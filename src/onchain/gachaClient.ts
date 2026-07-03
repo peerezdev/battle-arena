@@ -170,6 +170,22 @@ export function requestBuyback(token: string, nftAddress: string): Promise<Buyba
   })
 }
 
+export interface NftWithdrawResponse {
+  signature: string
+  nft_address: string
+  address: string
+}
+
+/** Send an NFT owned by the user's embedded wallet to an external Solana address. The backend
+ *  verifies ownership and signs the transfer with the (delegated) embedded wallet — mirrors the
+ *  USDC withdraw. `destAddress` is the destination the user typed. */
+export function withdrawNft(token: string, nftAddress: string, destAddress: string): Promise<NftWithdrawResponse> {
+  return gachaFetch<NftWithdrawResponse>('/users/me/nft/withdraw', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ nft_address: nftAddress, address: destAddress }),
+  })
+}
+
 export function openPack(token: string, memo: string): Promise<OpenPackResult> {
   return gachaFetch<OpenPackResult>('/gacha/open-pack', {
     method: 'POST', headers: authHeaders(token),
