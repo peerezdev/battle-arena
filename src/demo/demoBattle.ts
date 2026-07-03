@@ -14,8 +14,18 @@ function fakeWallet(rng: () => number): string {
 }
 
 function parseGrade(c: MachineCard): number | null {
-  const g = Number(c.the_grade ?? c.generic_grade ?? c.grade)
-  return Number.isFinite(g) ? g : null
+  // CC exposes grade as "PSA GEM-MT 10" / the_grade "GEM-MT 10" / generic_grade "10". Take the
+  // first field that yields a number — a clean numeric if present, else the trailing number out
+  // of a human grade like "GEM-MT 10". (A plain `the_grade ?? generic_grade` would pick the
+  // non-null text field and Number() it to NaN, dropping the grade.)
+  for (const raw of [c.generic_grade, c.the_grade, c.grade]) {
+    if (raw == null) continue
+    const direct = Number(raw)
+    if (Number.isFinite(direct) && direct > 0) return direct
+    const m = String(raw).match(/(\d+(?:\.\d+)?)\s*$/)
+    if (m) return Number(m[1])
+  }
+  return null
 }
 
 function groupByRarity(pool: MachineCard[]): Map<string, MachineCard[]> {
@@ -76,8 +86,8 @@ export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>,
   }
 }
 
-/** Battle Royale demo: you + (n-1) bots. Each round the survivors pull one card and the lowest
- *  value that round is eliminated, until one remains. Mirrors the real lowest-value rule. */
+/** Battle Royale demo: you + (n-1) bots. Each round the survivors pull one card and the player
+ *  with the lowest ACCUMULATED total is eliminated, until one remains. Mirrors the real backend. */
 export function buildRoyaleDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, numPlayers = 10, rng: () => number = Math.random): Battle {
   const byRarity = groupByRarity(pool)
   const wallets = [DEMO_ME, ...Array.from({ length: numPlayers - 1 }, () => fakeWallet(rng))]
@@ -89,12 +99,14 @@ export function buildRoyaleDemo(pool: MachineCard[], odds: Record<string, number
   let alive = [...wallets]
   let round = 1
   while (alive.length > 1) {
-    const rp = alive.map((w) => { const c = pickCard(byRarity, odds, rng); pulls.push(toPull(c, round, w)); acc[w] += val(c); return { w, v: val(c) } })
-    let worst = rp[0]
-    for (const x of rp) if (x.v <= worst.v) worst = x   // tie → later seat falls (matches engine's "mayor asiento")
-    elimRound[worst.w] = round
-    rounds.push({ round_number: round, eliminated_wallet: worst.w, tie_break_index: null })
-    alive = alive.filter((w) => w !== worst.w)
+    for (const w of alive) { const c = pickCard(byRarity, odds, rng); pulls.push(toPull(c, round, w)); acc[w] += val(c) }
+    // Eliminate the lowest ACCUMULATED total (matches the real backend), NOT the lowest single
+    // pull this round — a strong overall lead must not be knocked out by one bad pull.
+    let worst = alive[0]
+    for (const w of alive) if (acc[w] <= acc[worst]) worst = w   // tie → later seat falls
+    elimRound[worst] = round
+    rounds.push({ round_number: round, eliminated_wallet: worst, tie_break_index: null })
+    alive = alive.filter((w) => w !== worst)
     round++
   }
 
