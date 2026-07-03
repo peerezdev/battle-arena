@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../theme'
 import { useEmotes } from './useEmotes'
@@ -7,6 +7,8 @@ import { throwEmoteToBattle, type Emote } from '../../onchain/emotesClient'
 import { AlphaVideo } from '../components/AlphaVideo'
 
 const MAX_SLOTS = 3
+/** Anti-spam: how long the sender must wait between emotes. Tweak here to change the cooldown. */
+export const EMOTE_COOLDOWN_MS = 4000
 
 function VideoThumb({ emote, size }: { emote: Emote; size: number }) {
   return (
@@ -22,15 +24,33 @@ export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: 
   const { byCode, owned, slots, loading, updateSlots } = useEmotes()
   const { identityToken } = useIdentityToken()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [cooldownUntil, setCooldownUntil] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+
+  // Tick while on cooldown so the remaining-time hint counts down and the buttons re-enable on time.
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return
+    const id = setInterval(() => {
+      const t = Date.now()
+      setNow(t)
+      if (t >= cooldownUntil) clearInterval(id)
+    }, 200)
+    return () => clearInterval(id)
+  }, [cooldownUntil])
+
+  const remainingMs = Math.max(0, cooldownUntil - now)
+  const onCooldown = remainingMs > 0
+  const remainingSec = Math.ceil(remainingMs / 1000)
 
   if (loading && !owned.length) return null
 
   const throwIt = (e: Emote | undefined) => {
-    if (!e) return
+    if (!e || onCooldown) return
     throwEmote(meWallet, e)   // local + audible (user gesture)
     if (battleId && battleId !== 'demo' && identityToken) {
       throwEmoteToBattle(identityToken, battleId, e.code).catch(() => { /* broadcast is best-effort */ })
     }
+    setCooldownUntil(Date.now() + EMOTE_COOLDOWN_MS)
   }
   const slotEmotes = slots.map((c) => byCode[c]).filter(Boolean) as Emote[]
 
@@ -42,11 +62,12 @@ export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: 
 
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, padding: '5px 11px 5px 14px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: `1px solid ${COLORS.border}` }}>
-      <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>EMOTE</span>
+      <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>{onCooldown ? `WAIT ${remainingSec}s` : 'EMOTE'}</span>
       <div style={{ display: 'flex', gap: 9 }}>
         {slotEmotes.map((e) => (
-          <button key={e.code} onClick={() => throwIt(e)} title={`Throw ${e.name}`}
-            style={{ width: 50, height: 50, padding: 3, borderRadius: '50%', border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <button key={e.code} onClick={() => throwIt(e)} disabled={onCooldown}
+            title={onCooldown ? `Cooldown · ${remainingSec}s` : `Throw ${e.name}`}
+            style={{ width: 50, height: 50, padding: 3, borderRadius: '50%', border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', cursor: onCooldown ? 'not-allowed' : 'pointer', opacity: onCooldown ? 0.4 : 1, transition: 'opacity .2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <VideoThumb emote={e} size={42} />
           </button>
         ))}
@@ -72,8 +93,9 @@ export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: 
                 const pinned = slots.includes(code)
                 return (
                   <div key={code} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                    <button onClick={() => { throwIt(e); setMenuOpen(false) }} title={`Throw ${e.name}`}
-                      style={{ width: 60, height: 60, padding: 3, borderRadius: 14, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', cursor: 'pointer', overflow: 'hidden' }}>
+                    <button onClick={() => { throwIt(e); setMenuOpen(false) }} disabled={onCooldown}
+                      title={onCooldown ? `Cooldown · ${remainingSec}s` : `Throw ${e.name}`}
+                      style={{ width: 60, height: 60, padding: 3, borderRadius: 14, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', cursor: onCooldown ? 'not-allowed' : 'pointer', opacity: onCooldown ? 0.4 : 1, transition: 'opacity .2s ease', overflow: 'hidden' }}>
                       <AlphaVideo webm={e.video_url} mov={e.video_mov} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
                     </button>
                     <button onClick={() => toggleSlot(code)} title={pinned ? 'Remove from quick' : 'Pin to quick'}
