@@ -544,3 +544,58 @@ async def test_run_battle_no_fee_deps_no_fee_call(session, monkeypatch):
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "settled"
     assert calls == []
+
+
+# ── resume_pack_battle: recover a battle orphaned in 'running' by a backend restart ──────────────
+
+@pytest.mark.asyncio
+async def test_resume_pack_battle_settles_complete_without_repulling(session):
+    """Orphaned battle with EVERY pull already resolved → settle to the winner, never re-pulling."""
+    from app.services.pack_engine import resume_pack_battle
+    b = PackBattle(id="rz1", mode="pack", machine_code="pokemon_50", price=50, max_players=2,
+                   status="running", server_seed="ab"*32, escrow_wallet_id="esc-id", escrow_address="ESC")
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="rz1", player_wallet="A"),
+                     BattlePlayer(battle_id="rz1", player_wallet="B")])
+    session.add_all([
+        BattlePull(battle_id="rz1", player_wallet="A", memo="mA", round_number=1, nft_address="nA", insured_value=100, auto_sold=False),
+        BattlePull(battle_id="rz1", player_wallet="B", memo="mB", round_number=1, nft_address="nB", insured_value=300, auto_sold=False),
+    ])
+    session.commit()
+    gacha = _Gacha({})   # must NOT be touched — resume never re-pulls
+    signer = _Signer()
+    built = []
+    async def build_transfer_tx(esc, dest, mint): built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
+    async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
+    out = await resume_pack_battle(session, b, gacha=gacha, signer=signer, resolve_wallet_id=lambda w: f"{w}-id",
+                                   build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                                   confirm_in_escrow=confirm_in_escrow,
+                                   now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+    assert out == "settled" and b.winner == "B" and b.status == "settled"
+    assert gacha.pulled == []                                    # never re-pulled
+    assert ("ESC", "B", "nA") in built and ("ESC", "B", "nB") in built   # both cards → winner B
+    assert session.query(BattlePull).filter_by(battle_id="rz1").count() == 2   # no new pull rows
+
+
+@pytest.mark.asyncio
+async def test_resume_pack_battle_voids_when_pulls_incomplete(session):
+    """A mid-pull crash (a player never pulled) → void; the caller then refunds each puller."""
+    from app.services.pack_engine import resume_pack_battle
+    b = PackBattle(id="rz2", mode="pack", machine_code="pokemon_50", price=50, max_players=2,
+                   status="running", server_seed="ab"*32, escrow_wallet_id="esc-id", escrow_address="ESC")
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="rz2", player_wallet="A"),
+                     BattlePlayer(battle_id="rz2", player_wallet="B")])
+    session.add(BattlePull(battle_id="rz2", player_wallet="A", memo="mA", round_number=1, nft_address="nA", insured_value=100))
+    session.commit()   # only A pulled — B is missing
+    gacha = _Gacha({})
+    async def build_transfer_tx(esc, dest, mint): return "x"
+    async def submit_tx(signed): return "ccsig"
+    async def confirm_in_escrow(esc, nft): return True
+    out = await resume_pack_battle(session, b, gacha=gacha, signer=_Signer(), resolve_wallet_id=lambda w: f"{w}-id",
+                                   build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                                   confirm_in_escrow=confirm_in_escrow,
+                                   now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+    assert out == "voided" and b.status == "voided" and b.winner is None
+    assert gacha.pulled == []                                    # never re-pulled

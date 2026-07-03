@@ -175,7 +175,25 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                 logger.warning("pull failed for %s in battle %s: %s — voiding", w, battle.id, exc)
                 battle.status = "voided"; session.commit(); return "voided"
 
-    # Winner determination can still void (e.g. tie with no server_seed). Settle itself is resilient.
+    return await _finalize_pack_battle(
+        session, battle, outcomes, players,
+        escrow_wallet_id=esc["id"], escrow_address=esc["address"],
+        gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, confirm_in_escrow=confirm_in_escrow,
+        build_usdc_sweep_tx=build_usdc_sweep_tx, usdc_balance=usdc_balance,
+        build_usdc_transfer_tx=build_usdc_transfer_tx, operator_wallet_id=operator_wallet_id,
+        now_fn=now_fn, sleep_fn=sleep_fn, escrow_max_attempts=escrow_max_attempts, escrow_delay=escrow_delay,
+    )
+
+
+async def _finalize_pack_battle(session, battle, outcomes, players, *, escrow_wallet_id, escrow_address,
+                                gacha, signer, resolve_wallet_id, build_transfer_tx, submit_tx,
+                                confirm_in_escrow, build_usdc_sweep_tx, usdc_balance, build_usdc_transfer_tx,
+                                operator_wallet_id, now_fn, sleep_fn, escrow_max_attempts, escrow_delay) -> str:
+    """Decide the winner from `outcomes` and settle: transfer the kept cards + sweep the escrow USDC to
+    the winner, collect the platform fee, mark settled, award loyalty. Winner-determination failure
+    (e.g. a tie with no server_seed) → voided. Shared by run_battle (after pulling) and
+    resume_pack_battle (after reconstructing outcomes from persisted pulls)."""
     try:
         client_seed = client_seed_from_nfts([o.nft_address for o in outcomes])
         winner, tie_idx = determine_winner(outcomes, server_seed=battle.server_seed, client_seed=client_seed)
@@ -188,7 +206,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     session.commit()
 
     await settle_cards_to_winner(
-        session, battle, escrow_wallet_id=esc["id"], escrow_address=esc["address"], winner=winner,
+        session, battle, escrow_wallet_id=escrow_wallet_id, escrow_address=escrow_address, winner=winner,
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
         confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
         sleep_fn=sleep_fn, wait_max_attempts=escrow_max_attempts, wait_delay=escrow_delay,
@@ -209,3 +227,39 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     award_battle_loyalty(session, battle, players, float(battle.price))
     session.commit()
     return "settled"
+
+
+async def resume_pack_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
+                             submit_tx, confirm_in_escrow, now_fn,
+                             escrow_max_attempts=20, escrow_delay=3.0, sleep_fn=None,
+                             build_usdc_sweep_tx=None, operator_wallet_id="",
+                             usdc_balance=None, build_usdc_transfer_tx=None) -> str:
+    """Resume a pack battle orphaned in 'running' (a backend restart killed the runner mid-flight).
+    NEVER re-pulls — it uses the persisted pulls. If every player's pull resolved → settle to the
+    winner. If any pull is missing/unresolved (a mid-pull crash) → void; the caller then refunds each
+    puller their own pull via refund_pack_void, so nobody's cards are stranded."""
+    sleep_fn = sleep_fn or asyncio.sleep
+    from app.models import BattlePlayer, BattlePull, BattlePack
+    players = [p.player_wallet for p in
+               session.query(BattlePlayer).filter_by(battle_id=battle.id).order_by(BattlePlayer.joined_at).all()]
+    packs = session.query(BattlePack).filter_by(battle_id=battle.id).order_by(BattlePack.sequence).all()
+    bundle = [p.machine_code for p in packs] or [battle.machine_code]
+    expected = len(players) * len(bundle)
+
+    pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
+    resolved = [p for p in pulls if p.nft_address]
+    if not battle.escrow_address or len(resolved) < expected:
+        logger.warning("resume: battle %s incomplete (%d/%d pulls) — voiding", battle.id, len(resolved), expected)
+        battle.status = "voided"; session.commit(); return "voided"
+
+    outcomes = [PullOutcome(p.player_wallet, p.memo, p.nft_address, p.insured_value or 0, p.grade,
+                            auto_sold=bool(p.auto_sold)) for p in resolved]
+    return await _finalize_pack_battle(
+        session, battle, outcomes, players,
+        escrow_wallet_id=battle.escrow_wallet_id, escrow_address=battle.escrow_address,
+        gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, confirm_in_escrow=confirm_in_escrow,
+        build_usdc_sweep_tx=build_usdc_sweep_tx, usdc_balance=usdc_balance,
+        build_usdc_transfer_tx=build_usdc_transfer_tx, operator_wallet_id=operator_wallet_id,
+        now_fn=now_fn, sleep_fn=sleep_fn, escrow_max_attempts=escrow_max_attempts, escrow_delay=escrow_delay,
+    )

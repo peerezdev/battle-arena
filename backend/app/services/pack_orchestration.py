@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from app.services.pack_engine import run_battle
+from app.services.pack_engine import run_battle, resume_pack_battle
 from app.services.royale_engine import run_royale
 from app.services.refund import refund_pack_void, refund_royale_void
 from app.services.royale_funding import distribute_usdc, confirm_usdc
@@ -295,6 +295,59 @@ async def run_pack_battle_live(
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, prepare_escrow=prepare_escrow,
         confirm_in_escrow=confirm_in_escrow, can_play=can_play, now_fn=now_fn, sponsor=sponsor,
         build_usdc_sweep_tx=build_usdc_sweep_tx, operator_wallet_id=operator_wallet_id,
+        usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
+    )
+    if result == "voided":
+        await refund_pack_void(
+            session, battle, escrow_wallet_id=battle.escrow_wallet_id, escrow_address=battle.escrow_address,
+            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
+            build_usdc_transfer_tx=build_usdc_transfer_tx, confirm_in_escrow=confirm_in_escrow,
+            operator_wallet_id=operator_wallet_id,
+        )
+    return result
+
+
+async def resume_pack_battle_live(session, battle, *, gacha, signer, rpc_url: str, usdc_mint: str,
+                                  token_program: str = TOKEN_PROGRAM, operator_wallet_id: str = "",
+                                  operator_address: str = "") -> str:
+    """Resume an orphaned 'running' pack battle after a backend restart: settle if every pull resolved,
+    else void + refund each puller. Builds the same on-chain closures as run_pack_battle_live but SKIPS
+    the pull loop (uses the persisted pulls) — so it never re-charges or re-pulls."""
+    from app.models import BattlePlayer
+    players = (session.query(BattlePlayer).filter_by(battle_id=battle.id).order_by(BattlePlayer.joined_at).all())
+    wallet_to_privy_id = {p.player_wallet: p.wallet_id for p in players}
+
+    def resolve_wallet_id(wallet: str):
+        return wallet_to_privy_id.get(wallet)
+
+    async def build_transfer_tx(esc, dest, nft):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await build_transfer(rpc_url, esc, dest, nft, bh)
+
+    submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
+    confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
+
+    async def build_usdc_sweep_tx(esc_addr, winner_addr):
+        bal = await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint, token_program)
+        if bal <= 0:
+            return None
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(esc_addr, winner_addr, usdc_mint, bh, amount=bal, decimals=6, fee_payer=operator_address)
+
+    async def build_usdc_transfer_tx(src, dest, amount):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(src, dest, usdc_mint, bh, amount=amount, decimals=6, fee_payer=operator_address)
+
+    async def usdc_balance(addr):
+        return await usdc_balance_base_units(rpc_url, addr, usdc_mint)
+
+    def now_fn() -> datetime:
+        return datetime.now(timezone.utc)
+
+    result = await resume_pack_battle(
+        session, battle, gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, confirm_in_escrow=confirm_in_escrow,
+        now_fn=now_fn, build_usdc_sweep_tx=build_usdc_sweep_tx, operator_wallet_id=operator_wallet_id,
         usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
     )
     if result == "voided":

@@ -34,7 +34,7 @@ from .services.pack_lobby import (
     get_battle, cancel_battle, verification, LobbyError,
 )
 from .services.pack_orchestration import (
-    run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
+    run_pack_battle_live, resume_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
@@ -1120,6 +1120,46 @@ def create_app(session_factory, chain: ChainSource,
         except Exception:
             _chat_mgr.disconnect(ws)
             await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
+
+    @app.on_event("startup")
+    async def _resume_orphaned_battles():
+        # A backend restart kills the in-memory battle runners. Without this, a battle left in
+        # 'running' is stranded forever (the reveal polls it and never sees it settle). On startup we
+        # finish orphaned PACK battles off the persisted pulls: every pull resolved → settle to the
+        # winner; a mid-pull crash (some pulls missing) → void + refund each puller their own pull.
+        # Runs in background tasks so startup isn't blocked by on-chain I/O. (Royale resume: TODO.)
+        if privy_signer is None or gacha is None:
+            return
+        try:
+            with session_factory() as s0:
+                running = [(b.id, b.mode) for b in s0.query(PackBattle).filter_by(status="running").all()]
+        except Exception:
+            logger.warning("resume: could not query orphaned battles")
+            return
+        for bid, mode in running:
+            if mode == "royale":
+                logger.warning("resume: orphaned royale %s left 'running' (royale resume not automated yet)", bid)
+                continue
+
+            async def _resume_one(battle_id=bid):
+                s2 = session_factory()
+                try:
+                    b = s2.get(PackBattle, battle_id)
+                    if b is None or b.status != "running":
+                        return
+                    logger.warning("resume: finishing orphaned pack battle %s", battle_id)
+                    await resume_pack_battle_live(
+                        s2, b, gacha=gacha, signer=privy_signer, rpc_url=solana_rpc_url,
+                        usdc_mint=cc_usdc_mint, operator_wallet_id=privy_operator_wallet_id,
+                        operator_address=privy_operator_address)
+                    asyncio.create_task(_broadcast_battle_drops(battle_id))
+                except Exception:
+                    logger.warning("resume: failed to finish orphaned battle %s", battle_id)
+                finally:
+                    release_reservations(s2, battle_id)
+                    s2.close()
+
+            asyncio.create_task(_resume_one())
 
     return app
 
