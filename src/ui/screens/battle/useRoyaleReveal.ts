@@ -16,6 +16,8 @@ export interface RoyaleRevealState {
   openingWallet: string | null   // slot currently waiting for its pull to resolve ("abriendo…")
   stagingWallet: string | null   // player whose card is playing its year→grade→rarity→card ceremony now
   stagingCard: RevealCardVM | null  // the card that stagingWallet is revealing
+  stagingKey: string | null      // unique per reveal step (round+cursor) — keys the staged card so it
+                                 // remounts every step even if two pulls share an nft address
   onCardShown: () => void        // the staged ceremony calls this when it lands → advance to the next card
   justEliminated: string | null  // player eliminated in the just-finished round (beat + break)
   tiedWallets: string[]          // players tied for last this round → spin the roulette (empty if no tie)
@@ -163,7 +165,7 @@ export function useRoyaleReveal(
     return {
       phase, projection: vm, revealRound: round, countdown,
       upcomingRound: round + 1, openingWallet: null, stagingWallet: null, stagingCard: null,
-      onCardShown, justEliminated: null, tiedWallets: [], tieEliminated: null,
+      stagingKey: null, onCardShown, justEliminated: null, tiedWallets: [], tieEliminated: null,
     }
   }
 
@@ -171,6 +173,7 @@ export function useRoyaleReveal(
   const openingWallet = targetWallet && !targetResolved ? targetWallet : null
   const stagingWallet = targetWallet && targetResolved ? targetWallet : null
   const stagingCard = stagingWallet ? targetCard : null
+  const stagingKey = stagingWallet ? `${round}:${card}` : null
   // Hold the elimination reveal while the tie-break roulette spins; show it from the round break on
   // (and immediately for the non-tie case, so the eliminated player's beat still plays).
   const justEliminated = (phase === 'roundBreak' || (roundComplete && !isTie))
@@ -179,6 +182,6 @@ export function useRoyaleReveal(
   const tieEliminated = phase === 'tieBreak' ? (roundData?.eliminatedWallet ?? null) : null
   return {
     phase, projection, revealRound: round, countdown, upcomingRound: round + 1,
-    openingWallet, stagingWallet, stagingCard, onCardShown, justEliminated, tiedWallets, tieEliminated,
+    openingWallet, stagingWallet, stagingCard, stagingKey, onCardShown, justEliminated, tiedWallets, tieEliminated,
   }
 }

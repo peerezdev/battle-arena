@@ -160,6 +160,28 @@ describe('useRoyaleReveal', () => {
     expect(pending.result.current.stagingWallet).toBeNull()
   })
 
+  it('gives each staged card a distinct key even when two pulls share an nft address (no stall)', () => {
+    // The demo picks pool cards with replacement, so two players in a round can hold the SAME
+    // nft_address. Keying the staged reveal by nft_address would not remount → onCardShown never
+    // fires again → the reveal freezes. The key must be unique per reveal step instead.
+    const vmDup: RevealVM = {
+      ...vm3,
+      rounds: [
+        { roundNumber: 1, eliminatedWallet: 'C', cards: [card('A', true, 100, 'dup'), card('B', false, 90, 'dup'), card('C', false, 40, 'nC1')] },
+        { roundNumber: 2, eliminatedWallet: 'B', cards: [card('A', true, 200, 'nA2'), card('B', false, 60, 'nB2')] },
+      ],
+    }
+    const { result } = renderHook(() => useRoyaleReveal(vmDup, { reducedMotion: false, onComplete: vi.fn() }))
+    const seen = new Set<string>()
+    for (let i = 0; i < 3; i++) {
+      const key = result.current.stagingKey
+      expect(typeof key).toBe('string')                 // a real key exists at each staging step
+      expect(seen.has(key as string)).toBe(false)       // and never repeats (A and B share 'dup')
+      seen.add(key as string)
+      act(() => { result.current.onCardShown() })
+    }
+  })
+
   it('runs the tie-break roulette before the round break, holding the elimination until it lands', () => {
     const { result } = renderHook(() => useRoyaleReveal(vmTie, { reducedMotion: false, onComplete: vi.fn() }))
     act(() => { result.current.onCardShown() })   // reveal A

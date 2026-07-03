@@ -63,7 +63,7 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
       <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
         <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
           revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
-        <Spotlight stagingCard={rv.stagingCard} activeName={activeName} isOpening={isOpening}
+        <Spotlight stagingCard={rv.stagingCard} revealKey={rv.stagingKey} activeName={activeName} isOpening={isOpening}
           reducedMotion={reducedMotion} onCardShown={rv.onCardShown} />
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 520px', minWidth: 280, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
@@ -164,8 +164,8 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
 // ─────────────────────────── SPOTLIGHT ───────────────────────────
 // The single card revealing right now — big + centered, playing the full staged ceremony
 // (year → grade → rarity → card). The player grid below only tracks standings.
-function Spotlight({ stagingCard, activeName, isOpening, reducedMotion, onCardShown }: {
-  stagingCard: RevealCardVM | null; activeName: string | null; isOpening: boolean
+function Spotlight({ stagingCard, revealKey, activeName, isOpening, reducedMotion, onCardShown }: {
+  stagingCard: RevealCardVM | null; revealKey: string | null; activeName: string | null; isOpening: boolean
   reducedMotion: boolean; onCardShown: () => void
 }) {
   const W = 172, H = 240
@@ -177,7 +177,7 @@ function Spotlight({ stagingCard, activeName, isOpening, reducedMotion, onCardSh
             {isOpening ? 'OPENING' : 'REVEALING'} · <span style={{ color: COLORS.text, fontWeight: 700 }}>{activeName}</span>
           </div>
           {stagingCard
-            ? <StagedCardReveal key={stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
+            ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
                 rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} onCardShown={onCardShown}>
                 <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
               </StagedCardReveal>
