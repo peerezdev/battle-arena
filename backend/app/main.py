@@ -37,7 +37,7 @@ from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc
-from .services.nft_transfer import submit_signed_tx
+from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
 from .services.reservations import reserve, reserved_total, royale_locked_total, release_reservations
 from .services import emotes as emote_service
 from .services.bots import load_bots, pick_bot
@@ -65,6 +65,12 @@ class WithdrawAddressBody(BaseModel):
 class WithdrawBody(BaseModel):
     address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # destination Solana wallet
     amount: float = Field(gt=0)  # USDC (dollars)
+
+
+class NftWithdrawBody(BaseModel):
+    # Transfer an NFT out of the player's embedded wallet to an EXTERNAL Solana address.
+    nft_address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # mint to send
+    address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")      # destination Solana wallet
 
 
 class EmoteSlotsBody(BaseModel):
@@ -650,6 +656,35 @@ def create_app(session_factory, chain: ChainSource,
         except Exception as exc:
             raise HTTPException(502, f"withdraw failed: {exc}")
         return {"signature": sig, "amount": body.amount, "address": body.address}
+
+    @app.post("/users/me/nft/withdraw")
+    async def me_nft_withdraw(body: NftWithdrawBody, wallet: str = Depends(current_user),
+                             wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        # Send an NFT owned by the player's (delegated) embedded wallet to an EXTERNAL address.
+        # Reuses the same nft_transfer service that ships won cards escrow→winner; here the owner
+        # is the player's own wallet, which authorizes + pays for the transfer (single signer, same
+        # shape as settle_cards_to_winner). Requires the wallet delegated so the server can sign.
+        if privy_signer is None:
+            raise HTTPException(503, "withdrawals_unavailable")
+        # Ownership check FIRST: only transfer a mint the authed wallet actually holds on-chain, so
+        # a user can never move someone else's NFT (the wallet is derived from their identity token).
+        try:
+            owns = await nft_in_owner(solana_rpc_url, wallet, body.nft_address)
+        except Exception as exc:
+            raise HTTPException(502, f"ownership check failed: {exc}")
+        if not owns:
+            raise HTTPException(403, "no eres dueño de este NFT")
+        _withdraw_throttle(wallet)  # same per-wallet throttle as USDC withdraw
+        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        try:
+            tx = await build_transfer(solana_rpc_url, wallet, body.address, body.nft_address, blockhash)
+            signed = await privy_signer.sign_solana(wallet_id, tx)
+            sig = await submit_signed_tx(solana_rpc_url, signed)
+        except UnsupportedNftStandard as exc:
+            raise HTTPException(422, f"unsupported nft standard: {exc}")
+        except Exception as exc:
+            raise HTTPException(502, f"nft withdraw failed: {exc}")
+        return {"signature": sig, "nft_address": body.nft_address, "address": body.address}
 
     # ── Delegated signing — once the wallet is delegated, the server signs on the user's behalf
     # (session signer) so gacha/buyback/arena don't pop a wallet prompt. Each endpoint only ever
