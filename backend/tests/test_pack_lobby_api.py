@@ -838,3 +838,89 @@ def test_withdraw_rate_limited(monkeypatch):
 
     r = c.post("/users/me/withdraw", json=body, headers=hdrs)
     assert r.status_code == 429, r.text
+
+
+# ── Join All Bots (DEV/TEST) ──────────────────────────────────────────────────
+
+_BOTS_3 = [
+    {"id": "bot-1", "address": "So1anaBOT11111111111111111111111111111111"},
+    {"id": "bot-2", "address": "So1anaBOT22222222222222222222222222222222"},
+    {"id": "bot-3", "address": "So1anaBOT33333333333333333333333333333333"},
+]
+
+
+def _mock_battle_env(monkeypatch, *, bots, run_called):
+    async def _high_balance(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _fake_run(session, battle, *, gacha, signer, **kwargs):
+        run_called.append(battle.id)
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.run_pack_battle_live", _fake_run)
+    monkeypatch.setattr("app.main.load_bots", lambda: bots)
+
+
+def _create_pack(c, priv, max_players):
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": max_players}, headers=hdrs)
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
+def _tick():
+    async def _drain():
+        await asyncio.sleep(0)
+    asyncio.get_event_loop().run_until_complete(_drain())
+
+
+def test_join_all_bots_fills_lobby_and_schedules_run(monkeypatch):
+    c, priv = _build_client(dev_endpoints_enabled=True)
+    run_called: list = []
+    _mock_battle_env(monkeypatch, bots=_BOTS_3, run_called=run_called)
+
+    battle_id = _create_pack(c, priv, max_players=4)  # creator = 1 player, 3 empty seats
+    r = c.post(f"/pack-battles/{battle_id}/join-all-bots")
+
+    assert r.status_code == 200, r.text
+    assert len(r.json()["players"]) == 4  # creator + 3 bots → full
+    _tick()
+    assert run_called, "run_pack_battle_live was not scheduled after bots filled the lobby"
+
+
+def test_join_all_bots_409_when_no_eligible_bots(monkeypatch):
+    c, priv = _build_client(dev_endpoints_enabled=True)
+    _mock_battle_env(monkeypatch, bots=[], run_called=[])  # no bots configured
+
+    battle_id = _create_pack(c, priv, max_players=2)
+    r = c.post(f"/pack-battles/{battle_id}/join-all-bots")
+
+    assert r.status_code == 409, r.text
+
+
+def test_join_all_bots_404_when_dev_disabled(monkeypatch):
+    c, priv = _build_client(dev_endpoints_enabled=False)
+    _mock_battle_env(monkeypatch, bots=_BOTS_3, run_called=[])
+
+    battle_id = _create_pack(c, priv, max_players=2)
+    r = c.post(f"/pack-battles/{battle_id}/join-all-bots")
+
+    assert r.status_code == 404, r.text
+
+
+def test_join_bot_still_adds_exactly_one(monkeypatch):
+    """Regression: the refactored /join-bot adds a single bot without filling a 4-seat lobby."""
+    c, priv = _build_client(dev_endpoints_enabled=True)
+    _mock_battle_env(monkeypatch, bots=_BOTS_3, run_called=[])
+
+    battle_id = _create_pack(c, priv, max_players=4)
+    r = c.post(f"/pack-battles/{battle_id}/join-bot")
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["players"]) == 2  # creator + exactly one bot
+    assert body["status"] == "lobby"  # not full → not started

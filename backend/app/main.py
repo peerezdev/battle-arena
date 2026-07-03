@@ -852,6 +852,59 @@ def create_app(session_factory, chain: ChainSource,
         await _chat_mgr.broadcast({"type": "emote", "battle_id": battle_id, "from": wallet, "code": body.code})
         return {"ok": True}
 
+    async def _add_one_bot(s: Session, b: PackBattle) -> Optional[bool]:
+        """Add one funded reserve bot to lobby `b`.
+
+        Returns the `filled` flag (True if this bot completed the lobby and the
+        battle was started) when a bot was added, or None if no eligible funded
+        bot is available. Raises HTTPException on on-chain failure (buy-in
+        collection) or a late-join race.
+        """
+        bots = load_bots()
+        if not bots:
+            return None
+        in_battle = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=b.id).all()}
+        buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
+        candidates = [bot for bot in bots if bot["address"] not in in_battle]
+        balances = {bot["address"]: await usdc_balance_base_units(solana_rpc_url, bot["address"], cc_usdc_mint)
+                    for bot in candidates}
+        bot = pick_bot(bots, in_battle, balances, buyin)
+        if bot is None:
+            return None
+        bw, bid = bot["address"], bot["id"]
+        if b.mode == "royale":
+            # Collect the bot's buy-in into the escrow BEFORE joining — single attempt. If the
+            # charge fails, the bot is NOT joined and the caller surfaces the error (toast):
+            # no silent unfunded joins, no double charge.
+            try:
+                await collect_buyin_confirmed(bid, bw, b.escrow_address, buyin)
+            except Exception as exc:
+                raise HTTPException(502, f"No se pudo cobrar el buy-in del bot: {exc}")
+            try:
+                _b2, filled = join_battle(s, b.id, bw, bid)
+            except LobbyError as e:
+                # Joined too late — refund the buy-in we just collected so it isn't stuck.
+                try:
+                    bh2 = await fetch_latest_blockhash(solana_rpc_url)
+                    await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
+                                          b.escrow_address, bw, cc_usdc_mint, buyin, bh2,
+                                          operator_wallet_id=privy_operator_wallet_id,
+                                          operator_address=privy_operator_address)
+                except Exception:
+                    logger.warning("join-bot refund failed for %s in %s", bw, b.id)
+                raise HTTPException(409, str(e))
+            if filled:
+                asyncio.create_task(_run_royale_bg(b.id))
+        else:
+            try:
+                _b2, filled = join_battle(s, b.id, bw, bid)
+            except LobbyError as e:
+                raise HTTPException(409, str(e))
+            reserve(s, bw, b.id, b.price)
+            if filled:
+                asyncio.create_task(_run_bg(b.id))
+        return filled
+
     @app.post("/pack-battles/{battle_id}/join-bot")
     async def join_bot_pack_battle(battle_id: str, s: Session = Depends(db)):
         """DEV/TEST: drop a random funded reserve bot into a lobby slot (no auth).
@@ -868,49 +921,36 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(404, "no existe")
         if b.status != "lobby":
             raise HTTPException(409, "la batalla no está en lobby")
-        bots = load_bots()
-        if not bots:
-            raise HTTPException(409, "no hay bots configurados")
-        in_battle = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()}
-        buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
-        candidates = [bot for bot in bots if bot["address"] not in in_battle]
-        balances = {bot["address"]: await usdc_balance_base_units(solana_rpc_url, bot["address"], cc_usdc_mint)
-                    for bot in candidates}
-        bot = pick_bot(bots, in_battle, balances, buyin)
-        if bot is None:
+        filled = await _add_one_bot(s, b)
+        if filled is None:
             raise HTTPException(409, "no hay bots libres con saldo suficiente")
-        bw, bid = bot["address"], bot["id"]
-        if b.mode == "royale":
-            # Collect the bot's buy-in into the escrow BEFORE joining — single attempt. If the
-            # charge fails, the bot is NOT joined and the caller surfaces the error (toast):
-            # no silent unfunded joins, no double charge.
-            try:
-                await collect_buyin_confirmed(bid, bw, b.escrow_address, buyin)
-            except Exception as exc:
-                raise HTTPException(502, f"No se pudo cobrar el buy-in del bot: {exc}")
-            try:
-                _b2, filled = join_battle(s, battle_id, bw, bid)
-            except LobbyError as e:
-                # Joined too late — refund the buy-in we just collected so it isn't stuck.
-                try:
-                    bh2 = await fetch_latest_blockhash(solana_rpc_url)
-                    await distribute_usdc(solana_rpc_url, privy_signer, b.escrow_wallet_id,
-                                          b.escrow_address, bw, cc_usdc_mint, buyin, bh2,
-                                          operator_wallet_id=privy_operator_wallet_id,
-                                          operator_address=privy_operator_address)
-                except Exception:
-                    logger.warning("join-bot refund failed for %s in %s", bw, battle_id)
-                raise HTTPException(409, str(e))
-            if filled:
-                asyncio.create_task(_run_royale_bg(battle_id))
-        else:
-            try:
-                _b2, filled = join_battle(s, battle_id, bw, bid)
-            except LobbyError as e:
-                raise HTTPException(409, str(e))
-            reserve(s, bw, battle_id, b.price)
-            if filled:
-                asyncio.create_task(_run_bg(battle_id))
+        return get_battle(s, battle_id)
+
+    @app.post("/pack-battles/{battle_id}/join-all-bots")
+    async def join_all_bots_pack_battle(battle_id: str, s: Session = Depends(db)):
+        """DEV/TEST: fill every empty lobby seat with funded reserve bots.
+
+        Same posture as /join-bot (unauthenticated, moves real USDC, dev-gated).
+        Best-effort: adds bots until the lobby fills or no eligible funded bot
+        remains; 409 only if it could not add a single bot.
+        """
+        if not dev_endpoints_enabled:
+            raise HTTPException(404, "Not Found")
+        b = s.get(PackBattle, battle_id)
+        if b is None:
+            raise HTTPException(404, "no existe")
+        if b.status != "lobby":
+            raise HTTPException(409, "la batalla no está en lobby")
+        added = 0
+        while True:
+            filled = await _add_one_bot(s, b)
+            if filled is None:   # no eligible funded bot left
+                break
+            added += 1
+            if filled:           # lobby completed → battle started
+                break
+        if added == 0:
+            raise HTTPException(409, "no hay bots libres con saldo suficiente")
         return get_battle(s, battle_id)
 
     @app.post("/pack-battles/{battle_id}/cancel")
