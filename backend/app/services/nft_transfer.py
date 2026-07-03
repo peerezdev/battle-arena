@@ -46,8 +46,9 @@ _PNFT_FLAGS = [
 
 
 def build_pnft_transfer(escrow: str, winner: str, mint: str, recent_blockhash: str,
-                        *, ruleset: str) -> str:
+                        *, ruleset: str, fee_payer: Optional[str] = None) -> str:
     esc = Pubkey.from_string(escrow); win = Pubkey.from_string(winner); mnt = Pubkey.from_string(mint)
+    payer = Pubkey.from_string(fee_payer) if fee_payer else esc   # operator-sponsored fee-payer, else owner
     esc_ata = get_associated_token_address(esc, mnt)
     win_ata = get_associated_token_address(win, mnt)
     accounts = [
@@ -60,8 +61,8 @@ def build_pnft_transfer(escrow: str, winner: str, mint: str, recent_blockhash: s
         master_edition_pda(mnt),              # 6 master edition
         token_record_pda(mnt, esc_ata),       # 7 owner token record
         token_record_pda(mnt, win_ata),       # 8 destination token record
-        esc,                                  # 9 authority
-        esc,                                  # 10 payer
+        esc,                                  # 9 authority (owner)
+        payer,                                # 10 payer (operator when sponsored, else owner)
         SYS_PROGRAM,                          # 11
         SYSVAR_INSTRUCTIONS,                  # 12
         TOKEN_PROGRAM,                        # 13
@@ -74,7 +75,7 @@ def build_pnft_transfer(escrow: str, winner: str, mint: str, recent_blockhash: s
     data = bytes([49, 0]) + (1).to_bytes(8, "little") + bytes([0])  # Transfer, V1, amount=1, auth_data=None
     transfer_ix = Instruction(METADATA_PROGRAM, data, metas)
     cu_ix = Instruction(COMPUTE_BUDGET, bytes([2]) + (400000).to_bytes(4, "little"), [])
-    msg = Message.new_with_blockhash([cu_ix, transfer_ix], esc, Hash.from_string(recent_blockhash))
+    msg = Message.new_with_blockhash([cu_ix, transfer_ix], payer, Hash.from_string(recent_blockhash))
     return base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
 
 
@@ -127,13 +128,14 @@ def read_core_collection(data: bytes) -> Optional[Pubkey]:
 
 
 def build_core_transfer(escrow: str, winner: str, mint: str, recent_blockhash: str,
-                        *, collection: Optional[str]) -> str:
+                        *, collection: Optional[str], fee_payer: Optional[str] = None) -> str:
     esc = Pubkey.from_string(escrow); win = Pubkey.from_string(winner); asset = Pubkey.from_string(mint)
+    payer = Pubkey.from_string(fee_payer) if fee_payer else esc   # operator-sponsored fee-payer, else owner
     coll = Pubkey.from_string(collection) if collection else _MPL_CORE_PK  # None → program id
     metas = [
         AccountMeta(asset,    is_signer=False, is_writable=True),                       # 0 asset
         AccountMeta(coll,     is_signer=False, is_writable=(collection is not None)),   # 1 collection|None
-        AccountMeta(esc,      is_signer=True,  is_writable=True),                       # 2 payer
+        AccountMeta(payer,    is_signer=True,  is_writable=True),                       # 2 payer (operator when sponsored)
         AccountMeta(esc,      is_signer=True,  is_writable=False),                      # 3 authority (owner)
         AccountMeta(win,      is_signer=False, is_writable=False),                      # 4 new_owner
         AccountMeta(SYS_PROGRAM, is_signer=False, is_writable=False),                   # 5 system_program
@@ -141,7 +143,7 @@ def build_core_transfer(escrow: str, winner: str, mint: str, recent_blockhash: s
     ]
     transfer_ix = Instruction(_MPL_CORE_PK, bytes([14, 0]), metas)  # TransferV1, compression_proof None
     cu_ix = Instruction(COMPUTE_BUDGET, bytes([2]) + (100000).to_bytes(4, "little"), [])
-    msg = Message.new_with_blockhash([cu_ix, transfer_ix], esc, Hash.from_string(recent_blockhash))
+    msg = Message.new_with_blockhash([cu_ix, transfer_ix], payer, Hash.from_string(recent_blockhash))
     return base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
 
 
@@ -195,23 +197,25 @@ async def detect_standard(rpc_url: str, mint: str) -> str:
     return "pnft" if _token_standard(raw) == 4 else "standard"
 
 
-async def build_transfer(rpc_url: str, escrow: str, winner: str, mint: str, blockhash: str) -> str:
-    """Dispatch to the correct builder; raise UnsupportedNftStandard for unsupported standards."""
+async def build_transfer(rpc_url: str, escrow: str, winner: str, mint: str, blockhash: str,
+                         *, fee_payer: Optional[str] = None) -> str:
+    """Dispatch to the correct builder; raise UnsupportedNftStandard for unsupported standards.
+    `fee_payer` (optional) sponsors the tx (operator pays gas + dest-ATA rent); default = owner."""
     std = await detect_standard(rpc_url, mint)
     if std == "pnft":
         meta = await _get_account(rpc_url, str(metadata_pda(Pubkey.from_string(mint))))
         ruleset = read_pnft_ruleset(base64.b64decode(meta["data"][0]))
         if ruleset is None:
             raise UnsupportedNftStandard("pnft with no ruleset is not supported in v1")
-        return build_pnft_transfer(escrow, winner, mint, blockhash, ruleset=str(ruleset))
+        return build_pnft_transfer(escrow, winner, mint, blockhash, ruleset=str(ruleset), fee_payer=fee_payer)
     if std == "standard":
         from app.services.solana_tx import build_nft_transfer
-        return build_nft_transfer(escrow, winner, mint, blockhash)
+        return build_nft_transfer(escrow, winner, mint, blockhash, fee_payer=fee_payer)
     if std == "core":
         info = await _get_account(rpc_url, mint)
         coll = read_core_collection(base64.b64decode(info["data"][0])) if info else None
         return build_core_transfer(escrow, winner, mint, blockhash,
-                                   collection=str(coll) if coll else None)
+                                   collection=str(coll) if coll else None, fee_payer=fee_payer)
     raise UnsupportedNftStandard(f"standard={std!r} is not supported")
 
 

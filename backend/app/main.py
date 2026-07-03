@@ -36,7 +36,7 @@ from .services.pack_lobby import (
 from .services.pack_orchestration import (
     run_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
 )
-from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc
+from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
 from .services.reservations import reserve, reserved_total, royale_locked_total, release_reservations
 from .services import emotes as emote_service
@@ -154,7 +154,9 @@ def create_app(session_factory, chain: ChainSource,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
                withdraw_rate_limit: int = 5,
-               withdraw_rate_window_s: float = 60.0) -> FastAPI:
+               withdraw_rate_window_s: float = 60.0,
+               withdraw_fee_pct: float = 0.0,
+               fee_wallet_address: str = "") -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
 
     if cors_origins:
@@ -649,21 +651,34 @@ def create_app(session_factory, chain: ChainSource,
         _withdraw_throttle(wallet)                      # rate-limit per authed wallet
         await _require_available(wallet, amount, s)     # caps at on-chain balance − reserved
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        # Platform fee: withdraw_fee_pct of the withdrawn amount, DEDUCTED from it — the destination
+        # receives the net, the fee goes to the fee wallet (fallback: operator). Atomic in one tx.
+        # 0 pct or no fee wallet → plain single-transfer withdrawal.
+        fee_dest = fee_wallet_address or privy_operator_address
+        fee = int(round(amount * withdraw_fee_pct)) if (withdraw_fee_pct > 0 and fee_dest) else 0
+        net = amount - fee
         try:
-            sig = await withdraw_usdc(solana_rpc_url, privy_signer, wallet_id, wallet,
-                                      privy_operator_wallet_id, privy_operator_address,
-                                      body.address, cc_usdc_mint, amount, blockhash)
+            if fee > 0:
+                sig = await withdraw_usdc_with_fee(solana_rpc_url, privy_signer, wallet_id, wallet,
+                                                   privy_operator_wallet_id, privy_operator_address,
+                                                   body.address, fee_dest, cc_usdc_mint, net, fee, blockhash)
+            else:
+                sig = await withdraw_usdc(solana_rpc_url, privy_signer, wallet_id, wallet,
+                                          privy_operator_wallet_id, privy_operator_address,
+                                          body.address, cc_usdc_mint, amount, blockhash)
         except Exception as exc:
             raise HTTPException(502, f"withdraw failed: {exc}")
-        return {"signature": sig, "amount": body.amount, "address": body.address}
+        return {"signature": sig, "amount": body.amount, "net": net / 1_000_000,
+                "fee": fee / 1_000_000, "address": body.address}
 
     @app.post("/users/me/nft/withdraw")
     async def me_nft_withdraw(body: NftWithdrawBody, wallet: str = Depends(current_user),
                              wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
         # Send an NFT owned by the player's (delegated) embedded wallet to an EXTERNAL address.
-        # Reuses the same nft_transfer service that ships won cards escrow→winner; here the owner
-        # is the player's own wallet, which authorizes + pays for the transfer (single signer, same
-        # shape as settle_cards_to_winner). Requires the wallet delegated so the server can sign.
+        # Reuses the same nft_transfer service that ships won cards escrow→winner. The OPERATOR
+        # sponsors the transfer (fee-payer + dest-ATA rent) when configured, so the user never needs
+        # SOL — 2-signer: the owner authorizes the move, the operator pays. Requires the wallet
+        # delegated so the server can sign on the owner's behalf.
         if privy_signer is None:
             raise HTTPException(503, "withdrawals_unavailable")
         # Ownership check FIRST: only transfer a mint the authed wallet actually holds on-chain, so
@@ -676,9 +691,13 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(403, "no eres dueño de este NFT")
         _withdraw_throttle(wallet)  # same per-wallet throttle as USDC withdraw
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        sponsored = bool(privy_operator_wallet_id and privy_operator_address)
         try:
-            tx = await build_transfer(solana_rpc_url, wallet, body.address, body.nft_address, blockhash)
-            signed = await privy_signer.sign_solana(wallet_id, tx)
+            tx = await build_transfer(solana_rpc_url, wallet, body.address, body.nft_address, blockhash,
+                                      fee_payer=privy_operator_address if sponsored else None)
+            signed = await privy_signer.sign_solana(wallet_id, tx)                          # owner authorizes
+            if sponsored:
+                signed = await privy_signer.sign_solana(privy_operator_wallet_id, signed)   # operator pays gas
             sig = await submit_signed_tx(solana_rpc_url, signed)
         except UnsupportedNftStandard as exc:
             raise HTTPException(422, f"unsupported nft standard: {exc}")
@@ -1131,7 +1150,9 @@ def build_default_app() -> FastAPI:
                       dev_endpoints_enabled=s.dev_endpoints_enabled,
                       min_withdraw_usdc=s.min_withdraw_usdc,
                       withdraw_rate_limit=s.withdraw_rate_limit,
-                      withdraw_rate_window_s=s.withdraw_rate_window_s)
+                      withdraw_rate_window_s=s.withdraw_rate_window_s,
+                      withdraw_fee_pct=s.withdraw_fee_pct,
+                      fee_wallet_address=s.fee_wallet_address)
 
 
 app = build_default_app()

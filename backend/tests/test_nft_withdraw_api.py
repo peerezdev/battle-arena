@@ -98,8 +98,8 @@ def _mock_chain(monkeypatch, *, owns: bool):
         calls["nft_in_owner"].append((rpc_url, owner, mint))
         return owns
 
-    async def _build_transfer(rpc_url, escrow, winner, mint, blockhash):
-        calls["build_transfer"].append((escrow, winner, mint))
+    async def _build_transfer(rpc_url, escrow, winner, mint, blockhash, *, fee_payer=None):
+        calls["build_transfer"].append((escrow, winner, mint, fee_payer))
         return "TXBYTES"
 
     async def _submit(rpc_url, signed):
@@ -116,10 +116,13 @@ def _mock_chain(monkeypatch, *, owns: bool):
     return calls
 
 
+OPERATOR = "So1anaOPERATOR1111111111111111111111111111"
+
+
 def test_nft_withdraw_transfers_owned_nft(monkeypatch):
-    """Owned NFT → 200; signed with the AUTHED user's wallet_id; transfer built owner→dest."""
+    """Owned NFT → 200; owner authorizes, OPERATOR sponsors (fee-payer + 2nd signer)."""
     signer = FakeSigner()
-    c, priv = _build_client(signer=signer)
+    c, priv = _build_client(signer=signer)   # operator configured → sponsored path
     calls = _mock_chain(monkeypatch, owns=True)
 
     hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
@@ -129,11 +132,11 @@ def test_nft_withdraw_transfers_owned_nft(monkeypatch):
     assert body == {"signature": "on-chain-sig", "nft_address": MINT, "address": DEST}
     # ownership was checked for the authed wallet + this mint
     assert calls["nft_in_owner"] == [(DUMMY_RPC, WALLET_A, MINT)]
-    # transfer built from the user's wallet (owner) to the external dest
-    assert calls["build_transfer"] == [(WALLET_A, DEST, MINT)]
-    # signed with the user's OWN wallet_id (never anyone else's)
-    assert signer.signed == [(WALLET_ID_A, "TXBYTES")]
-    assert calls["submit"] == ["signed::TXBYTES"]
+    # transfer built owner→dest with the OPERATOR as fee-payer (user needs no SOL)
+    assert calls["build_transfer"] == [(WALLET_A, DEST, MINT, OPERATOR)]
+    # 2-signer: the OWNER authorizes first, then the OPERATOR pays the fee
+    assert signer.signed == [(WALLET_ID_A, "TXBYTES"), ("op-wallet-id", "signed::TXBYTES")]
+    assert calls["submit"] == ["signed::signed::TXBYTES"]
 
 
 def test_nft_withdraw_rejects_unowned_nft(monkeypatch):

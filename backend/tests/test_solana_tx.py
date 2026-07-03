@@ -8,6 +8,7 @@ from solders.token.associated import get_associated_token_address
 
 from app.services.solana_tx import (
     build_nft_transfer,
+    build_token_multi_transfer,
     TOKEN_PROGRAM,
     ATA_PROGRAM,
 )
@@ -189,3 +190,40 @@ def test_build_create_ata_single_idempotent_ix_operator_payer():
                                        Pubkey.from_string(TOKEN_PROGRAM))
     a = [str(keys[i]) for i in ix.accounts]
     assert a[1] == str(ata) and a[2] == OWNER              # ATA + its owner
+
+
+# ---------------------------------------------------------------------------
+# Operator-sponsored fee-payer (NFT withdraw) + fee-split multi-transfer (USDC withdraw fee)
+# ---------------------------------------------------------------------------
+OPERATOR   = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"   # any valid distinct pubkey (Token-2022 id)
+FEE_WALLET = "5DfUc9vcvLBNCTrzWXsXrEdD8x8DoPuYxLYoAytXuub9"
+
+
+class TestOperatorFeePayer:
+    def test_nft_transfer_operator_is_fee_payer(self):
+        """fee_payer=OPERATOR → operator is the tx fee-payer; the owner is still present (authority)."""
+        tx = Transaction.from_bytes(base64.b64decode(
+            build_nft_transfer(ESCROW, DEST, MINT, BLOCKHASH, fee_payer=OPERATOR)))
+        assert tx.message.account_keys[0] == Pubkey.from_string(OPERATOR)
+        assert Pubkey.from_string(ESCROW) in tx.message.account_keys
+
+    def test_nft_transfer_default_fee_payer_is_owner(self):
+        """No fee_payer → owner pays (unchanged escrow→winner behaviour)."""
+        tx = Transaction.from_bytes(base64.b64decode(
+            build_nft_transfer(ESCROW, DEST, MINT, BLOCKHASH)))
+        assert tx.message.account_keys[0] == Pubkey.from_string(ESCROW)
+
+
+class TestMultiTransferFeeSplit:
+    def test_two_transfers_with_operator_fee_payer(self):
+        """net→dest + fee→fee_wallet in one tx: operator is fee-payer, 4 instructions, both ATAs present."""
+        tx = Transaction.from_bytes(base64.b64decode(build_token_multi_transfer(
+            ESCROW, [(DEST, 99_000_000), (FEE_WALLET, 1_000_000)], MINT, BLOCKHASH,
+            decimals=6, fee_payer=OPERATOR)))
+        keys = tx.message.account_keys
+        assert keys[0] == Pubkey.from_string(OPERATOR)             # operator sponsors
+        assert len(tx.message.instructions) == 4                   # create+transfer per destination
+        for dest in (DEST, FEE_WALLET):
+            dest_ata = get_associated_token_address(Pubkey.from_string(dest), Pubkey.from_string(MINT),
+                                                    Pubkey.from_string(TOKEN_PROGRAM))
+            assert dest_ata in keys

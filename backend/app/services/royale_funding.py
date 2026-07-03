@@ -4,7 +4,7 @@ from __future__ import annotations
 import httpx
 from solders.pubkey import Pubkey
 from solders.token.associated import get_associated_token_address
-from app.services.solana_tx import build_token_transfer, TOKEN_PROGRAM
+from app.services.solana_tx import build_token_transfer, build_token_multi_transfer, TOKEN_PROGRAM
 from app.services.nft_transfer import submit_signed_tx
 
 
@@ -69,6 +69,20 @@ async def withdraw_usdc(rpc_url, signer, player_wallet_id, player_address, opera
     tx = build_token_transfer(player_address, dest_address, usdc_mint, blockhash,
                               amount=amount, decimals=6, fee_payer=operator_address)
     signed = await signer.sign_solana(player_wallet_id, tx)        # player authorizes the USDC move
+    signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
+    return await submit_signed_tx(rpc_url, signed)
+
+
+async def withdraw_usdc_with_fee(rpc_url, signer, player_wallet_id, player_address, operator_wallet_id,
+                                 operator_address, dest_address, fee_dest, usdc_mint,
+                                 net_amount, fee_amount, blockhash) -> str:
+    """User withdrawal WITH a platform fee, in ONE atomic tx: net_amount → dest_address and
+    fee_amount → fee_dest, both from the player's wallet. 2-signer: player authorizes, operator
+    pays the fee. Atomic so the user never gets the net without the fee being collected."""
+    tx = build_token_multi_transfer(player_address,
+                                    [(dest_address, net_amount), (fee_dest, fee_amount)],
+                                    usdc_mint, blockhash, decimals=6, fee_payer=operator_address)
+    signed = await signer.sign_solana(player_wallet_id, tx)        # player authorizes the USDC moves
     signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
     return await submit_signed_tx(rpc_url, signed)
 

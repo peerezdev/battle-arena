@@ -83,7 +83,7 @@ DUMMY_RPC = "https://api.devnet.solana.com"
 DUMMY_MINT = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
 
 
-def _build_client(signer=None, dev_endpoints_enabled=False):
+def _build_client(signer=None, dev_endpoints_enabled=False, withdraw_fee_pct=0.0, fee_wallet_address=""):
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -106,6 +106,8 @@ def _build_client(signer=None, dev_endpoints_enabled=False):
         privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
         escrow_seed_lamports=10_000_000,
         dev_endpoints_enabled=dev_endpoints_enabled,
+        withdraw_fee_pct=withdraw_fee_pct,
+        fee_wallet_address=fee_wallet_address,
     )
     return TestClient(app, raise_server_exceptions=True), priv
 
@@ -838,6 +840,67 @@ def test_withdraw_rate_limited(monkeypatch):
 
     r = c.post("/users/me/withdraw", json=body, headers=hdrs)
     assert r.status_code == 429, r.text
+
+
+def test_withdraw_charges_platform_fee(monkeypatch):
+    """A withdraw fee (pct of the amount) is DEDUCTED: the destination receives the net and the
+    fee wallet receives the fee, in one atomic call to withdraw_usdc_with_fee."""
+    fee_wallet = "So1anaFEEWALLET1111111111111111111111111111"
+    captured = {}
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _wf(rpc, signer, pwid, paddr, owid, oaddr, dest, fee_dest, mint, net, fee, bh):
+        captured.update(dest=dest, fee_dest=fee_dest, net=net, fee=fee)
+        return "sig-fee"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.withdraw_usdc_with_fee", _wf)
+
+    c, priv = _build_client(signer=object(), withdraw_fee_pct=0.01, fee_wallet_address=fee_wallet)
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 100.0}, headers=hdrs)
+
+    assert r.status_code == 200, r.text
+    # 100 USDC → 1% fee = 1 USDC (1_000_000 base) to the fee wallet, 99 USDC (99_000_000) to dest.
+    assert captured == {"dest": WALLET_B, "fee_dest": fee_wallet, "net": 99_000_000, "fee": 1_000_000}
+    body = r.json()
+    assert body["net"] == 99.0 and body["fee"] == 1.0
+
+
+def test_withdraw_no_fee_when_pct_zero(monkeypatch):
+    """With withdraw_fee_pct=0 the plain single-transfer withdraw is used (no fee split)."""
+    used = {"plain": False, "fee": False}
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _wd(*a, **k):
+        used["plain"] = True
+        return "sig-plain"
+
+    async def _wf(*a, **k):
+        used["fee"] = True
+        return "sig-fee"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.withdraw_usdc", _wd)
+    monkeypatch.setattr("app.main.withdraw_usdc_with_fee", _wf)
+
+    c, priv = _build_client(signer=object(), withdraw_fee_pct=0.0)
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 100.0}, headers=hdrs)
+    assert r.status_code == 200, r.text
+    assert used == {"plain": True, "fee": False}
 
 
 # ── Join All Bots (DEV/TEST) ──────────────────────────────────────────────────

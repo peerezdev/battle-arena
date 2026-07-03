@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     min_withdraw_usdc: float = 1.0        # retiro mínimo (USDC); env: MIN_WITHDRAW_USDC
     withdraw_rate_limit: int = 5          # nº máx. de retiros por wallet y ventana
     withdraw_rate_window_s: float = 60.0  # ventana del rate-limit de retiros (segundos)
+    # Fee de plataforma sobre cada withdraw de USDC: pct del importe retirado, descontado (el
+    # destino recibe el resto) y enviado al fee_wallet_address (fallback al operador). 0 → sin fee.
+    # env: WITHDRAW_FEE_PCT
+    withdraw_fee_pct: float = 0.01
 
 
 def get_settings() -> Settings:

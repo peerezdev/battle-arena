@@ -108,14 +108,16 @@ def build_nft_transfer(
     mint: str,
     recent_blockhash: str,
     token_program: str = TOKEN_PROGRAM,
+    *,
+    fee_payer: str = None,
 ) -> str:
     """
     Thin wrapper around build_token_transfer for NFT (amount=1, decimals=0).
-    Fee payer = escrow.
+    Fee payer = fee_payer if given (operator-sponsored), else the escrow/owner.
     """
     return build_token_transfer(
         escrow_address, dest_address, mint, recent_blockhash,
-        amount=1, decimals=0, token_program=token_program,
+        amount=1, decimals=0, token_program=token_program, fee_payer=fee_payer,
     )
 
 
@@ -150,4 +152,49 @@ def build_create_ata(
         ],
     )
     message = Message.new_with_blockhash([create_ix], payer_pk, Hash.from_string(recent_blockhash))
+    return base64.b64encode(bytes(Transaction.new_unsigned(message))).decode()
+
+
+def build_token_multi_transfer(
+    source_address: str,
+    transfers: list,
+    mint: str,
+    recent_blockhash: str,
+    *,
+    decimals: int,
+    fee_payer: str,
+    token_program: str = TOKEN_PROGRAM,
+) -> str:
+    """Transfer from ONE source to SEVERAL destinations in a single atomic tx, creating each
+    destination ATA idempotently. `transfers` is a list of (dest_address, amount). `fee_payer`
+    pays gas + ATA rent (2-signer: source authority + fee_payer). Used for the USDC withdraw fee
+    split (net→dest, fee→fee_wallet) so the user never gets a partial withdrawal."""
+    src_pk        = Pubkey.from_string(source_address)
+    mint_pk       = Pubkey.from_string(mint)
+    token_prog_pk = Pubkey.from_string(token_program)
+    ata_prog_pk   = Pubkey.from_string(ATA_PROGRAM)
+    sys_prog_pk   = Pubkey.from_string(SYS_PROGRAM)
+    payer_pk      = Pubkey.from_string(fee_payer)
+    blockhash     = Hash.from_string(recent_blockhash)
+    src_ata       = get_associated_token_address(src_pk, mint_pk, token_prog_pk)
+
+    ixs = []
+    for dest_address, amount in transfers:
+        dest_pk  = Pubkey.from_string(dest_address)
+        dest_ata = get_associated_token_address(dest_pk, mint_pk, token_prog_pk)
+        ixs.append(Instruction(ata_prog_pk, bytes([1]), [   # CreateIdempotent dest ATA
+            AccountMeta(payer_pk,      is_signer=True,  is_writable=True),
+            AccountMeta(dest_ata,      is_signer=False, is_writable=True),
+            AccountMeta(dest_pk,       is_signer=False, is_writable=False),
+            AccountMeta(mint_pk,       is_signer=False, is_writable=False),
+            AccountMeta(sys_prog_pk,   is_signer=False, is_writable=False),
+            AccountMeta(token_prog_pk, is_signer=False, is_writable=False),
+        ]))
+        ixs.append(Instruction(token_prog_pk, bytes([12]) + amount.to_bytes(8, "little") + bytes([decimals]), [
+            AccountMeta(src_ata,  is_signer=False, is_writable=True),
+            AccountMeta(mint_pk,  is_signer=False, is_writable=False),
+            AccountMeta(dest_ata, is_signer=False, is_writable=True),
+            AccountMeta(src_pk,   is_signer=True,  is_writable=False),   # source owner = transfer authority
+        ]))
+    message = Message.new_with_blockhash(ixs, payer_pk, blockhash)
     return base64.b64encode(bytes(Transaction.new_unsigned(message))).decode()
