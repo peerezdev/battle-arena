@@ -96,6 +96,19 @@ describe('ChatDock live drops', () => {
     expect(screen.getByRole('button', { name: 'Unirse' })).toBeTruthy()
   })
 
+  it('renders a battle-created event as "{creator} created a Pack Battle $50" + Join', () => {
+    chatState.messages = [{
+      user: 'prueba2', text: 'created a Pack Battle', ts: Date.now(),
+      kind: 'system', event: 'created', amountUsd: 250, mode: 'pack',   // 250 → unique vs test drops
+      action: { label: 'Join', battleId: 'b7', mode: 'pack' },
+    }]
+    renderDock()
+    expect(screen.getByText('prueba2')).toBeTruthy()
+    expect(screen.getByText(/created a Pack Battle/)).toBeTruthy()
+    expect(screen.getByText('$250')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Join' })).toBeTruthy()
+  })
+
   it('renders a system announcement without an action (no button)', () => {
     chatState.messages = [{
       user: '📢 Arena', text: '🔥 neo sacó Charizard · $300 (x6.0 la tirada)', ts: Date.now(),

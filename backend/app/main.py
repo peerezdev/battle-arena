@@ -808,7 +808,8 @@ def create_app(session_factory, chain: ChainSource,
             resp = get_battle(s, b.id)
             resp["buyin"] = buyin
             resp["escrow_address"] = b.escrow_address
-            await _announce_created(b, buyin, "royale")
+            await _announce_created(b, buyin, "royale",
+                                    read_user_view(s, wallet, elo_start).get("alias") or abbreviate(wallet))
             return resp
 
         # Default: pack mode — build the bundle (1..10 boxes), reserve the total
@@ -834,7 +835,8 @@ def create_app(session_factory, chain: ChainSource,
         except LobbyError as e:
             raise HTTPException(409, str(e))
         reserve(s, wallet, b.id, total)
-        await _announce_created(b, total, mode)
+        await _announce_created(b, total, mode,
+                                read_user_view(s, wallet, elo_start).get("alias") or abbreviate(wallet))
         return get_battle(s, b.id)
 
     @app.post("/pack-battles/{battle_id}/join")
@@ -1124,29 +1126,37 @@ def create_app(session_factory, chain: ChainSource,
 
     _ANNOUNCER = "📢 Arena"
 
-    async def _announce(text: str, *, action: Optional[dict] = None, persist: bool = False) -> None:
+    async def _announce(text: str, *, user: Optional[str] = None, action: Optional[dict] = None,
+                        extra: Optional[dict] = None, persist: bool = False) -> None:
         """Post a system announcement into the lobby chat. `persist=True` stores it in history
-        (highlights: big hits, winners); battle-created pings are live-only. Never raises."""
+        (highlights: big hits, winners); battle-created pings are live-only. `user` overrides the
+        announcer name (e.g. the battle creator); `extra` adds structured fields for the client to
+        style. Never raises."""
         try:
-            msg = {"type": "message", "kind": "system", "user": _ANNOUNCER,
+            author = user or _ANNOUNCER
+            msg = {"type": "message", "kind": "system", "user": author,
                    "text": text, "ts": int(_time.time())}
             if action:
                 msg["action"] = action
+            if extra:
+                msg.update(extra)
             if persist:
                 with session_factory() as s:
-                    save_chat_message(s, _ANNOUNCER, text, msg["ts"], kind="system", action=action)
+                    save_chat_message(s, author, text, msg["ts"], kind="system", action=action)
             await _chat_mgr.broadcast(msg)
         except Exception:
             logger.exception("chat announce failed")
 
-    async def _announce_created(battle, stake_base: int, mode: str) -> None:
-        """Live-only ping when a joinable battle is created, with a quick-join button."""
+    async def _announce_created(battle, stake_base: int, mode: str, creator_name: str) -> None:
+        """Live-only ping when a joinable battle is created — rendered as a chat event
+        '{creator} created a Pack Battle $50', with a quick-join button."""
         if (battle.max_players or 0) <= 1:
             return   # no open seat → nobody to invite
         label = "Battle Royale" if mode == "royale" else "Pack Battle"
         stake = (stake_base or 0) / 1_000_000
-        await _announce(f"Nueva {label} · entrada ${stake:,.0f} USDC",
-                        action={"label": "Unirse", "battleId": battle.id, "mode": mode})
+        await _announce(f"created a {label}", user=creator_name,
+                        extra={"event": "created", "amountUsd": stake, "mode": mode},
+                        action={"label": "Join", "battleId": battle.id, "mode": mode})
 
     def _chat_allow(wallet: str) -> bool:
         now = _time.time()

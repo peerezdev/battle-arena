@@ -507,8 +507,30 @@ export function ChatDock({
               Be the first to write…
             </div>
           ) : (
-            messages.map((msg, idx) => msg.kind === 'system' ? (
-              /* System announcement: battle created / big hit / winner */
+            messages.map((msg, idx) => msg.kind === 'system' && msg.event === 'created' ? (
+              /* Battle-created chat event: "{creator} created a Pack Battle $50" + quick-join */
+              <div key={`${msg.ts}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 2px' }}>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill={COLORS.green} style={{ flexShrink: 0 }} aria-hidden="true">
+                  <circle cx="8" cy="5" r="3" />
+                  <path d="M2 15c0-3.3 2.7-6 6-6s6 2.7 6 6z" />
+                </svg>
+                <span style={{ flex: 1, fontSize: 12, fontFamily: FONTS.body, lineHeight: 1.35 }}>
+                  <span style={{ color: userColor(msg.user), fontWeight: 700 }}>{msg.user}</span>
+                  <span style={{ color: COLORS.muted }}> {msg.text} </span>
+                  {msg.amountUsd != null && (
+                    <span style={{ color: '#f5c542', fontWeight: 800 }}>{formatUsd(msg.amountUsd)}</span>
+                  )}
+                </span>
+                {msg.action && (
+                  <button onClick={() => navigate(`/play/battle/${msg.action!.battleId}`)} style={{
+                    flexShrink: 0, background: 'transparent', border: `1px solid ${COLORS.green}`, borderRadius: 7,
+                    padding: '3px 10px', color: COLORS.green, fontFamily: FONTS.display, fontWeight: 800,
+                    fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}>{msg.action.label}</button>
+                )}
+              </div>
+            ) : msg.kind === 'system' ? (
+              /* System announcement: big hit / winner */
               <div key={`${msg.ts}-${idx}`} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 background: 'rgba(0,255,196,0.06)', border: `1px solid ${COLORS.border}`,

@@ -10,6 +10,9 @@ export interface ChatLine {
   ts: number
   kind?: 'system'            // system announcements (battle created, big hit, winner)
   action?: ChatAction        // optional button (quick-join / view)
+  event?: 'created'          // structured event for custom rendering
+  amountUsd?: number         // stake/value styled in gold (created events)
+  mode?: string              // 'pack' | 'royale'
 }
 
 function buildWsUrl(identityToken: string | null | undefined): string {
@@ -98,6 +101,9 @@ export function useChat(enabled = true): {
                 ts: msg.ts as number,
                 kind: msg.kind as 'system' | undefined,
                 action: msg.action as ChatAction | undefined,
+                event: msg.event as 'created' | undefined,
+                amountUsd: msg.amountUsd as number | undefined,
+                mode: msg.mode as string | undefined,
               },
             ])
           } else if (msg.type === 'presence') {
