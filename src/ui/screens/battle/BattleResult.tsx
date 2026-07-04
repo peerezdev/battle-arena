@@ -4,6 +4,7 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { shortWallet } from './RoyaleReveal'
 import { RevealCard } from './RevealCard'
+import { WinningsBuyback } from './WinningsBuyback'
 import { VerifyPanel } from './VerifyPanel'
 import { useAliases } from '../../useAliases'
 import { startRematch } from '../../battle/startRematch'
@@ -79,8 +80,10 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
         </div>
       </section>
 
-      {/* winner's haul — every card pulled in the battle goes to the winner */}
-      {allLoot.length > 0 && (
+      {/* winner's haul — the winner can keep or sell each card back for USDC; others just see it */}
+      {allLoot.length > 0 && (iWon ? (
+        <WinningsBuyback cards={allLoot} winnerWallet={vm.meWallet} lootTotal={lootTotal} />
+      ) : (
         <section style={{
           borderRadius: 22, padding: 'clamp(20px,2.4vw,30px)',
           background: 'linear-gradient(135deg,rgba(0,255,196,.08),rgba(13,17,22,.6) 55%,rgba(255,46,151,.06))',
@@ -95,7 +98,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
             {allLoot.map((c, i) => <RevealCard key={i} card={c} reducedMotion w={120} h={200} />)}
           </div>
         </section>
-      )}
+      ))}
 
       {/* standings */}
       <div>
@@ -136,8 +139,8 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
         </div>
       </div>
 
-      {/* buyback footer */}
-      {vm.buybackTotal > 0 && (
+      {/* buyback footer — the winner gets the interactive keep/sell above instead */}
+      {!iWon && vm.buybackTotal > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '16px 20px', borderRadius: 16, background: '#ffffff08', border: `1px solid ${COLORS.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
             <span style={{ width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,255,196,.12)', border: '1px solid rgba(0,255,196,.32)', color: COLORS.green }}>

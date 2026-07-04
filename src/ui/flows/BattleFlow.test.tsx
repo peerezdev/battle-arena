@@ -5,6 +5,8 @@ vi.mock('../../onchain/useBattle', () => ({ useBattle: vi.fn() }))
 vi.mock('../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'A' }))
 vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => vi.fn() }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
+// The winner's result mounts WinningsBuyback (wallet/buyback); this flow test only checks the result renders.
+vi.mock('../screens/battle/WinningsBuyback', () => ({ WinningsBuyback: () => null }))
 vi.mock('../../onchain/packBattleClient', async (orig) => ({
   ...(await orig<typeof import('../../onchain/packBattleClient')>()),
   cancelBattle: vi.fn().mockResolvedValue({}),

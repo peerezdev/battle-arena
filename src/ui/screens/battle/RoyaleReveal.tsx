@@ -5,6 +5,7 @@ import { startRematch } from '../../battle/startRematch'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
+import { WinningsBuyback } from './WinningsBuyback'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
 import { useAliases } from '../../useAliases'
@@ -287,15 +288,24 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
               <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-.02em', background: 'linear-gradient(120deg,#f5c542,#5cffd8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(lootTotal)}</div>
             </div>
           </div>
-          <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted, marginBottom: 12 }}>CHAMPION LOOT · {formatUsd(lootTotal)}</div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {allLoot.map((c, i) => (
-                <RevealCard key={i} card={c} reducedMotion w={120} h={200} />
-              ))}
+          {!iWon && (
+            <div style={{ flex: '1 1 320px', minWidth: 280 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted, marginBottom: 12 }}>CHAMPION LOOT · {formatUsd(lootTotal)}</div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {allLoot.map((c, i) => (
+                  <RevealCard key={i} card={c} reducedMotion w={120} h={200} />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </section>
+      )}
+
+      {/* Champion (me) can keep or sell each won card back for USDC */}
+      {iWon && allLoot.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <WinningsBuyback cards={allLoot} winnerWallet={vm.meWallet} lootTotal={lootTotal} />
+        </div>
       )}
 
       <div style={{ borderRadius: 18, overflow: 'hidden', border: `1px solid ${COLORS.border}`, background: 'linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.008))' }}>
