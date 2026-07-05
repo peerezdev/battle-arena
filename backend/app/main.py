@@ -929,9 +929,12 @@ def create_app(session_factory, chain: ChainSource,
         new_id = created["id"]
         finished.rematch_battle_id = new_id
         s.commit()
+        buyin_base = royale_buyin(finished.max_players, finished.price) if finished.mode == "royale" else finished.price
+        from_name = read_user_view(s, wallet, elo_start).get("alias") or abbreviate(wallet)
         await _chat_mgr.broadcast({
             "type": "rematch", "finished_battle_id": battle_id, "rematch_battle_id": new_id,
-            "from": wallet, "players": sorted(participants), "mode": finished.mode,
+            "from": wallet, "from_name": from_name, "players": sorted(participants),
+            "mode": finished.mode, "buyin": (buyin_base or 0) / 1_000_000,
         })
         return {"battle_id": new_id, "created": True, "joined": True}
 

@@ -177,3 +177,9 @@ textarea::placeholder {
 
 /* Filling-lobby "seats left" pulse dot */
 @keyframes ba-pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+/* Rematch challenge toast — slide up in / down out, animated swords, shrinking countdown bar */
+@keyframes ba-rmt-in { 0%{opacity:0;transform:translateY(22px) scale(.96)} 60%{opacity:1;transform:translateY(-4px) scale(1.005)} 100%{opacity:1;transform:translateY(0) scale(1)} }
+@keyframes ba-rmt-out { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(14px) scale(.97)} }
+@keyframes ba-swords { 0%,100%{transform:rotate(0)} 12%{transform:rotate(-14deg)} 24%{transform:rotate(10deg)} 36%{transform:rotate(0)} }
+@keyframes ba-rmt-prog { from{transform:scaleX(1)} to{transform:scaleX(0)} }
