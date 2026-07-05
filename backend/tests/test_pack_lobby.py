@@ -23,7 +23,7 @@ def test_create_rejects_royale(session):
 
 def test_create_royale_allowed_and_sets_mode(session):
     b = create_battle(session, "WC", "wid-c", machine_code="pokemon_50",
-                      price=50_000_000, max_players=4, mode="royale")
+                      price=50_000_000, max_players=5, mode="royale")
     assert b.mode == "royale" and b.status == "lobby"
     # seed must be generated (used for PF tie-break in royale rounds)
     assert b.server_seed and b.server_seed_hash
@@ -31,6 +31,19 @@ def test_create_royale_allowed_and_sets_mode(session):
 def test_create_rejects_bad_max_players(session):
     with pytest.raises(LobbyError):
         create_battle(session, "WC", "wid", machine_code="pokemon_50", price=50_000_000, max_players=1)
+
+
+def test_per_mode_player_bounds(session):
+    mk = lambda n, mode: create_battle(session, "WC", "wid", machine_code="pokemon_50",
+                                        price=50_000_000, max_players=n, mode=mode)
+    # Pack Battle: 2–4 (5+ rejected)
+    with pytest.raises(LobbyError): mk(5, "pack")
+    assert mk(4, "pack").max_players == 4
+    # Battle Royale: 5–10 (below 5 or above 10 rejected)
+    with pytest.raises(LobbyError): mk(4, "royale")
+    with pytest.raises(LobbyError): mk(11, "royale")
+    assert mk(5, "royale").max_players == 5
+    assert mk(10, "royale").max_players == 10
 
 def test_join_fills_atomically(session):
     b = create_battle(session, "WC", "wid-c", machine_code="pokemon_50", price=50_000_000, max_players=2)
@@ -154,11 +167,11 @@ def test_list_open_includes_mode_and_buyin(session):
     create_battle(session, "WA", "wid-a", machine_code="pokemon_50",
                   price=50_000_000, max_players=2, mode="pack")
     create_battle(session, "WB", "wid-b", machine_code="pokemon_50",
-                  price=50_000_000, max_players=4, mode="royale")
+                  price=50_000_000, max_players=5, mode="royale")
     rows = list_open(session)
     by_mode = {r["mode"]: r for r in rows}
     assert by_mode["pack"]["buyin"] == 50_000_000
-    assert by_mode["royale"]["buyin"] == royale_buyin(4, 50_000_000)
+    assert by_mode["royale"]["buyin"] == royale_buyin(5, 50_000_000)
     # base shape preserved
     assert set(by_mode["pack"]) == {
         "id", "mode", "machine_code", "price", "max_players", "players", "buyin",
@@ -174,9 +187,9 @@ def test_list_open_includes_creator_wallet(session):
 
 
 def test_list_open_includes_player_wallets(session):
-    # a 3-seat royale so it stays in lobby after a second player joins
+    # a 5-seat royale so it stays in lobby after a second player joins
     b = create_battle(session, "WC", "wid-c", machine_code="pokemon_50",
-                      price=50_000_000, max_players=3, mode="royale")
+                      price=50_000_000, max_players=5, mode="royale")
     join_battle(session, b.id, "WB", "wid-b")
     row = list_open(session)[0]
     assert row["players"] == 2

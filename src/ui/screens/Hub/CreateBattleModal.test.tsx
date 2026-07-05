@@ -35,7 +35,7 @@ describe('CreateBattleModal multi-pack', () => {
     fireEvent.click(create)
     expect(createBattle).toHaveBeenCalledWith('tok', {
       packs: [{ machine_code: 'm25', count: 2 }, { machine_code: 'm50', count: 1 }],
-      max_players: 4, mode: 'pack',
+      max_players: 2, mode: 'pack',   // pack default is now 2 (head-to-head)
     })
   })
 

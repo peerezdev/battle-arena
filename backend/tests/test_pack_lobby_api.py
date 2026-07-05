@@ -388,7 +388,7 @@ def test_royale_create_returns_200_with_buyin_and_escrow(client_priv, monkeypatc
     monkeypatch.setattr("app.main.fetch_latest_blockhash", _fake_blockhash)
 
     hdrs = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
-    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 4, "mode": "royale"}, headers=hdrs)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs)
     assert r.status_code == 200, r.text
     body = r.json()
     assert body.get("mode") == "royale"
@@ -425,7 +425,7 @@ def test_royale_join_collects_buyin(client_priv, monkeypatch):
 
     # Player A creates royale battle
     hdrs_a = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
-    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 3, "mode": "royale"}, headers=hdrs_a)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs_a)
     assert r.status_code == 200, r.text
     battle_id = r.json()["id"]
 
@@ -462,7 +462,7 @@ def test_royale_creator_buyin_collected_at_create(client_priv, monkeypatch):
 
     # Player A creates royale battle
     hdrs_a = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
-    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 3, "mode": "royale"}, headers=hdrs_a)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs_a)
     assert r.status_code == 200, r.text
 
     # collect_buyin should have been called once (for the creator) right at create time
@@ -507,13 +507,19 @@ def test_royale_fill_schedules_run_royale_live(client_priv, monkeypatch):
     monkeypatch.setattr("app.main.run_pack_battle_live", _fake_run_pack_live)
 
     hdrs_a = _auth_headers(priv2, WALLET_A, WALLET_ID_A)
-    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2, "mode": "royale"}, headers=hdrs_a)
+    r = c2.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs_a)
     assert r.status_code == 200, r.text
     battle_id = r.json()["id"]
 
-    hdrs_b = _auth_headers(priv2, WALLET_B, WALLET_ID_B)
-    r2 = c2.post(f"/pack-battles/{battle_id}/join", headers=hdrs_b)
-    assert r2.status_code == 200, r2.text
+    # Fill the remaining 4 seats (royale minimum is 5) so the lobby fills and schedules the run.
+    for addr, wid in [
+        (WALLET_B, WALLET_ID_B),
+        ("So1anaCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC1", "wallet-id-ccc"),
+        ("So1anaDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD1", "wallet-id-ddd"),
+        ("So1anaEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE1", "wallet-id-eee"),
+    ]:
+        rj = c2.post(f"/pack-battles/{battle_id}/join", headers=_auth_headers(priv2, addr, wid))
+        assert rj.status_code == 200, rj.text
 
     # Drain the event loop so the task fires
     asyncio.get_event_loop().run_until_complete(asyncio.sleep(0))
@@ -635,7 +641,7 @@ def test_royale_cancel_refunds_buyins(monkeypatch):
     monkeypatch.setattr("app.main.refund_buyin", _refund)
 
     hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
-    res = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 3, "mode": "royale"}, headers=hdrs_a)
+    res = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs_a)
     assert res.status_code == 200, res.text
     bid = res.json()["id"]
 

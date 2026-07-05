@@ -20,8 +20,12 @@ def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, p
                   mode="pack", packs: list[tuple[str, int]] | None = None):
     if mode not in ("pack", "royale"):
         raise ModeNotSupported(f"Modo '{mode}' no soportado")
-    if not (2 <= max_players <= 10):
-        raise LobbyError("max_players debe estar entre 2 y 10")
+    # Per-mode player limits: Pack Battle 2–4, Battle Royale 5–10.
+    if mode == "royale":
+        if not (5 <= max_players <= 10):
+            raise LobbyError("Battle Royale: entre 5 y 10 jugadores")
+    elif not (2 <= max_players <= 4):
+        raise LobbyError("Pack Battle: entre 2 y 4 jugadores")
     seed, h = gen_server_seed()
     b = PackBattle(id=uuid.uuid4().hex, mode=mode, machine_code=machine_code, price=price,
                    max_players=max_players, status="lobby", server_seed=seed, server_seed_hash=h,

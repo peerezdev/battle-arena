@@ -7,7 +7,9 @@ import { buildCreateBody, bundleToPacks, totalBoxes, bundleCostUsd, royaleTotalP
 import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 
-const PLAYER_COUNTS = [2, 3, 4, 5, 6, 8, 10]
+// Per-mode player limits: Pack Battle 2–4, Battle Royale 5–10 (enforced again on the backend).
+const PLAYER_COUNTS_BY_MODE = { pack: [2, 3, 4], royale: [5, 6, 7, 8, 9, 10] } as const
+const DEFAULT_PLAYERS = { pack: 2, royale: 5 } as const
 const MAX_BOXES = 10
 
 // Art/holo/ring per card, cycled by index (mirrors the gacha rarity palette).
@@ -34,12 +36,18 @@ export function CreateBattleModal({ onClose, onCreated, lockedMode }: {
   const [machineCode, setMachineCode] = useState<string>('')   // royale single machine
   const [counts, setCounts] = useState<Record<string, number>>({})   // pack bundle
   const [mode, setMode] = useState<BattleMode>(lockedMode ?? 'pack')
-  const [players, setPlayers] = useState(4)
+  const [players, setPlayers] = useState<number>((lockedMode ?? 'pack') === 'royale' ? DEFAULT_PLAYERS.royale : DEFAULT_PLAYERS.pack)
   const [sort, setSort] = useState<'low' | 'high'>('low')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const isRoyale = mode === 'royale'
+  const playerCounts = PLAYER_COUNTS_BY_MODE[isRoyale ? 'royale' : 'pack']
+
+  // Keep the player count valid for the mode (Pack 2–4, Royale 5–10) when the mode toggles.
+  useEffect(() => {
+    setPlayers((p) => (playerCounts.includes(p as never) ? p : DEFAULT_PLAYERS[isRoyale ? 'royale' : 'pack']))
+  }, [isRoyale])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Default the royale machine selection once the catalogue is available.
   useEffect(() => { setMachineCode((c) => c || machines[0]?.code || '') }, [machines])
@@ -142,7 +150,7 @@ export function CreateBattleModal({ onClose, onCreated, lockedMode }: {
           {/* players */}
           <div style={sectionLabel}>PLAYERS</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 22 }}>
-            {PLAYER_COUNTS.map((n) => {
+            {playerCounts.map((n) => {
               const on = players === n
               return (
                 <button key={n} onClick={() => setPlayers(n)}
