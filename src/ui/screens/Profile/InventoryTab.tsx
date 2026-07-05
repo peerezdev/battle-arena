@@ -24,11 +24,11 @@ function useGridStyle(): React.CSSProperties {
 }
 
 // Uniform card — no rarity tint/border/glow/badge; every card looks the same.
-function CardTile({ card, onClick, selectable, checked, onToggle }: {
+function CardTile({ card, onClick, checked, onToggle }: {
   card: OwnedCard
   onClick: () => void
-  selectable?: boolean
   checked?: boolean
+  /** When provided, a selection checkbox is shown in the top-right corner. */
   onToggle?: () => void
 }) {
   const [imgErr, setImgErr] = useState(false)
@@ -48,32 +48,34 @@ function CardTile({ card, onClick, selectable, checked, onToggle }: {
 
   const insuredValue = card.insuredValue ?? meta?.insured_value ?? null
   const name = (card.name && card.name !== 'Unnamed') ? card.name : (meta?.name ?? card.name)
-  // In select mode a click toggles selection; otherwise it opens the detail modal.
-  const activate = selectable ? (onToggle ?? onClick) : onClick
 
   return (
     <div
-      onClick={activate}
+      onClick={onClick}
       role="button"
-      aria-pressed={selectable ? !!checked : undefined}
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') activate() }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       style={{
         position: 'relative', borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
         background: COLORS.panel2,
-        border: `1px solid ${selectable && checked ? COLORS.green : COLORS.border}`,
-        boxShadow: selectable && checked ? `0 0 0 1px ${COLORS.green}, ${SHADOW.glow(COLORS.green)}` : 'none',
+        border: `1px solid ${checked ? COLORS.green : COLORS.border}`,
+        boxShadow: checked ? `0 0 0 1px ${COLORS.green}, ${SHADOW.glow(COLORS.green)}` : 'none',
       }}
     >
-      {selectable && (
+      {onToggle && (
         <span
-          aria-hidden
+          role="checkbox"
+          aria-checked={!!checked}
+          aria-label={checked ? 'Deselect card' : 'Select card'}
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onToggle() }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); onToggle() } }}
           style={{
-            position: 'absolute', top: 10, right: 10, zIndex: 3,
+            position: 'absolute', top: 10, right: 10, zIndex: 3, cursor: 'pointer',
             width: 24, height: 24, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: checked ? COLORS.green : 'rgba(6,8,11,.7)',
+            background: checked ? COLORS.green : 'rgba(6,8,11,.66)',
             border: `1px solid ${checked ? COLORS.green : COLORS.border}`,
-            color: '#06170f',
+            color: '#06170f', backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
           }}
         >
           {checked && (
@@ -169,7 +171,6 @@ function OwnInventory() {
   const grid = useGridStyle()
 
   const [selected, setSelected] = useState<OwnedCard | null>(null)
-  const [selectMode, setSelectMode] = useState(false)
   const [chosen, setChosen] = useState<Set<string>>(new Set())
   const [onlyBuyback, setOnlyBuyback] = useState(false)
   const [withdrawOpen, setWithdrawOpen] = useState(false)
@@ -190,7 +191,6 @@ function OwnInventory() {
 
   function clearSelection() {
     setChosen(new Set())
-    setSelectMode(false)
     setBulkBuyback(null)
   }
 
@@ -234,18 +234,10 @@ function OwnInventory() {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
             Buyback available
           </button>
-          <button
-            type="button"
-            aria-pressed={selectMode}
-            onClick={() => { setSelectMode((v) => !v); if (selectMode) clearSelection() }}
-            style={chipStyle(selectMode)}
-          >
-            {selectMode ? 'Done' : 'Select'}
-          </button>
         </div>
       </div>
 
-      {selectMode && chosen.size > 0 && (
+      {chosen.size > 0 && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14,
           padding: '10px 14px', borderRadius: 12, background: COLORS.panel2, border: `1px solid ${COLORS.border}`,
@@ -296,13 +288,12 @@ function OwnInventory() {
       )}
 
       <div style={grid}>
-        {!selectMode && !onlyBuyback && <OpenPacksTile />}
+        {!onlyBuyback && <OpenPacksTile />}
         {visible.map((c) => (
           <CardTile
             key={`${c.source}-${c.mint}`}
             card={c}
             onClick={() => setSelected(c)}
-            selectable={selectMode}
             checked={chosen.has(c.mint)}
             onToggle={() => toggle(c.mint)}
           />
