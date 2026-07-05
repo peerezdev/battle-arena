@@ -1290,9 +1290,6 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
       {results.length > 1 && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, letterSpacing: '.1em' }}>PACK {index + 1} / {results.length}</div>
       )}
-      {result.auto_sold && (
-        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.green }}>⚡ Auto-sold {formatUsd((result.buyback_amount ?? 0) / 1e6)}</div>
-      )}
       <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} single={results.length === 1 && !result.auto_sold} onNext={onAdvance} />
       <div style={{ display: 'flex', gap: 10 }}>
         <button onClick={() => setSkippedAt(index)}
@@ -1323,6 +1320,7 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
 
   const pending = sellable.filter((r) => sell[r.nft_address!] && status[r.nft_address!] !== 'sold')
   const estimate = pending.reduce((s, r) => s + (r.insured_value ?? 0) * pct / 100, 0)
+  const soldCount = sellable.filter((r) => status[r.nft_address!] === 'sold').length
 
   function setAll(v: boolean) {
     setSell(() => {
@@ -1417,18 +1415,18 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
           })}
         </div>
 
-        {/* Claim — centered at the bottom; executes every card marked Sell */}
-        {sellable.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
-            <button onClick={claim} disabled={claiming || pending.length === 0}
-              style={{ padding: '13px 30px', borderRadius: 13, border: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 15,
-                cursor: (claiming || pending.length === 0) ? 'default' : 'pointer',
-                background: pending.length === 0 ? COLORS.panel2 : GRADIENT, color: pending.length === 0 ? COLORS.muted : '#06120c',
-                boxShadow: pending.length === 0 ? 'none' : '0 0 22px -6px rgba(0,255,196,.7)' }}>
-              {claiming ? 'Claiming…' : pending.length > 0 ? `Claim · sell ${pending.length} (~${formatUsd(estimate)})` : 'Claim'}
-            </button>
-          </div>
-        )}
+        {/* Bottom action — sells every card marked Sell; when none is marked (keep all) it just
+            closes the summary, so the button is always clickable. */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
+          <button onClick={pending.length > 0 ? claim : onClose} disabled={claiming}
+            style={{ padding: '13px 30px', borderRadius: 13, border: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 15,
+              cursor: claiming ? 'default' : 'pointer',
+              background: GRADIENT, color: '#06120c', boxShadow: '0 0 22px -6px rgba(0,255,196,.7)' }}>
+            {claiming ? 'Claiming…'
+              : pending.length > 0 ? `Claim · sell ${pending.length} (~${formatUsd(estimate)})`
+              : soldCount > 0 ? 'Done' : 'Keep all & continue'}
+          </button>
+        </div>
       </div>
     </motion.div>
   )
