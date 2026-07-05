@@ -23,15 +23,17 @@ const miniBtn: CSSProperties = {
   cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
 }
 
-export function CreateBattleModal({ onClose, onCreated }: {
+export function CreateBattleModal({ onClose, onCreated, lockedMode }: {
   onClose: () => void; onCreated: (battleId: string) => void
+  /** When set, the modal is fixed to this mode and the pack/royale toggle is hidden. */
+  lockedMode?: BattleMode
 }) {
   const { identityToken } = useIdentityToken()
   const gate = useDelegationGate()
   const { machines, loading: machinesLoading } = useMachineList()   // shared/cached → instant on reopen
   const [machineCode, setMachineCode] = useState<string>('')   // royale single machine
   const [counts, setCounts] = useState<Record<string, number>>({})   // pack bundle
-  const [mode, setMode] = useState<BattleMode>('pack')
+  const [mode, setMode] = useState<BattleMode>(lockedMode ?? 'pack')
   const [players, setPlayers] = useState(4)
   const [sort, setSort] = useState<'low' | 'high'>('low')
   const [busy, setBusy] = useState(false)
@@ -118,7 +120,8 @@ export function CreateBattleModal({ onClose, onCreated }: {
 
         {/* body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px clamp(20px,2.6vw,28px)' }}>
-          {/* battle mode */}
+          {/* battle mode — hidden when the modal is locked to a mode (per-mode page) */}
+          {!lockedMode && (<>
           <div style={sectionLabel}>BATTLE MODE</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', maxWidth: 480, margin: '0 auto 22px' }}>
             {([['pack', 'Pack', 'Winner takes all'], ['royale', 'Royale', 'Last one standing']] as const).map(([k, label, sub]) => {
@@ -134,6 +137,7 @@ export function CreateBattleModal({ onClose, onCreated }: {
               )
             })}
           </div>
+          </>)}
 
           {/* players */}
           <div style={sectionLabel}>PLAYERS</div>

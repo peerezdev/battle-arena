@@ -2,15 +2,33 @@ import { COLORS, GRADIENT, FONTS } from '../../theme'
 import { STAKE_OPTIONS } from './hubMockData'
 import { useReducedMotion } from '../../useReducedMotion'
 
+type QuickMode = 'pack' | 'royale'
+
+const MODE_COPY: Record<QuickMode, { name: string; desc: string; cta: string }> = {
+  pack: {
+    name: 'Pack Battle',
+    desc: 'Open a pack head-to-head — the higher pull takes both cards.',
+    cta: 'Create Pack Battle',
+  },
+  royale: {
+    name: 'Battle Royale',
+    desc: 'Up to 10 players open packs in rounds — the lowest value drops each round. Last one standing takes the pot.',
+    cta: 'Create Battle Royale',
+  },
+}
+
 interface Props {
+  mode?: QuickMode
   stakes?: number[]
   selectedStake: number
   onStake: (n: number) => void
   onCreate: () => void
-  onPlayDemo: () => void
+  /** When omitted, the free-demo link is hidden (e.g. Battle Royale has no demo). */
+  onPlayDemo?: () => void
 }
 
 export function QuickMatch({
+  mode = 'pack',
   stakes = STAKE_OPTIONS,
   selectedStake,
   onStake,
@@ -18,6 +36,7 @@ export function QuickMatch({
   onPlayDemo,
 }: Props) {
   const reducedMotion = useReducedMotion()
+  const copy = MODE_COPY[mode]
   return (
     <div style={{ padding: 'clamp(6px,1vw,14px) 2px' }}>
         {/* Kicker */}
@@ -55,7 +74,7 @@ export function QuickMatch({
               color: 'transparent',
             }}
           >
-            Pack Battle
+            {copy.name}
           </span>
         </h2>
 
@@ -68,7 +87,7 @@ export function QuickMatch({
             maxWidth: 460,
           }}
         >
-          Open a pack head-to-head — the higher pull takes both cards, or play it out in a Mana Duel.
+          {copy.desc}
         </p>
 
         {/* Stake chips */}
@@ -115,7 +134,7 @@ export function QuickMatch({
               cursor: 'pointer',
             }}
           >
-            <span style={{ position: 'relative', zIndex: 1 }}>Create battle</span>
+            <span style={{ position: 'relative', zIndex: 1 }}>{copy.cta}</span>
             <span
               aria-hidden
               style={{
@@ -126,22 +145,24 @@ export function QuickMatch({
               }}
             />
           </button>
-          <button
-            onClick={onPlayDemo}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              borderBottom: `1px dashed ${COLORS.muted}`,
-              color: COLORS.muted,
-              padding: '2px 0',
-              fontFamily: FONTS.body,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
-          >
-            or try a free demo →
-          </button>
+          {onPlayDemo && (
+            <button
+              onClick={onPlayDemo}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: `1px dashed ${COLORS.muted}`,
+                color: COLORS.muted,
+                padding: '2px 0',
+                fontFamily: FONTS.body,
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              or try a free demo →
+            </button>
+          )}
         </div>
     </div>
   )

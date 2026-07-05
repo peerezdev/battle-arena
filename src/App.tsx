@@ -3,6 +3,7 @@ import { Suspense, lazy } from 'react'
 import { COLORS } from './ui/theme'
 import { Landing } from './ui/screens/Landing'
 import { Hub } from './ui/screens/Hub/Hub'
+import { ModeHub } from './ui/screens/Hub/ModeHub'
 import { AppShell } from './ui/layouts/AppShell'
 import { BattleFlow } from './ui/flows/BattleFlow'
 import { DemoFlow } from './ui/flows/DemoFlow'
@@ -19,6 +20,8 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route element={<AppShell />}>
           <Route path="/app" element={<Hub />} />
+          <Route path="/play/arena" element={<ModeHub mode="pack" />} />
+          <Route path="/play/royale" element={<ModeHub mode="royale" />} />
           <Route path="/play/battle/:battleId" element={<BattleFlow />} />
           <Route path="/play/demo/:mode" element={<DemoFlow />} />
           <Route
