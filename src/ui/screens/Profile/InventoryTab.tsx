@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
-import { COLORS, FONTS, SHADOW, formatUsd } from '../../theme'
+import { COLORS, FONTS, SHADOW, GRADIENT, formatUsd } from '../../theme'
+import { showToast } from '../../toast'
 import { useIsWide } from '../../useIsWide'
 import { useCollectorCryptNfts, type OwnedCard } from '../../../inventory/useCollectorCryptNfts'
 import { usePublicInventory } from '../../../inventory/usePublicInventory'
@@ -148,9 +149,7 @@ export function InventoryTab({ wallet }: { wallet?: string }) {
   return <OwnInventory />
 }
 
-type BulkBuyback =
-  | { phase: 'running'; done: number; total: number; ok: number; failed: number }
-  | { phase: 'finished'; done: number; total: number; ok: number; failed: number }
+type BulkBuyback = { phase: 'running'; done: number; total: number; ok: number; failed: number }
 
 function chipStyle(active: boolean): React.CSSProperties {
   return {
@@ -169,6 +168,7 @@ function OwnInventory() {
   const embeddedAddress = useEmbeddedSolanaAddress()
   const { available: buybackMints } = useBuybackAvailability(cards, embeddedAddress)
   const grid = useGridStyle()
+  const wide = useIsWide('(min-width: 860px)')   // desktop: bar sits low; mobile: clears the bottom nav
 
   const [selected, setSelected] = useState<OwnedCard | null>(null)
   const [chosen, setChosen] = useState<Set<string>>(new Set())
@@ -187,6 +187,10 @@ function OwnInventory() {
       if (next.has(mint)) next.delete(mint); else next.add(mint)
       return next
     })
+  }
+
+  function selectAll() {
+    setChosen(new Set(visible.map((c) => c.mint)))
   }
 
   function clearSelection() {
@@ -214,12 +218,13 @@ function OwnInventory() {
       }
       setBulkBuyback({ phase: 'running', done: i + 1, total, ok, failed })
     }
-    setBulkBuyback({ phase: 'finished', done: total, total, ok, failed })
     refresh()
+    showToast(failed ? `Buyback · ${ok} sold, ${failed} failed` : `Buyback complete · ${ok} sold`, failed ? 'error' : 'success')
+    clearSelection()
   }
 
   return (
-    <div style={{ animation: 'ba-tabin .25s ease-out' }}>
+    <div style={{ animation: 'ba-tabin .25s ease-out', paddingBottom: chosen.size > 0 ? (wide ? 96 : 152) : 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
         <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.2em', color: COLORS.muted }}>
           YOUR WALLET · <span style={{ color: COLORS.text }}>{cards.length} CARDS</span>{loading && <span style={{ color: COLORS.muted }}> · loading…</span>}
@@ -237,52 +242,6 @@ function OwnInventory() {
         </div>
       </div>
 
-      {chosen.size > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 14,
-          padding: '10px 14px', borderRadius: 12, background: COLORS.panel2, border: `1px solid ${COLORS.border}`,
-        }}>
-          <span style={{ fontFamily: FONTS.body, fontSize: 13, fontWeight: 700, color: COLORS.text }}>{chosen.size} selected</span>
-          {chosenEmbedded.length < chosen.size && (
-            <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>
-              ({chosenEmbedded.length} eligible — only wallet-won cards)
-            </span>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-            <button
-              type="button"
-              disabled={chosenEmbedded.length === 0 || bulkBuyback?.phase === 'running'}
-              onClick={() => void runBulkBuyback()}
-              style={{
-                ...chipStyle(false),
-                opacity: (chosenEmbedded.length === 0 || bulkBuyback?.phase === 'running') ? 0.5 : 1,
-                cursor: (chosenEmbedded.length === 0 || bulkBuyback?.phase === 'running') ? 'default' : 'pointer',
-              }}
-            >
-              {bulkBuyback?.phase === 'running' ? `Selling ${bulkBuyback.done}/${bulkBuyback.total}…` : 'Buyback'}
-            </button>
-            <button
-              type="button"
-              disabled={chosenEmbedded.length === 0}
-              onClick={() => setWithdrawOpen(true)}
-              style={{
-                ...chipStyle(false),
-                opacity: chosenEmbedded.length === 0 ? 0.5 : 1,
-                cursor: chosenEmbedded.length === 0 ? 'default' : 'pointer',
-              }}
-            >
-              Withdraw
-            </button>
-            <button type="button" onClick={clearSelection} style={chipStyle(false)}>Clear</button>
-          </div>
-          {bulkBuyback?.phase === 'finished' && (
-            <div style={{ flexBasis: '100%', fontFamily: FONTS.mono, fontSize: 11, color: bulkBuyback.failed ? COLORS.red : COLORS.green }}>
-              Buyback complete · {bulkBuyback.ok} sold{bulkBuyback.failed ? ` · ${bulkBuyback.failed} failed` : ''}
-            </div>
-          )}
-        </div>
-      )}
-
       {onlyBuyback && visible.length === 0 && (
         <div style={{ color: COLORS.muted, fontSize: 14, marginBottom: 14 }}>No cards with an active buyback offer.</div>
       )}
@@ -299,6 +258,62 @@ function OwnInventory() {
           />
         ))}
       </div>
+
+      {/* Floating selection action bar (bottom-centre) — appears while cards are selected. */}
+      {chosen.size > 0 && (
+        <div className="hidescroll" style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: wide ? 24 : 84,
+          zIndex: 60, maxWidth: 'calc(100vw - 20px)', overflowX: 'auto',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, width: 'max-content', padding: '9px 10px', borderRadius: 18,
+            background: 'rgba(13,16,22,.96)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+            border: `1px solid ${COLORS.border}`, boxShadow: `0 22px 60px -18px rgba(0,0,0,.85), 0 0 0 1px ${COLORS.green}24`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 6px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: '#cdd4dd', whiteSpace: 'nowrap' }}>
+                Selected
+                <span key={chosen.size} style={{
+                  minWidth: 26, height: 26, padding: '0 7px', borderRadius: 9, background: 'linear-gradient(135deg,#3df0a0,#13c98a)',
+                  color: '#06170f', fontFamily: FONTS.mono, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  animation: 'ba-pop .22s ease-out', boxShadow: `0 0 14px -4px ${COLORS.green}cc`,
+                }}>{chosen.size}</span>
+              </span>
+              <span style={{ width: 1, height: 24, background: 'rgba(255,255,255,.1)' }} />
+              <button type="button" onClick={selectAll}
+                style={{ padding: '9px 14px', borderRadius: 11, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.03)', color: '#cdd4dd', cursor: 'pointer', fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.1em', whiteSpace: 'nowrap' }}>SELECT ALL</button>
+              <button type="button" onClick={clearSelection}
+                style={{ padding: '9px 8px', border: 0, background: 'transparent', color: COLORS.muted, cursor: 'pointer', fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.1em' }}>CANCEL</button>
+            </div>
+
+            <span style={{ width: 1, height: 30, background: 'rgba(255,255,255,.1)', margin: '0 2px' }} />
+
+            <button type="button" onClick={() => setWithdrawOpen(true)} disabled={chosenEmbedded.length === 0}
+              title={chosenEmbedded.length === 0 ? 'Only wallet-won cards can be withdrawn' : undefined}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 9, padding: '11px 20px', borderRadius: 12, border: 0,
+                cursor: chosenEmbedded.length === 0 ? 'default' : 'pointer', opacity: chosenEmbedded.length === 0 ? 0.5 : 1,
+                fontFamily: FONTS.mono, fontSize: 12, letterSpacing: '.08em', fontWeight: 700, color: '#06170f',
+                background: GRADIENT, boxShadow: `0 10px 26px -12px ${COLORS.green}b3`, whiteSpace: 'nowrap',
+              }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+              WITHDRAW
+            </button>
+            <button type="button" onClick={() => void runBulkBuyback()} disabled={chosenEmbedded.length === 0 || bulkBuyback?.phase === 'running'}
+              title={chosenEmbedded.length === 0 ? 'Only wallet-won cards can be sold back' : undefined}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 9, padding: '11px 18px', borderRadius: 12,
+                border: '1px solid rgba(245,197,66,.38)', background: 'rgba(245,197,66,.09)', color: '#f5c542',
+                cursor: (chosenEmbedded.length === 0 || bulkBuyback?.phase === 'running') ? 'default' : 'pointer',
+                opacity: chosenEmbedded.length === 0 ? 0.5 : 1,
+                fontFamily: FONTS.mono, fontSize: 12, letterSpacing: '.08em', fontWeight: 700, whiteSpace: 'nowrap',
+              }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 3" /></svg>
+              {bulkBuyback?.phase === 'running' ? `SELLING ${bulkBuyback.done}/${bulkBuyback.total}` : 'BUYBACK'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {selected && <InventoryCardModal card={selected} onClose={() => setSelected(null)} onSold={() => refresh()} />}
       <WithdrawNftModal
