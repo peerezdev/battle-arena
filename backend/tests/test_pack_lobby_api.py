@@ -675,6 +675,61 @@ def test_royale_cancel_refunds_buyins(monkeypatch):
     assert refunds[0][0] == WALLET_A
 
 
+def test_cancel_refundea_al_jugador_que_entro_durante_el_cancel(monkeypatch):
+    """Simula el interleaving: un jugador se une DESPUÉS del (viejo) snapshot pero ANTES del flip.
+    Con el fix, el snapshot es post-flip y ese jugador queda incluido en los refunds."""
+    import app.main as m
+    from app.services.pack_lobby import cancel_battle as real_cancel
+    from app.models import BattlePlayer
+
+    late_added = {}
+
+    def cancel_and_sneak_join(s, battle_id, wallet):
+        # el "otro request" inserta su BattlePlayer justo antes del flip
+        if not late_added.get(battle_id):
+            s.add(BattlePlayer(battle_id=battle_id, player_wallet="LATE_JOINER", wallet_id="late-id"))
+            s.commit()
+            late_added[battle_id] = True
+        return real_cancel(s, battle_id, wallet)
+    monkeypatch.setattr(m, "cancel_battle", cancel_and_sneak_join)
+
+    refunds = []
+
+    async def fake_refund_buyin(rpc, signer, ewid, eaddr, owid, oaddr, player, mint, amount, bh):
+        refunds.append(player); return "sig"
+    monkeypatch.setattr(m, "refund_buyin", fake_refund_buyin)
+
+    async def fake_bh(rpc):
+        return "B" * 32
+    monkeypatch.setattr(m, "fetch_latest_blockhash", fake_bh)
+
+    # Crear una royale en lobby con creador CREATOR (mismo patrón de test_royale_cancel_refunds_buyins)
+    c, priv = _build_client(signer=_FakeSigner())
+
+    async def _high(*args, **kwargs):
+        return 1_000_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _collect(*args, **kwargs):
+        return "collect-sig"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.collect_buyin", _collect)
+
+    hdrs = _auth_headers(priv, "CREATOR", "creator-id")
+    res = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs)
+    assert res.status_code == 200, res.text
+    bid = res.json()["id"]
+
+    r = c.post(f"/pack-battles/{bid}/cancel", headers=hdrs)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "cancelled"
+    assert "LATE_JOINER" in refunds and "CREATOR" in refunds
+
+
 def test_verify_endpoint_pre_settle_and_404(client_priv, monkeypatch):
     c, priv = client_priv
 

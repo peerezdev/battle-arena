@@ -1096,13 +1096,15 @@ def create_app(session_factory, chain: ChainSource,
         if b is None:
             raise HTTPException(404, "no existe")
         is_royale = b.mode == "royale"
-        players = [p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()]
         escrow_wallet_id = b.escrow_wallet_id
         escrow_address = b.escrow_address
         try:
             cancel_battle(s, battle_id, wallet)   # validates creator + lobby, sets cancelled
         except LobbyError as e:
             raise HTTPException(409, str(e))
+        # Snapshot POST-flip: un join que se coló antes del flip queda incluido en los refunds;
+        # uno posterior falla en join_battle (status != lobby) y se auto-refundea por su path.
+        players = [p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()]
         if is_royale:
             # Refund each joined player their buy-in from the escrow (best-effort, bounded retries).
             buyin = royale_buyin(b.max_players, b.price)
