@@ -48,7 +48,7 @@ export default function App() {
           />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/:wallet" element={<ProfilePage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/ranking" element={<LeaderboardPage />} />
           <Route path="/help" element={<HelpPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/home" replace />} />

@@ -9,7 +9,7 @@ describe('NAV_ROUTES', () => {
     expect(NAV_ROUTES.royale).toBe('/play/royale')
     expect(NAV_ROUTES.gacha).toBe('/play/gacha')
     expect(NAV_ROUTES.mana).toBe('/play/mana')
-    expect(NAV_ROUTES.ranks).toBe('/leaderboard')
+    expect(NAV_ROUTES.ranks).toBe('/ranking')
   })
 })
 
@@ -20,7 +20,7 @@ describe('activeNavFromPath', () => {
     expect(activeNavFromPath('/play/royale')).toBe('royale')
     expect(activeNavFromPath('/play/gacha')).toBe('gacha')
     expect(activeNavFromPath('/play/mana')).toBe('mana')
-    expect(activeNavFromPath('/leaderboard')).toBe('ranks')
+    expect(activeNavFromPath('/ranking')).toBe('ranks')
     expect(activeNavFromPath('/profile')).toBeNull()
     expect(activeNavFromPath('/')).toBeNull()
   })
