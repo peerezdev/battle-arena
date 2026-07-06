@@ -27,6 +27,7 @@ export interface OpenBattle {
   id: string; mode: BattleMode; machine_code: string; price: number
   max_players: number; players: number; buyin: number; creator_wallet: string | null
   player_wallets: string[]
+  packs?: string[]   // ordered bundle machine_codes (pack mode); empty for royale
 }
 
 export interface VerifyRound { round_number: number; client_seed: string; eliminated_wallet: string; tie_break_index: number | null }

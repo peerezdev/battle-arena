@@ -12,6 +12,7 @@ export interface LiveBattle {
   canCancel?: boolean
   alreadyJoined?: boolean
   entry: number; pot: number; slots: string; statusText: string; statusColor: string
+  machineCodes?: string[]   // packs opened (pack: the bundle in order; royale: the single machine)
 }
 
 export const MOCK_DROPS: DropItem[] = [

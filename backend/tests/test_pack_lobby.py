@@ -175,7 +175,7 @@ def test_list_open_includes_mode_and_buyin(session):
     # base shape preserved
     assert set(by_mode["pack"]) == {
         "id", "mode", "machine_code", "price", "max_players", "players", "buyin",
-        "creator_wallet", "player_wallets"}
+        "creator_wallet", "player_wallets", "packs"}
 
 
 def test_list_open_includes_creator_wallet(session):

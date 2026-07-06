@@ -1,6 +1,40 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
+import { useMachineList } from '../../useMachines'
+import type { GachaMachine } from '../../../onchain/gachaClient'
 import type { LiveBattle, BattleMode } from './hubMockData'
+
+function machineImg(m: GachaMachine | undefined): string | null {
+  return m?.thumbnailUrl ?? m?.image ?? null
+}
+
+/** "OPENS N · [pack images]" strip — the bundle for pack, the single machine for royale. */
+function OpensRow({ battle: b, byCode }: { battle: LiveBattle; byCode: Map<string, GachaMachine> }) {
+  const isPack = b.mode === 'pack'
+  const codes = b.machineCodes && b.machineCodes.length ? b.machineCodes : [b.title]
+  const shown = isPack ? codes : codes.slice(0, 1)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: `1px solid ${COLORS.border}`, marginBottom: 16 }}>
+      <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.14em', color: COLORS.muted, whiteSpace: 'nowrap' }}>{isPack ? `OPENS ${codes.length}` : 'ROOM PACK'}</span>
+      <div className="hidescroll" style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflowX: 'auto' }}>
+        {shown.map((code, i) => {
+          const img = machineImg(byCode.get(code))
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <div style={{ width: 24, height: 31, borderRadius: 5, overflow: 'hidden', background: '#0f0a16', border: `1px solid ${COLORS.border}` }}>
+                {img && <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+              </div>
+              {i < shown.length - 1 && <span style={{ color: '#4a4456', fontSize: 9 }}>›</span>}
+            </div>
+          )
+        })}
+      </div>
+      <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted, whiteSpace: 'nowrap' }}>
+        {isPack ? `${codes.length} pack${codes.length === 1 ? '' : 's'} / player` : (byCode.get(codes[0])?.name ?? '')}
+      </span>
+    </div>
+  )
+}
 
 const MODE_LABEL: Record<BattleMode, string> = {
   pack:   'PACK BATTLE',
@@ -19,6 +53,8 @@ interface Props {
 
 export function LiveBattles({ battles, onBattleAction, onCancel, onOpen }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
+  const { machines } = useMachineList()
+  const byCode = useMemo(() => new Map(machines.map((m) => [m.code, m])), [machines])
 
   return (
     <div>
@@ -121,7 +157,7 @@ export function LiveBattles({ battles, onBattleAction, onCancel, onOpen }: Props
       {/* (d) Battle cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
         {battles.map((b) => (
-          <BattleCard key={b.id} battle={b} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
+          <BattleCard key={b.id} battle={b} byCode={byCode} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
         ))}
       </div>
     </div>
@@ -141,7 +177,7 @@ function parseSlots(slots: string): { filled: number; total: number } {
   return { filled: Number(m[1]), total: Number(m[2]) }
 }
 
-function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBattle; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
+function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
   const modeColor = MODE_COLOR[b.mode]
   const modeBg = `${modeColor}22`
   const modeBd = `${modeColor}66`
@@ -197,6 +233,9 @@ function BattleCard({ battle: b, onAction, onCancel, onOpen }: { battle: LiveBat
           <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.muted }}>{formatUsd(b.entry)}</div>
         </div>
       </div>
+
+      {/* opens sequence */}
+      <OpensRow battle={b} byCode={byCode} />
 
       {/* players + action */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>

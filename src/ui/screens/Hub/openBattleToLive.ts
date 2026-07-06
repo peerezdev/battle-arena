@@ -43,6 +43,7 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
     entry,
     pot: estPot,
     slots: `${b.players}/${b.max_players}`,
+    machineCodes: (b.packs && b.packs.length) ? b.packs : [b.machine_code],
     ...status,
   }
 }
