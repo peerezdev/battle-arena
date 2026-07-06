@@ -2,7 +2,7 @@ import { COLORS, FONTS, formatUsd } from '../../theme'
 import { tintFor, medalColor } from './royaleShared'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
-export function LiveLeaderboard({ vm, name, title = 'LEADERBOARD' }: {
+export function LiveLeaderboard({ vm, name, title = 'RANKING' }: {
   vm: RevealVM; name: (p: RevealPlayerVM) => string; title?: string
 }) {
   // Alive players on top (by total desc); eliminated sink to the bottom, most-recently

@@ -25,7 +25,7 @@ describe('RoyaleReveal', () => {
     render(<MemoryRouter><RoyaleReveal vm={vm} reducedMotion /></MemoryRouter>)
     expect(screen.getByText(/ALIVE/i)).toBeTruthy()                          // battle bar
     expect(screen.getAllByText('You')).toHaveLength(2)                       // grid card + leaderboard row (old single-grid view had 1)
-    expect(screen.getByText('LEADERBOARD')).toBeTruthy()                     // live leaderboard sidebar rendered
+    expect(screen.getByText('RANKING')).toBeTruthy()                         // live ranking sidebar rendered
     expect(document.querySelectorAll('[data-player-anchor]')).toHaveLength(2) // grid renders every player in seating order
     expect(screen.getAllByText(/eliminated/i).length).toBeGreaterThan(0)     // B marked out
   })
