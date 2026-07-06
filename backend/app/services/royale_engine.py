@@ -13,6 +13,116 @@ from app.services.battle_fees import collect_battle_fee
 logger = logging.getLogger(__name__)
 
 
+async def _play_round(session, battle, *, esc_addr, remaining, accumulated, round_number,
+                      gacha, signer, resolve_wallet_id, distribute, confirm_usdc,
+                      price_base, sleep_fn, max_attempts, delay,
+                      skip_existing=False, fund_guard=False) -> None:
+    round_nfts = []
+    existing = {}
+    if skip_existing:
+        existing = {p.player_wallet: p for p in
+                    session.query(BattlePull).filter_by(battle_id=battle.id,
+                                                        round_number=round_number).all()
+                    if p.nft_address}
+    for w in remaining:
+        prev = existing.get(w)
+        if prev is not None:
+            round_nfts.append(prev.nft_address)   # tiró antes del restart; ya cuenta en accumulated
+            continue
+        # fund_guard: si el distribute pre-crash llegó, no re-fondear (doble fondeo drenaría el
+        # pool y haría fallar rondas futuras). Carrera residual (distribute en vuelo que aterriza
+        # tras el check) → pool corto → void limpio más adelante; aceptado en el spec.
+        if not (fund_guard and await confirm_usdc(w, price_base)):
+            await distribute(esc_addr, w, price_base)
+        for _ in range(max_attempts):
+            if await confirm_usdc(w, price_base):
+                break
+            await sleep_fn(delay)
+        else:
+            raise RuntimeError(f"usdc not delivered to {w}")
+        pack = await gacha.generate_pack(player_address=w, pack_type=battle.machine_code,
+                                         alt_player_address=esc_addr, turbo=True)
+        pull = BattlePull(battle_id=battle.id, player_wallet=w, memo=pack["memo"],
+                          round_number=round_number)
+        session.add(pull)
+        session.commit()
+        signed = await signer.sign_solana(resolve_wallet_id(w), pack["transaction"])
+        sub = await gacha.submit_tx(signed)
+        if not sub.get("signature"):
+            raise RuntimeError("pull submit failed")
+        res = await gacha.open_pack(pack["memo"])
+        attempts = 0
+        while res.get("pending") and attempts < max_attempts:
+            await sleep_fn(delay)
+            res = await gacha.open_pack(pack["memo"])
+            attempts += 1
+        if res.get("pending") or not res.get("nft_address"):
+            raise RuntimeError("pull did not resolve")
+        pull.nft_address = res["nft_address"]
+        pull.insured_value = res.get("insured_value") or 0
+        pull.grade = res.get("grade")
+        pull.rarity = res.get("rarity")
+        pull.year = res.get("year")
+        pull.name = res.get("name")
+        pull.auto_sold = bool(res.get("auto_sold"))
+        pull.buyback_amount = res.get("buyback_amount")
+        session.commit()
+        accumulated[w] += res.get("insured_value") or 0
+        round_nfts.append(res["nft_address"])
+
+    # Eliminate the player with the lowest accumulated insured_value
+    minv = min(accumulated[w] for w in remaining)
+    losers = sorted([w for w in remaining if accumulated[w] == minv])
+    if len(losers) == 1:
+        elim, tie_idx, cs = losers[0], None, ""
+    else:
+        cs = client_seed_round(round_number, round_nfts)
+        tie_idx = pick_index(battle.server_seed, cs, len(losers))
+        elim = losers[tie_idx]
+    remaining.remove(elim)
+    bp = session.query(BattlePlayer).filter_by(battle_id=battle.id, player_wallet=elim).first()
+    bp.eliminated_round = round_number
+    for w in remaining + [elim]:
+        p = session.query(BattlePlayer).filter_by(battle_id=battle.id, player_wallet=w).first()
+        p.accumulated_value = accumulated[w]
+    session.add(BattleRound(battle_id=battle.id, round_number=round_number, client_seed=cs,
+                            eliminated_wallet=elim, tie_break_index=tie_idx))
+    session.commit()
+
+
+async def _settle_and_finish(session, battle, *, winner, players, esc, gacha, signer,
+                             resolve_wallet_id, build_transfer_tx, submit_tx, confirm_in_escrow,
+                             build_usdc_sweep_tx, usdc_balance, build_usdc_transfer_tx,
+                             operator_wallet_id, now_fn, sleep_fn, max_attempts, delay) -> str:
+    # Settle: transfer all non-auto-sold escrow NFTs + the escrow USDC to the winner (resilient).
+    await settle_cards_to_winner(
+        session, battle, escrow_wallet_id=esc["id"], escrow_address=esc["address"], winner=winner,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
+        confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
+        sleep_fn=sleep_fn, wait_max_attempts=max_attempts, wait_delay=delay,
+        operator_wallet_id=operator_wallet_id,
+    )
+
+    if usdc_balance is not None and build_usdc_transfer_tx is not None:
+        await collect_battle_fee(
+            session, battle, winner, len(players), gacha=gacha, signer=signer,
+            resolve_wallet_id=resolve_wallet_id, submit_tx=submit_tx,
+            usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
+            operator_wallet_id=operator_wallet_id, sleep_fn=sleep_fn,
+        )
+
+    battle.winner = winner
+    battle.status = "settled"
+    battle.settled_at = now_fn()
+    # Loyalty points: per-player buy-in for a royale is royale_buyin(max_players, price).
+    from app.services.referrals import award_battle_loyalty
+    from app.services.royale_funding import royale_buyin
+    award_battle_loyalty(session, battle, players,
+                         float(royale_buyin(battle.max_players, battle.price)))
+    session.commit()
+    return "settled"
+
+
 async def run_royale(
     session, battle, *,
     gacha, signer, resolve_wallet_id,
@@ -74,127 +184,26 @@ async def run_royale(
     try:
         while len(remaining) > 1:
             round_number += 1
-            round_nfts = []
-
-            for w in remaining:
-                # 1. Fund player from pool
-                await distribute(esc["address"], w, price_base)
-
-                # 2. Wait for funds to arrive
-                for _ in range(max_attempts):
-                    if await confirm_usdc(w, price_base):
-                        break
-                    await sleep_fn(delay)
-                else:
-                    raise RuntimeError(f"usdc not delivered to {w}")
-
-                # 3. Player pulls (pays their own pull on-chain)
-                pack = await gacha.generate_pack(
-                    player_address=w,
-                    pack_type=battle.machine_code,
-                    alt_player_address=esc["address"],
-                    turbo=True,
-                )
-                pull = BattlePull(
-                    battle_id=battle.id,
-                    player_wallet=w,
-                    memo=pack["memo"],
-                    round_number=round_number,
-                )
-                session.add(pull)
-                session.commit()
-
-                signed = await signer.sign_solana(resolve_wallet_id(w), pack["transaction"])
-                sub = await gacha.submit_tx(signed)
-                if not sub.get("signature"):
-                    raise RuntimeError("pull submit failed")
-
-                # 4. Poll until pack opens
-                res = await gacha.open_pack(pack["memo"])
-                attempts = 0
-                while res.get("pending") and attempts < max_attempts:
-                    await sleep_fn(delay)
-                    res = await gacha.open_pack(pack["memo"])
-                    attempts += 1
-                if res.get("pending") or not res.get("nft_address"):
-                    raise RuntimeError("pull did not resolve")
-
-                # 5. Persist result and accumulate
-                pull.nft_address = res["nft_address"]
-                pull.insured_value = res.get("insured_value") or 0
-                pull.grade = res.get("grade")
-                pull.rarity = res.get("rarity")
-                pull.year = res.get("year")
-                pull.name = res.get("name")
-                pull.auto_sold = bool(res.get("auto_sold"))
-                pull.buyback_amount = res.get("buyback_amount")
-                session.commit()
-
-                accumulated[w] += res.get("insured_value") or 0
-                round_nfts.append(res["nft_address"])
-
-            # Eliminate the player with the lowest accumulated insured_value
-            minv = min(accumulated[w] for w in remaining)
-            losers = sorted([w for w in remaining if accumulated[w] == minv])
-
-            if len(losers) == 1:
-                elim, tie_idx, cs = losers[0], None, ""
-            else:
-                cs = client_seed_round(round_number, round_nfts)
-                tie_idx = pick_index(battle.server_seed, cs, len(losers))
-                elim = losers[tie_idx]
-
-            remaining.remove(elim)
-
-            # Persist elimination and accumulated values
-            bp = session.query(BattlePlayer).filter_by(
-                battle_id=battle.id, player_wallet=elim
-            ).first()
-            bp.eliminated_round = round_number
-
-            for w in remaining + [elim]:
-                p = session.query(BattlePlayer).filter_by(
-                    battle_id=battle.id, player_wallet=w
-                ).first()
-                p.accumulated_value = accumulated[w]
-
-            session.add(BattleRound(
-                battle_id=battle.id,
+            await _play_round(
+                session, battle,
+                esc_addr=esc["address"], remaining=remaining, accumulated=accumulated,
                 round_number=round_number,
-                client_seed=cs,
-                eliminated_wallet=elim,
-                tie_break_index=tie_idx,
-            ))
-            session.commit()
-
-        # Settle: transfer all non-auto-sold escrow NFTs + the escrow USDC to the winner (resilient).
-        winner = remaining[0]
-        await settle_cards_to_winner(
-            session, battle, escrow_wallet_id=esc["id"], escrow_address=esc["address"], winner=winner,
-            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
-            confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
-            sleep_fn=sleep_fn, wait_max_attempts=max_attempts, wait_delay=delay,
-            operator_wallet_id=operator_wallet_id,
-        )
-
-        if usdc_balance is not None and build_usdc_transfer_tx is not None:
-            await collect_battle_fee(
-                session, battle, winner, len(players), gacha=gacha, signer=signer,
-                resolve_wallet_id=resolve_wallet_id, submit_tx=submit_tx,
-                usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
-                operator_wallet_id=operator_wallet_id, sleep_fn=sleep_fn,
+                gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+                distribute=distribute, confirm_usdc=confirm_usdc,
+                price_base=price_base, sleep_fn=sleep_fn, max_attempts=max_attempts, delay=delay,
             )
 
-        battle.winner = winner
-        battle.status = "settled"
-        battle.settled_at = now_fn()
-        # Loyalty points: per-player buy-in for a royale is royale_buyin(max_players, price).
-        from app.services.referrals import award_battle_loyalty
-        from app.services.royale_funding import royale_buyin
-        award_battle_loyalty(session, battle, players,
-                             float(royale_buyin(battle.max_players, battle.price)))
-        session.commit()
-        return "settled"
+        winner = remaining[0]
+        return await _settle_and_finish(
+            session, battle,
+            winner=winner, players=players, esc=esc,
+            gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+            build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+            confirm_in_escrow=confirm_in_escrow, build_usdc_sweep_tx=build_usdc_sweep_tx,
+            usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
+            operator_wallet_id=operator_wallet_id, now_fn=now_fn,
+            sleep_fn=sleep_fn, max_attempts=max_attempts, delay=delay,
+        )
 
     except Exception as exc:
         logger.warning("royale failed %s: %s — voiding", battle.id, exc)
