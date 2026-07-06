@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
+import { useIsWide } from '../../useIsWide'
 import { useMachineList } from '../../useMachines'
 import type { GachaMachine } from '../../../onchain/gachaClient'
 import type { LiveBattle, BattleMode } from './hubMockData'
@@ -198,7 +199,49 @@ function multLabel(entry: number, pot: number): string | null {
   return `×${Math.abs(mult - Math.round(mult)) < 0.05 ? Math.round(mult) : mult.toFixed(1)}`
 }
 
+/** Mobile body: packs panel + pot box side by side (no prices, tighter cells). */
+function CompactPacksPot({ battle: b, byCode, modeColor, mult }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; modeColor: string; mult: string | null }) {
+  const groups = groupCodes(b)
+  return (
+    <div style={{ display: 'flex', gap: 12, padding: '0 16px', marginBottom: 14 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 9, justifyContent: 'center', alignItems: 'flex-end', flexWrap: 'wrap', padding: '12px 8px', borderRadius: 13, background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.07)' }}>
+        {groups.map((g, i) => {
+          const m = byCode.get(g.code)
+          const img = machineImg(m)
+          return (
+            <div key={i} style={{ textAlign: 'center' }}>
+              <div style={{ position: 'relative', width: 46, height: 62, margin: '0 auto 6px', borderRadius: 9, background: 'linear-gradient(160deg,#1a1322,#0f0a16)', border: '1px solid rgba(255,255,255,.14)' }}>
+                {img && <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, display: 'block' }} />}
+                {b.mode === 'pack' && (
+                  <span style={{ position: 'absolute', top: -5, right: -5, padding: '1px 6px', borderRadius: 999, background: COLORS.green, color: '#06170f', fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700 }}>×{g.qty}</span>
+                )}
+              </div>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 8.5, color: '#cdd4dd', maxWidth: 54, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {(m?.shortName ?? m?.name ?? g.code).toUpperCase()}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ flex: 'none', width: 112, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 13, background: `${modeColor}0d`, border: `1px solid ${modeColor}38` }}>
+        <div style={{ lineHeight: 1.15 }}>
+          <div style={{ fontSize: 9.5, color: '#7a8492', letterSpacing: '.06em', marginBottom: 2 }}>EST. POT</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', color: modeColor }}>{formatUsd(b.pot)}</div>
+        </div>
+        <div style={{ height: 1, background: 'rgba(255,255,255,.08)' }} />
+        <div style={{ lineHeight: 1.15 }}>
+          <div style={{ fontSize: 9.5, color: '#7a8492', letterSpacing: '.06em', marginBottom: 2 }}>{b.costLabel}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#cdd4dd' }}>
+            {formatUsd(b.entry)}{mult && <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: modeColor }}> {mult}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
+  const wide = useIsWide('(min-width: 760px)')
   const modeColor = MODE_COLOR[b.mode]
   const { filled, total } = parseSlots(b.slots)
   const openSeats = Math.max(0, total - filled)
@@ -225,9 +268,9 @@ function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle:
         ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'
       }}
     >
-      {/* header — mode badge + status, then buy-in → ×N → estimated pot */}
-      <div style={{ padding: '16px 18px 14px', background: `linear-gradient(180deg,${modeColor}0f,transparent)` }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      {/* header — mode badge + status; on wide also buy-in → ×N → estimated pot */}
+      <div style={{ padding: wide ? '16px 18px 14px' : '16px 16px 14px', background: `linear-gradient(180deg,${modeColor}0f,transparent)` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: wide ? 14 : 0 }}>
           <span style={{
             display: 'inline-flex', padding: '5px 11px', borderRadius: 8,
             fontFamily: FONTS.mono, fontSize: 11, fontWeight: 500,
@@ -240,29 +283,35 @@ function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle:
             {b.statusText}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 21, fontWeight: 700, color: COLORS.muted }}>{formatUsd(b.entry)}</span>
-          <span style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minWidth: 70 }}>
-            <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
-            <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
-            {mult && (
-              <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', padding: '2px 9px', borderRadius: 999, background: '#0c0f15', border: `1px solid ${modeColor}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: modeColor }}>
-                {mult}
+        {wide && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 21, fontWeight: 700, color: COLORS.muted }}>{formatUsd(b.entry)}</span>
+              <span style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minWidth: 70 }}>
+                <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
+                <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
+                {mult && (
+                  <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', padding: '2px 9px', borderRadius: 999, background: '#0c0f15', border: `1px solid ${modeColor}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: modeColor }}>
+                    {mult}
+                  </span>
+                )}
               </span>
-            )}
-          </span>
-          <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', color: modeColor }}>{formatUsd(b.pot)}</span>
-        </div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.1em', color: '#7a8492', marginTop: 4 }}>
-          {b.costLabel} → ESTIMATED POT
-        </div>
+              <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', color: modeColor }}>{formatUsd(b.pot)}</span>
+            </div>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.1em', color: '#7a8492', marginTop: 4 }}>
+              {b.costLabel} → ESTIMATED POT
+            </div>
+          </>
+        )}
       </div>
 
-      {/* packs opened — full-bleed strip */}
-      <PacksGrid battle={b} byCode={byCode} />
+      {/* packs opened — wide: full-bleed strip · mobile: packs panel + pot box */}
+      {wide
+        ? <PacksGrid battle={b} byCode={byCode} />
+        : <CompactPacksPot battle={b} byCode={byCode} modeColor={modeColor} mult={mult} />}
 
       {/* footer — seats + action */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: wide ? '14px 18px 16px' : '0 16px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           {b.players.map((p, i) => (
             <span key={i} style={{
@@ -281,9 +330,15 @@ function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle:
             }} />
           ))}
           {b.extra && <span style={{ fontFamily: FONTS.display, fontWeight: 800, color: COLORS.muted, fontSize: 11, marginLeft: 6 }}>{b.extra}</span>}
-          <span style={{ marginLeft: 9, fontFamily: FONTS.mono, fontSize: 12, color: openSeats > 0 ? '#f5c542' : COLORS.muted }}>
-            {openSeats > 0 ? `${openSeats} seat${openSeats === 1 ? '' : 's'} left` : b.slots}
-          </span>
+          {wide ? (
+            <span style={{ marginLeft: 9, fontFamily: FONTS.mono, fontSize: 12, color: openSeats > 0 ? '#f5c542' : COLORS.muted }}>
+              {openSeats > 0 ? `${openSeats} seat${openSeats === 1 ? '' : 's'} left` : b.slots}
+            </span>
+          ) : (
+            <span style={{ marginLeft: 9, fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>
+              {b.slots}{openSeats > 0 && <> · <span style={{ color: '#f5c542' }}>{openSeats} left</span></>}
+            </span>
+          )}
         </div>
 
         {b.action === 'watch' ? (

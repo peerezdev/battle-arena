@@ -1,9 +1,15 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { LiveBattles } from './LiveBattles'
 import type { LiveBattle } from './hubMockData'
 
+// jsdom has no matchMedia, so useIsWide would always report narrow — pin it per test.
+const mocks = vi.hoisted(() => ({ wide: true }))
+vi.mock('../../useIsWide', () => ({ useIsWide: () => mocks.wide }))
+
 const b: LiveBattle = { id: 'b1', mode: 'royale', live: false, title: 'ROYALE', sub: '', players: [{ violet: false }, { violet: true }], cards: [], costLabel: 'ENTRY', costValue: 562, action: 'join', entry: 562, pot: 2300, slots: '2/4', statusText: 'Filling', statusColor: '#f5c542' }
+
+beforeEach(() => { mocks.wide = true })
 
 describe('LiveBattles', () => {
   it('renders a card and fires join', () => {
@@ -26,5 +32,13 @@ describe('LiveBattles', () => {
     const full: LiveBattle = { ...b, slots: '4/4', statusText: 'Live', statusColor: '#ff5e7a', action: 'watch' }
     render(<LiveBattles battles={[full]} onBattleAction={vi.fn()} onOpen={vi.fn()} />)
     expect(screen.queryByText(/seats? left/i)).toBeNull()
+  })
+
+  it('mobile: compact card shows the pot box and "x/y · N left" instead of the header pot row', () => {
+    mocks.wide = false
+    render(<LiveBattles battles={[b]} onBattleAction={vi.fn()} onOpen={vi.fn()} />)
+    expect(screen.getByText('EST. POT')).toBeTruthy()                    // pot box
+    expect(screen.getByText('2 left')).toBeTruthy()                      // footer amber count
+    expect(screen.queryByText(/ENTRY → ESTIMATED POT/i)).toBeNull()      // wide-only header label
   })
 })
