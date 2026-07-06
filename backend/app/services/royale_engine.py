@@ -210,6 +210,81 @@ async def run_royale(
         return await _void(session, battle)
 
 
+async def resume_royale(session, battle, *, gacha, signer, resolve_wallet_id,
+                        distribute, confirm_usdc, confirm_in_escrow,
+                        build_transfer_tx, submit_tx, price_base, now_fn,
+                        sleep_fn=None, max_attempts=20, delay=3.0,
+                        build_usdc_sweep_tx=None, operator_wallet_id="",
+                        usdc_balance=None, build_usdc_transfer_tx=None,
+                        reconcile_max_attempts=5) -> str:
+    """Retoma una royale huérfana en 'running' (un restart mató el runner). Reconstruye
+    remaining/accumulated/ronda desde la DB y CONTINÚA la partida: en la ronda interrumpida,
+    quien ya tiró no repite; una pull a medio abrir se reconcilia (re-poll del memo) y, si es
+    irrecuperable, se anula (el wiring refundea). No re-cobra buy-ins ni re-tira nada."""
+    sleep_fn = sleep_fn or asyncio.sleep
+
+    if not battle.escrow_wallet_id or not battle.escrow_address:
+        logger.warning("resume royale %s: no escrow — voiding", battle.id)
+        return await _void(session, battle)
+    esc = {"id": battle.escrow_wallet_id, "address": battle.escrow_address}
+
+    players = [p.player_wallet for p in
+               session.query(BattlePlayer).filter_by(battle_id=battle.id)
+               .order_by(BattlePlayer.joined_at).all()]
+    eliminated = {p.player_wallet for p in
+                  session.query(BattlePlayer).filter_by(battle_id=battle.id).all()
+                  if p.eliminated_round is not None}
+    remaining = [w for w in players if w not in eliminated]
+    if not remaining:
+        logger.warning("resume royale %s: no remaining players — voiding", battle.id)
+        return await _void(session, battle)
+
+    # Ronda interrumpida: reconciliar pulls a medio abrir ANTES de reconstruir acumulados.
+    pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
+    if any(p.memo and not p.nft_address for p in pulls):
+        from app.services.reconcile import reconcile_unresolved_pulls
+        await reconcile_unresolved_pulls(session, battle, gacha=gacha, sleep_fn=sleep_fn,
+                                         max_attempts=reconcile_max_attempts, delay=delay)
+        pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
+        if any(p.memo and not p.nft_address for p in pulls):
+            logger.warning("resume royale %s: unresolved pull(s) — voiding", battle.id)
+            return await _void(session, battle)
+
+    accumulated = {w: 0.0 for w in players}
+    for p in pulls:
+        accumulated[p.player_wallet] = accumulated.get(p.player_wallet, 0.0) + (p.insured_value or 0)
+
+    last = (session.query(BattleRound).filter_by(battle_id=battle.id)
+            .order_by(BattleRound.round_number.desc()).first())
+    round_number = last.round_number if last else 0
+
+    try:
+        first = True   # solo la ronda interrumpida reusa pulls existentes y aplica el fund-guard
+        while len(remaining) > 1:
+            round_number += 1
+            await _play_round(session, battle, esc_addr=esc["address"], remaining=remaining,
+                              accumulated=accumulated, round_number=round_number,
+                              gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+                              distribute=distribute, confirm_usdc=confirm_usdc,
+                              price_base=price_base, sleep_fn=sleep_fn,
+                              max_attempts=max_attempts, delay=delay,
+                              skip_existing=first, fund_guard=first)
+            first = False
+        return await _settle_and_finish(session, battle, winner=remaining[0], players=players,
+                                        esc=esc, gacha=gacha, signer=signer,
+                                        resolve_wallet_id=resolve_wallet_id,
+                                        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                                        confirm_in_escrow=confirm_in_escrow,
+                                        build_usdc_sweep_tx=build_usdc_sweep_tx,
+                                        usdc_balance=usdc_balance,
+                                        build_usdc_transfer_tx=build_usdc_transfer_tx,
+                                        operator_wallet_id=operator_wallet_id, now_fn=now_fn,
+                                        sleep_fn=sleep_fn, max_attempts=max_attempts, delay=delay)
+    except Exception as exc:
+        logger.warning("royale resume failed %s: %s — voiding", battle.id, exc)
+        return await _void(session, battle)
+
+
 async def _void(session, battle) -> str:
     """Mark battle voided (engine-side only). Refund is handled by the wiring layer."""
     battle.status = "voided"
