@@ -570,13 +570,22 @@ async def resume_royale_live(session, battle, *, gacha, signer, rpc_url: str, us
 
 async def reconcile_voided_battle_live(session, battle, *, gacha, signer, rpc_url: str,
                                        usdc_mint: str, token_program: str = TOKEN_PROGRAM,
-                                       operator_wallet_id: str = "", operator_address: str = "") -> None:
+                                       operator_wallet_id: str = "", operator_address: str = "",
+                                       reconcile_max_attempts: int = 1) -> None:
     """Barrido post-void (startup / tarea diferida): re-poll de memos sin resolver + refund de lo
-    pendiente. Idempotente vía BattlePull.refunded; early-return si no queda nada. Nunca lanza."""
+    pendiente. Idempotente vía BattlePull.refunded; early-return si no queda nada. Nunca lanza.
+
+    reconcile_max_attempts se pasa a reconcile_unresolved_pulls como max_attempts. Se mantiene en
+    1 por defecto (una sola consulta por pull, sin sleeps) porque este barrido corre en CADA
+    startup para TODA batalla con refunds pendientes: una pull cuyo memo nunca resuelve (p. ej.
+    crash antes de siquiera enviar la tx del pull) haría que el barrido reintentara 5 veces con
+    delay 3.0 (~15s) por pull, por batalla, en cada arranque, para siempre. El default de 5 de
+    reconcile_unresolved_pulls se reserva para los paths "calientes" (run/resume_*_live), que
+    corren justo después del fallo, cuando CC todavía puede tener el resultado en caché."""
     try:
         if not battle.escrow_address or not has_pending_refunds(session, battle):
             return
-        await reconcile_unresolved_pulls(session, battle, gacha=gacha)
+        await reconcile_unresolved_pulls(session, battle, gacha=gacha, max_attempts=reconcile_max_attempts)
 
         async def build_transfer_tx(esc, dest, nft):
             bh = await fetch_latest_blockhash(rpc_url)

@@ -861,6 +861,37 @@ async def test_reconcile_voided_battle_live_royale_usa_refund_royale(session, mo
     assert order == ["reconcile", "refund_royale"]
 
 
+@pytest.mark.asyncio
+async def test_reconcile_voided_battle_live_bounds_reconcile_polling(session, monkeypatch):
+    """El barrido post-void (startup/tarea diferida) NO debe usar el default de
+    reconcile_unresolved_pulls (max_attempts=5, delay=3.0) — una pull cuyo memo nunca resuelve
+    haría que CADA startup repolleara ~15s por pull, por batalla, para siempre. Por defecto debe
+    forwardear max_attempts=1."""
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePull
+    seen = {}
+
+    async def fake_reconcile(session, battle, *, gacha, **kw):
+        seen["max_attempts"] = kw.get("max_attempts")
+        return 0
+
+    async def fake_refund(*a, **kw):
+        pass
+
+    monkeypatch.setattr(po, "reconcile_unresolved_pulls", fake_reconcile)
+    monkeypatch.setattr(po, "refund_pack_void", fake_refund)
+
+    b = PackBattle(id="w5", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="voided", escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b)
+    session.add(BattlePull(battle_id="w5", player_wallet="A", memo="mA", round_number=1))
+    session.commit()
+
+    await po.reconcile_voided_battle_live(session, b, gacha=object(), signer=object(),
+                                          rpc_url="http://rpc", usdc_mint="M" * 32)
+    assert seen["max_attempts"] == 1
+
+
 # ── Task 7: resume_royale_live ────────────────────────────────────────────────
 
 @pytest.mark.asyncio

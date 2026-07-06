@@ -52,6 +52,14 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
                 p.refunded = True   # nada que devolver; no re-seleccionar en barridos
                 session.commit()
                 continue
+            # NOTE: refunded is only set to True AFTER _sign_submit_retry succeeds (below),
+            # not before the submit. This ordering is deliberate: if the process crashes
+            # between the submit landing and this commit, a later sweep will re-send the
+            # USDC (at-least-once — the player gets paid twice at worst, which is
+            # recoverable). Flipping refunded=True before the submit would risk the
+            # opposite failure — a crash there means the player is marked paid but never
+            # actually receives the USDC, and no sweep will ever retry it. Do not swap
+            # this order "to avoid double-pay".
             ok = await _sign_submit_retry(
                 lambda p=p: build_usdc_transfer_tx(escrow_address, p.player_wallet, p.buyback_amount),
                 signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
