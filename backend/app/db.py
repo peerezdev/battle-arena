@@ -33,6 +33,7 @@ _ENSURE_COLUMNS = [
     ("gacha_packs", "name", "VARCHAR"),
     ("chat_messages", "kind", "VARCHAR NOT NULL DEFAULT 'user'"),
     ("chat_messages", "action", "VARCHAR"),
+    ("battle_pulls", "refunded", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
 
@@ -67,9 +68,28 @@ def _backfill_gacha_price(engine):
                              {"p": int(m.group(1)) * 1_000_000, "m": memo})
 
 
+def _backfill_refunded(engine):
+    """One-shot al añadir battle_pulls.refunded: las batallas ya terminadas se dan por
+    saldadas (sus refunds ocurrieron antes de existir el flag). Solo se llama cuando la
+    columna acaba de crearse — ver init_db."""
+    insp = inspect(engine)
+    if "battle_pulls" not in set(insp.get_table_names()):
+        return
+    with engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE battle_pulls SET refunded = 1 WHERE battle_id IN "
+            "(SELECT id FROM pack_battles WHERE status IN ('settled', 'voided', 'cancelled'))"
+        ))
+
+
 def init_db(engine):
     # importa los modelos para registrarlos en Base.metadata antes de create_all
     from . import models  # noqa: F401
+    insp = inspect(engine)
+    had_refunded = ("battle_pulls" in set(insp.get_table_names())
+                    and "refunded" in {c["name"] for c in insp.get_columns("battle_pulls")})
     Base.metadata.create_all(engine)
     _ensure_columns(engine)
+    if not had_refunded:
+        _backfill_refunded(engine)
     _backfill_gacha_price(engine)

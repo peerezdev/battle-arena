@@ -45,10 +45,14 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
     from app.models import BattlePull
     pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
     for p in pulls:
+        if p.refunded:
+            continue
         if p.auto_sold:
             if not p.buyback_amount:
+                p.refunded = True   # nada que devolver; no re-seleccionar en barridos
+                session.commit()
                 continue
-            await _sign_submit_retry(
+            ok = await _sign_submit_retry(
                 lambda p=p: build_usdc_transfer_tx(escrow_address, p.player_wallet, p.buyback_amount),
                 signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
@@ -58,10 +62,15 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
                 await _wait_in_escrow(confirm_in_escrow, escrow_address, p.nft_address,
                                       sleep_fn, wait_max_attempts, wait_delay)
                 return await build_transfer_tx(escrow_address, p.player_wallet, p.nft_address)
-            await _sign_submit_retry(
+            ok = await _sign_submit_retry(
                 _build, signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
                 ctx=f"pack void card {p.nft_address} in {battle.id}")
+        else:
+            continue   # memo sin resolver: lo cubre la reconciliación, no hay nada que devolver aún
+        if ok:
+            p.refunded = True
+            session.commit()
 
 
 async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_address,
@@ -83,35 +92,50 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
 
     # 1+2: return alive players' own pulls (cards + auto-sold commons' USDC).
     for p in pulls:
-        if p.player_wallet not in alive:
+        if p.player_wallet not in alive or p.refunded:
             continue
         if p.auto_sold:
-            if p.buyback_amount:
-                await _sign_submit_retry(
-                    lambda p=p: build_usdc_transfer_tx(escrow_address, p.player_wallet, p.buyback_amount),
-                    signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
-                    sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
-                    ctx=f"royale void usdc {p.player_wallet} in {battle.id}", operator_wallet_id=operator_wallet_id)
+            if not p.buyback_amount:
+                p.refunded = True   # nada que devolver; no re-seleccionar en barridos
+                session.commit()
+                continue
+            ok = await _sign_submit_retry(
+                lambda p=p: build_usdc_transfer_tx(escrow_address, p.player_wallet, p.buyback_amount),
+                signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
+                sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
+                ctx=f"royale void usdc {p.player_wallet} in {battle.id}", operator_wallet_id=operator_wallet_id)
         elif p.nft_address:
             async def _build(p=p):
                 await _wait_in_escrow(confirm_in_escrow, escrow_address, p.nft_address,
                                       sleep_fn, wait_max_attempts, wait_delay)
                 return await build_transfer_tx(escrow_address, p.player_wallet, p.nft_address)
-            await _sign_submit_retry(
+            ok = await _sign_submit_retry(
                 _build, signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
                 ctx=f"royale void card {p.nft_address} in {battle.id}")
+        else:
+            continue   # memo sin resolver: lo cubre la reconciliación, no hay nada que devolver aún
+        if ok:
+            p.refunded = True
+            session.commit()
 
     # 3: buy back each eliminated player's non-common cards → USDC into the escrow.
     for p in pulls:
-        if p.player_wallet in eliminated and not p.auto_sold and p.nft_address:
-            for _ in range(max_attempts):
-                try:
-                    await buyback_to_escrow(p.nft_address)
-                    break
-                except Exception as exc:
-                    logger.warning("royale void buyback %s in %s: retry: %s", p.nft_address, battle.id, exc)
-                    await sleep_fn(wait_delay)
+        if p.player_wallet not in eliminated or p.refunded:
+            continue
+        if p.auto_sold or not p.nft_address:
+            p.refunded = True   # su USDC/nada quedó en el escrow por diseño; no re-seleccionar
+            session.commit()
+            continue
+        for _ in range(max_attempts):
+            try:
+                await buyback_to_escrow(p.nft_address)
+                p.refunded = True
+                session.commit()
+                break
+            except Exception as exc:
+                logger.warning("royale void buyback %s in %s: retry: %s", p.nft_address, battle.id, exc)
+                await sleep_fn(wait_delay)
 
     # 4+5: split the leftover escrow USDC equally among the alive.
     if not alive:
