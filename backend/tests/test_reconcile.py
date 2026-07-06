@@ -81,6 +81,39 @@ async def test_reconcile_gacha_exception_no_lanza(session):
     assert n == 0
 
 
+@pytest.mark.asyncio
+async def test_reconcile_commit_falla_hace_rollback_y_sigue_con_el_resto(session):
+    from app.services.reconcile import reconcile_unresolved_pulls
+    b = _mk(session, pulls=[
+        BattlePull(battle_id="v1", player_wallet="A", memo="mA", round_number=1),
+        BattlePull(battle_id="v1", player_wallet="B", memo="mB", round_number=1),
+    ])
+    gacha = _Gacha({
+        "mA": {"pending": False, "nft_address": "nftA", "insured_value": 100},
+        "mB": {"pending": False, "nft_address": "nftB", "insured_value": 200},
+    })
+    real_commit = session.commit
+    calls = {"n": 0}
+
+    def flaky_commit():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("db locked")
+        real_commit()
+
+    session.commit = flaky_commit
+    try:
+        n = await reconcile_unresolved_pulls(session, b, gacha=gacha, sleep_fn=_noslp)
+    finally:
+        session.commit = real_commit
+    assert n == 1
+    session.rollback()
+    pa = session.query(BattlePull).filter_by(player_wallet="A").first()
+    pb = session.query(BattlePull).filter_by(player_wallet="B").first()
+    assert pa.nft_address is None       # el commit fallido no debe filtrarse en commits posteriores
+    assert pb.nft_address == "nftB"     # la segunda pull sí reconcilia
+
+
 def test_has_pending_refunds(session):
     from app.services.reconcile import has_pending_refunds
     b = _mk(session, pulls=[

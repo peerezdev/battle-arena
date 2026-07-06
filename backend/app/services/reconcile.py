@@ -45,7 +45,8 @@ async def reconcile_unresolved_pulls(session, battle, *, gacha, sleep_fn=None,
             logger.info("reconcile: pull %s in battle %s resolved late to %s",
                         p.memo, battle.id, p.nft_address)
         except Exception as exc:
-            logger.warning("reconcile: open_pack failed for %s in battle %s: %s",
+            session.rollback()   # descarta mutaciones sin commitear para no filtrarlas en commits posteriores
+            logger.warning("reconcile: failed for memo %s in battle %s: %s",
                            p.memo, battle.id, exc)
     return resolved
 
