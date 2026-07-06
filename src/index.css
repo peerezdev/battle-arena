@@ -192,3 +192,16 @@ textarea::placeholder {
 /* Waiting room — status dot pulse + panel/odds entrance */
 @keyframes wr-pulse { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
 @keyframes wr-in { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:none} }
+
+/* Onboarding tutorial — mascot guide + speech bubble (first-visit) */
+@keyframes ob-in { 0%{opacity:0;transform:translateY(14px) scale(.97)} 100%{opacity:1;transform:none} }
+@keyframes ob-step { 0%{opacity:0;transform:translateX(18px)} 100%{opacity:1;transform:none} }
+@keyframes ob-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+@keyframes ob-pulse { 0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:1;transform:scale(1.12)} }
+@keyframes ob-sweep { 0%{transform:translateX(-120%)} 100%{transform:translateX(320%)} }
+@keyframes ob-ring { 0%{transform:scale(.7);opacity:.7} 100%{transform:scale(1.6);opacity:0} }
+/* On narrow screens drop the mascot and let the bubble take the width */
+@media (max-width: 640px) {
+  .ob-mascot { display: none !important; }
+  .ob-bubble { max-width: calc(100vw - 36px) !important; margin: 0 0 20px 0 !important; }
+}

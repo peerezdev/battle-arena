@@ -14,12 +14,14 @@ import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
 import { useChat } from '../../hooks/useChat'
 import { RematchToastHost } from '../components/RematchToast'
+import { OnboardingTutorial } from '../components/OnboardingTutorial'
 import { LiveDropsStrip } from '../screens/Hub/LiveDropsStrip'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
 
 const DOCK_KEY = 'ba.dockCollapsed'
+const ONBOARD_KEY = 'ba.onboarded'   // set once the first-visit tutorial is finished/skipped
 
 // Compact Gimmighoul count for the tight mobile header (262,500,000 → 262.5M).
 function fmtGh(n: number): string {
@@ -45,6 +47,15 @@ export function AppShell() {
   const [dockCollapsed, setDockCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(DOCK_KEY) === '1' } catch { return false }
   })
+
+  // First-visit onboarding — show the guided tour once per browser.
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    try { return localStorage.getItem(ONBOARD_KEY) !== '1' } catch { return false }
+  })
+  function dismissOnboarding() {
+    try { localStorage.setItem(ONBOARD_KEY, '1') } catch { /* ignore */ }
+    setShowOnboarding(false)
+  }
 
   function toggleDock() {
     setDockCollapsed((c) => {
@@ -286,6 +297,9 @@ export function AppShell() {
       {/* ── TOASTS ────────────────────────────────────────────────────────── */}
       <Toaster />
       <RematchToastHost />   {/* app-wide rematch challenge toast (bottom-centre) */}
+
+      {/* ── ONBOARDING — first-visit guided tour ──────────────────────────── */}
+      {showOnboarding && <OnboardingTutorial onClose={dismissOnboarding} reducedMotion={reducedMotion} />}
 
       {/* ── CHAT — tablet: side drawer (full dock) · mobile: full-screen chat-only over the nav ── */}
       {chatOpen && !(wideRail && wideDock) && (wideRail ? (
