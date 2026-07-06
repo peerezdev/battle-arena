@@ -188,3 +188,7 @@ textarea::placeholder {
 @keyframes ba-pop { 0%{transform:scale(.6)} 70%{transform:scale(1.15)} 100%{transform:scale(1)} }
 .hidescroll{ scrollbar-width:none }
 .hidescroll::-webkit-scrollbar{ display:none }
+
+/* Waiting room — status dot pulse + panel/odds entrance */
+@keyframes wr-pulse { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
+@keyframes wr-in { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:none} }

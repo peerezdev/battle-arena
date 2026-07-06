@@ -1,7 +1,7 @@
 import { type ReactNode, type CSSProperties, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
-import { COLORS, FONTS, GRADIENT } from '../theme'
+import { COLORS, FONTS } from '../theme'
 import { useBattle } from '../../onchain/useBattle'
 import { cancelBattle, joinBot, joinAllBots, joinBattle } from '../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
@@ -11,8 +11,7 @@ import { useBattleEmotes } from '../emotes/useBattleEmotes'
 import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
-import { CardBack } from '../screens/battle/CardBack'
-import { shortWallet } from '../screens/battle/RoyaleReveal'
+import { WaitingRoom } from '../screens/battle/WaitingRoom'
 import { showToast } from '../toast'
 
 function Centered({ children }: { children: ReactNode }) {
@@ -95,70 +94,21 @@ export function BattleFlow() {
   }
 
   if (battle.status === 'lobby') {
-    const isCreator = !!meWallet && battle.creator_wallet === meWallet
-    const isParticipant = !!meWallet && battle.players.some((p) => p.wallet === meWallet)
-    const spaceAvailable = battle.players.length < battle.max_players
-    const slots = Array.from({ length: battle.max_players }, (_, i) => battle.players[i] ?? null)
     return (
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 20 }}>Waiting for players</div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>
-          {battle.players.length}/{battle.max_players} · {battle.mode.toUpperCase()}
-        </div>
-        {spaceAvailable && (
-          <button onClick={onJoinAllBots} disabled={joiningAll} style={joinAllBotsBtn}>
-            {joiningAll ? 'Adding bots…' : 'Join All Bots'}
-          </button>
-        )}
-        {!isParticipant && spaceAvailable && (
-          <button onClick={onJoinSelf} disabled={joiningSelf} style={{
-            padding: '13px 30px', borderRadius: 13, border: 0, cursor: joiningSelf ? 'default' : 'pointer',
-            fontFamily: FONTS.display, fontWeight: 800, fontSize: 15, color: '#06170f', background: GRADIENT,
-            boxShadow: '0 0 26px -6px rgba(0,255,196,.7)', opacity: joiningSelf ? 0.7 : 1,
-          }}>
-            {joiningSelf ? 'Joining…' : 'Join battle'}
-          </button>
-        )}
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 680 }}>
-          {slots.map((p, i) => {
-            const isMe = !!p && !!meWallet && p.wallet === meWallet
-            const accent = isMe ? COLORS.green : COLORS.violet
-            return (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, width: 132 }}>
-                {p ? (
-                  <>
-                    <div style={{
-                      width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: FONTS.display, fontWeight: 900, fontSize: 16, border: `2px solid ${accent}`,
-                      color: accent, boxShadow: `0 0 14px ${accent}66`,
-                    }}>
-                      {isMe ? 'YOU' : p.wallet.slice(0, 2)}
-                    </div>
-                    <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: isMe ? COLORS.green : COLORS.muted }}>
-                      {isMe ? 'You' : shortWallet(p.wallet)}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <CardBack width={92} height={128} accent={COLORS.border} label="empty" />
-                    <button onClick={onJoinBot} disabled={joiningBot} style={joinBotBtn}>
-                      {joiningBot ? '…' : '+ Join Bot'}
-                    </button>
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
-        {botError && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>{botError}</div>}
-        {isCreator && (
-          <button onClick={onCancelLobby} style={{ ...backBtn, borderColor: `${COLORS.red}55`, color: COLORS.red }}>
-            Cancel lobby
-          </button>
-        )}
-        {cancelError && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>{cancelError}</div>}
-        <button onClick={exit} style={backBtn}>Back</button>
-      </div>
+      <WaitingRoom
+        battle={battle}
+        meWallet={meWallet}
+        onJoinSelf={onJoinSelf}
+        onJoinBot={onJoinBot}
+        onJoinAllBots={onJoinAllBots}
+        onCancel={onCancelLobby}
+        onExit={exit}
+        joiningSelf={joiningSelf}
+        joiningBot={joiningBot}
+        joiningAll={joiningAll}
+        botError={botError}
+        cancelError={cancelError}
+      />
     )
   }
 
@@ -200,15 +150,4 @@ export function BattleFlow() {
 const backBtn: CSSProperties = {
   marginTop: 8, background: '#0c1019', color: COLORS.text, border: `1px solid ${COLORS.border}`,
   borderRadius: 10, padding: '10px 22px', fontWeight: 700, cursor: 'pointer',
-}
-
-const joinBotBtn: CSSProperties = {
-  background: GRADIENT, color: '#06120c', border: 'none', borderRadius: 10,
-  padding: '8px 14px', fontWeight: 800, fontSize: 12, cursor: 'pointer', fontFamily: FONTS.display,
-}
-
-const joinAllBotsBtn: CSSProperties = {
-  padding: '10px 22px', borderRadius: 12, border: `1px solid ${COLORS.violet}`,
-  background: 'transparent', color: COLORS.violet, fontFamily: FONTS.display,
-  fontWeight: 800, fontSize: 13, cursor: 'pointer',
 }

@@ -123,9 +123,10 @@ def get_battle(session, battle_id):
     b = session.get(PackBattle, battle_id)
     if b is None:
         raise LobbyError("no existe")
+    buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
     out = {"id": b.id, "mode": b.mode, "machine_code": b.machine_code, "price": b.price,
            "max_players": b.max_players, "status": b.status, "winner": b.winner,
-           "creator_wallet": b.creator_wallet,
+           "creator_wallet": b.creator_wallet, "buyin": buyin,
            "players": _player_states(session, battle_id),
            "rounds": _rounds(session, battle_id),
            "server_seed_hash": b.server_seed_hash,

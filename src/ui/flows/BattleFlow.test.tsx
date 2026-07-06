@@ -79,7 +79,7 @@ describe('BattleFlow', () => {
       loading: false, error: null,
     })
     render(<BattleFlow />)
-    const btn = screen.getByText(/cancel lobby/i)
+    const btn = screen.getByText('Cancel')
     fireEvent.click(btn)
     expect(cancelBattle).toHaveBeenCalledWith('tok', 'b1')
   })
@@ -90,6 +90,6 @@ describe('BattleFlow', () => {
       loading: false, error: null,
     })
     render(<BattleFlow />)
-    expect(screen.queryByText(/cancel lobby/i)).toBeNull()
+    expect(screen.queryByText('Cancel')).toBeNull()
   })
 })
