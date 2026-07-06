@@ -1055,6 +1055,27 @@ def test_startup_sweep_reconciles_voided_battles(monkeypatch):
     assert swept == ["vd1"]
 
 
+def test_startup_resume_lanza_resume_royale_para_huerfanas(monkeypatch):
+    """Una royale en 'running' al arrancar dispara resume_royale_live (ya no solo un warning)."""
+    import app.main as m
+    resumed = []
+
+    async def fake_resume_live(session, battle, **kw):
+        resumed.append(battle.id); return "settled"
+
+    monkeypatch.setattr(m, "resume_royale_live", fake_resume_live)
+    sf, c, priv = _build_client_with_sf(signer=object())
+    from app.models import PackBattle
+    with sf() as s:
+        s.add(PackBattle(id="ro1", mode="royale", machine_code="m", price=50, max_players=5,
+                         status="running", server_seed="ab" * 32,
+                         escrow_wallet_id="eid", escrow_address="ESC"))
+        s.commit()
+    with c:
+        c.get("/pack-battles/open")
+    assert resumed == ["ro1"]
+
+
 def test_run_bg_voided_schedules_deferred_reconcile(client_priv, monkeypatch):
     """When the live pack run comes back 'voided', _run_bg schedules a deferred reconcile
     (_reconcile_voided_later) instead of just dropping the result on the floor."""

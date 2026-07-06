@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 import httpx
 
 from app.services.pack_engine import run_battle, resume_pack_battle
-from app.services.royale_engine import run_royale
+from app.services.royale_engine import run_royale, resume_royale
 from app.services.refund import refund_pack_void, refund_royale_void
 from app.services.reconcile import reconcile_unresolved_pulls, has_pending_refunds
 from app.services.royale_funding import distribute_usdc, confirm_usdc
@@ -477,6 +477,93 @@ async def run_royale_live(
             build_usdc_transfer_tx=build_usdc_transfer_tx, buyback_to_escrow=buyback_to_escrow,
             escrow_usdc_balance=escrow_usdc_balance, confirm_in_escrow=confirm_in_escrow,
             operator_wallet_id=operator_wallet_id,
+        )
+    return result
+
+
+async def resume_royale_live(session, battle, *, gacha, signer, rpc_url: str, usdc_mint: str,
+                             operator_wallet_id: str = "", operator_address: str = "",
+                             seed_lamports: int = 10_000_000, price_base: int) -> str:
+    """Wiring del resume de royale: mismas closures on-chain que run_royale_live, pero
+    sin re-cobrar buy-ins ni re-crear escrow. Re-siembra gas SOL solo si el escrow quedó
+    a 0 (p. ej. nunca llegó a sembrarse antes del crash)."""
+    from app.models import BattlePlayer
+
+    players = (session.query(BattlePlayer).filter_by(battle_id=battle.id)
+               .order_by(BattlePlayer.joined_at).all())
+    wallet_to_privy_id = {p.player_wallet: p.wallet_id for p in players}
+
+    def resolve_wallet_id(wallet: str):
+        return wallet_to_privy_id.get(wallet)
+
+    async def distribute(esc_addr: str, player_addr: str, amt: int) -> str:
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await distribute_usdc(
+            rpc_url, signer, battle.escrow_wallet_id, esc_addr, player_addr, usdc_mint, amt, bh,
+            operator_wallet_id=operator_wallet_id, operator_address=operator_address)
+
+    async def confirm_usdc_cb(player_addr: str, min_base_units: int) -> bool:
+        return await confirm_usdc(rpc_url, player_addr, usdc_mint, min_base_units)
+
+    async def build_transfer_tx(esc, dest, mint):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return await build_transfer(rpc_url, esc, dest, mint, bh)
+
+    submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
+    confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
+
+    async def build_usdc_sweep_tx(esc_addr, winner_addr):
+        bal = await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
+        if bal <= 0:
+            return None
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(esc_addr, winner_addr, usdc_mint, bh, amount=bal,
+                                    decimals=6, fee_payer=operator_address)
+
+    async def build_usdc_transfer_tx(src, dest, amount):
+        bh = await fetch_latest_blockhash(rpc_url)
+        return build_token_transfer(src, dest, usdc_mint, bh, amount=amount, decimals=6,
+                                    fee_payer=operator_address)
+
+    async def buyback_to_escrow(nft):
+        bb = await gacha.buyback(battle.escrow_address, nft)
+        txb = bb.get("serialized_transaction")
+        if not txb:
+            return
+        signed = await signer.sign_solana(battle.escrow_wallet_id, txb)
+        await gacha.submit_tx(signed)
+
+    async def escrow_usdc_balance(esc_addr):
+        return await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
+
+    def now_fn():
+        return datetime.now(timezone.utc)
+
+    # Gas del escrow: re-sembrar SOLO si quedó a 0 (re-sembrar siempre quemaría lamports).
+    try:
+        if await sol_balance(rpc_url, battle.escrow_address) <= 0:
+            await seed_and_confirm_sol(rpc_url, signer, operator_wallet_id, operator_address,
+                                       battle.escrow_address, seed_lamports)
+    except Exception as exc:
+        logger.warning("resume royale %s: gas re-seed failed: %s (continuing; first distribute "
+                       "will void cleanly if the escrow is unusable)", battle.id, exc)
+
+    result = await resume_royale(
+        session, battle, gacha=gacha, signer=signer, resolve_wallet_id=resolve_wallet_id,
+        distribute=distribute, confirm_usdc=confirm_usdc_cb, confirm_in_escrow=confirm_in_escrow,
+        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, price_base=price_base,
+        now_fn=now_fn, build_usdc_sweep_tx=build_usdc_sweep_tx,
+        operator_wallet_id=operator_wallet_id, usdc_balance=escrow_usdc_balance,
+        build_usdc_transfer_tx=build_usdc_transfer_tx,
+    )
+    if result == "voided":
+        await reconcile_unresolved_pulls(session, battle, gacha=gacha)
+        await refund_royale_void(
+            session, battle, escrow_wallet_id=battle.escrow_wallet_id,
+            escrow_address=battle.escrow_address, build_transfer_tx=build_transfer_tx,
+            submit_tx=submit_tx, signer=signer, build_usdc_transfer_tx=build_usdc_transfer_tx,
+            buyback_to_escrow=buyback_to_escrow, escrow_usdc_balance=escrow_usdc_balance,
+            confirm_in_escrow=confirm_in_escrow, operator_wallet_id=operator_wallet_id,
         )
     return result
 

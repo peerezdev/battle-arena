@@ -859,3 +859,51 @@ async def test_reconcile_voided_battle_live_royale_usa_refund_royale(session, mo
     await po.reconcile_voided_battle_live(session, b, gacha=object(), signer=object(),
                                           rpc_url="http://rpc", usdc_mint="M" * 32)
     assert order == ["reconcile", "refund_royale"]
+
+
+# ── Task 7: resume_royale_live ────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_resume_royale_live_invoca_refund_en_void(session, monkeypatch):
+    import app.services.pack_orchestration as po
+    order = []
+    async def fake_resume(*a, **kw): return "voided"
+    async def fake_reconcile(*a, **kw): order.append("reconcile"); return 0
+    async def fake_refund(*a, **kw): order.append("refund")
+    monkeypatch.setattr(po, "resume_royale", fake_resume)
+    monkeypatch.setattr(po, "reconcile_unresolved_pulls", fake_reconcile)
+    monkeypatch.setattr(po, "refund_royale_void", fake_refund)
+    async def fake_sol_balance(rpc, addr): return 1   # escrow con gas → sin re-seed
+    monkeypatch.setattr(po, "sol_balance", fake_sol_balance)
+
+    from app.models import PackBattle
+    b = PackBattle(id="rl1", mode="royale", machine_code="m", price=50, max_players=5,
+                   status="running", server_seed="ab" * 32,
+                   escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b); session.commit()
+    class _S:
+        async def sign_solana(self, wid, tx): return "s"
+    out = await po.resume_royale_live(session, b, gacha=object(), signer=_S(),
+                                      rpc_url="http://rpc", usdc_mint="M" * 32, price_base=50)
+    assert out == "voided" and order == ["reconcile", "refund"]
+
+
+@pytest.mark.asyncio
+async def test_resume_royale_live_reseed_solo_si_escrow_sin_gas(session, monkeypatch):
+    import app.services.pack_orchestration as po
+    seeded = []
+    async def fake_resume(*a, **kw): return "settled"
+    monkeypatch.setattr(po, "resume_royale", fake_resume)
+    async def fake_sol_balance(rpc, addr): return 0
+    monkeypatch.setattr(po, "sol_balance", fake_sol_balance)
+    async def fake_seed(*a, **kw): seeded.append(True); return "sig"
+    monkeypatch.setattr(po, "seed_and_confirm_sol", fake_seed)
+
+    from app.models import PackBattle
+    b = PackBattle(id="rl2", mode="royale", machine_code="m", price=50, max_players=5,
+                   status="running", server_seed="ab" * 32,
+                   escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b); session.commit()
+    out = await po.resume_royale_live(session, b, gacha=object(), signer=object(),
+                                      rpc_url="http://rpc", usdc_mint="M" * 32, price_base=50)
+    assert out == "settled" and seeded == [True]

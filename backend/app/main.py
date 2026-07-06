@@ -35,7 +35,8 @@ from .services.pack_lobby import (
     get_battle, cancel_battle, verification, LobbyError,
 )
 from .services.pack_orchestration import (
-    run_pack_battle_live, resume_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
+    run_pack_battle_live, resume_pack_battle_live, run_royale_live, resume_royale_live,
+    usdc_balance_base_units, fetch_latest_blockhash,
     reconcile_voided_battle_live,
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
@@ -1244,12 +1245,14 @@ def create_app(session_factory, chain: ChainSource,
     async def _resume_orphaned_battles():
         # A backend restart kills the in-memory battle runners. Without this, a battle left in
         # 'running' is stranded forever (the reveal polls it and never sees it settle). On startup we
-        # finish orphaned PACK battles off the persisted pulls: every pull resolved → settle to the
-        # winner; a mid-pull crash (some pulls missing) → void + refund each puller their own pull.
+        # finish orphaned PACK and ROYALE battles off the persisted state: for pack, every pull
+        # resolved → settle to the winner, a mid-pull crash (some pulls missing) → void + refund
+        # each puller their own pull; for royale, resume_royale_live continues from the last
+        # completed round (or voids + refunds if a mid-round pull is unrecoverable).
         # Also sweeps every already-'voided' battle through reconcile_voided_battle_live, in case a
         # hot void's deferred reconcile never got to run before a restart (idempotent, cheap no-op
         # for battles with nothing pending). Runs in background tasks so startup isn't blocked by
-        # on-chain I/O. (Royale resume: TODO.)
+        # on-chain I/O.
         if privy_signer is None or gacha is None:
             return
         try:
@@ -1259,21 +1262,24 @@ def create_app(session_factory, chain: ChainSource,
             logger.warning("resume: could not query orphaned battles")
             return
         for bid, mode in running:
-            if mode == "royale":
-                logger.warning("resume: orphaned royale %s left 'running' (royale resume not automated yet)", bid)
-                continue
-
-            async def _resume_one(battle_id=bid):
+            async def _resume_one(battle_id=bid, battle_mode=mode):
                 s2 = session_factory()
                 try:
                     b = s2.get(PackBattle, battle_id)
                     if b is None or b.status != "running":
                         return
-                    logger.warning("resume: finishing orphaned pack battle %s", battle_id)
-                    await resume_pack_battle_live(
-                        s2, b, gacha=gacha, signer=privy_signer, rpc_url=solana_rpc_url,
-                        usdc_mint=cc_usdc_mint, operator_wallet_id=privy_operator_wallet_id,
-                        operator_address=privy_operator_address)
+                    logger.warning("resume: finishing orphaned %s battle %s", battle_mode, battle_id)
+                    if battle_mode == "royale":
+                        await resume_royale_live(
+                            s2, b, gacha=gacha, signer=privy_signer, rpc_url=solana_rpc_url,
+                            usdc_mint=cc_usdc_mint, operator_wallet_id=privy_operator_wallet_id,
+                            operator_address=privy_operator_address,
+                            seed_lamports=escrow_seed_lamports, price_base=b.price)
+                    else:
+                        await resume_pack_battle_live(
+                            s2, b, gacha=gacha, signer=privy_signer, rpc_url=solana_rpc_url,
+                            usdc_mint=cc_usdc_mint, operator_wallet_id=privy_operator_wallet_id,
+                            operator_address=privy_operator_address)
                     asyncio.create_task(_broadcast_battle_drops(battle_id))
                 except Exception:
                     logger.warning("resume: failed to finish orphaned battle %s", battle_id)
