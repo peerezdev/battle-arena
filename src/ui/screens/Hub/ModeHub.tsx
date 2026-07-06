@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../../theme'
 import type { LiveBattle, BattleMode } from './hubMockData'
-import { STAKE_OPTIONS } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
 import { showToast } from '../../toast'
@@ -25,7 +24,6 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   const navigate = useNavigate()
   const { identityToken } = useIdentityToken()
   const meWallet = useEmbeddedSolanaAddress()
-  const [stake, setStake] = useState<number>(STAKE_OPTIONS[1])
   const { battles } = useOpenBattles()
   const gate = useDelegationGate()
   const [createOpen, setCreateOpen] = useState(false)
@@ -64,8 +62,6 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
     <div style={{ padding: '24px clamp(14px,2.4vw,28px) 44px', display: 'flex', flexDirection: 'column', gap: 26 }}>
       <QuickMatch
         mode={mode}
-        selectedStake={stake}
-        onStake={setStake}
         onCreate={() => setCreateOpen(true)}
         onPlayDemo={mode === 'pack' ? () => setDemoOpen(true) : undefined}
       />

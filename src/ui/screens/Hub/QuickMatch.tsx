@@ -1,5 +1,4 @@
 import { COLORS, GRADIENT, FONTS } from '../../theme'
-import { STAKE_OPTIONS } from './hubMockData'
 import { useReducedMotion } from '../../useReducedMotion'
 
 type QuickMode = 'pack' | 'royale'
@@ -19,9 +18,6 @@ const MODE_COPY: Record<QuickMode, { name: string; desc: string; cta: string }> 
 
 interface Props {
   mode?: QuickMode
-  stakes?: number[]
-  selectedStake: number
-  onStake: (n: number) => void
   onCreate: () => void
   /** When omitted, the free-demo link is hidden (e.g. Battle Royale has no demo). */
   onPlayDemo?: () => void
@@ -29,9 +25,6 @@ interface Props {
 
 export function QuickMatch({
   mode = 'pack',
-  stakes = STAKE_OPTIONS,
-  selectedStake,
-  onStake,
   onCreate,
   onPlayDemo,
 }: Props) {
@@ -89,32 +82,6 @@ export function QuickMatch({
         >
           {copy.desc}
         </p>
-
-        {/* Stake chips */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-          {stakes.map((n) => {
-            const active = n === selectedStake
-            return (
-              <button
-                key={n}
-                onClick={() => onStake(n)}
-                style={{
-                  fontFamily: FONTS.display,
-                  fontWeight: 700,
-                  fontSize: 13,
-                  border: `1px solid ${active ? '#00ffc466' : COLORS.border}`,
-                  borderRadius: 10,
-                  padding: '9px 15px',
-                  cursor: 'pointer',
-                  color: active ? COLORS.green : COLORS.muted,
-                  background: active ? '#00ffc414' : 'transparent',
-                }}
-              >
-                ${n}
-              </button>
-            )
-          })}
-        </div>
 
         {/* CTA row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
