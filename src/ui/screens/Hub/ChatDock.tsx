@@ -478,18 +478,35 @@ export function ChatDock({
           >
             {online} online
           </span>
-          {onClose && (
-            <button
-              onClick={onClose}
-              title="Close chat"
-              style={{
-                marginLeft: 'auto', background: 'transparent', border: `1px solid ${COLORS.border}`,
-                color: COLORS.muted, borderRadius: 8, width: 26, height: 26, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, lineHeight: 1,
-              }}
-            >
-              ✕
-            </button>
+          {(onToggle || onClose) && (
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              {onToggle && (
+                <button
+                  onClick={onToggle}
+                  title="Collapse panel"
+                  style={{
+                    background: 'transparent', border: `1px solid ${COLORS.border}`,
+                    color: COLORS.muted, borderRadius: 8, width: 26, height: 26, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, lineHeight: 1,
+                  }}
+                >
+                  ›
+                </button>
+              )}
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  title="Close chat"
+                  style={{
+                    background: 'transparent', border: `1px solid ${COLORS.border}`,
+                    color: COLORS.muted, borderRadius: 8, width: 26, height: 26, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </span>
           )}
         </div>
 
