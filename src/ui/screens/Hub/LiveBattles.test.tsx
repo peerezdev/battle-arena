@@ -9,7 +9,8 @@ describe('LiveBattles', () => {
   it('renders a card and fires join', () => {
     const onBattleAction = vi.fn()
     render(<LiveBattles battles={[b]} onBattleAction={onBattleAction} onOpen={vi.fn()} />)
-    expect(screen.getByText(/EST\.? POT/i)).toBeTruthy()
+    expect(screen.getByText(/ENTRY → ESTIMATED POT/i)).toBeTruthy()   // header buy-in→pot label
+    expect(screen.getByText('×4.1')).toBeTruthy()                        // pot/entry multiplier pill
     fireEvent.click(screen.getByRole('button', { name: /join/i }))
     expect(onBattleAction).toHaveBeenCalledWith(b)
   })
@@ -18,7 +19,7 @@ describe('LiveBattles', () => {
     // a 2-player pack lobby with 1/2 is "Waiting for opponent" — must still show the note
     const pack: LiveBattle = { ...b, mode: 'pack', slots: '1/2', statusText: 'Waiting for opponent', statusColor: '#00ffc4' }
     render(<LiveBattles battles={[pack]} onBattleAction={vi.fn()} onOpen={vi.fn()} />)
-    expect(screen.getByText(/1 seat left · starts when full/i)).toBeTruthy()
+    expect(screen.getByText(/1 seat left/i)).toBeTruthy()
   })
 
   it('hides the seats-left note when the lobby is full', () => {

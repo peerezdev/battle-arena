@@ -8,30 +8,43 @@ function machineImg(m: GachaMachine | undefined): string | null {
   return m?.thumbnailUrl ?? m?.image ?? null
 }
 
-/** "OPENS N · [pack images]" strip — the bundle for pack, the single machine for royale. */
-function OpensRow({ battle: b, byCode }: { battle: LiveBattle; byCode: Map<string, GachaMachine> }) {
-  const isPack = b.mode === 'pack'
+// Run-length groups of the pack bundle in opening order ([base,base,neo] → BASE ×2, NEO ×1).
+// Royale rooms run a single machine, so they always collapse to one group.
+function groupCodes(b: LiveBattle): { code: string; qty: number }[] {
   const codes = b.machineCodes && b.machineCodes.length ? b.machineCodes : [b.title]
-  const shown = isPack ? codes : codes.slice(0, 1)
+  if (b.mode !== 'pack') return [{ code: codes[0], qty: 1 }]
+  const groups: { code: string; qty: number }[] = []
+  for (const c of codes) {
+    const last = groups[groups.length - 1]
+    if (last && last.code === c) last.qty++
+    else groups.push({ code: c, qty: 1 })
+  }
+  return groups
+}
+
+/** Full-bleed pack strip: one cell per bundle group — machine image, ×qty badge, name, price. */
+function PacksGrid({ battle: b, byCode }: { battle: LiveBattle; byCode: Map<string, GachaMachine> }) {
+  const groups = groupCodes(b)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: `1px solid ${COLORS.border}`, marginBottom: 16 }}>
-      <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.14em', color: COLORS.muted, whiteSpace: 'nowrap' }}>{isPack ? `OPENS ${codes.length}` : 'ROOM PACK'}</span>
-      <div className="hidescroll" style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflowX: 'auto' }}>
-        {shown.map((code, i) => {
-          const img = machineImg(byCode.get(code))
-          return (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-              <div style={{ width: 24, height: 31, borderRadius: 5, overflow: 'hidden', background: '#0f0a16', border: `1px solid ${COLORS.border}` }}>
-                {img && <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-              </div>
-              {i < shown.length - 1 && <span style={{ color: '#4a4456', fontSize: 9 }}>›</span>}
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${groups.length}, 1fr)`, borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}` }}>
+      {groups.map((g, i) => {
+        const m = byCode.get(g.code)
+        const img = machineImg(m)
+        return (
+          <div key={i} style={{ textAlign: 'center', padding: '14px 8px', borderRight: i < groups.length - 1 ? `1px solid ${COLORS.border}` : 'none' }}>
+            <div style={{ position: 'relative', width: 50, height: 66, margin: '0 auto 8px', borderRadius: 10, overflow: 'visible', background: 'linear-gradient(160deg,#1a1322,#0f0a16)', border: '1px solid rgba(255,255,255,.14)' }}>
+              {img && <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 9, display: 'block' }} />}
+              {b.mode === 'pack' && (
+                <span style={{ position: 'absolute', top: -6, right: -6, padding: '2px 7px', borderRadius: 999, background: COLORS.green, color: '#06170f', fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700 }}>×{g.qty}</span>
+              )}
             </div>
-          )
-        })}
-      </div>
-      <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted, whiteSpace: 'nowrap' }}>
-        {isPack ? `${codes.length} pack${codes.length === 1 ? '' : 's'} / player` : (byCode.get(codes[0])?.name ?? '')}
-      </span>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.06em', color: '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {(m?.shortName ?? m?.name ?? g.code).toUpperCase()}
+            </div>
+            {m != null && <div style={{ fontFamily: FONTS.mono, fontSize: 9, color: COLORS.green, marginTop: 2 }}>{formatUsd(m.price)}</div>}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -177,22 +190,29 @@ function parseSlots(slots: string): { filled: number; total: number } {
   return { filled: Number(m[1]), total: Number(m[2]) }
 }
 
+// The "×N" step from buy-in to full pot (3 players → ×3). One decimal when not whole
+// (royale entry covers a variable pack count, so the ratio is rarely an integer).
+function multLabel(entry: number, pot: number): string | null {
+  if (entry <= 0 || pot <= 0) return null
+  const mult = pot / entry
+  return `×${Math.abs(mult - Math.round(mult)) < 0.05 ? Math.round(mult) : mult.toFixed(1)}`
+}
+
 function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
   const modeColor = MODE_COLOR[b.mode]
-  const modeBg = `${modeColor}22`
-  const modeBd = `${modeColor}66`
   const { filled, total } = parseSlots(b.slots)
   const openSeats = Math.max(0, total - filled)
+  const mult = multLabel(b.entry, b.pot)
   return (
     <div
       onClick={() => onOpen(b)}
       style={{
         position: 'relative',
         overflow: 'hidden',
-        borderRadius: 18,
-        padding: 18,
-        background: 'linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012))',
+        borderRadius: 20,
+        background: '#0c0f15',
         border: `1px solid ${COLORS.border}`,
+        boxShadow: '0 20px 60px -20px rgba(0,0,0,.8)',
         cursor: 'pointer',
         transition: 'border-color 0.12s, transform 0.12s',
       }}
@@ -205,143 +225,86 @@ function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle:
         ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'
       }}
     >
-      {/* mode badge + status */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 11px', borderRadius: 8,
-          fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 500,
-          color: modeColor, background: modeBg, border: `1px solid ${modeBd}`,
-        }}>
-          {MODE_LABEL[b.mode]}
-        </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: b.statusColor }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.statusColor, boxShadow: `0 0 6px ${b.statusColor}` }} />
-          {b.statusText}
-        </span>
+      {/* header — mode badge + status, then buy-in → ×N → estimated pot */}
+      <div style={{ padding: '16px 18px 14px', background: `linear-gradient(180deg,${modeColor}0f,transparent)` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span style={{
+            display: 'inline-flex', padding: '5px 11px', borderRadius: 8,
+            fontFamily: FONTS.mono, fontSize: 11, fontWeight: 500,
+            color: modeColor, background: `${modeColor}1f`, border: `1px solid ${modeColor}59`,
+          }}>
+            {MODE_LABEL[b.mode]}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: b.statusColor }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.statusColor, boxShadow: `0 0 6px ${b.statusColor}`, animation: 'ba-pulse 1.4s infinite' }} />
+            {b.statusText}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 21, fontWeight: 700, color: COLORS.muted }}>{formatUsd(b.entry)}</span>
+          <span style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minWidth: 70 }}>
+            <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
+            <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
+            {mult && (
+              <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', padding: '2px 9px', borderRadius: 999, background: '#0c0f15', border: `1px solid ${modeColor}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: modeColor }}>
+                {mult}
+              </span>
+            )}
+          </span>
+          <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', color: modeColor }}>{formatUsd(b.pot)}</span>
+        </div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.1em', color: '#7a8492', marginTop: 4 }}>
+          {b.costLabel} → ESTIMATED POT
+        </div>
       </div>
 
-      {/* pot + entry */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 18 }}>
-        <div>
-          <div style={{ fontSize: 11, color: COLORS.muted, letterSpacing: '.04em', marginBottom: 3 }}>EST. POT</div>
-          <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 28, letterSpacing: '-.02em', color: COLORS.text }}>
-            {formatUsd(b.pot)}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: COLORS.muted, letterSpacing: '.04em', marginBottom: 3 }}>{b.costLabel}</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.muted }}>{formatUsd(b.entry)}</div>
-        </div>
-      </div>
+      {/* packs opened — full-bleed strip */}
+      <PacksGrid battle={b} byCode={byCode} />
 
-      {/* opens sequence */}
-      <OpensRow battle={b} byCode={byCode} />
-
-      {/* players + action */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <PlayerAvatars players={b.players} extra={b.extra} openSeats={openSeats} />
-          <span style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.muted }}>{b.slots}</span>
+      {/* footer — seats + action */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {b.players.map((p, i) => (
+            <span key={i} style={{
+              width: 32, height: 32, borderRadius: '50%', flex: 'none',
+              background: p.violet ? 'linear-gradient(135deg,#ff6bb5,#c02579)' : 'linear-gradient(135deg,#3df0a0,#13c98a)',
+              border: '2px solid #0c0f15',
+              marginLeft: i > 0 ? -8 : 0,
+            }} />
+          ))}
+          {/* dashed pulsing empty seats — cap the circles, the label carries the real count */}
+          {Array.from({ length: Math.min(openSeats, 3) }, (_, i) => (
+            <span key={`seat-${i}`} className="ba-slotpulse" style={{
+              width: 32, height: 32, borderRadius: '50%', flex: 'none',
+              border: '2px dashed rgba(245,197,66,.5)', background: 'transparent',
+              marginLeft: -8, animationDelay: `${i * 0.35}s`,
+            }} />
+          ))}
+          {b.extra && <span style={{ fontFamily: FONTS.display, fontWeight: 800, color: COLORS.muted, fontSize: 11, marginLeft: 6 }}>{b.extra}</span>}
+          <span style={{ marginLeft: 9, fontFamily: FONTS.mono, fontSize: 12, color: openSeats > 0 ? '#f5c542' : COLORS.muted }}>
+            {openSeats > 0 ? `${openSeats} seat${openSeats === 1 ? '' : 's'} left` : b.slots}
+          </span>
         </div>
 
         {b.action === 'watch' ? (
           <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
-            style={{ border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, borderRadius: 11, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>
+            style={{ border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, borderRadius: 12, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
             Watch
           </button>
         ) : b.canCancel && onCancel ? (
           <button onClick={(e) => { e.stopPropagation(); onCancel(b) }}
-            style={{ border: `1px solid ${COLORS.red}55`, background: 'transparent', color: COLORS.red, borderRadius: 11, padding: '9px 16px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
+            style={{ border: `1px solid ${COLORS.red}59`, background: `${COLORS.red}14`, color: '#ff7a8f', borderRadius: 12, padding: '10px 20px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
             Cancel
           </button>
         ) : b.alreadyJoined ? (
           <span style={{ fontSize: 12, fontWeight: 700, color: COLORS.muted }}>You're in</span>
         ) : (
           <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
-            style={{ background: GRADIENT, color: '#06120c', border: 'none', borderRadius: 11, padding: '9px 18px', fontWeight: 800, fontSize: 13.5, cursor: 'pointer', boxShadow: '0 0 18px -6px rgba(0,255,196,.7)' }}>
+            style={{ background: GRADIENT, color: '#06120c', border: 'none', borderRadius: 12, padding: '10px 20px', fontWeight: 800, fontSize: 14, cursor: 'pointer', boxShadow: '0 0 18px -6px rgba(0,255,196,.7)' }}>
             Join
           </button>
         )}
       </div>
-
-      {openSeats > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 13, paddingTop: 12, borderTop: '1px dashed rgba(245,197,66,.25)' }}>
-          <span style={{ flex: 'none', width: 6, height: 6, borderRadius: '50%', background: '#f5c542', boxShadow: '0 0 6px #f5c542', animation: 'ba-pulse 1.4s infinite' }} />
-          <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: '#f5c542' }}>
-            {openSeats} seat{openSeats === 1 ? '' : 's'} left · starts when full
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function PlayerAvatars({
-  players,
-  extra,
-  openSeats = 0,
-}: {
-  players: { violet: boolean }[]
-  extra?: string
-  openSeats?: number
-}) {
-  const hasVS = players.length === 2
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: hasVS ? 9 : 0 }}>
-      {players.map((p, i) => (
-        <div
-          key={i}
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            border: `2px solid ${p.violet ? COLORS.violet : COLORS.green}`,
-            background: p.violet ? '#1a1430' : '#0f2018',
-            marginLeft: !hasVS && i > 0 ? -13 : 0,
-          }}
-        />
-      ))}
-      {/* Open seats — pulsing empty rings, only meaningful for fillable (non-1v1) lobbies */}
-      {!hasVS && Array.from({ length: openSeats }, (_, i) => (
-        <div
-          key={`seat-${i}`}
-          className="ba-slotpulse"
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            border: '2px dashed rgba(245,197,66,.5)',
-            background: 'transparent',
-            marginLeft: -13,
-          }}
-        />
-      ))}
-      {extra && (
-        <span
-          style={{
-            fontFamily: FONTS.display,
-            fontWeight: 800,
-            color: COLORS.muted,
-            fontSize: 11,
-            marginLeft: 5,
-          }}
-        >
-          {extra}
-        </span>
-      )}
-      {hasVS && (
-        <span
-          style={{
-            fontFamily: FONTS.display,
-            fontWeight: 800,
-            color: COLORS.muted,
-            fontSize: 11,
-          }}
-        >
-          VS
-        </span>
-      )}
     </div>
   )
 }
