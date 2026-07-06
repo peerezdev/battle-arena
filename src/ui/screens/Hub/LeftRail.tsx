@@ -26,7 +26,7 @@ export const NAV_ICONS: Record<HubNav, ReactNode> = {
 const ITEMS: { id: HubNav; label: string }[] = [
   { id: 'lobby', label: 'Home' },
   { id: 'pack', label: 'Pack Battle' },
-  { id: 'royale', label: 'Battle Royale' },
+  { id: 'royale', label: 'Royale' },
   { id: 'gacha', label: 'Gacha' },
   { id: 'ranks', label: 'Leaderboard' },
   { id: 'help', label: 'Help' },
@@ -103,8 +103,11 @@ export function LeftRail({ active }: { active: HubNav }) {
                 />
               )}
               {NAV_ICONS[item.id]}
-              <span style={{ position: 'relative', fontSize: 11, fontWeight: 500, letterSpacing: '.02em' }}>
-                {item.label}
+              {/* Each word on its own line, so two-word labels (Pack Battle, Battle Royale) wrap. */}
+              <span style={{ position: 'relative', fontSize: 11, fontWeight: 500, letterSpacing: '.02em', textAlign: 'center', lineHeight: 1.15 }}>
+                {item.label.split(' ').map((word, i) => (
+                  <span key={i} style={{ display: 'block' }}>{word}</span>
+                ))}
               </span>
             </Link>
           )
