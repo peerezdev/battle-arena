@@ -36,6 +36,7 @@ from .services.pack_lobby import (
 )
 from .services.pack_orchestration import (
     run_pack_battle_live, resume_pack_battle_live, run_royale_live, usdc_balance_base_units, fetch_latest_blockhash,
+    reconcile_voided_battle_live,
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
@@ -613,15 +614,37 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(409, "máquina no disponible")
         return int(m["price"]) * 1_000_000   # USDC base units
 
+    _RECONCILE_DELAY_S = 300   # reintento de reconciliación tras un void en caliente
+
+    async def _reconcile_voided_later(battle_id: str, delay_s: float = _RECONCILE_DELAY_S):
+        """Tras un void en caliente puede quedar una pull pagada sin resolver (CC lento). Reintenta
+        la reconciliación + refund con sesión fresca cuando CC haya tenido tiempo de resolver."""
+        try:
+            await asyncio.sleep(delay_s)
+            s3 = session_factory()
+            try:
+                b = s3.get(PackBattle, battle_id)
+                if b is not None and b.status == "voided":
+                    await reconcile_voided_battle_live(
+                        s3, b, gacha=gacha, signer=privy_signer, rpc_url=solana_rpc_url,
+                        usdc_mint=cc_usdc_mint, operator_wallet_id=privy_operator_wallet_id,
+                        operator_address=privy_operator_address)
+            finally:
+                s3.close()
+        except Exception:
+            logger.exception("deferred reconcile failed for %s", battle_id)
+
     async def _run_bg(battle_id: str):
         """Background task for pack battles."""
         s2 = session_factory()
         try:
             b = s2.get(PackBattle, battle_id)
-            await run_pack_battle_live(s2, b, gacha=gacha, signer=privy_signer,
+            result = await run_pack_battle_live(s2, b, gacha=gacha, signer=privy_signer,
                 rpc_url=solana_rpc_url, usdc_mint=cc_usdc_mint,
                 min_usdc_base_units=b.price, operator_wallet_id=privy_operator_wallet_id,
                 operator_address=privy_operator_address, seed_lamports=escrow_seed_lamports)
+            if result == "voided":
+                asyncio.create_task(_reconcile_voided_later(battle_id))
             asyncio.create_task(_broadcast_battle_drops(battle_id))
             asyncio.create_task(_maybe_announce_winner(battle_id))
         except Exception:
@@ -640,12 +663,14 @@ def create_app(session_factory, chain: ChainSource,
         s2 = session_factory()
         try:
             b = s2.get(PackBattle, battle_id)
-            await run_royale_live(s2, b, gacha=gacha, signer=privy_signer,
+            result = await run_royale_live(s2, b, gacha=gacha, signer=privy_signer,
                 rpc_url=solana_rpc_url, usdc_mint=cc_usdc_mint,
                 operator_wallet_id=privy_operator_wallet_id,
                 operator_address=privy_operator_address,
                 seed_lamports=escrow_seed_lamports,
                 price_base=b.price)
+            if result == "voided":
+                asyncio.create_task(_reconcile_voided_later(battle_id))
             asyncio.create_task(_broadcast_battle_drops(battle_id))
             asyncio.create_task(_maybe_announce_winner(battle_id))
         except Exception:
@@ -1221,7 +1246,10 @@ def create_app(session_factory, chain: ChainSource,
         # 'running' is stranded forever (the reveal polls it and never sees it settle). On startup we
         # finish orphaned PACK battles off the persisted pulls: every pull resolved → settle to the
         # winner; a mid-pull crash (some pulls missing) → void + refund each puller their own pull.
-        # Runs in background tasks so startup isn't blocked by on-chain I/O. (Royale resume: TODO.)
+        # Also sweeps every already-'voided' battle through reconcile_voided_battle_live, in case a
+        # hot void's deferred reconcile never got to run before a restart (idempotent, cheap no-op
+        # for battles with nothing pending). Runs in background tasks so startup isn't blocked by
+        # on-chain I/O. (Royale resume: TODO.)
         if privy_signer is None or gacha is None:
             return
         try:
@@ -1254,6 +1282,32 @@ def create_app(session_factory, chain: ChainSource,
                     s2.close()
 
             asyncio.create_task(_resume_one())
+
+        # Barrido de reconciliación: batallas voided con refunds/pulls pendientes (p.ej. un void
+        # en caliente cuya reconciliación diferida no llegó a correr antes de un reinicio).
+        try:
+            with session_factory() as s1:
+                voided_ids = [b.id for b in s1.query(PackBattle).filter_by(status="voided").all()]
+        except Exception:
+            logger.warning("resume: could not query voided battles for reconcile sweep")
+            voided_ids = []
+
+        async def _sweep_one(battle_id):
+            s2 = session_factory()
+            try:
+                b = s2.get(PackBattle, battle_id)
+                if b is not None:
+                    await reconcile_voided_battle_live(
+                        s2, b, gacha=gacha, signer=privy_signer, rpc_url=solana_rpc_url,
+                        usdc_mint=cc_usdc_mint, operator_wallet_id=privy_operator_wallet_id,
+                        operator_address=privy_operator_address)
+            except Exception:
+                logger.warning("reconcile sweep failed for %s", battle_id)
+            finally:
+                s2.close()
+
+        for bid in voided_ids:
+            asyncio.create_task(_sweep_one(battle_id=bid))
 
     return app
 

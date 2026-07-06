@@ -112,6 +112,29 @@ def _build_client(signer=None, dev_endpoints_enabled=False, withdraw_fee_pct=0.0
     return TestClient(app, raise_server_exceptions=True), priv
 
 
+def _build_client_with_sf(signer=None):
+    """Like _build_client, but also returns the session_factory so a test can seed rows directly
+    (needed to exercise the startup sweep against pre-existing 'voided' battles)."""
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    init_db(engine)
+    sf = make_session_factory(engine)
+    priv = _make_es256()
+    privy = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv.public_key())
+    gacha = GachaService(base_url="https://dev-gacha.example.com", api_key="")
+    app = create_app(
+        sf, MockChainSource(), gacha=gacha, privy=privy, privy_signer=signer,
+        solana_rpc_url=DUMMY_RPC, cc_usdc_mint=DUMMY_MINT,
+        privy_operator_wallet_id="op-wallet-id",
+        privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
+        escrow_seed_lamports=10_000_000,
+    )
+    return sf, TestClient(app, raise_server_exceptions=True), priv
+
+
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 @pytest.fixture
@@ -993,3 +1016,79 @@ def test_join_bot_still_adds_exactly_one(monkeypatch):
     body = r.json()
     assert len(body["players"]) == 2  # creator + exactly one bot
     assert body["status"] == "lobby"  # not full → not started
+
+
+# ── Task 4: startup reconcile sweep + deferred reconcile after a hot void ─────
+
+def test_startup_sweep_reconciles_voided_battles(monkeypatch):
+    """On startup, every 'voided' battle is swept through reconcile_voided_battle_live; a
+    'settled' battle must NOT be touched."""
+    import app.main as m
+    from app.models import PackBattle, BattlePull
+
+    swept = []
+
+    async def fake_sweep(session, battle, **kw):
+        swept.append(battle.id)
+
+    monkeypatch.setattr(m, "reconcile_voided_battle_live", fake_sweep)
+
+    # privy_signer must be truthy for _resume_orphaned_battles to proceed past its early-return
+    # gate (it bails when privy_signer is None) — a bare object() is enough, it's never called
+    # because reconcile_voided_battle_live itself is faked.
+    sf, c, priv = _build_client_with_sf(signer=object())
+
+    with sf() as s:
+        s.add(PackBattle(id="vd1", mode="pack", machine_code="m", price=50, max_players=2,
+                         status="voided", escrow_wallet_id="eid", escrow_address="ESC"))
+        s.add(BattlePull(battle_id="vd1", player_wallet="A", memo="mA", round_number=1))
+        s.add(PackBattle(id="ok1", mode="pack", machine_code="m", price=50, max_players=2,
+                         status="settled"))
+        s.commit()
+
+    with c:
+        # The startup hook schedules the sweep via asyncio.create_task on the TestClient's
+        # persistent portal loop; a request inside the `with` block gives that loop a chance
+        # to run the (already-scheduled, no-internal-await) task before we assert.
+        c.get("/pack-battles/open")
+
+    assert swept == ["vd1"]
+
+
+def test_run_bg_voided_schedules_deferred_reconcile(client_priv, monkeypatch):
+    """When the live pack run comes back 'voided', _run_bg schedules a deferred reconcile
+    (_reconcile_voided_later) instead of just dropping the result on the floor."""
+    c, priv = client_priv
+
+    async def _high_balance(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _fake_run_voided(session, battle, *, gacha, signer, **kwargs):
+        return "voided"
+
+    scheduled_names = []
+    orig_create_task = asyncio.create_task
+
+    def spy_create_task(coro, *a, **kw):
+        scheduled_names.append(getattr(coro, "__qualname__", str(coro)))
+        return orig_create_task(coro, *a, **kw)
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.run_pack_battle_live", _fake_run_voided)
+    monkeypatch.setattr(asyncio, "create_task", spy_create_task)
+
+    hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    bid = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs_a).json()["id"]
+    hdrs_b = _auth_headers(priv, WALLET_B, WALLET_ID_B)
+    r = c.post(f"/pack-battles/{bid}/join", headers=hdrs_b)
+    assert r.status_code == 200, r.text
+
+    asyncio.get_event_loop().run_until_complete(asyncio.sleep(0))
+
+    assert any("_reconcile_voided_later" in name for name in scheduled_names), (
+        f"_run_bg did not schedule a deferred reconcile on 'voided'; scheduled: {scheduled_names}"
+    )
