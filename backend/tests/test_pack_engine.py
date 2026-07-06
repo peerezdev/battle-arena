@@ -627,3 +627,144 @@ async def test_finalize_logs_undelivered_card_loudly(session, caplog):
                                        now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "settled"                                      # settle is resilient — battle still settles
     assert "NOT delivered" in caplog.text and "cNFTasset" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_settle_salta_cartas_ya_transferidas(session):
+    """Resume tras settle parcial: una pull con transferred=True no se re-transfiere."""
+    from app.services.pack_engine import settle_cards_to_winner
+    b = PackBattle(id="s1", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="running", server_seed="ab" * 32,
+                   escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b)
+    session.add_all([
+        BattlePull(battle_id="s1", player_wallet="A", memo="mA", nft_address="nA",
+                   insured_value=100, transferred=True, round_number=1),
+        BattlePull(battle_id="s1", player_wallet="B", memo="mB", nft_address="nB",
+                   insured_value=300, round_number=1),
+    ])
+    session.commit()
+    built = []
+    async def btx(esc, dest, nft): built.append(nft); return f"x-{nft}"
+    await settle_cards_to_winner(session, b, escrow_wallet_id="eid", escrow_address="ESC",
+                                 winner="B", build_transfer_tx=btx, submit_tx=_sub,
+                                 signer=_Signer(), confirm_in_escrow=_ce,
+                                 build_usdc_sweep_tx=None, sleep_fn=_noslp,
+                                 wait_max_attempts=1, wait_delay=0)
+    assert built == ["nB"]
+
+
+@pytest.mark.asyncio
+async def test_run_battle_empate_sin_server_seed_hace_void(session):
+    """Empate con server_seed None → determine_winner lanza → voided (no crash)."""
+    b = PackBattle(id="s2", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="running", server_seed=None)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="s2", player_wallet="A"),
+                     BattlePlayer(battle_id="s2", player_wallet="B")])
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
+                    "B": {"nft_address": "nB", "insured_value": 100, "grade": 8}})
+    async def prep(addr): pass
+    out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           prepare_escrow=prep, can_play=lambda w: True,
+                           now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
+                           sleep_fn=_noslp)
+    assert out == "voided" and b.status == "voided"
+
+
+@pytest.mark.asyncio
+async def test_run_battle_todo_autosold_settlea_sin_transferir_cartas(session):
+    """Todos los pulls auto-sold → ganador por insured_value, cero transfers, sweep al ganador."""
+    b = PackBattle(id="s3", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="running", server_seed="ab" * 32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="s3", player_wallet="A"),
+                     BattlePlayer(battle_id="s3", player_wallet="B")])
+    session.commit()
+    gacha = _Gacha({"A": {"nft_address": "nA", "insured_value": 40, "grade": None,
+                          "auto_sold": True, "buyback_amount": 30_000_000},
+                    "B": {"nft_address": "nB", "insured_value": 60, "grade": None,
+                          "auto_sold": True, "buyback_amount": 45_000_000}})
+    built, sweeps = [], []
+    async def btx(esc, dest, nft): built.append(nft); return "x"
+    async def sweep(esc, winner): sweeps.append(winner); return "sweep-tx"
+    async def prep(addr): pass
+    out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           prepare_escrow=prep, can_play=lambda w: True,
+                           now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
+                           sleep_fn=_noslp, build_usdc_sweep_tx=sweep)
+    assert out == "settled" and b.winner == "B"
+    assert built == [] and sweeps == ["B"]
+
+
+@pytest.mark.asyncio
+async def test_resume_pack_sin_escrow_hace_void_sin_crash(session):
+    """Restart entre el fill y la creación del escrow: running, sin escrow, sin pulls → void."""
+    from app.services.pack_engine import resume_pack_battle
+    b = PackBattle(id="s4", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="running", server_seed="ab" * 32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="s4", player_wallet="A"),
+                     BattlePlayer(battle_id="s4", player_wallet="B")])
+    session.commit()
+    out = await resume_pack_battle(session, b, gacha=object(), signer=_Signer(),
+                                   resolve_wallet_id=lambda w: None, build_transfer_tx=_btx,
+                                   submit_tx=_sub, confirm_in_escrow=_ce,
+                                   now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
+                                   sleep_fn=_noslp)
+    assert out == "voided" and b.status == "voided"
+
+
+@pytest.mark.asyncio
+async def test_void_a_mitad_de_bundle_y_refund_devuelve_lo_ya_sacado(session):
+    """Bundle de 2 cajas; la caja 2 de B nunca abre → voided. El refund posterior devuelve
+    a cada puller sus cartas YA resueltas (integración run_battle + refund_pack_void)."""
+    from app.models import BattlePack
+    from app.services.refund import refund_pack_void
+    b = PackBattle(id="s5", mode="pack", machine_code="m1", price=100, max_players=2,
+                   status="running", server_seed="ab" * 32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="s5", player_wallet="A"),
+                     BattlePlayer(battle_id="s5", player_wallet="B"),
+                     BattlePack(battle_id="s5", machine_code="m1", price=50, sequence=1),
+                     BattlePack(battle_id="s5", machine_code="m2", price=50, sequence=2)])
+    session.commit()
+
+    class _FailingGacha(_Gacha):
+        """La 4ª pull (B, caja 2) queda pending para siempre."""
+        def __init__(self, opens):
+            super().__init__(opens); self.count = 0
+        async def open_pack(self, memo):
+            self.count += 1
+            if self.count >= 4:
+                return {"pending": True}
+            return await super().open_pack(memo)
+
+    gacha = _FailingGacha({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
+                           "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
+    async def prep(addr): pass
+    out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           prepare_escrow=prep, can_play=lambda w: True,
+                           now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
+                           sleep_fn=_noslp, open_max_attempts=1, open_delay=0)
+    assert out == "voided"
+
+    built = []
+    async def btx(esc, dest, nft): built.append((dest, nft)); return "x"
+    async def utx(src, dest, amt): return "u"
+    await refund_pack_void(session, b, escrow_wallet_id=b.escrow_wallet_id,
+                           escrow_address=b.escrow_address, build_transfer_tx=btx,
+                           submit_tx=_sub, signer=_Signer(), build_usdc_transfer_tx=utx,
+                           confirm_in_escrow=_ce, sleep_fn=_noslp)
+    # Nota: _Gacha usa memo "m-{wallet}", así que la pull de la caja 2 de A comparte memo con
+    # la de la caja 1; lo relevante: cada carta RESUELTA vuelve a su dueño y nada más.
+    resolved = [(p.player_wallet, p.nft_address) for p in
+                session.query(BattlePull).filter_by(battle_id="s5").all() if p.nft_address]
+    assert set(built) == {(w, n) for w, n in resolved}

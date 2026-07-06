@@ -60,7 +60,7 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
     from app.models import BattlePull
     pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
     for p in pulls:
-        if p.auto_sold or not p.nft_address:
+        if p.auto_sold or not p.nft_address or p.transferred:
             continue
         for _ in range(max_attempts):
             try:
