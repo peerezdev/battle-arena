@@ -19,7 +19,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route element={<AppShell />}>
-          <Route path="/app" element={<Hub />} />
+          <Route path="/home" element={<Hub />} />
           <Route path="/play/arena" element={<ModeHub mode="pack" />} />
           <Route path="/play/royale" element={<ModeHub mode="royale" />} />
           <Route path="/play/battle/:battleId" element={<BattleFlow />} />
@@ -51,7 +51,7 @@ export default function App() {
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/help" element={<HelpPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/app" replace />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </BrowserRouter>
   )

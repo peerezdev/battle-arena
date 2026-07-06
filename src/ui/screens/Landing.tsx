@@ -399,7 +399,7 @@ export function Landing() {
           >
             {/* Primary gradient button */}
             <motion.button
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/home')}
               whileTap={reduced ? undefined : { scale: 0.97 }}
               style={{
                 background: GRADIENT,
@@ -528,7 +528,7 @@ export function Landing() {
               title="Pack Battle"
               description="Both players open a pack; the winner takes both cards. Resolve by value or play it out."
               pill="WINNER TAKES ALL"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/home')}
               reduced={reduced}
             />
             <GameCard
@@ -536,7 +536,7 @@ export function Landing() {
               title="Battle Royale"
               description="Up to 10 players open packs in rounds; lowest value falls; the last one standing takes the pot."
               pill="2–10 PLAYERS"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/home')}
               reduced={reduced}
             />
             <GameCard
@@ -544,7 +544,7 @@ export function Landing() {
               title="Gacha"
               description="Open Collector Crypt packs and jump straight into a battle with the card you pull."
               pill="PULL → PLAY"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/home')}
               reduced={reduced}
             />
             <GameCard
@@ -552,7 +552,7 @@ export function Landing() {
               title="Mana Duel"
               description="Hidden mana allocation across three fronts. Skill-first; card value gives a capped edge."
               pill="SKILL"
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/home')}
               reduced={reduced}
             />
           </motion.div>

@@ -20,7 +20,7 @@ export function OnchainFlow() {
   const [authToken, setAuthToken] = useState('')
   const [selectedCard, setSelectedCard] = useState<SelectedCard | null>(null)
   const [currentBattle, setCurrentBattle] = useState<BattleInfo | null>(null)
-  const toLobby = () => navigate('/app')
+  const toLobby = () => navigate('/home')
   function renderScreen() {
     if (screen === 'connect') {
       return (

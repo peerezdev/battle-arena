@@ -40,7 +40,7 @@ export function DemoFlow() {
   const navigate = useNavigate()
   const reduced = useReducedMotion()
   const isRoyale = mode === 'royale'
-  const exit = () => navigate('/app')
+  const exit = () => navigate('/home')
 
   const [battle, setBattle] = useState<Battle | null>(null)
   const [error, setError] = useState<string | null>(null)

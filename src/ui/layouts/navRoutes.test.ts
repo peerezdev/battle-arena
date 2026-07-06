@@ -4,7 +4,7 @@ import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 
 describe('NAV_ROUTES', () => {
   it('maps each nav id to its route', () => {
-    expect(NAV_ROUTES.lobby).toBe('/app')
+    expect(NAV_ROUTES.lobby).toBe('/home')
     expect(NAV_ROUTES.pack).toBe('/play/arena')
     expect(NAV_ROUTES.royale).toBe('/play/royale')
     expect(NAV_ROUTES.gacha).toBe('/play/gacha')
@@ -15,7 +15,7 @@ describe('NAV_ROUTES', () => {
 
 describe('activeNavFromPath', () => {
   it('derives the active nav id from the pathname', () => {
-    expect(activeNavFromPath('/app')).toBe('lobby')
+    expect(activeNavFromPath('/home')).toBe('lobby')
     expect(activeNavFromPath('/play/arena')).toBe('pack')
     expect(activeNavFromPath('/play/royale')).toBe('royale')
     expect(activeNavFromPath('/play/gacha')).toBe('gacha')

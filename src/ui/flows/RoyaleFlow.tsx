@@ -17,7 +17,7 @@ export function RoyaleFlow() {
   const [rstate, setRstate] = useState<RoyaleState | null>(null)
   function startRoyale(config: RoyaleConfig) { setRstate(createRoyale(config, ['You'])); setScreen('board') }
   function playRoundFn() { setRstate((s) => (s ? playRound(s) : s)) }
-  const exit = () => navigate('/app')
+  const exit = () => navigate('/home')
   return (
     <AnimatePresence mode="wait">
       <motion.div key={screen} variants={pageVariants(reduced)} initial="initial" animate="animate" exit="exit" transition={pageTransition(reduced)} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>

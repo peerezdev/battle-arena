@@ -10,7 +10,7 @@ export function HelpPage() {
   return (
     <div style={{ padding: '20px clamp(16px,3vw,44px) 60px', maxWidth: 1120, margin: '0 auto', width: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
-        <Link to="/app" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 15px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', color: '#cdd4dd', fontSize: 14, fontWeight: 600 }}>‹ Back to Lobby</Link>
+        <Link to="/home" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 15px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', color: '#cdd4dd', fontSize: 14, fontWeight: 600 }}>‹ Back to Home</Link>
         <span style={{ fontFamily: FONTS.display, fontSize: 17, fontWeight: 700 }}>Help & Guides</span>
       </div>
 
@@ -67,7 +67,7 @@ export function HelpPage() {
               <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 4 }}>Ready to play?</div>
               <div style={{ fontSize: 14, color: '#9aa4b2' }}>Pick a mode and jump into a live lobby.</div>
             </div>
-            <Link to="/app" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 26px', borderRadius: 13, fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT }}>Back to Lobby →</Link>
+            <Link to="/home" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 26px', borderRadius: 13, fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT }}>Back to Home →</Link>
           </div>
         </article>
       </div>

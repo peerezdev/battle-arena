@@ -39,7 +39,7 @@ export function BattleFlow() {
   const [joiningAll, setJoiningAll] = useState(false)
   const [botError, setBotError] = useState<string | null>(null)
   const [joiningSelf, setJoiningSelf] = useState(false)
-  const exit = () => navigate('/app')
+  const exit = () => navigate('/home')
 
   function onJoinSelf() {
     if (!battle) return
