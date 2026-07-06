@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 from datetime import datetime, timezone
 
 import httpx
@@ -16,6 +17,7 @@ import httpx
 from app.services.pack_engine import run_battle, resume_pack_battle
 from app.services.royale_engine import run_royale
 from app.services.refund import refund_pack_void, refund_royale_void
+from app.services.reconcile import reconcile_unresolved_pulls, has_pending_refunds
 from app.services.royale_funding import distribute_usdc, confirm_usdc
 from app.services.solana_tx import TOKEN_PROGRAM, build_token_transfer, build_create_ata
 from app.services.nft_transfer import build_transfer, submit_signed_tx, nft_in_owner
@@ -25,6 +27,8 @@ from solders.system_program import transfer, TransferParams
 from solders.token.associated import get_associated_token_address
 from solders.transaction import Transaction
 from solders.pubkey import Pubkey
+
+logger = logging.getLogger(__name__)
 
 
 async def fetch_latest_blockhash(rpc_url: str) -> str:
@@ -298,6 +302,7 @@ async def run_pack_battle_live(
         usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
     )
     if result == "voided":
+        await reconcile_unresolved_pulls(session, battle, gacha=gacha)
         await refund_pack_void(
             session, battle, escrow_wallet_id=battle.escrow_wallet_id, escrow_address=battle.escrow_address,
             build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
@@ -351,6 +356,7 @@ async def resume_pack_battle_live(session, battle, *, gacha, signer, rpc_url: st
         usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
     )
     if result == "voided":
+        await reconcile_unresolved_pulls(session, battle, gacha=gacha)
         await refund_pack_void(
             session, battle, escrow_wallet_id=battle.escrow_wallet_id, escrow_address=battle.escrow_address,
             build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
@@ -464,6 +470,7 @@ async def run_royale_live(
         usdc_balance=escrow_usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
     )
     if result == "voided":
+        await reconcile_unresolved_pulls(session, battle, gacha=gacha)
         await refund_royale_void(
             session, battle, escrow_wallet_id=battle.escrow_wallet_id, escrow_address=battle.escrow_address,
             build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
@@ -472,3 +479,55 @@ async def run_royale_live(
             operator_wallet_id=operator_wallet_id,
         )
     return result
+
+
+async def reconcile_voided_battle_live(session, battle, *, gacha, signer, rpc_url: str,
+                                       usdc_mint: str, token_program: str = TOKEN_PROGRAM,
+                                       operator_wallet_id: str = "", operator_address: str = "") -> None:
+    """Barrido post-void (startup / tarea diferida): re-poll de memos sin resolver + refund de lo
+    pendiente. Idempotente vía BattlePull.refunded; early-return si no queda nada. Nunca lanza."""
+    try:
+        if not battle.escrow_address or not has_pending_refunds(session, battle):
+            return
+        await reconcile_unresolved_pulls(session, battle, gacha=gacha)
+
+        async def build_transfer_tx(esc, dest, nft):
+            bh = await fetch_latest_blockhash(rpc_url)
+            return await build_transfer(rpc_url, esc, dest, nft, bh)
+
+        submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
+        confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
+
+        async def build_usdc_transfer_tx(src, dest, amount):
+            bh = await fetch_latest_blockhash(rpc_url)
+            return build_token_transfer(src, dest, usdc_mint, bh, amount=amount, decimals=6,
+                                        fee_payer=operator_address)
+
+        if battle.mode == "royale":
+            async def buyback_to_escrow(nft):
+                bb = await gacha.buyback(battle.escrow_address, nft)
+                txb = bb.get("serialized_transaction")
+                if not txb:
+                    return
+                signed = await signer.sign_solana(battle.escrow_wallet_id, txb)
+                await gacha.submit_tx(signed)
+
+            async def escrow_usdc_balance(esc_addr):
+                return await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
+
+            await refund_royale_void(
+                session, battle, escrow_wallet_id=battle.escrow_wallet_id,
+                escrow_address=battle.escrow_address, build_transfer_tx=build_transfer_tx,
+                submit_tx=submit_tx, signer=signer, build_usdc_transfer_tx=build_usdc_transfer_tx,
+                buyback_to_escrow=buyback_to_escrow, escrow_usdc_balance=escrow_usdc_balance,
+                confirm_in_escrow=confirm_in_escrow, operator_wallet_id=operator_wallet_id,
+            )
+        else:
+            await refund_pack_void(
+                session, battle, escrow_wallet_id=battle.escrow_wallet_id,
+                escrow_address=battle.escrow_address, build_transfer_tx=build_transfer_tx,
+                submit_tx=submit_tx, signer=signer, build_usdc_transfer_tx=build_usdc_transfer_tx,
+                confirm_in_escrow=confirm_in_escrow, operator_wallet_id=operator_wallet_id,
+            )
+    except Exception:
+        logger.exception("reconcile sweep failed for battle %s", battle.id)

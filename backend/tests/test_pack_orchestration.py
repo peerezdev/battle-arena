@@ -767,3 +767,95 @@ async def test_royale_wiring_passes_fee_closures(session, monkeypatch):
 
     assert seen["usdc_balance"] is not None
     assert seen["build_usdc_transfer_tx"] is not None
+
+
+@pytest.mark.asyncio
+async def test_void_reconcilia_antes_de_refundear(session, monkeypatch):
+    """En el path de void, reconcile_unresolved_pulls corre ANTES que refund_pack_void."""
+    import app.services.pack_orchestration as po
+    order = []
+
+    async def fake_run(*a, **kw):
+        return "voided"
+    async def fake_reconcile(session, battle, **kw):
+        order.append("reconcile"); return 0
+    async def fake_refund(session, battle, **kw):
+        order.append("refund")
+    monkeypatch.setattr(po, "run_battle", fake_run)
+    monkeypatch.setattr(po, "reconcile_unresolved_pulls", fake_reconcile)
+    monkeypatch.setattr(po, "refund_pack_void", fake_refund)
+
+    from app.models import PackBattle
+    b = PackBattle(id="w1", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="running", server_seed="ab" * 32)
+    session.add(b); session.commit()
+
+    class _S:
+        async def sign_solana(self, wid, tx): return "s"
+    out = await po.run_pack_battle_live(session, b, gacha=object(), signer=_S(),
+                                        rpc_url="http://rpc", usdc_mint="M" * 32,
+                                        min_usdc_base_units=50)
+    assert out == "voided"
+    assert order == ["reconcile", "refund"]
+
+
+@pytest.mark.asyncio
+async def test_reconcile_voided_battle_live_early_return_sin_pendientes(session, monkeypatch):
+    """Con todas las pulls refunded, el barrido no reconcilia ni refundea."""
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePull
+    called = []
+    async def fake_reconcile(*a, **kw): called.append("reconcile"); return 0
+    async def fake_refund(*a, **kw): called.append("refund")
+    monkeypatch.setattr(po, "reconcile_unresolved_pulls", fake_reconcile)
+    monkeypatch.setattr(po, "refund_pack_void", fake_refund)
+
+    b = PackBattle(id="w2", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="voided", escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b)
+    session.add(BattlePull(battle_id="w2", player_wallet="A", memo="mA", nft_address="n",
+                           refunded=True, round_number=1))
+    session.commit()
+    await po.reconcile_voided_battle_live(session, b, gacha=object(), signer=object(),
+                                          rpc_url="http://rpc", usdc_mint="M" * 32)
+    assert called == []
+
+
+@pytest.mark.asyncio
+async def test_reconcile_voided_battle_live_pack_reconcilia_y_refundea(session, monkeypatch):
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePull
+    order = []
+    async def fake_reconcile(session, battle, **kw): order.append("reconcile"); return 1
+    async def fake_refund(session, battle, **kw): order.append("refund")
+    monkeypatch.setattr(po, "reconcile_unresolved_pulls", fake_reconcile)
+    monkeypatch.setattr(po, "refund_pack_void", fake_refund)
+
+    b = PackBattle(id="w3", mode="pack", machine_code="m", price=50, max_players=2,
+                   status="voided", escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b)
+    session.add(BattlePull(battle_id="w3", player_wallet="A", memo="mA", round_number=1))
+    session.commit()
+    await po.reconcile_voided_battle_live(session, b, gacha=object(), signer=object(),
+                                          rpc_url="http://rpc", usdc_mint="M" * 32)
+    assert order == ["reconcile", "refund"]
+
+
+@pytest.mark.asyncio
+async def test_reconcile_voided_battle_live_royale_usa_refund_royale(session, monkeypatch):
+    import app.services.pack_orchestration as po
+    from app.models import PackBattle, BattlePull
+    order = []
+    async def fake_reconcile(session, battle, **kw): order.append("reconcile"); return 0
+    async def fake_refund_royale(session, battle, **kw): order.append("refund_royale")
+    monkeypatch.setattr(po, "reconcile_unresolved_pulls", fake_reconcile)
+    monkeypatch.setattr(po, "refund_royale_void", fake_refund_royale)
+
+    b = PackBattle(id="w4", mode="royale", machine_code="m", price=50, max_players=5,
+                   status="voided", escrow_wallet_id="eid", escrow_address="ESC")
+    session.add(b)
+    session.add(BattlePull(battle_id="w4", player_wallet="A", memo="mA", round_number=1))
+    session.commit()
+    await po.reconcile_voided_battle_live(session, b, gacha=object(), signer=object(),
+                                          rpc_url="http://rpc", usdc_mint="M" * 32)
+    assert order == ["reconcile", "refund_royale"]
