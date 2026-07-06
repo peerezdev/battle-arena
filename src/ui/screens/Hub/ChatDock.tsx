@@ -161,7 +161,7 @@ export function ChatDock({
             marginTop: 8,
           }}
         >
-          RECENT DROPS · CHAT
+          CHAT
         </div>
       </aside>
     )
@@ -177,7 +177,9 @@ export function ChatDock({
         height: '100%',
       }}
     >
-      {!chatOnly && (<>
+      {/* Recent Drops — hidden for now, kept for future reuse. Re-enable by changing
+          `false &&` back to `!chatOnly &&`. */}
+      {false && !chatOnly && (<>
       {/* ── RECENT DROPS ── */}
       <div
         style={{

@@ -21,7 +21,9 @@ beforeEach(() => {
 })
 
 describe('ChatDock live drops', () => {
-  it('renders a drop row with the opener username', () => {
+  // Recent Drops is hidden for now (kept in the code for future reuse) — the render-drops
+  // tests below are skipped until it's re-enabled in ChatDock.
+  it.skip('renders a drop row with the opener username', () => {
     addDrop({
       id: 'mint-1', name: 'Pikachu', valueUsd: 123.5, rarity: 'Rare',
       image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'neo',
@@ -32,7 +34,7 @@ describe('ChatDock live drops', () => {
     expect(screen.getByText('neo')).toBeTruthy()
   })
 
-  it('falls back to a short wallet when username is null', () => {
+  it.skip('falls back to a short wallet when username is null', () => {
     addDrop({
       id: 'mint-2', name: 'Charizard', valueUsd: 999, rarity: 'Epic',
       image: null, source: 'gacha', wallet: 'So1anaAAAAAAAAAAAAAAZZZZ', username: null,
@@ -45,7 +47,7 @@ describe('ChatDock live drops', () => {
 
   // Regression: a drop with ts in epoch SECONDS (backend / legacy cache) must render
   // a sane relative time, not "~20608d ago" from treating seconds as milliseconds.
-  it('renders a seconds-epoch ts as a recent time, not decades ago', () => {
+  it.skip('renders a seconds-epoch ts as a recent time, not decades ago', () => {
     addDrop({
       id: 'mint-secs', name: 'Mew', valueUsd: 50, rarity: 'Rare',
       image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'kai',
@@ -59,7 +61,7 @@ describe('ChatDock live drops', () => {
 
   // Regression: drops persisted before the global-drops change lack wallet/username.
   // ChatDock must render them (as 'anon') instead of crashing on userColor(undefined).
-  it('renders a legacy drop without wallet/username without crashing', () => {
+  it.skip('renders a legacy drop without wallet/username without crashing', () => {
     addDrop({
       id: 'mint-legacy', name: 'Squirtle', valueUsd: 10, rarity: 'Common',
       image: null, source: 'gacha', ts: Date.now(),
@@ -71,7 +73,7 @@ describe('ChatDock live drops', () => {
 
   // Lobby v2: an Epic drop gets a "BIG PULL" badge next to its name — the badge is
   // driven by rarity, not value, so a low-value Epic still earns it.
-  it('shows a BIG PULL badge for an Epic drop (rarity-driven, not value)', () => {
+  it.skip('shows a BIG PULL badge for an Epic drop (rarity-driven, not value)', () => {
     addDrop({
       id: 'mint-bigpull', name: 'Mewtwo', valueUsd: 200, rarity: 'Epic',
       image: null, source: 'gacha', wallet: 'WalletABCDEF1234', username: 'ash',
