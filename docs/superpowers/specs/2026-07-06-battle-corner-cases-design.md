@@ -63,10 +63,12 @@ async def reconcile_and_refund_voided(session, battle, *, gacha, <closures on-ch
   transfer/USDC de esa pull se envía con éxito, y **saltan** pulls ya
   `refunded` — así el barrido de startup puede re-ejecutar refunds sin
   duplicar transferencias.
-- El reparto de sobrante de royale (split entre vivos) NO se re-ejecuta en
-  barridos posteriores: solo corre en el void original (el sobrante ya se
-  repartió; volver a calcularlo repartiría de más). El barrido posterior solo
-  cubre pulls individuales reconciliadas.
+- Los barridos posteriores pueden re-ejecutar `refund_royale_void` completo:
+  las pulls individuales están guardadas por `refunded`, los buybacks marcan
+  `refunded` al completarse, y el reparto de sobrante (split entre vivos) lee
+  el balance ACTUAL del escrow — tras el void original queda ~0, así que una
+  re-ejecución solo reparte dinero nuevo (p. ej. el buyback de una carta
+  reconciliada tarde).
 
 ### Puntos de ejecución
 
