@@ -9,6 +9,8 @@ import { useReducedMotion } from '../useReducedMotion'
 import { useIsWide } from '../useIsWide'
 import { AuthButtons } from '../components/AuthButtons'
 import { RadioPlayer } from '../components/RadioPlayer'
+import { MobileRadioBar } from '../components/MobileRadioBar'
+import { useRadio } from '../radio/useRadio'
 import { DepositModal } from '../components/DepositModal'
 import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
@@ -47,6 +49,11 @@ export function AppShell() {
   const [dockCollapsed, setDockCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(DOCK_KEY) === '1' } catch { return false }
   })
+
+  // Radio is a singleton store — subscribing here only tells us whether the
+  // mobile mini-player (bottom stack) will render, to size the content padding.
+  const { tracks: radioTracks } = useRadio()
+  const mobileRadio = !wideRail && radioTracks.length > 0
 
   // First-visit onboarding — show the guided tour once per browser.
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
@@ -116,13 +123,17 @@ export function AppShell() {
           <LeftRail active={active} />
         </div>
       ) : (
-        <BottomNav
-          active={active}
-          onNavigate={() => setChatOpen(false)}
-          onChat={() => setChatOpen((o) => !o)}
-          chatActive={chatOpen}
-          chatUnread={chatUnread}
-        />
+        // Mobile bottom stack: radio mini-player floating above the tab bar.
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50 }}>
+          <MobileRadioBar />
+          <BottomNav
+            active={active}
+            onNavigate={() => setChatOpen(false)}
+            onChat={() => setChatOpen((o) => !o)}
+            chatActive={chatOpen}
+            chatUnread={chatUnread}
+          />
+        </div>
       )}
 
         {/* Global topbar (row 1) — spans the full content width, over the dock, so Recent Drops sits below it */}
@@ -134,10 +145,12 @@ export function AppShell() {
             alignItems: 'center',
             flexWrap: 'wrap',
             rowGap: 8,
-            gap: 14,
-            padding: '12px 18px',
-            borderBottom: `1px solid ${COLORS.border}`,
-            background: 'transparent',
+            gap: wideRail ? 14 : 10,
+            padding: wideRail ? '12px 18px' : '12px 14px',
+            borderBottom: '1px solid rgba(255,255,255,.07)',
+            background: wideRail ? 'transparent' : 'rgba(8,10,14,.9)',
+            backdropFilter: wideRail ? undefined : 'blur(14px)',
+            WebkitBackdropFilter: wideRail ? undefined : 'blur(14px)',
           }}
         >
           {/* Brand — "Collector Arena" wordmark on desktop; logo dot on mobile (no rail there) */}
@@ -146,24 +159,25 @@ export function AppShell() {
               Collector <span style={{ color: COLORS.green }}>Arena</span>
             </span>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <span
-                style={{
-                  width: 13,
-                  height: 13,
-                  borderRadius: 4,
-                  background: GRADIENT,
-                  boxShadow: '0 0 10px #ff2e9788',
-                }}
-              />
-            </div>
+            <span
+              style={{
+                flex: 'none',
+                width: 30,
+                height: 30,
+                borderRadius: 10,
+                background: GRADIENT,
+                boxShadow: '0 0 14px -4px rgba(0,255,196,.7)',
+              }}
+            />
           )}
 
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Radio — global player, lives above the router so audio survives navigation */}
-          <RadioPlayer />
+          {/* Radio — global player in the header on desktop; on mobile it lives in the
+              bottom stack (MobileRadioBar). The store is a singleton, so audio survives
+              navigation and breakpoint changes either way. */}
+          {wideRail && <RadioPlayer />}
 
           {/* Balance + Gimmighouls — labelled groups on desktop; one divided box on mobile */}
           {authenticated && (wideRail ? (
@@ -193,36 +207,40 @@ export function AppShell() {
               </div>
             </div>
           ) : (
-            // Mobile: USDC | Gimmighouls in one box, split by a vertical divider.
-            <div style={{ display: 'flex', alignItems: 'stretch', background: '#11161f', border: `1px solid ${COLORS.border}`, borderRadius: 11 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
-                <img src="/usdc.svg" alt="" width={17} height={17} style={{ display: 'block' }} />
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 13 }}>
-                  {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
-                </span>
-              </div>
-              <span style={{ width: 1, background: COLORS.border }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }} title="Gimmighouls">
-                <img src="/gimmighoul.png" alt="" width={17} height={17} style={{ display: 'block' }} />
-                <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 13 }}>
-                  {gimmighouls != null ? fmtGh(gimmighouls) : '—'}
-                </span>
-              </div>
+            // Mobile: one pill — USDC | Gimmighouls | compact "+" deposit square.
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 6px 6px 12px', borderRadius: 11, background: 'rgba(255,255,255,.05)', border: `1px solid ${COLORS.border}` }}>
+              <img src="/usdc.svg" alt="" width={15} height={15} style={{ display: 'block' }} />
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                {availableUsd(usdc, reserved) != null ? formatUsd(availableUsd(usdc, reserved)!) : '—'}
+              </span>
+              <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,.12)' }} />
+              <img src="/gimmighoul.png" alt="" title="Gimmighouls" width={15} height={15} style={{ display: 'block' }} />
+              <span style={{ fontSize: 13, fontWeight: 700 }}>
+                {gimmighouls != null ? fmtGh(gimmighouls) : '—'}
+              </span>
+              <button
+                onClick={() => setDepositOpen(true)}
+                title="Deposit"
+                aria-label="Deposit"
+                style={{ width: 26, height: 26, borderRadius: 8, border: 0, cursor: 'pointer', fontSize: 15, fontWeight: 700, color: '#06170f', background: 'linear-gradient(135deg,#3df0a0,#13c98a)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+              >
+                +
+              </button>
             </div>
           ))}
 
-          {/* Deposit (before the account pill, as in the mockup) */}
-          {authenticated && (
+          {/* Deposit (desktop — mobile has the compact "+" inside the balance pill) */}
+          {authenticated && wideRail && (
             <button
               onClick={() => setDepositOpen(true)}
               style={{
                 background: GRADIENT,
                 border: 'none',
                 borderRadius: 10,
-                padding: wideRail ? '9px 16px' : '7px 14px',
+                padding: '9px 16px',
                 color: '#06120c',
                 fontWeight: 800,
-                fontSize: wideRail ? 13 : 12,
+                fontSize: 13,
                 fontFamily: FONTS.display,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
@@ -248,7 +266,7 @@ export function AppShell() {
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            paddingBottom: !wideRail ? 72 : 0, // space for bottom nav on mobile
+            paddingBottom: wideRail ? 0 : mobileRadio ? 128 : 72, // space for the mobile bottom stack (nav + optional radio bar)
           }}
         >
           {/* Mobile: Live Drops strip at the top of the scroll (scrolls away on scroll down) */}
@@ -336,49 +354,44 @@ function BottomNav({
   chatActive: boolean
   chatUnread: boolean
 }) {
+  const INACTIVE = '#5c6675'
   const btn = {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 3,
     background: 'transparent', border: 'none', cursor: 'pointer',
-    padding: '8px 6px', borderRadius: 10, fontFamily: FONTS.body, flex: '1 1 0', minWidth: 0,
+    padding: 0, fontFamily: FONTS.body, flex: '1 1 0', minWidth: 0, lineHeight: 1.5,
   }
   return (
     <nav
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 60,
-        background: 'rgba(9,11,16,.94)',
+        background: 'rgba(8,10,14,.95)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
-        borderTop: `1px solid ${COLORS.border}`,
+        borderTop: '1px solid rgba(255,255,255,.07)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-around',
-        zIndex: 50,
-        overflowX: 'auto',
+        padding: '9px 2px 12px',
       }}
     >
       {NAV_ITEMS.map((item) => {
         const isActive = !chatActive && item.id === active
+        const color = isActive ? COLORS.green : INACTIVE
         return (
           <Link key={item.id} to={NAV_ROUTES[item.id]} onClick={onNavigate} title={item.label}
-            style={{ ...btn, textDecoration: 'none', color: isActive ? COLORS.text : COLORS.muted }}>
+            style={{ ...btn, textDecoration: 'none', color }}>
             {NAV_ICONS[item.id]}
-            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>{item.label}</span>
+            <span style={{ fontSize: 9.5, fontWeight: isActive ? 600 : 400 }}>{item.label}</span>
           </Link>
         )
       })}
       {/* Chat lives in the nav on mobile (no floating button) */}
-      <button onClick={onChat} title="Chat" style={{ ...btn, color: chatActive ? COLORS.text : COLORS.muted }}>
+      <button onClick={onChat} title="Chat" style={{ ...btn, color: chatActive ? COLORS.green : INACTIVE }}>
         <span style={{ position: 'relative', display: 'inline-flex' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
           {chatUnread && (
-            <span aria-label="Unread messages" style={{ position: 'absolute', top: -3, right: -4, width: 9, height: 9, borderRadius: '50%', background: COLORS.red, border: '2px solid rgba(9,11,16,.94)', boxShadow: `0 0 6px ${COLORS.red}` }} />
+            <span aria-label="Unread messages" style={{ position: 'absolute', top: -3, right: -4, width: 9, height: 9, borderRadius: '50%', background: COLORS.red, border: '2px solid rgba(8,10,14,.95)', boxShadow: `0 0 6px ${COLORS.red}` }} />
           )}
         </span>
-        <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.02em' }}>Chat</span>
+        <span style={{ fontSize: 9.5, fontWeight: chatActive ? 600 : 400 }}>Chat</span>
       </button>
     </nav>
   )
