@@ -576,7 +576,7 @@ async def reconcile_voided_battle_live(session, battle, *, gacha, signer, rpc_ur
     pendiente. Idempotente vía BattlePull.refunded; early-return si no queda nada. Nunca lanza.
 
     reconcile_max_attempts se pasa a reconcile_unresolved_pulls como max_attempts. Se mantiene en
-    1 por defecto (una sola consulta por pull, sin sleeps) porque este barrido corre en CADA
+    1 por defecto (a lo sumo 2 consultas y un sleep por pull, ~3s) porque este barrido corre en CADA
     startup para TODA batalla con refunds pendientes: una pull cuyo memo nunca resuelve (p. ej.
     crash antes de siquiera enviar la tx del pull) haría que el barrido reintentara 5 veces con
     delay 3.0 (~15s) por pull, por batalla, en cada arranque, para siempre. El default de 5 de
