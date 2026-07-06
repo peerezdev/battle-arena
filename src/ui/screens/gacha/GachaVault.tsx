@@ -331,7 +331,7 @@ export default function GachaVault() {
             scrollbarWidth: 'none',
           }}
         >
-          {machines.map((m) => {
+          {[...machines].sort((a, b) => (a.price ?? 0) - (b.price ?? 0)).map((m) => {
             const isActive = selected?.code === m.code
             return (
               <button
