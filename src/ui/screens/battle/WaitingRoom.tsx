@@ -95,11 +95,7 @@ export function WaitingRoom({
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'clamp(14px,2.4vw,28px)' }}>
-      <div style={{
-        width: 1040, maxWidth: '100%', margin: '0 auto', borderRadius: 22, overflow: 'hidden',
-        background: 'linear-gradient(180deg,#10131a,#0b0e14)', border: `1px solid ${COLORS.border}`,
-        boxShadow: '0 40px 110px -30px rgba(0,0,0,.85)',
-      }}>
+      <div style={{ width: 1040, maxWidth: '100%', margin: '0 auto' }}>
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 24px', borderBottom: `1px solid ${COLORS.border}`, flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 999, background: `${accent}1f`, border: `1px solid ${accent}73`, fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.2em', color: accent }}>
@@ -124,7 +120,7 @@ export function WaitingRoom({
                     return (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <div style={{ position: 'relative', width: 26, height: 34, borderRadius: 6, overflow: 'hidden', background: 'linear-gradient(160deg,#1a1322,#0f0a16)', border: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {img ? <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ width: 12, height: 12, borderRadius: 3.5, background: accent, transform: 'rotate(45deg)' }} />}
+                          {img && <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                           <span style={{ position: 'absolute', bottom: -7, left: '50%', transform: 'translateX(-50%)', fontFamily: FONTS.mono, fontSize: 7.5, color: '#7a8492' }}>{i + 1}</span>
                         </div>
                         {i < arr.length - 1 && <span style={{ color: '#4a4456', fontSize: 10, marginBottom: 6 }}>▸</span>}
@@ -147,18 +143,14 @@ export function WaitingRoom({
                 const order = g.startOrder === g.endOrder ? `${g.startOrder}º` : `${g.startOrder}º–${g.endOrder}º`
                 return (
                   <button key={g.code + i} onClick={() => setSel(i)} style={{ position: 'relative', flex: 'none', width: 132, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', textAlign: 'center', color: 'inherit', opacity: on ? 1 : 0.62, transition: 'opacity .2s,transform .2s', transform: on ? 'translateY(-4px)' : 'none' }}>
-                    <div style={{ position: 'relative', width: 132, height: 172, borderRadius: 16, overflow: 'hidden', background: 'linear-gradient(160deg,#1a1322,#0f0a16)', border, boxShadow: on ? `0 18px 44px -14px ${COLORS.green}55` : '0 14px 34px -16px rgba(0,0,0,.7)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                      {img && <img src={img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.5 }} />}
+                    <div style={{ position: 'relative', width: 132, height: 172, borderRadius: 16, overflow: 'hidden', background: 'linear-gradient(160deg,#1a1322,#0f0a16)', border, boxShadow: on ? `0 18px 44px -14px ${COLORS.green}55` : '0 14px 34px -16px rgba(0,0,0,.7)' }}>
+                      {img && <img src={img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
                       {isPB && <span style={{ position: 'absolute', top: 8, left: 8, padding: '3px 8px', borderRadius: 7, background: 'rgba(0,0,0,.55)', border: `1px solid ${COLORS.border}`, fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.08em', color: '#cdd4dd' }}>{order}</span>}
                       {isPB && g.qty > 1 && <span style={{ position: 'absolute', bottom: 8, right: 8, padding: '3px 8px', borderRadius: 7, background: `${COLORS.green}24`, border: `1px solid ${COLORS.green}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: COLORS.green }}>×{g.qty}</span>}
-                      <span style={{ position: 'relative', width: 54, height: 54, borderRadius: 16, background: accent, transform: 'rotate(45deg)', boxShadow: `0 0 30px -6px ${accent}` }} />
-                      <div style={{ position: 'relative', lineHeight: 1.3 }}>
-                        <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.16em', color: '#cdd4dd' }}>{(m?.shortName ?? m?.name ?? g.code).toUpperCase()}</div>
-                        <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.1em', color: '#7a8492' }}>{formatUsd(m?.price ?? 0)}</div>
-                      </div>
                       {on && <span style={{ position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: '50%', background: COLORS.green, color: '#06170f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
                     </div>
-                    <div style={{ marginTop: 8, fontSize: 14, fontWeight: 700, color: on ? COLORS.green : COLORS.muted }}>{formatUsd(m?.price ?? 0)}</div>
+                    <div style={{ marginTop: 8, fontFamily: FONTS.body, fontSize: 12.5, fontWeight: 700, color: on ? COLORS.text : COLORS.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m?.name ?? g.code}</div>
+                    <div style={{ marginTop: 2, fontFamily: FONTS.mono, fontSize: 12, fontWeight: 700, color: on ? COLORS.green : COLORS.muted }}>{formatUsd(m?.price ?? 0)}</div>
                   </button>
                 )
               })}
