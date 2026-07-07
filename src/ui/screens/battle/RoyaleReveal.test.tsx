@@ -24,10 +24,10 @@ describe('RoyaleReveal', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
     render(<MemoryRouter><RoyaleReveal vm={vm} reducedMotion /></MemoryRouter>)
     expect(screen.getByText(/ALIVE/i)).toBeTruthy()                          // battle bar
-    expect(screen.getAllByText('You')).toHaveLength(2)                       // grid card + leaderboard row (old single-grid view had 1)
-    expect(screen.getByText('RANKING')).toBeTruthy()                         // live ranking sidebar rendered
-    expect(document.querySelectorAll('[data-player-anchor]')).toHaveLength(2) // grid renders every player in seating order
-    expect(screen.getAllByText(/eliminated/i).length).toBeGreaterThan(0)     // B marked out
+    expect(screen.getAllByText('You')).toHaveLength(2)                       // standings row + player chip
+    expect(screen.getByText('STANDINGS')).toBeTruthy()                       // 1a standings sidebar rendered
+    expect(document.querySelectorAll('[data-player-anchor]')).toHaveLength(2) // one chip per player (emote anchor)
+    expect(screen.getByText(/OUT · R1/)).toBeTruthy()                        // B marked out in its chip
   })
 
   it('reduced motion on a settled battle fires onComplete (prop wired into the hook)', () => {

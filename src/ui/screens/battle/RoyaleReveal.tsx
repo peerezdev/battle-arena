@@ -11,8 +11,8 @@ import { CardBack } from './CardBack'
 import { useAliases } from '../../useAliases'
 import { EmoteBar } from '../../emotes/EmoteBar'
 import { shortWallet, tintFor, medalColor } from './royaleShared'
-import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
-import { LiveLeaderboard } from './LiveLeaderboard'
+import { useIsWide } from '../../useIsWide'
+import { useRoyaleReveal, totalRounds, revealOrderWallets } from './useRoyaleReveal'
 import { RoundBreakOverlay } from './RoundBreakOverlay'
 import { TieBreakRoulette } from './TieBreakRoulette'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
@@ -58,25 +58,30 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
     return p ? name(p) : shortWallet(w)
   }
 
+  const wide = useIsWide('(min-width: 860px)')
+  // Stage flanks: the pull that just resolved (the previous opener this round) and who opens next.
+  const order = revealOrderWallets(vm, rv.revealRound)
+  const activeIdx = activeWallet ? order.indexOf(activeWallet) : -1
+  const lastPlayer = activeIdx > 0 ? proj.players.find((p) => p.wallet === order[activeIdx - 1]) ?? null : null
+  const lastCard = lastPlayer?.cards[lastPlayer.cards.length - 1] ?? null
+  const lastPull = lastCard ? { name: lastCard.name ?? 'card', value: lastCard.insuredValue ?? 0 } : null
+  const upNextName = activeIdx >= 0 && activeIdx + 1 < order.length ? nameByWallet(order[activeIdx + 1]) : null
+
   return (
     <div style={{ ...screenStyle, position: 'relative' }}>
       {TITLE}
       <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
         <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
           revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
-        <Spotlight stagingCard={rv.stagingCard} revealKey={rv.stagingKey} activeName={activeName} isOpening={isOpening}
-          reducedMotion={reducedMotion} onCardShown={rv.onCardShown} />
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 520px', minWidth: 280, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
-            {proj.players.map((p) => (
-              <PlayerRevealCard key={p.wallet} p={p} name={name} reducedMotion={reducedMotion}
-                active={p.wallet === activeWallet} eliminatedBeat={p.wallet === rv.justEliminated} />
-            ))}
-          </div>
-          <div style={{ flex: '0 1 300px', minWidth: 240 }}>
-            <LiveLeaderboard vm={proj} name={name} />
-          </div>
+        {/* 1a · escenario central: stage (opener + card + last/next) + standings */}
+        <div style={{ display: 'grid', gridTemplateColumns: wide ? 'minmax(0,1fr) 300px' : '1fr', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
+          <Stage activePlayer={activePlayer} activeName={activeName} isOpening={isOpening}
+            stagingCard={rv.stagingCard} revealKey={rv.stagingKey} reducedMotion={reducedMotion}
+            onCardShown={rv.onCardShown} lastPull={lastPull} upNextName={upNextName} />
+          <Standings vm={proj} name={name} activeWallet={activeWallet} />
         </div>
+        {/* 1a · fila de chips de jugador (uno por jugador, ancla de emotes) */}
+        <ChipsRow players={proj.players} name={name} activeWallet={activeWallet} justEliminated={rv.justEliminated} reducedMotion={reducedMotion} />
       </div>
       {rv.phase === 'roundBreak' && !reducedMotion && <RoundBreakOverlay vm={proj} name={name} upcomingRound={rv.upcomingRound} countdown={rv.countdown} />}
       {rv.phase === 'tieBreak' && !reducedMotion && <TieBreakRoulette tied={rv.tiedWallets} eliminated={rv.tieEliminated} nameOf={nameByWallet} reducedMotion={reducedMotion} />}
@@ -162,76 +167,122 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
   )
 }
 
-// ─────────────────────────── SPOTLIGHT ───────────────────────────
-// The single card revealing right now — big + centered, playing the full staged ceremony
-// (year → grade → rarity → card). The player grid below only tracks standings.
-function Spotlight({ stagingCard, revealKey, activeName, isOpening, reducedMotion, onCardShown }: {
-  stagingCard: RevealCardVM | null; revealKey: string | null; activeName: string | null; isOpening: boolean
-  reducedMotion: boolean; onCardShown: () => void
+// ─────────────────────────── STAGE ───────────────────────────
+// Centre stage: the opener on the left, the single card playing its full staged ceremony
+// (year → grade → rarity → card) in the middle, and the last pull / up-next on the right.
+function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, reducedMotion, onCardShown, lastPull, upNextName }: {
+  activePlayer: RevealPlayerVM | null; activeName: string | null; isOpening: boolean
+  stagingCard: RevealCardVM | null; revealKey: string | null; reducedMotion: boolean; onCardShown: () => void
+  lastPull: { name: string; value: number } | null; upNextName: string | null
 }) {
-  const W = 172, H = 240
+  const W = 200, H = 280
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 22, minHeight: H + 44 }}>
-      {activeName ? (
-        <>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: '.16em', color: COLORS.muted }}>
-            {isOpening ? 'OPENING' : 'REVEALING'} · <span style={{ color: COLORS.text, fontWeight: 700 }}>{activeName}</span>
-          </div>
-          {stagingCard
-            ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
-                rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} onCardShown={onCardShown}>
-                <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
-              </StagedCardReveal>
-            : <CardBack width={W} height={H} accent={COLORS.muted} label="opening…" />}
-        </>
-      ) : (
-        <div style={{ width: W, height: H }} />
-      )}
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(18px,3vw,36px)', flexWrap: 'wrap',
+      borderRadius: 16, minHeight: H + 48, padding: 'clamp(16px,2vw,24px)',
+      background: 'radial-gradient(60% 90% at 50% 40%,rgba(0,255,196,.08),transparent 70%)', border: `1px solid ${COLORS.border}`,
+    }}>
+      {/* opener */}
+      <div style={{ textAlign: 'center', minWidth: 96 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%', marginBottom: 8, fontSize: 16, fontWeight: 700, color: '#06170f', background: activePlayer ? tintFor(activePlayer.wallet) : '#2a3340', border: '2px solid #06080b' }}>
+          {activeName ? activeName.slice(0, 1).toUpperCase() : ''}
+        </span>
+        <div style={{ fontSize: 15, fontWeight: 700, color: activePlayer?.isMe ? COLORS.green : COLORS.text }}>{activeName ?? '—'}</div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green, marginTop: 4 }}>{activeName ? (isOpening ? 'OPENING NOW' : 'REVEALING') : 'WAITING'}</div>
+      </div>
+
+      {/* card ceremony */}
+      {stagingCard
+        ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
+            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} onCardShown={onCardShown}>
+            <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
+          </StagedCardReveal>
+        : <CardBack width={W} height={H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}
+
+      {/* last pull / up next */}
+      <div style={{ textAlign: 'left', lineHeight: 1.3, minWidth: 110 }}>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#7a8492', marginBottom: 4 }}>LAST PULL</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#f5c542', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{lastPull?.name ?? '—'}</div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.green }}>{lastPull ? formatUsd(lastPull.value) : ''}</div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#7a8492', marginTop: 14 }}>UP NEXT</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{upNextName ?? '—'}</div>
+      </div>
     </div>
   )
 }
 
-// ─────────────────────────── PLAYER CARD ───────────────────────────
-function PlayerRevealCard({ p, name, reducedMotion, active, eliminatedBeat }: {
-  p: RevealPlayerVM; name: (p: RevealPlayerVM) => string; reducedMotion: boolean; active: boolean; eliminatedBeat: boolean
+// ─────────────────────────── STANDINGS ───────────────────────────
+// Live ranking by revealed value — one row per player (replaces the old grid+leaderboard pair).
+function Standings({ vm, name, activeWallet }: {
+  vm: RevealVM; name: (p: RevealPlayerVM) => string; activeWallet: string | null
 }) {
-  const elim = p.eliminatedRound != null
-  const latest = p.cards[p.cards.length - 1] ?? null
-  const pending = { wallet: p.wallet, isMe: p.isMe, nftAddress: null, rarity: null, insuredValue: null, autoSold: false, grade: null, year: null, name: null }
+  const sorted = [...vm.players].sort((a, b) => b.total - a.total || a.wallet.localeCompare(b.wallet))
   return (
-    <div data-player-anchor={p.wallet} style={{
-      position: 'relative', borderRadius: 18, padding: 12, overflow: 'hidden',
-      background: 'linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))',
-      border: `1px solid ${eliminatedBeat ? 'rgba(255,94,122,.6)' : active ? 'rgba(0,255,196,.6)' : COLORS.border}`,
-      boxShadow: eliminatedBeat ? '0 0 40px -14px rgba(255,94,122,.8)' : active ? '0 0 30px -12px rgba(0,255,196,.7)' : 'none',
-      transition: 'box-shadow .3s, border-color .3s',
-    }}>
-      <div style={{ opacity: elim ? 0.45 : 1, filter: elim ? 'grayscale(.9)' : 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ flex: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#06170f', background: tintFor(p.wallet), border: `2px solid ${p.isMe ? 'rgba(0,255,196,.7)' : 'rgba(255,255,255,.12)'}` }}>{name(p).slice(0, 1).toUpperCase()}</span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: p.isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 104 }}>{name(p)}</span>
-              {p.isMe && <span style={{ flex: 'none', padding: '1px 6px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRadius: 16, background: '#0c0f15', border: `1px solid ${COLORS.border}`, padding: '16px 18px', overflow: 'hidden' }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.1em', color: '#7a8492', marginBottom: 10 }}>STANDINGS</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, overflowY: 'auto', minHeight: 0 }}>
+        {sorted.map((p, i) => {
+          const cur = p.wallet === activeWallet
+          const elim = p.eliminatedRound != null
+          return (
+            <div key={p.wallet} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 9px', borderRadius: 8, background: cur ? 'rgba(0,255,196,.07)' : 'transparent' }}>
+              <span style={{ width: 14, fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, color: i === 0 ? '#f5c542' : '#7a8492' }}>{i + 1}</span>
+              <span style={{ flex: 'none', width: 18, height: 18, borderRadius: '50%', background: tintFor(p.wallet), opacity: elim ? 0.5 : 1 }} />
+              <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: cur ? COLORS.green : elim ? '#5d6674' : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: elim ? 'line-through' : 'none' }}>{name(p)}</span>
+              <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: p.total > 0 ? COLORS.text : '#7a8492' }}>{formatUsd(p.total)}</span>
             </div>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#6c7682', marginTop: 2 }}>{p.cards.length} card{p.cards.length === 1 ? '' : 's'}</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12, minHeight: 128 }}>
-          {latest
-            ? <RevealCard key={latest.nftAddress} card={latest} reducedMotion={reducedMotion} />
-            : <RevealCard card={pending} reducedMotion={reducedMotion} />}
-        </div>
-        <div>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.16em', color: COLORS.muted }}>TOTAL</div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em', color: elim ? COLORS.muted : COLORS.text }}>{formatUsd(p.total)}</div>
-        </div>
+          )
+        })}
       </div>
-      {elim && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,8,11,.34)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 13px', borderRadius: 10, background: 'rgba(255,94,122,.14)', border: '1px solid rgba(255,94,122,.45)', color: '#ff8198', fontSize: 12, fontWeight: 700 }}>✕ ELIMINATED · R{p.eliminatedRound}</span>
-        </div>
-      )}
+    </div>
+  )
+}
+
+// ─────────────────────────── CHIPS ROW ───────────────────────────
+// One compact chip per player along the bottom — carries data-player-anchor so thrown emotes
+// still land on a player. Shows their latest pull, "opening…" for the active opener, dimmed if out.
+function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }: {
+  players: RevealPlayerVM[]; name: (p: RevealPlayerVM) => string; activeWallet: string | null
+  justEliminated: string | null; reducedMotion: boolean
+}) {
+  return (
+    <div className="hidescroll" style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+      {players.map((p) => {
+        const cur = p.wallet === activeWallet
+        const out = p.eliminatedRound != null
+        const beat = !reducedMotion && p.wallet === justEliminated
+        const latest = p.cards[p.cards.length - 1] ?? null
+        const hasPull = !!latest && !cur
+        return (
+          <div key={p.wallet} data-player-anchor={p.wallet} style={{
+            flex: '1 0 96px', minWidth: 0, padding: '9px 8px', borderRadius: 12, textAlign: 'center', lineHeight: 1.3,
+            opacity: out ? 0.55 : 1, transition: 'box-shadow .3s, border-color .3s',
+            background: cur ? 'rgba(0,255,196,.08)' : 'rgba(255,255,255,.025)',
+            border: `1px solid ${beat ? 'rgba(255,94,122,.6)' : cur ? 'rgba(0,255,196,.45)' : out ? 'rgba(255,46,126,.25)' : COLORS.border}`,
+            boxShadow: beat ? '0 0 30px -12px rgba(255,94,122,.8)' : cur ? '0 0 24px -12px rgba(0,255,196,.7)' : 'none',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
+              <span style={{ flex: 'none', width: 16, height: 16, borderRadius: '50%', background: tintFor(p.wallet) }} />
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: p.isMe ? COLORS.green : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
+            </div>
+            <div style={{
+              height: 56, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', marginBottom: 6,
+              background: hasPull ? 'rgba(245,197,66,.06)' : 'linear-gradient(150deg,#141a24,#0b0e14)',
+              border: `1px solid ${cur ? 'rgba(0,255,196,.45)' : hasPull ? 'rgba(245,197,66,.3)' : COLORS.border}`,
+            }}>
+              <span style={{ fontSize: 9, lineHeight: 1.25, color: cur ? COLORS.green : hasPull ? '#cdd4dd' : '#4a525e', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                {cur ? 'opening…' : hasPull ? (latest!.name ?? 'card') : 'waiting'}
+              </span>
+            </div>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 700, color: cur ? COLORS.green : hasPull ? COLORS.green : '#4a525e' }}>
+              {cur ? '···' : hasPull ? formatUsd(latest!.insuredValue ?? 0) : '—'}
+            </div>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700, color: '#ff6ba4', minHeight: 12 }}>
+              {out ? `OUT · R${p.eliminatedRound}` : ''}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
