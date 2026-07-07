@@ -219,7 +219,12 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
 function Standings({ vm, name, activeWallet }: {
   vm: RevealVM; name: (p: RevealPlayerVM) => string; activeWallet: string | null
 }) {
-  const sorted = [...vm.players].sort((a, b) => b.total - a.total || a.wallet.localeCompare(b.wallet))
+  // Alive on top by value; eliminated sink to the bottom (most-recent first) so a living
+  // player never ranks below an out one. #1 = leader; the last alive is at risk this round.
+  const sorted = [...vm.players].sort((a, b) =>
+    ((b.eliminatedRound ?? 1e9) - (a.eliminatedRound ?? 1e9)) || (b.total - a.total) || a.wallet.localeCompare(b.wallet))
+  const aliveCount = vm.players.filter((p) => p.eliminatedRound == null).length
+  const atRiskWallet = aliveCount > 1 ? [...sorted].reverse().find((p) => p.eliminatedRound == null)?.wallet ?? null : null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRadius: 16, background: '#0c0f15', border: `1px solid ${COLORS.border}`, padding: '16px 18px', overflow: 'hidden' }}>
       <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.1em', color: '#7a8492', marginBottom: 10 }}>STANDINGS</div>
@@ -227,9 +232,10 @@ function Standings({ vm, name, activeWallet }: {
         {sorted.map((p, i) => {
           const cur = p.wallet === activeWallet
           const elim = p.eliminatedRound != null
+          const atRisk = p.wallet === atRiskWallet
           return (
             <div key={p.wallet} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 9px', borderRadius: 8, background: cur ? 'rgba(0,255,196,.07)' : 'transparent' }}>
-              <span style={{ width: 14, fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, color: i === 0 ? '#f5c542' : '#7a8492' }}>{i + 1}</span>
+              <span style={{ width: 14, fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, color: i === 0 ? '#f5c542' : atRisk ? '#ff5e7a' : '#7a8492', animation: atRisk ? 'ba-pulse 1s infinite' : undefined }}>{i + 1}</span>
               <span style={{ flex: 'none', width: 18, height: 18, borderRadius: '50%', background: tintFor(p.wallet), opacity: elim ? 0.5 : 1 }} />
               <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: cur ? COLORS.green : elim ? '#5d6674' : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: elim ? 'line-through' : 'none' }}>{name(p)}</span>
               {p.isMe && <span style={{ flex: 'none', padding: '1px 5px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', color: COLORS.green }}>YOU</span>}
