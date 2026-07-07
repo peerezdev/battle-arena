@@ -103,6 +103,7 @@ export function BattleFlow() {
         onJoinAllBots={onJoinAllBots}
         onCancel={onCancelLobby}
         onExit={exit}
+        onBack={() => navigate(-1)}
         joiningSelf={joiningSelf}
         joiningBot={joiningBot}
         joiningAll={joiningAll}

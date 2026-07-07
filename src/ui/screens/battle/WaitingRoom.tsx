@@ -34,7 +34,7 @@ function machineImg(m: GachaMachine | undefined): string | null {
 }
 
 export function WaitingRoom({
-  battle, meWallet, onJoinSelf, onJoinBot, onJoinAllBots, onCancel, onExit,
+  battle, meWallet, onJoinSelf, onJoinBot, onJoinAllBots, onCancel, onExit, onBack,
   joiningSelf, joiningBot, joiningAll, botError, cancelError,
 }: {
   battle: Battle
@@ -44,6 +44,7 @@ export function WaitingRoom({
   onJoinAllBots: () => void
   onCancel: () => void
   onExit: () => void
+  onBack: () => void        // ← navigate to the page the player came from (history back)
   joiningSelf: boolean
   joiningBot: boolean
   joiningAll: boolean
@@ -96,6 +97,18 @@ export function WaitingRoom({
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: 'clamp(14px,2.4vw,28px)' }}>
       <div style={{ width: 1040, maxWidth: '100%', margin: '0 auto' }}>
+        {/* back — return to the page the player came from */}
+        <button
+          type="button"
+          onClick={onBack}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, margin: '0 24px 4px', padding: '4px 0', background: 'transparent', border: 0, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 13, fontWeight: 600, color: COLORS.muted, transition: 'color .12s' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = COLORS.text }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = COLORS.muted }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+          Back
+        </button>
+
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 24px', borderBottom: `1px solid ${COLORS.border}`, flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 999, background: `${accent}1f`, border: `1px solid ${accent}73`, fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.2em', color: accent }}>

@@ -3,7 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 vi.mock('../../onchain/useBattle', () => ({ useBattle: vi.fn() }))
 vi.mock('../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'A' }))
-vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => vi.fn() }))
+const nav = vi.hoisted(() => vi.fn())
+vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => nav }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 // The winner's result mounts WinningsBuyback (wallet/buyback); this flow test only checks the result renders.
 vi.mock('../screens/battle/WinningsBuyback', () => ({ WinningsBuyback: () => null }))
@@ -42,6 +43,14 @@ describe('BattleFlow', () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'lobby', pulls: [] }, loading: false, error: null })
     render(<BattleFlow />)
     expect(screen.getByText(/waiting/i)).toBeTruthy()
+  })
+
+  it('Back in the lobby waiting room returns to the previous page (history back)', () => {
+    nav.mockClear()
+    mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'lobby', pulls: [] }, loading: false, error: null })
+    render(<BattleFlow />)
+    fireEvent.click(screen.getByText('Back'))
+    expect(nav).toHaveBeenCalledWith(-1)
   })
 
   it('renders the royale reveal while running', () => {
