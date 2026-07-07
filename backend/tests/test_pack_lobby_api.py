@@ -883,6 +883,25 @@ def test_join_bot_enabled_passes_gate_in_dev():
     assert r.json()["detail"] == "no existe"
 
 
+# ── /dev/announce: chat-event demo endpoint is dev-gated ──────────────────────
+
+def test_dev_announce_disabled_by_default():
+    """The chat-announcement demo endpoint 404s when DEV_ENDPOINTS_ENABLED is off."""
+    c, _priv = _build_client()
+    r = c.post("/dev/announce", json={"event": "hit", "user": "neo", "text": "pulled Charizard", "amountUsd": 320})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Not Found"
+
+
+def test_dev_announce_enabled_ok_in_dev():
+    """With dev endpoints on, /dev/announce accepts a sample announcement and returns ok."""
+    c, _priv = _build_client(dev_endpoints_enabled=True)
+    r = c.post("/dev/announce", json={"event": "winner", "user": "mole", "text": "won a Pack Battle",
+                                      "amountUsd": 1240, "mode": "pack", "action_label": "View"})
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
 # ── A2: /users/me/withdraw anti-drain (minimum amount + per-wallet rate limit) ─
 
 def test_withdraw_below_minimum_rejected():

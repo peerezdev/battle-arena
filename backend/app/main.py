@@ -106,6 +106,20 @@ class GeneratePackBody(BaseModel):
     pack_type: str = Field(min_length=1, max_length=32, pattern=r"^[a-z0-9_]+$")
 
 
+class DevAnnounceBody(BaseModel):
+    """DEV/TEST: fire a sample chat announcement so the render can be iterated without
+    waiting for a real hit/winner/created event. Broadcast-only by default (persist=False)
+    so it never pollutes the persisted history."""
+    text: str = Field(default="", max_length=200)
+    user: str = Field(default="📢 Arena", max_length=64)
+    event: Optional[str] = Field(default=None, pattern=r"^(hit|winner|created)$")
+    amountUsd: Optional[float] = None
+    mode: Optional[str] = Field(default=None, pattern=r"^(pack|royale)$")
+    action_label: Optional[str] = Field(default=None, max_length=24)
+    battle_id: str = Field(default="demo", max_length=64)
+    persist: bool = False
+
+
 class SubmitTxBody(BaseModel):
     signed_transaction: str = Field(min_length=1, max_length=3000)
 
@@ -1190,6 +1204,25 @@ def create_app(session_factory, chain: ChainSource,
         await _announce(f"created a {label}", user=creator_name,
                         extra={"event": "created", "amountUsd": stake, "mode": mode},
                         action={"label": "Join", "battleId": battle.id, "mode": mode})
+
+    @app.post("/dev/announce")
+    async def dev_announce(body: DevAnnounceBody):
+        """DEV/TEST: broadcast one sample chat announcement (dev-gated → 404 in prod).
+        Lets the chat-event design be iterated by firing hit/winner/created examples."""
+        if not dev_endpoints_enabled:
+            raise HTTPException(404, "Not Found")
+        extra: dict = {}
+        if body.event:
+            extra["event"] = body.event
+        if body.amountUsd is not None:
+            extra["amountUsd"] = body.amountUsd
+        if body.mode:
+            extra["mode"] = body.mode
+        action = None
+        if body.action_label:
+            action = {"label": body.action_label, "battleId": body.battle_id, "mode": body.mode or "pack"}
+        await _announce(body.text, user=body.user, extra=extra or None, action=action, persist=body.persist)
+        return {"ok": True}
 
     def _chat_allow(wallet: str) -> bool:
         now = _time.time()
