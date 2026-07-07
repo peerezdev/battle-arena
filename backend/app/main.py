@@ -483,7 +483,7 @@ def create_app(session_factory, chain: ChainSource,
             if mult is not None and mult >= hit_announce_mult:
                 who = drop.get("username") or abbreviate(drop.get("wallet") or "")
                 name = drop.get("name") or "una carta"
-                await _announce(f"sacó {name}", user=who,
+                await _announce(f"pulled {name}", user=who,
                                 extra={"event": "hit", "amountUsd": drop["valueUsd"]}, persist=True)
         except Exception:
             logger.exception("live drop broadcast failed")
@@ -546,9 +546,9 @@ def create_app(session_factory, chain: ChainSource,
                     return
                 who = read_user_view(s, b.winner, elo_start).get("alias") or abbreviate(b.winner)
             label = "Battle Royale" if mode == "royale" else "Pack Battle"
-            await _announce(f"ganó {label}", user=who,
+            await _announce(f"won a {label}", user=who,
                             extra={"event": "winner", "amountUsd": take, "mode": mode},
-                            action={"label": "Ver", "battleId": battle_id, "mode": mode}, persist=True)
+                            action={"label": "View", "battleId": battle_id, "mode": mode}, persist=True)
         except Exception:
             logger.exception("winner announce failed")
 

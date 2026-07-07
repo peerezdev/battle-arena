@@ -123,26 +123,26 @@ describe('ChatDock live drops', () => {
 
   it('renders a big-hit event like created: player + name + gold value, no button', () => {
     chatState.messages = [{
-      user: 'neo', text: 'sacó Charizard', ts: Date.now(),
+      user: 'neo', text: 'pulled Charizard', ts: Date.now(),
       kind: 'system', event: 'hit', amountUsd: 320,
     }]
     renderDock()
     expect(screen.getByText('neo')).toBeTruthy()
-    expect(screen.getByText(/sacó Charizard/)).toBeTruthy()
+    expect(screen.getByText(/pulled Charizard/)).toBeTruthy()
     expect(screen.getByText('$320')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Ver|Join|Unirse/ })).toBeNull()   // hits carry no action button
+    expect(screen.queryByRole('button', { name: /View|Join/ })).toBeNull()   // hits carry no action button
   })
 
-  it('renders a winner event like created: player + mode + gold value + Ver button', () => {
+  it('renders a winner event like created: player + mode + gold value + View button', () => {
     chatState.messages = [{
-      user: 'mole', text: 'ganó Pack Battle', ts: Date.now(),
+      user: 'mole', text: 'won a Pack Battle', ts: Date.now(),
       kind: 'system', event: 'winner', amountUsd: 1200, mode: 'pack',
-      action: { label: 'Ver', battleId: 'b9', mode: 'pack' },
+      action: { label: 'View', battleId: 'b9', mode: 'pack' },
     }]
     renderDock()
     expect(screen.getByText('mole')).toBeTruthy()
-    expect(screen.getByText(/ganó Pack Battle/)).toBeTruthy()
+    expect(screen.getByText(/won a Pack Battle/)).toBeTruthy()
     expect(screen.getByText('$1.2k')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Ver' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
   })
 })
