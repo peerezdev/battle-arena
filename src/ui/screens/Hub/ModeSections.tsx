@@ -78,15 +78,18 @@ export function ModeSections() {
               background: '#0c0f15', border: `1px solid rgba(${s.rgb},.28)`,
               padding: 'clamp(22px,3vw,30px) clamp(22px,3.4vw,34px)',
             }}>
-              {/* watermark cluster — the mode's navbar icon + big number, faint accent */}
+              {/* watermark cluster — the mode's navbar icon + big number, faint accent.
+                  The icon uses a SOLID colour + group opacity (not a low-alpha stroke): its
+                  many overlapping stroke paths would otherwise compound alpha at crossings and
+                  read as darker "layered" patches. Opacity flattens the icon, then fades once. */}
               <span aria-hidden style={{
                 position: 'absolute', top: -20, right: 10, pointerEvents: 'none',
-                display: 'flex', alignItems: 'center', gap: 10, color: `rgba(${s.rgb},.13)`,
+                display: 'flex', alignItems: 'center', gap: 10,
               }}>
-                <span style={{ display: 'inline-flex', width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ display: 'inline-flex', width: 60, height: 60, alignItems: 'center', justifyContent: 'center', color: `rgb(${s.rgb})`, opacity: 0.16 }}>
                   <span style={{ display: 'inline-flex', transform: 'scale(2.6)' }}>{NAV_ICONS[s.nav]}</span>
                 </span>
-                <span style={{ fontFamily: FONTS.mono, fontSize: 96, fontWeight: 700, lineHeight: 1 }}>{s.n}</span>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 96, fontWeight: 700, lineHeight: 1, color: `rgba(${s.rgb},.13)` }}>{s.n}</span>
               </span>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
                 <span style={{ fontSize: 24, fontWeight: 700, color: s.title }}>{s.name}</span>
