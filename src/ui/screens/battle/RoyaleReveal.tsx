@@ -232,6 +232,7 @@ function Standings({ vm, name, activeWallet }: {
               <span style={{ width: 14, fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, color: i === 0 ? '#f5c542' : '#7a8492' }}>{i + 1}</span>
               <span style={{ flex: 'none', width: 18, height: 18, borderRadius: '50%', background: tintFor(p.wallet), opacity: elim ? 0.5 : 1 }} />
               <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: cur ? COLORS.green : elim ? '#5d6674' : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: elim ? 'line-through' : 'none' }}>{name(p)}</span>
+              {p.isMe && <span style={{ flex: 'none', padding: '1px 5px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', color: COLORS.green }}>YOU</span>}
               <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: p.total > 0 ? COLORS.text : '#7a8492' }}>{formatUsd(p.total)}</span>
             </div>
           )
