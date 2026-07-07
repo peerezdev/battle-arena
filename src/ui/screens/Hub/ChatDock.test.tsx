@@ -130,6 +130,7 @@ describe('ChatDock live drops', () => {
     expect(screen.getByText('neo')).toBeTruthy()
     expect(screen.getByText(/pulled Charizard/)).toBeTruthy()
     expect(screen.getByText('$320')).toBeTruthy()
+    expect(screen.getByText('GACHA')).toBeTruthy()                          // gacha source tag
     expect(screen.queryByRole('button', { name: /View|Join/ })).toBeNull()   // hits carry no action button
   })
 

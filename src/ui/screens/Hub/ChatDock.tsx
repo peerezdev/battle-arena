@@ -530,8 +530,8 @@ export function ChatDock({
               /* Structured system event — same inline look for all three:
                  icon + "{who} {text}" + gold value (+ optional button).
                  created: "{creator} created a Pack Battle $50" [Join]
-                 hit:     "{who} sacó {card} $320"
-                 winner:  "{who} ganó Pack Battle $1.2k" [Ver] */
+                 hit:     "🔥 [GACHA] {who} pulled {card} $320"  (hits are always gacha pulls)
+                 winner:  "{who} won a Pack Battle $1.2k" [View] */
               <div key={`${msg.ts}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 2px' }}>
                 {msg.event === 'created' ? (
                   <svg width="12" height="12" viewBox="0 0 16 16" fill={COLORS.green} style={{ flexShrink: 0 }} aria-hidden="true">
@@ -540,6 +540,10 @@ export function ChatDock({
                   </svg>
                 ) : (
                   <span style={{ flexShrink: 0, fontSize: 12, lineHeight: 1 }} aria-hidden="true">{msg.event === 'winner' ? '🏆' : '🔥'}</span>
+                )}
+                {/* every hit is a gacha pull — tag it so the source reads at a glance */}
+                {msg.event === 'hit' && (
+                  <span style={{ flexShrink: 0, padding: '1px 7px', borderRadius: 6, background: 'rgba(169,139,255,.14)', border: '1px solid rgba(169,139,255,.4)', fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700, letterSpacing: '.1em', color: '#a98bff' }}>GACHA</span>
                 )}
                 <span style={{ flex: 1, fontSize: 12, fontFamily: FONTS.body, lineHeight: 1.35 }}>
                   <span style={{ color: userColor(msg.user), fontWeight: 700 }}>{msg.user}</span>
