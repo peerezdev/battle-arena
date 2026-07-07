@@ -10,8 +10,8 @@ export interface ChatLine {
   ts: number
   kind?: 'system'            // system announcements (battle created, big hit, winner)
   action?: ChatAction        // optional button (quick-join / view)
-  event?: 'created'          // structured event for custom rendering
-  amountUsd?: number         // stake/value styled in gold (created events)
+  event?: 'created' | 'hit' | 'winner'  // structured event for custom rendering (icon + name + gold value)
+  amountUsd?: number         // stake/value styled in gold (created / hit / winner events)
   mode?: string              // 'pack' | 'royale'
 }
 
@@ -90,6 +90,9 @@ export function useChat(enabled = true): {
                 ts: m.ts as number,
                 kind: m.kind as 'system' | undefined,
                 action: m.action as ChatAction | undefined,
+                event: m.event as ChatLine['event'],
+                amountUsd: m.amountUsd as number | undefined,
+                mode: m.mode as string | undefined,
               })),
             )
           } else if (msg.type === 'message') {
@@ -101,7 +104,7 @@ export function useChat(enabled = true): {
                 ts: msg.ts as number,
                 kind: msg.kind as 'system' | undefined,
                 action: msg.action as ChatAction | undefined,
-                event: msg.event as 'created' | undefined,
+                event: msg.event as ChatLine['event'],
                 amountUsd: msg.amountUsd as number | undefined,
                 mode: msg.mode as string | undefined,
               },

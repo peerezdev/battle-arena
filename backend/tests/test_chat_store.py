@@ -60,6 +60,22 @@ def test_system_announcement_persists_kind_and_action(session):
     assert hist[1] == {"user": "📢 Arena", "text": "🔥 big hit", "ts": 6, "kind": "system"}
 
 
+def test_structured_event_persists_event_and_amount(session):
+    # A persisted big-hit / winner must round-trip its event tag + gold value so it
+    # re-renders in the structured style (not plain text) after a reconnect.
+    save_chat_message(session, "neo", "sacó Charizard", ts=7, kind="system",
+                      event="hit", amount_usd=320.0)
+    save_chat_message(session, "mole", "ganó Pack Battle", ts=8, kind="system",
+                      event="winner", amount_usd=1200.0,
+                      action={"label": "Ver", "battleId": "b9", "mode": "pack"})
+    hist = recent_chat_messages(session)
+    assert hist[0] == {"user": "neo", "text": "sacó Charizard", "ts": 7,
+                       "kind": "system", "event": "hit", "amountUsd": 320.0}
+    assert hist[1] == {"user": "mole", "text": "ganó Pack Battle", "ts": 8,
+                       "kind": "system", "event": "winner", "amountUsd": 1200.0,
+                       "action": {"label": "Ver", "battleId": "b9", "mode": "pack"}}
+
+
 @pytest.mark.parametrize("value,cost_base,expected", [
     (150.0, 50_000_000, 3.0),     # $150 hit on a $50 pull → x3
     (500.0, 50_000_000, 10.0),

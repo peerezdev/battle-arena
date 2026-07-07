@@ -180,3 +180,5 @@ class ChatMessage(Base):
     ts: Mapped[int] = mapped_column(Integer, index=True)   # unix seconds
     kind: Mapped[str] = mapped_column(String, default="user")            # "user" | "system" (announcements)
     action: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON {label, battleId, mode} for a button
+    event: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # "created" | "hit" | "winner" — structured render tag
+    amount_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # value styled in gold (hit pull / winner take)

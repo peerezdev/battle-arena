@@ -526,13 +526,21 @@ export function ChatDock({
               Be the first to write…
             </div>
           ) : (
-            messages.map((msg, idx) => msg.kind === 'system' && msg.event === 'created' ? (
-              /* Battle-created chat event: "{creator} created a Pack Battle $50" + quick-join */
+            messages.map((msg, idx) => msg.kind === 'system' && (msg.event === 'created' || msg.event === 'hit' || msg.event === 'winner') ? (
+              /* Structured system event — same inline look for all three:
+                 icon + "{who} {text}" + gold value (+ optional button).
+                 created: "{creator} created a Pack Battle $50" [Join]
+                 hit:     "{who} sacó {card} $320"
+                 winner:  "{who} ganó Pack Battle $1.2k" [Ver] */
               <div key={`${msg.ts}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '3px 2px' }}>
-                <svg width="12" height="12" viewBox="0 0 16 16" fill={COLORS.green} style={{ flexShrink: 0 }} aria-hidden="true">
-                  <circle cx="8" cy="5" r="3" />
-                  <path d="M2 15c0-3.3 2.7-6 6-6s6 2.7 6 6z" />
-                </svg>
+                {msg.event === 'created' ? (
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill={COLORS.green} style={{ flexShrink: 0 }} aria-hidden="true">
+                    <circle cx="8" cy="5" r="3" />
+                    <path d="M2 15c0-3.3 2.7-6 6-6s6 2.7 6 6z" />
+                  </svg>
+                ) : (
+                  <span style={{ flexShrink: 0, fontSize: 12, lineHeight: 1 }} aria-hidden="true">{msg.event === 'winner' ? '🏆' : '🔥'}</span>
+                )}
                 <span style={{ flex: 1, fontSize: 12, fontFamily: FONTS.body, lineHeight: 1.35 }}>
                   <span style={{ color: userColor(msg.user), fontWeight: 700 }}>{msg.user}</span>
                   <span style={{ color: COLORS.muted }}> {msg.text} </span>

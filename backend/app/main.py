@@ -483,8 +483,8 @@ def create_app(session_factory, chain: ChainSource,
             if mult is not None and mult >= hit_announce_mult:
                 who = drop.get("username") or abbreviate(drop.get("wallet") or "")
                 name = drop.get("name") or "una carta"
-                await _announce(f"🔥 {who} sacó {name} · ${drop['valueUsd']:,.0f} (x{mult:.1f} la tirada)",
-                                persist=True)
+                await _announce(f"sacó {name}", user=who,
+                                extra={"event": "hit", "amountUsd": drop["valueUsd"]}, persist=True)
         except Exception:
             logger.exception("live drop broadcast failed")
 
@@ -544,10 +544,10 @@ def create_app(session_factory, chain: ChainSource,
                            for p in s.query(BattlePull).filter_by(battle_id=battle_id).all())
                 if entry <= 0 or take < winner_announce_mult * entry:
                     return
-                mult = take / entry
                 who = read_user_view(s, b.winner, elo_start).get("alias") or abbreviate(b.winner)
             label = "Battle Royale" if mode == "royale" else "Pack Battle"
-            await _announce(f"🏆 {who} se llevó ${take:,.0f} en {label} (x{mult:.1f} la entrada)",
+            await _announce(f"ganó {label}", user=who,
+                            extra={"event": "winner", "amountUsd": take, "mode": mode},
                             action={"label": "Ver", "battleId": battle_id, "mode": mode}, persist=True)
         except Exception:
             logger.exception("winner announce failed")
@@ -1173,7 +1173,9 @@ def create_app(session_factory, chain: ChainSource,
                 msg.update(extra)
             if persist:
                 with session_factory() as s:
-                    save_chat_message(s, author, text, msg["ts"], kind="system", action=action)
+                    save_chat_message(s, author, text, msg["ts"], kind="system", action=action,
+                                      event=(extra or {}).get("event"),
+                                      amount_usd=(extra or {}).get("amountUsd"))
             await _chat_mgr.broadcast(msg)
         except Exception:
             logger.exception("chat announce failed")

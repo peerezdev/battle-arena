@@ -33,6 +33,8 @@ _ENSURE_COLUMNS = [
     ("gacha_packs", "name", "VARCHAR"),
     ("chat_messages", "kind", "VARCHAR NOT NULL DEFAULT 'user'"),
     ("chat_messages", "action", "VARCHAR"),
+    ("chat_messages", "event", "VARCHAR"),
+    ("chat_messages", "amount_usd", "FLOAT"),
     ("battle_pulls", "refunded", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 
