@@ -193,6 +193,9 @@ textarea::placeholder {
 @keyframes wr-pulse { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
 @keyframes wr-in { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:none} }
 
+/* Royale standings — at-risk (last alive) row pulses a red background (text stays readable) */
+@keyframes ba-atrisk { 0%,100% { background: rgba(255,94,122,.07) } 50% { background: rgba(255,94,122,.22) } }
+
 /* Onboarding tutorial — mascot guide + speech bubble (first-visit) */
 @keyframes ob-in { 0%{opacity:0;transform:translateY(14px) scale(.97)} 100%{opacity:1;transform:none} }
 @keyframes ob-step { 0%{opacity:0;transform:translateX(18px)} 100%{opacity:1;transform:none} }

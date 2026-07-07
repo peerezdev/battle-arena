@@ -233,9 +233,15 @@ function Standings({ vm, name, activeWallet }: {
           const cur = p.wallet === activeWallet
           const elim = p.eliminatedRound != null
           const atRisk = p.wallet === atRiskWallet
+          const leader = i === 0
           return (
-            <div key={p.wallet} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 9px', borderRadius: 8, background: cur ? 'rgba(0,255,196,.07)' : 'transparent' }}>
-              <span style={{ width: 14, fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, color: i === 0 ? '#f5c542' : atRisk ? '#ff5e7a' : '#7a8492', animation: atRisk ? 'ba-pulse 1s infinite' : undefined }}>{i + 1}</span>
+            <div key={p.wallet} style={{
+              display: 'flex', alignItems: 'center', gap: 9, padding: '6px 9px', borderRadius: 8,
+              border: `1px solid ${leader ? 'rgba(245,197,66,.4)' : atRisk ? 'rgba(255,94,122,.45)' : 'transparent'}`,
+              background: atRisk ? 'rgba(255,94,122,.07)' : leader ? 'rgba(245,197,66,.09)' : cur ? 'rgba(0,255,196,.07)' : 'transparent',
+              animation: atRisk ? 'ba-atrisk 1.1s ease-in-out infinite' : undefined,
+            }}>
+              <span style={{ width: 14, fontFamily: FONTS.mono, fontSize: 10.5, fontWeight: 700, color: leader ? '#f5c542' : atRisk ? '#ff5e7a' : '#7a8492' }}>{i + 1}</span>
               <span style={{ flex: 'none', width: 18, height: 18, borderRadius: '50%', background: tintFor(p.wallet), opacity: elim ? 0.5 : 1 }} />
               <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: cur ? COLORS.green : elim ? '#5d6674' : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: elim ? 'line-through' : 'none' }}>{name(p)}</span>
               {p.isMe && <span style={{ flex: 'none', padding: '1px 5px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', color: COLORS.green }}>YOU</span>}
