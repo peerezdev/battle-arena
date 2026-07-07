@@ -13,7 +13,7 @@ import { useAliases } from '../../useAliases'
 import { EmoteBar } from '../../emotes/EmoteBar'
 import { shortWallet, tintFor, medalColor } from './royaleShared'
 import { useIsWide } from '../../useIsWide'
-import { useRoyaleReveal, totalRounds, revealOrderWallets } from './useRoyaleReveal'
+import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
 import { RoundBreakOverlay } from './RoundBreakOverlay'
 import { TieBreakRoulette } from './TieBreakRoulette'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
@@ -64,24 +64,17 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
   }
 
   const wide = useIsWide('(min-width: 860px)')
-  // Stage flanks: the pull that just resolved (the previous opener this round) and who opens next.
-  const order = revealOrderWallets(vm, rv.revealRound)
-  const activeIdx = activeWallet ? order.indexOf(activeWallet) : -1
-  const lastPlayer = activeIdx > 0 ? proj.players.find((p) => p.wallet === order[activeIdx - 1]) ?? null : null
-  const lastCard = lastPlayer?.cards[lastPlayer.cards.length - 1] ?? null
-  const lastPull = lastCard ? { name: lastCard.name ?? 'card', value: lastCard.insuredValue ?? 0 } : null
-  const upNextName = activeIdx >= 0 && activeIdx + 1 < order.length ? nameByWallet(order[activeIdx + 1]) : null
 
   return (
     <div style={{ ...screenStyle, position: 'relative' }}>
       <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
-        <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
-          revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
-        {/* 1a · escenario central: stage (opener + card + last/next) + standings */}
-        <div style={{ display: 'grid', gridTemplateColumns: wide ? 'minmax(0,1fr) 300px' : '1fr', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
+        {/* vertical battle bar (left) · stage (center) · standings (right) */}
+        <div style={{ display: 'grid', gridTemplateColumns: wide ? '224px minmax(0,1fr) 300px' : '1fr', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
+          <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
+            revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
           <Stage activePlayer={activePlayer} activeName={activeName} isOpening={isOpening}
             stagingCard={rv.stagingCard} revealKey={rv.stagingKey} reducedMotion={reducedMotion}
-            onCardShown={rv.onCardShown} lastPull={lastPull} upNextName={upNextName} />
+            onCardShown={rv.onCardShown} />
           <Standings vm={proj} name={name} activeWallet={activeWallet} />
         </div>
         {/* 1a · fila de chips de jugador (uno por jugador, ancla de emotes) */}
@@ -116,54 +109,60 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
   )
 }
 
-// ─────────────────────────── BATTLE BAR ───────────────────────────
+// ─────────────────────────── BATTLE BAR (vertical, left of the stage) ───────────────────────────
 function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, settled }: {
   proj: RevealVM; totalPlayers: number; alive: number; entry: number; revealRound: number; rounds: number; settled: boolean
 }) {
   const progress = totalPlayers > 1 ? (totalPlayers - alive) / (totalPlayers - 1) : 0
+  const rule = <span style={{ height: 1, background: COLORS.border }} />
   return (
     <section style={{
-      position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap',
-      padding: '16px 22px', borderRadius: 18, marginBottom: 22,
-      background: 'linear-gradient(135deg,rgba(255,46,151,.16),rgba(13,17,22,.55) 46%,rgba(0,255,196,.10))',
+      display: 'flex', flexDirection: 'column', gap: 14, padding: '18px 18px', borderRadius: 16,
+      background: 'linear-gradient(160deg,rgba(255,46,151,.16),rgba(13,17,22,.55) 55%,rgba(0,255,196,.10))',
       border: `1px solid ${COLORS.border}`,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-        <div style={{ width: 50, height: 50, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(255,46,151,.5)', boxShadow: '0 0 24px -8px rgba(255,46,151,.7)' }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6bb5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
+      {/* mark + LIVE */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 'none', width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(255,46,151,.5)', boxShadow: '0 0 24px -8px rgba(255,46,151,.7)' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff6bb5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
         </div>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            {!settled && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,94,122,.12)', border: '1px solid rgba(255,94,122,.32)', fontFamily: FONTS.mono, fontSize: 11, color: '#ff8198' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5e7a', boxShadow: '0 0 6px #ff5e7a' }} />LIVE
-              </span>
-            )}
-          </div>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: COLORS.muted, marginTop: 3 }}>
-            Battle Royale · entry {formatUsd(entry)} · last one standing
-          </div>
-        </div>
-      </div>
-      <div style={{ flex: '1 1 220px', minWidth: 190 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.muted }}>
-            {settled ? 'Battle complete' : 'Revealing the round'}
+        {!settled && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,94,122,.12)', border: '1px solid rgba(255,94,122,.32)', fontFamily: FONTS.mono, fontSize: 11, color: '#ff8198' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5e7a', boxShadow: '0 0 6px #ff5e7a' }} />LIVE
           </span>
+        )}
+      </div>
+
+      {/* title + sub */}
+      <div>
+        <div style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 700, letterSpacing: '-.01em' }}>Battle Royale</div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginTop: 3 }}>entry {formatUsd(entry)} · last one standing</div>
+      </div>
+
+      {rule}
+
+      {/* round + progress */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.muted }}>{settled ? 'Battle complete' : 'Revealing'}</span>
           <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>round <span style={{ color: COLORS.text, fontWeight: 700 }}>{Math.min(revealRound, rounds)}</span> / {rounds}</span>
         </div>
         <div style={{ height: 8, borderRadius: 8, background: '#ffffff10', overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
           <div style={{ height: '100%', width: `${Math.round(progress * 100)}%`, borderRadius: 8, background: GRADIENT, boxShadow: '0 0 16px -2px rgba(0,255,196,.7)', transition: 'width .4s ease' }} />
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-        <div style={{ textAlign: 'right' }}>
+
+      {rule}
+
+      {/* alive + pot */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+        <div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }}>ALIVE</div>
           <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em' }}><span style={{ color: COLORS.green }}>{alive}</span><span style={{ color: '#5c6675', fontSize: 16 }}> / {totalPlayers}</span></div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }}>POT REVEALED</div>
-          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(proj.potValue)}</div>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }}>POT</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em', background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(proj.potValue)}</div>
         </div>
       </div>
     </section>
@@ -171,27 +170,28 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
 }
 
 // ─────────────────────────── STAGE ───────────────────────────
-// Centre stage: the opener on the left, the single card playing its full staged ceremony
-// (year → grade → rarity → card) in the middle, and the last pull / up-next on the right.
-function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, reducedMotion, onCardShown, lastPull, upNextName }: {
+// Centre stage: the opener sits above the single card, which plays its full staged ceremony
+// (year → grade → rarity → card).
+function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, reducedMotion, onCardShown }: {
   activePlayer: RevealPlayerVM | null; activeName: string | null; isOpening: boolean
   stagingCard: RevealCardVM | null; revealKey: string | null; reducedMotion: boolean; onCardShown: () => void
-  lastPull: { name: string; value: number } | null; upNextName: string | null
 }) {
   const W = 200, H = 280
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(18px,3vw,36px)', flexWrap: 'wrap',
-      borderRadius: 16, minHeight: H + 48, padding: 'clamp(16px,2vw,24px)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16,
+      borderRadius: 16, minHeight: H + 88, padding: 'clamp(16px,2vw,24px)',
       background: 'radial-gradient(60% 90% at 50% 40%,rgba(0,255,196,.08),transparent 70%)', border: `1px solid ${COLORS.border}`,
     }}>
-      {/* opener */}
-      <div style={{ textAlign: 'center', minWidth: 96 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%', marginBottom: 8, fontSize: 16, fontWeight: 700, color: '#06170f', background: activePlayer ? tintFor(activePlayer.wallet) : '#2a3340', border: '2px solid #06080b' }}>
+      {/* opener — above the card */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 36 }}>
+        <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: '50%', fontSize: 13, fontWeight: 700, color: '#06170f', background: activePlayer ? tintFor(activePlayer.wallet) : '#2a3340', border: '2px solid #06080b' }}>
           {activeName ? activeName.slice(0, 1).toUpperCase() : ''}
         </span>
-        <div style={{ fontSize: 15, fontWeight: 700, color: activePlayer?.isMe ? COLORS.green : COLORS.text }}>{activeName ?? '—'}</div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green, marginTop: 4 }}>{activeName ? (isOpening ? 'OPENING NOW' : 'REVEALING') : 'WAITING'}</div>
+        <span style={{ fontSize: 16, fontWeight: 700, color: activePlayer?.isMe ? COLORS.green : COLORS.text }}>{activeName ?? '—'}</span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.12em', color: COLORS.green, padding: '3px 8px', borderRadius: 7, background: 'rgba(0,255,196,.1)', border: '1px solid rgba(0,255,196,.3)' }}>
+          {activeName ? (isOpening ? 'OPENING NOW' : 'REVEALING') : 'WAITING'}
+        </span>
       </div>
 
       {/* card ceremony */}
@@ -201,15 +201,6 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
           </StagedCardReveal>
         : <CardBack width={W} height={H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}
-
-      {/* last pull / up next */}
-      <div style={{ textAlign: 'left', lineHeight: 1.3, minWidth: 110 }}>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#7a8492', marginBottom: 4 }}>LAST PULL</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#f5c542', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{lastPull?.name ?? '—'}</div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: COLORS.green }}>{lastPull ? formatUsd(lastPull.value) : ''}</div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#7a8492', marginTop: 14 }}>UP NEXT</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 }}>{upNextName ?? '—'}</div>
-      </div>
     </div>
   )
 }
