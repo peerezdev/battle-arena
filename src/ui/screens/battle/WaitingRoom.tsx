@@ -120,7 +120,7 @@ export function WaitingRoom({
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: wide ? 'minmax(0,1fr) 330px' : '1fr' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: wide ? `minmax(0,1fr) ${battle.max_players > 5 ? 448 : 330}px` : '1fr' }}>
           {/* ── left: packs + odds ── */}
           <div style={{ padding: 'clamp(18px,2.2vw,26px) clamp(18px,2.4vw,30px)' }}>
             {/* lineup / sequence */}
@@ -211,33 +211,44 @@ export function WaitingRoom({
               <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.24em', color: COLORS.muted }}>PLAYERS</span>
               <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.text, fontWeight: 700 }}>{battle.players.length}<span style={{ color: '#5c6675' }}>/{battle.max_players}</span></span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-              {Array.from({ length: battle.max_players }, (_, i) => battle.players[i] ?? null).map((p, i) => {
+            {(() => {
+              const slots = Array.from({ length: battle.max_players }, (_, i) => battle.players[i] ?? null)
+              const renderSlot = (p: typeof slots[number], i: number) => {
                 const isMe = !!p && !!meWallet && p.wallet === meWallet
                 if (p) {
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 13, background: `${COLORS.green}12`, border: `1px solid ${COLORS.green}59` }}>
-                      <span style={{ width: 36, height: 36, borderRadius: '50%', background: GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#06170f' }}>{isMe ? 'P' : p.wallet.slice(0, 1).toUpperCase()}</span>
+                      <span style={{ flex: 'none', width: 36, height: 36, borderRadius: '50%', background: GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#06170f' }}>{isMe ? 'P' : p.wallet.slice(0, 1).toUpperCase()}</span>
                       <div style={{ flex: 1, lineHeight: 1.25, minWidth: 0 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isMe ? 'You' : shortWallet(p.wallet)}</div>
                         <div style={{ fontFamily: FONTS.mono, fontSize: 9, color: COLORS.green }}>READY</div>
                       </div>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.green, boxShadow: `0 0 8px ${COLORS.green}` }} />
+                      <span style={{ flex: 'none', width: 8, height: 8, borderRadius: '50%', background: COLORS.green, boxShadow: `0 0 8px ${COLORS.green}` }} />
                     </div>
                   )
                 }
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 13, border: `1px dashed ${COLORS.border}` }}>
-                    <span style={{ width: 36, height: 36, borderRadius: '50%', border: `1.5px dashed rgba(255,255,255,.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5c6675', animation: 'wr-pulse 2.4s infinite' }}>?</span>
-                    <div style={{ flex: 1, lineHeight: 1.25 }}>
+                    <span style={{ flex: 'none', width: 36, height: 36, borderRadius: '50%', border: `1.5px dashed rgba(255,255,255,.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5c6675', animation: 'wr-pulse 2.4s infinite' }}>?</span>
+                    <div style={{ flex: 1, lineHeight: 1.25, minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, color: COLORS.muted }}>Open slot</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 9, color: '#5c6675' }}>SLOT {i + 1}</div>
                     </div>
-                    <button onClick={onJoinBot} disabled={joiningBot} style={{ padding: '6px 11px', borderRadius: 9, border: `1px solid ${COLORS.violet}73`, background: `${COLORS.violet}1a`, color: COLORS.violet, cursor: joiningBot ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11.5, fontWeight: 700 }}>{joiningBot ? '…' : '+ Bot'}</button>
+                    <button onClick={onJoinBot} disabled={joiningBot} style={{ flex: 'none', padding: '6px 11px', borderRadius: 9, border: `1px solid ${COLORS.violet}73`, background: `${COLORS.violet}1a`, color: COLORS.violet, cursor: joiningBot ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11.5, fontWeight: 700 }}>{joiningBot ? '…' : '+ Bot'}</button>
                   </div>
                 )
-              })}
-            </div>
+              }
+              // > 5 players → two columns: always 5 in the first, the rest in the second.
+              if (slots.length > 5) {
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{slots.slice(0, 5).map((p, i) => renderSlot(p, i))}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{slots.slice(5).map((p, i) => renderSlot(p, i + 5))}</div>
+                  </div>
+                )
+              }
+              return <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>{slots.map((p, i) => renderSlot(p, i))}</div>
+            })()}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: `1px solid ${COLORS.border}`, marginBottom: 16 }}>
               <div style={{ flex: 1, lineHeight: 1.2 }}><div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.18em', color: COLORS.muted, marginBottom: 4 }}>ENTRY</div><div style={{ fontSize: 21, fontWeight: 700, color: COLORS.green }}>{formatUsd(entry)}</div></div>
