@@ -4,7 +4,7 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { startRematch } from '../../battle/startRematch'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
-import { RevealCard } from './RevealCard'
+import { RevealCard, rarityColor } from './RevealCard'
 import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { WinningsBuyback } from './WinningsBuyback'
 import { StagedCardReveal } from './StagedCardReveal'
@@ -246,11 +246,13 @@ function Standings({ vm, name, activeWallet }: {
 function ChipCardBox({ latest, cur, hasPull }: { latest: RevealCardVM | null; cur: boolean; hasPull: boolean }) {
   const [imgError, setImgError] = useState(false)
   const showImg = hasPull && !!latest?.nftAddress && !imgError
+  const rc = rarityColor(latest?.rarity ?? null)   // rarity tint for the card box (border/bg/glow)
   return (
     <div style={{
       height: 56, borderRadius: 7, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6,
-      background: hasPull ? 'rgba(245,197,66,.06)' : 'linear-gradient(150deg,#141a24,#0b0e14)',
-      border: `1px solid ${cur ? 'rgba(0,255,196,.45)' : hasPull ? 'rgba(245,197,66,.3)' : COLORS.border}`,
+      background: hasPull ? `${rc}14` : 'linear-gradient(150deg,#141a24,#0b0e14)',
+      border: `1px solid ${cur ? 'rgba(0,255,196,.45)' : hasPull ? rc : COLORS.border}`,
+      boxShadow: hasPull ? `0 0 14px -8px ${rc}` : 'none',
     }}>
       {showImg
         ? <img src={ccCardImageUrl(latest!.nftAddress!)} alt="" onError={() => setImgError(true)}
