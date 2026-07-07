@@ -5,6 +5,7 @@ import { startRematch } from '../../battle/startRematch'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { VerifyPanel } from './VerifyPanel'
 import { RevealCard } from './RevealCard'
+import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { WinningsBuyback } from './WinningsBuyback'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
@@ -26,7 +27,7 @@ const screenStyle = { padding: '18px clamp(14px,2.4vw,28px) 28px', display: 'fle
 
 // ⏱️ Cuánto se queda la carta central mostrándose antes de pasar al siguiente jugador (ms).
 // Cambia este número para ajustar el tiempo del reveal (3000 = 3 segundos).
-const CARD_DWELL_MS = 3000
+const CARD_DWELL_MS = 1500
 
 function useRanked(vm: RevealVM) {
   // Finish ranking: still-alive on top by value; eliminated below by when they went out.
@@ -240,6 +241,27 @@ function Standings({ vm, name, activeWallet }: {
   )
 }
 
+// The card box inside a player chip: shows the image of the player's latest pull once it's
+// resolved (falling back to its name if the image fails), else the opening/waiting state.
+function ChipCardBox({ latest, cur, hasPull }: { latest: RevealCardVM | null; cur: boolean; hasPull: boolean }) {
+  const [imgError, setImgError] = useState(false)
+  const showImg = hasPull && !!latest?.nftAddress && !imgError
+  return (
+    <div style={{
+      height: 56, borderRadius: 7, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+      background: hasPull ? 'rgba(245,197,66,.06)' : 'linear-gradient(150deg,#141a24,#0b0e14)',
+      border: `1px solid ${cur ? 'rgba(0,255,196,.45)' : hasPull ? 'rgba(245,197,66,.3)' : COLORS.border}`,
+    }}>
+      {showImg
+        ? <img src={ccCardImageUrl(latest!.nftAddress!)} alt="" onError={() => setImgError(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+        : <span style={{ fontSize: 9, lineHeight: 1.25, padding: '0 5px', color: cur ? COLORS.green : hasPull ? '#cdd4dd' : '#4a525e', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {cur ? 'opening…' : hasPull ? (latest?.name ?? 'card') : 'waiting'}
+          </span>}
+    </div>
+  )
+}
+
 // ─────────────────────────── CHIPS ROW ───────────────────────────
 // One compact chip per player along the bottom — carries data-player-anchor so thrown emotes
 // still land on a player. Shows their latest pull, "opening…" for the active opener, dimmed if out.
@@ -267,15 +289,7 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
               <span style={{ flex: 'none', width: 16, height: 16, borderRadius: '50%', background: tintFor(p.wallet) }} />
               <span style={{ fontSize: 10.5, fontWeight: 600, color: p.isMe ? COLORS.green : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
             </div>
-            <div style={{
-              height: 56, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', marginBottom: 6,
-              background: hasPull ? 'rgba(245,197,66,.06)' : 'linear-gradient(150deg,#141a24,#0b0e14)',
-              border: `1px solid ${cur ? 'rgba(0,255,196,.45)' : hasPull ? 'rgba(245,197,66,.3)' : COLORS.border}`,
-            }}>
-              <span style={{ fontSize: 9, lineHeight: 1.25, color: cur ? COLORS.green : hasPull ? '#cdd4dd' : '#4a525e', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                {cur ? 'opening…' : hasPull ? (latest!.name ?? 'card') : 'waiting'}
-              </span>
-            </div>
+            <ChipCardBox latest={latest} cur={cur} hasPull={hasPull} />
             <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 700, color: cur ? COLORS.green : hasPull ? COLORS.green : '#4a525e' }}>
               {cur ? '···' : hasPull ? formatUsd(latest!.insuredValue ?? 0) : '—'}
             </div>
