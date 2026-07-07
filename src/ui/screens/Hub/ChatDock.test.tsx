@@ -121,17 +121,23 @@ describe('ChatDock live drops', () => {
     expect(screen.queryByRole('button', { name: 'Unirse' })).toBeNull()
   })
 
-  it('renders a big-hit event like created: player + name + gold value, no button', () => {
+  it('renders a big-hit event with the machine chip, player, name and gold value, no button', () => {
     chatState.messages = [{
       user: 'neo', text: 'pulled Charizard', ts: Date.now(),
-      kind: 'system', event: 'hit', amountUsd: 320,
+      kind: 'system', event: 'hit', amountUsd: 320, machine: 'TCG Prime',
     }]
     renderDock()
     expect(screen.getByText('neo')).toBeTruthy()
     expect(screen.getByText(/pulled Charizard/)).toBeTruthy()
     expect(screen.getByText('$320')).toBeTruthy()
-    expect(screen.getByText('GACHA')).toBeTruthy()                          // gacha source tag
+    expect(screen.getByText('TCG PRIME')).toBeTruthy()                       // machine the hit came from
     expect(screen.queryByRole('button', { name: /View|Join/ })).toBeNull()   // hits carry no action button
+  })
+
+  it('a hit with no machine falls back to a GACHA chip', () => {
+    chatState.messages = [{ user: 'neo', text: 'pulled Charizard', ts: Date.now(), kind: 'system', event: 'hit', amountUsd: 320 }]
+    renderDock()
+    expect(screen.getByText('GACHA')).toBeTruthy()
   })
 
   it('renders a winner event like created: player + mode + gold value + View button', () => {

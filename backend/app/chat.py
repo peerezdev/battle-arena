@@ -17,15 +17,17 @@ CHAT_KEEP = 50   # how many recent messages to retain / replay
 
 def save_chat_message(session, author: str, text: str, ts: int, *, kind: str = "user",
                       action: Optional[dict] = None, event: Optional[str] = None,
-                      amount_usd: Optional[float] = None, keep: int = CHAT_KEEP) -> None:
+                      amount_usd: Optional[float] = None, machine: Optional[str] = None,
+                      keep: int = CHAT_KEEP) -> None:
     """Persist one chat message and prune to the newest `keep` (so the table stays bounded).
     kind='system' + optional action={label, battleId, mode} for announcements with a button.
-    event ('hit'|'winner'|…) + amount_usd let persisted announcements re-render in their
-    structured style (icon + name + gold value) after a reconnect, not just as plain text."""
+    event ('hit'|'winner'|…) + amount_usd (+ machine, the gacha machine a hit came from) let
+    persisted announcements re-render in their structured style (icon + name + gold value)
+    after a reconnect, not just as plain text."""
     from app.models import ChatMessage
     session.add(ChatMessage(author=author, text=text, ts=ts, kind=kind,
                             action=json.dumps(action) if action else None,
-                            event=event, amount_usd=amount_usd))
+                            event=event, amount_usd=amount_usd, machine=machine))
     session.commit()
     old = [r[0] for r in session.query(ChatMessage.id)
            .order_by(ChatMessage.id.desc()).offset(keep).all()]
@@ -54,6 +56,8 @@ def recent_chat_messages(session, limit: int = CHAT_KEEP) -> list[dict]:
                 m["event"] = r.event
             if r.amount_usd is not None:
                 m["amountUsd"] = r.amount_usd
+            if r.machine:
+                m["machine"] = r.machine
         out.append(m)
     return out
 

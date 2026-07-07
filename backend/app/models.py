@@ -182,3 +182,4 @@ class ChatMessage(Base):
     action: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON {label, battleId, mode} for a button
     event: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # "created" | "hit" | "winner" — structured render tag
     amount_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # value styled in gold (hit pull / winner take)
+    machine: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # gacha machine a hit came from (display name)

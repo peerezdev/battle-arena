@@ -115,6 +115,7 @@ class DevAnnounceBody(BaseModel):
     event: Optional[str] = Field(default=None, pattern=r"^(hit|winner|created)$")
     amountUsd: Optional[float] = None
     mode: Optional[str] = Field(default=None, pattern=r"^(pack|royale)$")
+    machine: Optional[str] = Field(default=None, max_length=64)   # gacha machine name (hit events)
     action_label: Optional[str] = Field(default=None, max_length=24)
     battle_id: str = Field(default="demo", max_length=64)
     persist: bool = False
@@ -484,10 +485,22 @@ def create_app(session_factory, chain: ChainSource,
                 "image": out.get("image"),
                 "ts": int(_time.time()),
             }
-            asyncio.create_task(_broadcast_drop_later(drop, cost_base=pack.price))
+            asyncio.create_task(_broadcast_drop_later(drop, cost_base=pack.price, machine_code=pack.pack_type))
         return out
 
-    async def _broadcast_drop_later(drop: dict, cost_base: Optional[int] = None) -> None:
+    async def _machine_name(machine_code: Optional[str]) -> Optional[str]:
+        """Display name (short name preferred) of a gacha machine, or None. Best-effort."""
+        if not machine_code:
+            return None
+        try:
+            machines = await gacha.machines()
+            m = next((x for x in machines if x.get("code") == machine_code), None)
+            return (m.get("shortName") or m.get("name")) if m else None
+        except Exception:
+            return None
+
+    async def _broadcast_drop_later(drop: dict, cost_base: Optional[int] = None,
+                                    machine_code: Optional[str] = None) -> None:
         # Hold the drop so it never spoils the opener's own reveal.
         try:
             await asyncio.sleep(LIVE_DROP_DELAY_S)
@@ -497,8 +510,11 @@ def create_app(session_factory, chain: ChainSource,
             if mult is not None and mult >= hit_announce_mult:
                 who = drop.get("username") or abbreviate(drop.get("wallet") or "")
                 name = drop.get("name") or "una carta"
-                await _announce(f"pulled {name}", user=who,
-                                extra={"event": "hit", "amountUsd": drop["valueUsd"]}, persist=True)
+                extra = {"event": "hit", "amountUsd": drop["valueUsd"]}
+                machine = await _machine_name(machine_code)
+                if machine:
+                    extra["machine"] = machine
+                await _announce(f"pulled {name}", user=who, extra=extra, persist=True)
         except Exception:
             logger.exception("live drop broadcast failed")
 
@@ -1189,7 +1205,8 @@ def create_app(session_factory, chain: ChainSource,
                 with session_factory() as s:
                     save_chat_message(s, author, text, msg["ts"], kind="system", action=action,
                                       event=(extra or {}).get("event"),
-                                      amount_usd=(extra or {}).get("amountUsd"))
+                                      amount_usd=(extra or {}).get("amountUsd"),
+                                      machine=(extra or {}).get("machine"))
             await _chat_mgr.broadcast(msg)
         except Exception:
             logger.exception("chat announce failed")
@@ -1218,6 +1235,8 @@ def create_app(session_factory, chain: ChainSource,
             extra["amountUsd"] = body.amountUsd
         if body.mode:
             extra["mode"] = body.mode
+        if body.machine:
+            extra["machine"] = body.machine
         action = None
         if body.action_label:
             action = {"label": body.action_label, "battleId": body.battle_id, "mode": body.mode or "pack"}
