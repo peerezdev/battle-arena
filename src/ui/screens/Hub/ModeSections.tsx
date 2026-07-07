@@ -66,8 +66,8 @@ function ModeCta({ s }: { s: ModeSection }) {
 
 export function ModeSections() {
   return (
-    <div style={{ padding: 'clamp(28px,4vw,56px) 16px 48px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 760 }}>
+    <div style={{ padding: 'clamp(28px,4vw,56px) clamp(16px,3vw,32px) 48px' }}>
+      <div style={{ width: '100%' }}>
         {SECTIONS.map((s, i) => (
           <div key={s.n}>
             <section style={{
