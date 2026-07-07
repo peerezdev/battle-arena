@@ -11,13 +11,14 @@ type Stage = 'year' | 'grade' | 'rarity' | 'card'
  *  to the front (`children`). Reduced-motion shows the front immediately. `onCardShown` fires
  *  once the card stage lands. */
 export function StagedCardReveal({
-  year, grade, rarity, reduced, stepMs = 1700, width = 180, height = 252, onCardShown, children,
+  year, grade, rarity, reduced, stepMs = 1700, dwellMs = 550, width = 180, height = 252, onCardShown, children,
 }: {
   year: string | null
   grade: number | string | null
   rarity: string | null
   reduced: boolean
   stepMs?: number
+  dwellMs?: number    // how long the revealed card stays before onCardShown advances (ms)
   width?: number
   height?: number
   onCardShown?: () => void
@@ -59,7 +60,7 @@ export function StagedCardReveal({
     // Fire AFTER the flip lands so totals/leaders update once the card is actually shown
     // (not while it's still flipping). Reduced motion fires synchronously.
     if (reduced) { onCardShown?.(); return }
-    const t = setTimeout(() => onCardShown?.(), 550)
+    const t = setTimeout(() => onCardShown?.(), dwellMs)
     return () => clearTimeout(t)
     // Fire once when the card stage is reached; onCardShown identity intentionally ignored.
     // eslint-disable-next-line react-hooks/exhaustive-deps

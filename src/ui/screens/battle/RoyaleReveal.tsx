@@ -24,6 +24,10 @@ const TITLE = (
 )
 const screenStyle = { padding: '18px clamp(14px,2.4vw,28px) 28px', display: 'flex', flexDirection: 'column' as const, gap: 18 }
 
+// ⏱️ Cuánto se queda la carta central mostrándose antes de pasar al siguiente jugador (ms).
+// Cambia este número para ajustar el tiempo del reveal (3000 = 3 segundos).
+const CARD_DWELL_MS = 3000
+
 function useRanked(vm: RevealVM) {
   // Finish ranking: still-alive on top by value; eliminated below by when they went out.
   return [...vm.players]
@@ -69,7 +73,6 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
 
   return (
     <div style={{ ...screenStyle, position: 'relative' }}>
-      {TITLE}
       <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
         <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
           revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
@@ -130,7 +133,6 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <span style={{ fontFamily: FONTS.display, fontSize: 19, fontWeight: 700, letterSpacing: '-.01em' }}>ROYALE {Math.round(entry)}</span>
             {!settled && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,94,122,.12)', border: '1px solid rgba(255,94,122,.32)', fontFamily: FONTS.mono, fontSize: 11, color: '#ff8198' }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5e7a', boxShadow: '0 0 6px #ff5e7a' }} />LIVE
@@ -194,7 +196,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {/* card ceremony */}
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
-            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} onCardShown={onCardShown}>
+            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} dwellMs={CARD_DWELL_MS} onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
           </StagedCardReveal>
         : <CardBack width={W} height={H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}
