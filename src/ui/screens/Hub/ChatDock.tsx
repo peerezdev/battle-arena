@@ -553,6 +553,9 @@ export function ChatDock({
                   {msg.amountUsd != null && (
                     <span style={{ color: '#f5c542', fontWeight: 800 }}>{formatUsd(msg.amountUsd)}</span>
                   )}
+                  {msg.event === 'hit' && msg.mult != null && msg.mult > 0 && (
+                    <span style={{ color: COLORS.muted, fontWeight: 700 }}> (x{msg.mult % 1 === 0 ? msg.mult : msg.mult.toFixed(1)})</span>
+                  )}
                 </span>
                 {msg.action && (
                   <button onClick={() => navigate(`/play/battle/${msg.action!.battleId}`)} style={{

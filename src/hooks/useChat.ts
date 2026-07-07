@@ -13,6 +13,7 @@ export interface ChatLine {
   event?: 'created' | 'hit' | 'winner'  // structured event for custom rendering (icon + name + gold value)
   amountUsd?: number         // stake/value styled in gold (created / hit / winner events)
   machine?: string           // gacha machine a hit came from (display name)
+  mult?: number              // hit multiple (value ÷ cost), rendered as "(x10)"
   mode?: string              // 'pack' | 'royale'
 }
 
@@ -95,6 +96,7 @@ export function useChat(enabled = true): {
                 amountUsd: m.amountUsd as number | undefined,
                 mode: m.mode as string | undefined,
                 machine: m.machine as string | undefined,
+                mult: m.mult as number | undefined,
               })),
             )
           } else if (msg.type === 'message') {
@@ -110,6 +112,7 @@ export function useChat(enabled = true): {
                 amountUsd: msg.amountUsd as number | undefined,
                 mode: msg.mode as string | undefined,
                 machine: msg.machine as string | undefined,
+                mult: msg.mult as number | undefined,
               },
             ])
           } else if (msg.type === 'presence') {

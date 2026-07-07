@@ -116,6 +116,7 @@ class DevAnnounceBody(BaseModel):
     amountUsd: Optional[float] = None
     mode: Optional[str] = Field(default=None, pattern=r"^(pack|royale)$")
     machine: Optional[str] = Field(default=None, max_length=64)   # gacha machine name (hit events)
+    mult: Optional[float] = None                                  # hit multiple, e.g. 10.0 → "(x10)"
     action_label: Optional[str] = Field(default=None, max_length=24)
     battle_id: str = Field(default="demo", max_length=64)
     persist: bool = False
@@ -510,7 +511,7 @@ def create_app(session_factory, chain: ChainSource,
             if mult is not None and mult >= hit_announce_mult:
                 who = drop.get("username") or abbreviate(drop.get("wallet") or "")
                 name = drop.get("name") or "una carta"
-                extra = {"event": "hit", "amountUsd": drop["valueUsd"]}
+                extra = {"event": "hit", "amountUsd": drop["valueUsd"], "mult": round(mult, 2)}
                 machine = await _machine_name(machine_code)
                 if machine:
                     extra["machine"] = machine
@@ -1206,7 +1207,8 @@ def create_app(session_factory, chain: ChainSource,
                     save_chat_message(s, author, text, msg["ts"], kind="system", action=action,
                                       event=(extra or {}).get("event"),
                                       amount_usd=(extra or {}).get("amountUsd"),
-                                      machine=(extra or {}).get("machine"))
+                                      machine=(extra or {}).get("machine"),
+                                      mult=(extra or {}).get("mult"))
             await _chat_mgr.broadcast(msg)
         except Exception:
             logger.exception("chat announce failed")
@@ -1237,6 +1239,8 @@ def create_app(session_factory, chain: ChainSource,
             extra["mode"] = body.mode
         if body.machine:
             extra["machine"] = body.machine
+        if body.mult is not None:
+            extra["mult"] = body.mult
         action = None
         if body.action_label:
             action = {"label": body.action_label, "battleId": body.battle_id, "mode": body.mode or "pack"}

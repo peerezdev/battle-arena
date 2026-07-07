@@ -183,3 +183,4 @@ class ChatMessage(Base):
     event: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # "created" | "hit" | "winner" — structured render tag
     amount_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # value styled in gold (hit pull / winner take)
     machine: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # gacha machine a hit came from (display name)
+    mult: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # hit multiple (value ÷ pull cost), e.g. 10.0 → "(x10)"

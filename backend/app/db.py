@@ -36,6 +36,7 @@ _ENSURE_COLUMNS = [
     ("chat_messages", "event", "VARCHAR"),
     ("chat_messages", "amount_usd", "FLOAT"),
     ("chat_messages", "machine", "VARCHAR"),
+    ("chat_messages", "mult", "FLOAT"),
     ("battle_pulls", "refunded", "BOOLEAN NOT NULL DEFAULT 0"),
 ]
 

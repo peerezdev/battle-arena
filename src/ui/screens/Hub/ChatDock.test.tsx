@@ -124,13 +124,14 @@ describe('ChatDock live drops', () => {
   it('renders a big-hit event with the machine chip, player, name and gold value, no button', () => {
     chatState.messages = [{
       user: 'neo', text: 'pulled Charizard', ts: Date.now(),
-      kind: 'system', event: 'hit', amountUsd: 320, machine: 'TCG Prime',
+      kind: 'system', event: 'hit', amountUsd: 320, machine: 'TCG Prime', mult: 10,
     }]
     renderDock()
     expect(screen.getByText('neo')).toBeTruthy()
     expect(screen.getByText(/pulled Charizard/)).toBeTruthy()
     expect(screen.getByText('$320')).toBeTruthy()
     expect(screen.getByText('TCG PRIME')).toBeTruthy()                       // machine the hit came from
+    expect(screen.getByText('(x10)')).toBeTruthy()                           // hit multiple
     expect(screen.queryByRole('button', { name: /View|Join/ })).toBeNull()   // hits carry no action button
   })
 

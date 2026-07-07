@@ -25,10 +25,10 @@ import urllib.error
 
 # Each entry maps directly to the DevAnnounceBody. Edit freely to iterate on the design.
 EXAMPLES = [
-    # ── big pulls — machine chip + user + "pulled {card}" + gold value, no button ──
-    {"event": "hit", "user": "neo", "text": "pulled Charizard VMAX (PSA 10)", "amountUsd": 2400, "machine": "TCG Prime"},
-    {"event": "hit", "user": "luna", "text": "pulled Umbreon Gold Star", "amountUsd": 860, "machine": "TCG Neo"},
-    {"event": "hit", "user": "0xF3a…9bd", "text": "pulled Lugia 1st Edition", "amountUsd": 512, "machine": "TCG Base"},
+    # ── big pulls — machine chip + user + "pulled {card}" + gold value + (xN) multiple, no button ──
+    {"event": "hit", "user": "neo", "text": "pulled Charizard VMAX (PSA 10)", "amountUsd": 2400, "machine": "TCG Prime", "mult": 30},
+    {"event": "hit", "user": "luna", "text": "pulled Umbreon Gold Star", "amountUsd": 860, "machine": "TCG Neo", "mult": 17.2},
+    {"event": "hit", "user": "0xF3a…9bd", "text": "pulled Lugia 1st Edition", "amountUsd": 512, "machine": "TCG Base", "mult": 25.6},
 
     # ── winners (🏆) — user + "won a {mode}" + gold take + View button ──
     {"event": "winner", "user": "mole", "text": "won a Pack Battle", "amountUsd": 1240,
