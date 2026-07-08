@@ -16,7 +16,10 @@ export function EmoteDock({ meWallet, battleId }: { meWallet: string; battleId?:
       marginLeft: `calc(${H_PAD} * -1)`, marginRight: `calc(${H_PAD} * -1)`,
       display: 'flex', justifyContent: 'flex-start', alignItems: 'center',
       padding: `10px ${H_PAD}`,
-      background: 'rgba(8,10,14,.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      // Translucent + heavy blur so the app's ambient gradient tints it through (matches the
+      // theme chrome) instead of reading as a flat black slab.
+      background: 'linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.008))',
+      backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
       borderTop: `1px solid ${COLORS.border}`,
     }}>
       <EmoteBar meWallet={meWallet} battleId={battleId} />
