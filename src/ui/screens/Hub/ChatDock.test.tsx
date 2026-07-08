@@ -150,7 +150,7 @@ describe('ChatDock live drops', () => {
     renderDock()
     expect(screen.getByText('mole')).toBeTruthy()
     expect(screen.getByText(/won a Pack Battle/)).toBeTruthy()
-    expect(screen.getByText('$1.2k')).toBeTruthy()
+    expect(screen.getByText('$1,200')).toBeTruthy()
     expect(screen.getByText(/\(x5\)/)).toBeTruthy()                     // take ÷ entry multiplier
     expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
   })

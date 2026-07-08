@@ -61,9 +61,9 @@ export function rarityGlow(rarity: string | null | undefined): string | null {
 }
 
 export function formatUsd(v: number): string {
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`
-  // Max 2 decimals, drop trailing zeros (avoids float noise like 159.10000000000002).
-  return `$${Math.round(v * 100) / 100}`
+  // Full amount with thousands separators (no k/M abbreviation). Max 2 decimals, trailing
+  // zeros dropped (so no float noise like 159.10000000000002, and whole dollars show clean).
+  return `$${(Math.round(v * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
 }
 
 export const FONTS = {
