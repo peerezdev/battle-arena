@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { RevealCard, rarityColor } from './RevealCard'
-import { EmoteBar } from '../../emotes/EmoteBar'
+import { EmoteDock } from '../../emotes/EmoteDock'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
 import { shortWallet } from './RoyaleReveal'
@@ -88,7 +88,7 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: 
   }
 
   return (
-    <div style={{ padding: '18px clamp(14px,2.4vw,28px) 24px', display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0 }}>
+    <div style={{ padding: '18px clamp(14px,2.4vw,28px) 24px', display: 'flex', flexDirection: 'column', gap: 18, minHeight: '100%' }}>
       {/* ── status bar ── */}
       <section style={{
         position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap',
@@ -162,7 +162,6 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: 
 
       {/* ── action bar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
-        {vm.meWallet && <EmoteBar meWallet={vm.meWallet} battleId={battleId} />}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 9 }}>
           {onExit && (
             <button onClick={onExit} style={{ padding: '11px 20px', borderRadius: 12, border: '1px solid rgba(255,94,122,.3)', background: 'rgba(255,94,122,.08)', color: '#ff8198', cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>
@@ -176,6 +175,9 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: 
           )}
         </div>
       </div>
+
+      {/* emotes — fixed dock at the very bottom */}
+      {vm.meWallet && <EmoteDock meWallet={vm.meWallet} battleId={battleId} />}
     </div>
   )
 }

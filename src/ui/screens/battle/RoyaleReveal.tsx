@@ -10,7 +10,7 @@ import { WinningsBuyback } from './WinningsBuyback'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
 import { useAliases } from '../../useAliases'
-import { EmoteBar } from '../../emotes/EmoteBar'
+import { EmoteDock } from '../../emotes/EmoteDock'
 import { shortWallet, tintFor, medalColor } from './royaleShared'
 import { useIsWide } from '../../useIsWide'
 import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
@@ -66,7 +66,7 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
   const wide = useIsWide('(min-width: 860px)')
 
   return (
-    <div style={{ ...screenStyle, position: 'relative' }}>
+    <div style={{ ...screenStyle, position: 'relative', minHeight: '100%' }}>
       <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
         {/* vertical battle bar (left) · stage (center) · standings (right) */}
         <div style={{ display: 'grid', gridTemplateColumns: wide ? '224px minmax(0,1fr) 300px' : '1fr', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
@@ -82,7 +82,7 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
       </div>
       {rv.phase === 'roundBreak' && !reducedMotion && <RoundBreakOverlay vm={proj} name={name} upcomingRound={rv.upcomingRound} countdown={rv.countdown} />}
       {rv.phase === 'tieBreak' && !reducedMotion && <TieBreakRoulette tied={rv.tiedWallets} eliminated={rv.tieEliminated} nameOf={nameByWallet} reducedMotion={reducedMotion} />}
-      {vm.meWallet && <div style={{ display: 'flex', marginTop: 4 }}><EmoteBar meWallet={vm.meWallet} battleId={battleId} /></div>}
+      {vm.meWallet && <EmoteDock meWallet={vm.meWallet} battleId={battleId} />}
     </div>
   )
 }
@@ -95,13 +95,12 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
   const [verifyOpen, setVerifyOpen] = useState(false)
   const name = nameOf(aliases)
   const ranked = useRanked(vm)
-  const entry = vm.players.length ? vm.potValue / vm.players.length : 0
 
   return (
     <div style={screenStyle}>
       {TITLE}
       <ResultView
-        vm={vm} name={name} ranked={ranked} entry={entry}
+        vm={vm} name={name} ranked={ranked}
         onRematch={() => startRematch({ battleId, mode: 'royale', token: identityToken, navigate })} onExit={onExit} onVerify={() => setVerifyOpen(true)}
       />
       {verifyOpen && battleId && <VerifyPanel battleId={battleId} onClose={() => setVerifyOpen(false)} />}
@@ -310,9 +309,9 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
 }
 
 // ─────────────────────────── RESULT VIEW ───────────────────────────
-function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
+function ResultView({ vm, name, ranked, onRematch, onExit, onVerify }: {
   vm: RevealVM; name: (p: RevealPlayerVM) => string; ranked: { p: RevealPlayerVM; rank: number }[]
-  entry: number; onRematch: () => void; onExit?: () => void; onVerify: () => void
+  onRematch: () => void; onExit?: () => void; onVerify: () => void
 }) {
   const champ = ranked[0]?.p
   const iAmPlayer = vm.players.some((p) => p.isMe)
@@ -387,7 +386,6 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
           <span style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: COLORS.muted }}>{vm.players.length} players · pot {formatUsd(vm.potValue)}</span>
         </div>
         {ranked.map(({ p, rank }) => {
-          const net = rank === 1 ? vm.potValue - entry : -entry
           return (
             <div key={p.wallet} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 18px', borderBottom: `1px solid #ffffff0a`, background: p.isMe ? 'rgba(0,255,196,.06)' : 'transparent' }}>
               <span style={{ flex: 'none', width: 30, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 15, fontWeight: 700, color: medalColor(rank) }}>#{rank}</span>
@@ -397,11 +395,8 @@ function ResultView({ vm, name, ranked, entry, onRematch, onExit, onVerify }: {
                 {p.isMe && <span style={{ flex: 'none', padding: '1px 6px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontSize: 9, fontWeight: 700, color: COLORS.green }}>YOU</span>}
               </div>
               <div style={{ flex: 'none', width: 74, textAlign: 'right' }}>
-                <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.12em', color: '#6c7682' }}>LOOT</div>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.12em', color: '#6c7682' }}>LOOT</div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#cdd4dd' }}>{formatUsd(p.total)}</div>
-              </div>
-              <div style={{ flex: 'none', width: 70, textAlign: 'right', fontSize: 14.5, fontWeight: 700, color: net >= 0 ? COLORS.green : '#ff8198' }}>
-                {net >= 0 ? `+${formatUsd(net)}` : `-${formatUsd(Math.abs(net))}`}
               </div>
             </div>
           )
