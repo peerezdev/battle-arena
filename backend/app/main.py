@@ -578,7 +578,7 @@ def create_app(session_factory, chain: ChainSource,
                 who = read_user_view(s, b.winner, elo_start).get("alias") or abbreviate(b.winner)
             label = "Battle Royale" if mode == "royale" else "Pack Battle"
             await _announce(f"won a {label}", user=who,
-                            extra={"event": "winner", "amountUsd": take, "mode": mode},
+                            extra={"event": "winner", "amountUsd": take, "mode": mode, "mult": round(take / entry, 2)},
                             action={"label": "View", "battleId": battle_id, "mode": mode}, persist=True)
         except Exception:
             logger.exception("winner announce failed")

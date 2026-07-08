@@ -141,16 +141,17 @@ describe('ChatDock live drops', () => {
     expect(screen.getByText('GACHA')).toBeTruthy()
   })
 
-  it('renders a winner event like created: player + mode + gold value + View button', () => {
+  it('renders a winner event like created: player + mode + gold value + multiplier + View button', () => {
     chatState.messages = [{
       user: 'mole', text: 'won a Pack Battle', ts: Date.now(),
-      kind: 'system', event: 'winner', amountUsd: 1200, mode: 'pack',
+      kind: 'system', event: 'winner', amountUsd: 1200, mode: 'pack', mult: 5,
       action: { label: 'View', battleId: 'b9', mode: 'pack' },
     }]
     renderDock()
     expect(screen.getByText('mole')).toBeTruthy()
     expect(screen.getByText(/won a Pack Battle/)).toBeTruthy()
     expect(screen.getByText('$1.2k')).toBeTruthy()
+    expect(screen.getByText(/\(x5\)/)).toBeTruthy()                     // take ÷ entry multiplier
     expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
   })
 })

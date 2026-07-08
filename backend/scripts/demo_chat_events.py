@@ -30,11 +30,11 @@ EXAMPLES = [
     {"event": "hit", "user": "luna", "text": "pulled Umbreon Gold Star", "amountUsd": 860, "machine": "TCG Neo", "mult": 17.2},
     {"event": "hit", "user": "0xF3a…9bd", "text": "pulled Lugia 1st Edition", "amountUsd": 512, "machine": "TCG Base", "mult": 25.6},
 
-    # ── winners (🏆) — user + "won a {mode}" + gold take + View button ──
+    # ── winners (🏆) — user + "won a {mode}" + gold take + (xN vs entry) + View button ──
     {"event": "winner", "user": "mole", "text": "won a Pack Battle", "amountUsd": 1240,
-     "mode": "pack", "action_label": "View", "battle_id": "demo-pack"},
+     "mode": "pack", "mult": 6.2, "action_label": "View", "battle_id": "demo-pack"},
     {"event": "winner", "user": "kappa", "text": "won a Battle Royale", "amountUsd": 4800,
-     "mode": "royale", "action_label": "View", "battle_id": "demo-royale"},
+     "mode": "royale", "mult": 10, "action_label": "View", "battle_id": "demo-royale"},
 
     # ── created — user + "created a {mode}" + gold stake + Join button ──
     {"event": "created", "user": "prueba2", "text": "created a Battle Royale", "amountUsd": 50,
