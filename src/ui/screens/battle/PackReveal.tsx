@@ -88,7 +88,7 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: 
   }
 
   return (
-    <div style={{ padding: '18px clamp(14px,2.4vw,28px) 24px', display: 'flex', flexDirection: 'column', gap: 18, minHeight: '100%' }}>
+    <div style={{ padding: '18px clamp(14px,2.4vw,28px) 0', display: 'flex', flexDirection: 'column', gap: 18, minHeight: '100%' }}>
       {/* ── status bar ── */}
       <section style={{
         position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap',

@@ -66,7 +66,7 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
   const wide = useIsWide('(min-width: 860px)')
 
   return (
-    <div style={{ ...screenStyle, position: 'relative', minHeight: '100%' }}>
+    <div style={{ ...screenStyle, position: 'relative', minHeight: '100%', paddingBottom: 0 }}>
       <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
         {/* vertical battle bar (left) · stage (center) · standings (right) */}
         <div style={{ display: 'grid', gridTemplateColumns: wide ? '224px minmax(0,1fr) 300px' : '1fr', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
