@@ -114,7 +114,7 @@ export function DemoFlow() {
         ) : (
           revealDone
             ? <BattleResult vm={battleToReveal(battle, DEMO_ME)} battleId="demo" onExit={exit} />
-            : <PackReveal vm={battleToReveal(battle, DEMO_ME)} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} onExit={exit} />
+            : <PackReveal vm={battleToReveal(battle, DEMO_ME)} reducedMotion={!!reduced} onComplete={() => setRevealDone(true)} />
         )}
       </div>
     </div>

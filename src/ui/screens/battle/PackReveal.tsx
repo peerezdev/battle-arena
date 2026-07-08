@@ -35,8 +35,8 @@ function layoutFor(n: number, wide: boolean): { panelW: number; cardW: number; c
   return { panelW: 178, cardW: 110, compact: true }
 }
 
-export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: {
-  vm: RevealVM; reducedMotion: boolean; onComplete?: () => void; onExit?: () => void; battleId?: string
+export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
+  vm: RevealVM; reducedMotion: boolean; onComplete?: () => void; battleId?: string
 }) {
   const wide = useIsWide('(min-width: 560px)')
   const { panelW, cardW, compact } = layoutFor(vm.players.length, wide)
@@ -80,12 +80,6 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: 
   // The pot builds up as cards are revealed (combined value of everything opened so far).
   const revealedPot = totals.reduce((s, v) => s + v, 0)
   const pot = useCountUp(revealedPot, !reducedMotion)
-
-  function skip() {
-    setRound(totalRounds - 1)
-    setDoneCount(vm.players.length)
-    if (settled) { setComplete(true); onComplete?.() }
-  }
 
   return (
     <div style={{ padding: '18px clamp(14px,2.4vw,28px) 0', display: 'flex', flexDirection: 'column', gap: 18, minHeight: '100%' }}>
@@ -158,22 +152,6 @@ export function PackReveal({ vm, reducedMotion, onComplete, onExit, battleId }: 
             compact={compact}
           />
         ))}
-      </div>
-
-      {/* ── action bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingTop: 16, borderTop: `1px solid ${COLORS.border}` }}>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 9 }}>
-          {onExit && (
-            <button onClick={onExit} style={{ padding: '11px 20px', borderRadius: 12, border: '1px solid rgba(255,94,122,.3)', background: 'rgba(255,94,122,.08)', color: '#ff8198', cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>
-              Leave battle
-            </button>
-          )}
-          {!complete && (
-            <button onClick={skip} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '11px 22px', borderRadius: 12, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 0 22px -6px rgba(0,255,196,.7)' }}>
-              ▶ Skip reveal
-            </button>
-          )}
-        </div>
       </div>
 
       {/* emotes — fixed dock at the very bottom */}
