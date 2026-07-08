@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { RoyaleReveal } from './RoyaleReveal'
-import type { RevealVM } from './battleReveal'
+vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: null }) }))
+import { RoyaleReveal, RoyaleResult } from './RoyaleReveal'
+import type { RevealVM, RevealCardVM } from './battleReveal'
 
 const vm: RevealVM = {
   mode: 'royale', status: 'running', winner: null, meWallet: 'A',
@@ -28,6 +29,27 @@ describe('RoyaleReveal', () => {
     expect(screen.getByText('STANDINGS')).toBeTruthy()                       // 1a standings sidebar rendered
     expect(document.querySelectorAll('[data-player-anchor]')).toHaveLength(2) // one chip per player (emote anchor)
     expect(screen.getByText(/OUT · R1/)).toBeTruthy()                        // B marked out in its chip
+  })
+
+  it('champion loot shows uncommon+ cards and packs the commons (loser view)', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+    const card = (rarity: string | null, insuredValue: number, nft: string): RevealCardVM =>
+      ({ wallet: 'A', isMe: false, nftAddress: nft, rarity, insuredValue, autoSold: false, grade: null, year: null, name: 'C' })
+    const settled: RevealVM = {
+      mode: 'royale', status: 'settled', winner: 'A', meWallet: 'B',
+      players: [
+        { wallet: 'A', isMe: false, accumulatedValue: 297, eliminatedRound: null, total: 297, cards: [
+          card('Epic', 97, 'e1'), card('Rare', 60, 'r1'), card('Common', 50, 'c1'), card('Common', 54, 'c2'), card(null, 40, 'c3'),
+        ] },
+        { wallet: 'B', isMe: true, accumulatedValue: 0, eliminatedRound: 1, total: 0, cards: [] },
+      ],
+      rounds: [], potValue: 297, machines: ['m'], buybackTotal: 0,
+    }
+    render(<MemoryRouter><RoyaleResult vm={settled} battleId="b1" /></MemoryRouter>)
+    expect(screen.getByText(/CHAMPION LOOT · 5 CARDS/)).toBeTruthy()   // 5 total
+    expect(screen.getByText(/TOP PULL/)).toBeTruthy()                  // the epic $97 leads
+    expect(screen.getByText('×3')).toBeTruthy()                        // 2 commons + 1 null = 3 packed
+    expect(screen.getByText('COMMONS')).toBeTruthy()
   })
 
   it('reduced motion on a settled battle fires onComplete (prop wired into the hook)', () => {

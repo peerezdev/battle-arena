@@ -308,6 +308,78 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
   )
 }
 
+// ─────────────────────────── LOOT SHOWCASE ───────────────────────────
+const FEATURED_RARITIES = new Set(['uncommon', 'rare', 'epic', 'legendary', 'mythic'])
+const isFeatured = (c: RevealCardVM) => FEATURED_RARITIES.has((c.rarity ?? '').toLowerCase())
+
+// The champion's pot: every uncommon+ card shown individually (best first, top pull highlighted),
+// and all the commons packed into one stack that expands to the full grid.
+function LootShowcase({ cards }: { cards: RevealCardVM[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const byValue = (a: RevealCardVM, b: RevealCardVM) => (b.insuredValue ?? 0) - (a.insuredValue ?? 0)
+  const featured = cards.filter(isFeatured).sort(byValue)
+  const commons = cards.filter((c) => !isFeatured(c)).sort(byValue)
+  const commonsTotal = commons.reduce((s, c) => s + (c.insuredValue ?? 0), 0)
+  const total = cards.reduce((s, c) => s + (c.insuredValue ?? 0), 0)
+
+  return (
+    <div style={{ flex: '1 1 360px', minWidth: 280 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: '#f5c542' }}>🏆 CHAMPION LOOT · {cards.length} CARD{cards.length === 1 ? '' : 'S'}</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: '#f5c542' }}>{formatUsd(total)}</span>
+        <span style={{ flex: 1 }} />
+        {commons.length > 0 && (
+          <button onClick={() => setExpanded((e) => !e)}
+            style={{ padding: '6px 13px', borderRadius: 9, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 12 }}>
+            {expanded ? 'Hide commons ↑' : `See all ${cards.length} ↓`}
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        {featured.map((c, i) => (
+          <div key={c.nftAddress ?? i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div style={i === 0 ? { borderRadius: 12, boxShadow: '0 0 34px -10px rgba(245,197,66,.7)' } : undefined}>
+              <RevealCard card={c} reducedMotion w={i === 0 ? 126 : 112} h={i === 0 ? 176 : 156} />
+            </div>
+            {i === 0 && <span style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#f5c542' }}>{formatUsd(c.insuredValue ?? 0)} · TOP PULL</span>}
+          </div>
+        ))}
+
+        {commons.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => setExpanded((e) => !e)}
+              style={{ position: 'relative', width: 112, height: 156, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>
+              <span style={{ position: 'absolute', inset: 0, transform: 'translate(11px,-9px) rotate(5deg)', borderRadius: 11, background: '#170e22', border: `1px solid ${COLORS.border}` }} />
+              <span style={{ position: 'absolute', inset: 0, transform: 'translate(5px,-4px) rotate(2.5deg)', borderRadius: 11, background: '#1c1128', border: `1px solid ${COLORS.border}` }} />
+              <span style={{ position: 'absolute', inset: 0, borderRadius: 11, background: 'linear-gradient(160deg,#241534,#120a1a)', border: '1px solid rgba(255,255,255,.16)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: COLORS.text }}>
+                <span style={{ fontSize: 24, fontWeight: 700 }}>×{commons.length}</span>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.1em', color: COLORS.muted }}>COMMONS</span>
+              </span>
+            </button>
+            <span style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: COLORS.muted }}>{formatUsd(commonsTotal)} total</span>
+          </div>
+        )}
+      </div>
+
+      {expanded && commons.length > 0 && (
+        <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px dashed rgba(245,197,66,.25)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(70px,1fr))', gap: 8 }}>
+            {commons.map((c, i) => (
+              <div key={c.nftAddress ?? i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: '100%', aspectRatio: '5 / 7', borderRadius: 7, overflow: 'hidden', background: 'linear-gradient(160deg,#241534,#120a1a)', border: `1px solid ${COLORS.border}` }}>
+                  {c.nftAddress && <img src={ccCardImageUrl(c.nftAddress)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                </div>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 9, color: '#7a8492' }}>{formatUsd(c.insuredValue ?? 0)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─────────────────────────── RESULT VIEW ───────────────────────────
 function ResultView({ vm, name, ranked, onRematch, onExit, onVerify }: {
   vm: RevealVM; name: (p: RevealPlayerVM) => string; ranked: { p: RevealPlayerVM; rank: number }[]
@@ -360,16 +432,7 @@ function ResultView({ vm, name, ranked, onRematch, onExit, onVerify }: {
               <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-.02em', background: 'linear-gradient(120deg,#f5c542,#5cffd8)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(lootTotal)}</div>
             </div>
           </div>
-          {!iWon && (
-            <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-              <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted, marginBottom: 12 }}>CHAMPION LOOT · {formatUsd(lootTotal)}</div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {allLoot.map((c, i) => (
-                  <RevealCard key={i} card={c} reducedMotion w={120} h={200} />
-                ))}
-              </div>
-            </div>
-          )}
+          {!iWon && <LootShowcase cards={allLoot} />}
         </section>
       )}
 
