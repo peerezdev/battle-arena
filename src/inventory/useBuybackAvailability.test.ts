@@ -32,6 +32,9 @@ describe('useBuybackAvailability', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect([...result.current.available]).toEqual(['mintYES'])
+    // Offer amount exposed for the payout preview; unavailable cards carry none.
+    expect(result.current.amounts.get('mintYES')).toBe(100)
+    expect(result.current.amounts.has('mintNO')).toBe(false)
 
     // The connected card must never be probed (buyback is embedded-only).
     const probed = fetchMock.mock.calls.map((c) => c[0] as string).join('|')

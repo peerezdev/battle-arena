@@ -12,8 +12,10 @@ import type { OwnedCard } from './useCollectorCryptNfts'
 export function useBuybackAvailability(
   cards: OwnedCard[],
   embeddedAddress: string | null,
-): { available: Set<string>; loading: boolean } {
+): { available: Set<string>; amounts: Map<string, number>; loading: boolean } {
   const [available, setAvailable] = useState<Set<string>>(new Set())
+  // mint → buyback offer amount in USDC base units (so callers can preview the payout).
+  const [amounts, setAmounts] = useState<Map<string, number>>(new Map())
   const [loading, setLoading] = useState(false)
 
   const embeddedMints = cards.filter((c) => c.source === 'embedded').map((c) => c.mint)
@@ -23,6 +25,7 @@ export function useBuybackAvailability(
   useEffect(() => {
     if (!embeddedAddress || embeddedMints.length === 0) {
       setAvailable(new Set())
+      setAmounts(new Map())
       return
     }
     let cancelled = false
@@ -31,14 +34,17 @@ export function useBuybackAvailability(
       embeddedMints.map(async (mint) => {
         try {
           const r = await fetchBuybackAvailable(embeddedAddress, mint)
-          return r.available && r.amount != null ? mint : null
+          return r.available && r.amount != null ? { mint, amount: r.amount } : null
         } catch {
           return null
         }
       }),
     )
-      .then((mints) => {
-        if (!cancelled) setAvailable(new Set(mints.filter((m): m is string => m != null)))
+      .then((results) => {
+        if (cancelled) return
+        const ok = results.filter((x): x is { mint: string; amount: number } => x != null)
+        setAvailable(new Set(ok.map((x) => x.mint)))
+        setAmounts(new Map(ok.map((x) => [x.mint, x.amount])))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -49,5 +55,5 @@ export function useBuybackAvailability(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` deriva de embeddedMints+address; depender de `key` evita el bucle por identidad del array
   }, [key])
 
-  return { available, loading }
+  return { available, amounts, loading }
 }
