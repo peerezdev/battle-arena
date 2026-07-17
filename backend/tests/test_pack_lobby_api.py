@@ -83,7 +83,8 @@ DUMMY_RPC = "https://api.devnet.solana.com"
 DUMMY_MINT = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
 
 
-def _build_client(signer=None, dev_endpoints_enabled=False, withdraw_fee_pct=0.0, fee_wallet_address=""):
+def _build_client(signer=None, dev_endpoints_enabled=False, withdraw_fee_pct=0.0, fee_wallet_address="",
+                  royale_creator_allowlist=None):
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -108,6 +109,7 @@ def _build_client(signer=None, dev_endpoints_enabled=False, withdraw_fee_pct=0.0
         dev_endpoints_enabled=dev_endpoints_enabled,
         withdraw_fee_pct=withdraw_fee_pct,
         fee_wallet_address=fee_wallet_address,
+        royale_creator_allowlist=royale_creator_allowlist,
     )
     return TestClient(app, raise_server_exceptions=True), priv
 
@@ -350,7 +352,8 @@ def test_join_insufficient_usdc_returns_402(client_priv, monkeypatch):
 
 # ── Royale mode tests ─────────────────────────────────────────────────────────
 
-def _make_royale_app(escrow_created_list=None, escrow_address="So1anaESCROWXXXXXXXXXXXXXXXXXXXXXXXXXXX1"):
+def _make_royale_app(escrow_created_list=None, escrow_address="So1anaESCROWXXXXXXXXXXXXXXXXXXXXXXXXXXX1",
+                     royale_creator_allowlist=None):
     """Build a fresh TestClient+priv pair with a fake signer that records escrow creation."""
     from app.db import make_session_factory, init_db
     from sqlalchemy import create_engine
@@ -384,6 +387,7 @@ def _make_royale_app(escrow_created_list=None, escrow_address="So1anaESCROWXXXXX
         privy_operator_wallet_id="op-wallet-id",
         privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
         escrow_seed_lamports=10_000_000,
+        royale_creator_allowlist=royale_creator_allowlist,
     )
     return TestClient(app2, raise_server_exceptions=True), priv2
 
@@ -1187,3 +1191,81 @@ def test_run_bg_voided_schedules_deferred_reconcile(client_priv, monkeypatch):
     assert any("_reconcile_voided_later" in name for name in scheduled_names), (
         f"_run_bg did not schedule a deferred reconcile on 'voided'; scheduled: {scheduled_names}"
     )
+
+
+# ── Royale creator allowlist (launch week) ────────────────────────────────────
+
+def test_royale_creator_allowlist_parses_csv():
+    from app.config import Settings
+    s = Settings(royale_creator_allowlist="  A1 , B2 ,, C3 ")
+    assert s.royale_creator_allowlist_set == {"A1", "B2", "C3"}
+    assert Settings(royale_creator_allowlist="").royale_creator_allowlist_set == set()
+
+
+def test_royale_create_blocked_for_non_allowlisted_wallet(monkeypatch):
+    """With an allowlist set, a wallet not on it gets 403 on royale create and NOTHING is charged/created."""
+    async def _high_balance(*args, **kwargs):
+        return 200_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _fake_collect_buyin(*args, **kwargs):
+        return "fake-sig"
+
+    escrow_created = []
+    # allowlist holds WALLET_B only; WALLET_A (below) is NOT allowed.
+    c, priv = _make_royale_app(escrow_created_list=escrow_created, royale_creator_allowlist={WALLET_B})
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.collect_buyin", _fake_collect_buyin)
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs)
+    assert r.status_code == 403, r.text
+    assert escrow_created == [], "no escrow must be created when creation is blocked"
+
+
+def test_royale_create_allowed_for_allowlisted_wallet(monkeypatch):
+    """A wallet ON the allowlist can still create a royale."""
+    async def _high_balance(*args, **kwargs):
+        return 200_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _fake_collect_buyin(*args, **kwargs):
+        return "fake-sig"
+
+    async def _fake_blockhash(rpc_url: str) -> str:
+        return "FakeBH444444444444444444444444444444444444444"
+
+    c, priv = _make_royale_app(royale_creator_allowlist={WALLET_A})
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.collect_buyin", _fake_collect_buyin)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _fake_blockhash)
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5, "mode": "royale"}, headers=hdrs)
+    assert r.status_code == 200, r.text
+
+
+def test_pack_create_unaffected_by_royale_allowlist(client_priv, monkeypatch):
+    """The royale allowlist does NOT gate Pack Battle creation."""
+    async def _high_balance(*args, **kwargs):
+        return 100_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    # allowlist holds WALLET_B; WALLET_A creates a PACK battle → must still succeed.
+    c, priv = _build_client(royale_creator_allowlist={WALLET_B})
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
+    assert r.status_code == 200, r.text

@@ -55,6 +55,14 @@ class Settings(BaseSettings):
     # destino recibe el resto) y enviado al fee_wallet_address (fallback al operador). 0 → sin fee.
     # env: WITHDRAW_FEE_PCT
     withdraw_fee_pct: float = 0.01
+    # Launch week: restringe la CREACIÓN de Battle Royale a estas wallets (Privy embedded
+    # Solana, base58, coma-separadas). Vacío = abierto a todos (comportamiento por defecto).
+    # env: ROYALE_CREATOR_ALLOWLIST
+    royale_creator_allowlist: str = ""
+
+    @property
+    def royale_creator_allowlist_set(self) -> set[str]:
+        return {w.strip() for w in self.royale_creator_allowlist.split(",") if w.strip()}
 
 
 def get_settings() -> Settings:

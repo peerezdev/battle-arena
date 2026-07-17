@@ -192,8 +192,13 @@ def create_app(session_factory, chain: ChainSource,
                withdraw_fee_pct: float = 0.0,
                fee_wallet_address: str = "",
                hit_announce_mult: float = 3.0,
-               winner_announce_mult: float = 4.0) -> FastAPI:
+               winner_announce_mult: float = 4.0,
+               royale_creator_allowlist: set[str] | None = None) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
+
+    # Wallets allowed to CREATE Battle Royale (empty = open to all). Captured by the
+    # /pack-battles handler below. See docs/.../2026-07-17-royale-create-allowlist-design.md.
+    _royale_allow: set[str] = set(royale_creator_allowlist or ())
 
     if cors_origins:
         app.add_middleware(
@@ -843,6 +848,8 @@ def create_app(session_factory, chain: ChainSource,
         mode = body.mode
 
         if mode == "royale":
+            if _royale_allow and wallet not in _royale_allow:
+                raise HTTPException(403, "La creación de Battle Royale está limitada durante el lanzamiento")
             # For royale, the funds check is against the buy-in, not just the pack price.
             buyin = royale_buyin(body.max_players, price)
             await _require_available(wallet, buyin, s)
@@ -1415,7 +1422,8 @@ def build_default_app() -> FastAPI:
                       withdraw_fee_pct=s.withdraw_fee_pct,
                       fee_wallet_address=s.fee_wallet_address,
                       hit_announce_mult=s.hit_announce_mult,
-                      winner_announce_mult=s.winner_announce_mult)
+                      winner_announce_mult=s.winner_announce_mult,
+                      royale_creator_allowlist=s.royale_creator_allowlist_set)
 
 
 app = build_default_app()
