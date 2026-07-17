@@ -1253,7 +1253,7 @@ def test_royale_create_allowed_for_allowlisted_wallet(monkeypatch):
     assert r.status_code == 200, r.text
 
 
-def test_pack_create_unaffected_by_royale_allowlist(client_priv, monkeypatch):
+def test_pack_create_unaffected_by_royale_allowlist(monkeypatch):
     """The royale allowlist does NOT gate Pack Battle creation."""
     async def _high_balance(*args, **kwargs):
         return 100_000_000

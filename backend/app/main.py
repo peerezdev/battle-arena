@@ -197,7 +197,7 @@ def create_app(session_factory, chain: ChainSource,
     app = FastAPI(title="Battle Arena — Backend")
 
     # Wallets allowed to CREATE Battle Royale (empty = open to all). Captured by the
-    # /pack-battles handler below. See docs/.../2026-07-17-royale-create-allowlist-design.md.
+    # /pack-battles handler below. See docs/superpowers/specs/2026-07-17-royale-create-allowlist-design.md.
     _royale_allow: set[str] = set(royale_creator_allowlist or ())
 
     if cors_origins:
