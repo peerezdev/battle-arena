@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { startRematch } from '../../battle/startRematch'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
-import { VerifyPanel } from './VerifyPanel'
 import { RevealCard, rarityColor } from './RevealCard'
 import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { WinningsBuyback } from './WinningsBuyback'
@@ -92,7 +91,6 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
   const navigate = useNavigate()
   const { identityToken } = useIdentityToken()
   const aliases = useAliases(vm.players.map((p) => p.wallet))
-  const [verifyOpen, setVerifyOpen] = useState(false)
   const name = nameOf(aliases)
   const ranked = useRanked(vm)
 
@@ -101,9 +99,8 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
       {TITLE}
       <ResultView
         vm={vm} name={name} ranked={ranked}
-        onRematch={() => startRematch({ battleId, mode: 'royale', token: identityToken, navigate })} onExit={onExit} onVerify={() => setVerifyOpen(true)}
+        onRematch={() => startRematch({ battleId, mode: 'royale', token: identityToken, navigate })} onExit={onExit}
       />
-      {verifyOpen && battleId && <VerifyPanel battleId={battleId} onClose={() => setVerifyOpen(false)} />}
     </div>
   )
 }
@@ -381,9 +378,9 @@ function LootShowcase({ cards }: { cards: RevealCardVM[] }) {
 }
 
 // ─────────────────────────── RESULT VIEW ───────────────────────────
-function ResultView({ vm, name, ranked, onRematch, onExit, onVerify }: {
+function ResultView({ vm, name, ranked, onRematch, onExit }: {
   vm: RevealVM; name: (p: RevealPlayerVM) => string; ranked: { p: RevealPlayerVM; rank: number }[]
-  onRematch: () => void; onExit?: () => void; onVerify: () => void
+  onRematch: () => void; onExit?: () => void
 }) {
   const champ = ranked[0]?.p
   const iAmPlayer = vm.players.some((p) => p.isMe)
@@ -468,7 +465,6 @@ function ResultView({ vm, name, ranked, onRematch, onExit, onVerify }: {
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18, justifyContent: 'center' }}>
         <button onClick={onRematch} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 0 22px -6px rgba(0,255,196,.7)' }}>↻ Rematch</button>
-        <button onClick={onVerify} style={{ padding: '13px 22px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.muted, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 600 }}>Verify (Provably Fair)</button>
         <button onClick={onExit} style={{ padding: '13px 26px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 15, fontWeight: 600 }}>Back to lobby</button>
       </div>
     </div>

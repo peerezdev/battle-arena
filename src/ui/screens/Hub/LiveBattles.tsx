@@ -58,17 +58,60 @@ const MODE_LABEL: Record<BattleMode, string> = {
 
 const FILTERS = ['All', 'Ready to join', 'Mine', 'Recent']
 
+// Which battles each filter shows. Status is absent on legacy/open-only rows → treated as an
+// open lobby. All = live or not-yet-started; Ready = joinable & not already in; Mine = created
+// by me; Recent = finished (settled).
+function matchesFilter(b: LiveBattle, filterIdx: number, meWallet: string | null): boolean {
+  const s = b.battleStatus
+  const finished = s === 'settled' || s === 'voided' || s === 'cancelled'
+  switch (filterIdx) {
+    case 1: { // Ready to join
+      const { filled, total } = parseSlots(b.slots)
+      return (!s || s === 'lobby') && total - filled > 0 && !b.alreadyJoined
+    }
+    case 2: // Mine — games I created that haven't finished yet (exclude settled/voided/cancelled)
+      return !!meWallet && b.creatorWallet === meWallet && !finished
+    case 3: // Recent
+      return s === 'settled'
+    default: // All — live or not yet started
+      return !finished
+  }
+}
+
+// Recent orders by finish time (newest first); everything else by creation time.
+function sortForFilter(filterIdx: number, list: LiveBattle[]): LiveBattle[] {
+  const t = (v?: string | null) => (v ? Date.parse(v) : 0)
+  const key = filterIdx === 3 ? (b: LiveBattle) => t(b.settledAt) : (b: LiveBattle) => t(b.createdAt)
+  return [...list].sort((a, b) => key(b) - key(a))
+}
+
+function emptyMessage(filterIdx: number, meWallet: string | null): string {
+  switch (filterIdx) {
+    case 1: return 'No games open to join right now.'
+    case 2: return meWallet ? "You haven't created any games yet." : 'Sign in to see games you created.'
+    case 3: return 'No finished games yet.'
+    default: return 'No live games right now.'
+  }
+}
+
 interface Props {
   battles: LiveBattle[]
+  meWallet?: string | null
   onBattleAction: (b: LiveBattle) => void
   onCancel?: (b: LiveBattle) => void
   onOpen: (b: LiveBattle) => void
 }
 
-export function LiveBattles({ battles, onBattleAction, onCancel, onOpen }: Props) {
+export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel, onOpen }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
   const { machines } = useMachineList()
   const byCode = useMemo(() => new Map(machines.map((m) => [m.code, m])), [machines])
+  const filtered = useMemo(
+    () => sortForFilter(activeFilter, battles.filter((b) => matchesFilter(b, activeFilter, meWallet))),
+    [battles, activeFilter, meWallet],
+  )
+  // Badge always reflects the count of active games (live or not started), not the current filter.
+  const liveCount = useMemo(() => battles.filter((b) => matchesFilter(b, 0, meWallet)).length, [battles, meWallet])
 
   return (
     <div>
@@ -104,7 +147,7 @@ export function LiveBattles({ battles, onBattleAction, onCancel, onOpen }: Props
             padding: '2px 10px',
           }}
         >
-          {battles.length} live
+          {liveCount} live
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <span
@@ -168,12 +211,18 @@ export function LiveBattles({ battles, onBattleAction, onCancel, onOpen }: Props
         ))}
       </div>
 
-      {/* (d) Battle cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
-        {battles.map((b) => (
-          <BattleCard key={b.id} battle={b} byCode={byCode} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
-        ))}
-      </div>
+      {/* (d) Battle cards — filtered by the segmented control */}
+      {filtered.length === 0 ? (
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, padding: '18px 4px' }}>
+          {emptyMessage(activeFilter, meWallet)}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
+          {filtered.map((b) => (
+            <BattleCard key={b.id} battle={b} byCode={byCode} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -285,9 +334,9 @@ function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle:
         </div>
         {wide && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 21, fontWeight: 700, color: COLORS.muted }}>{formatUsd(b.entry)}</span>
-              <span style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minWidth: 70 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <span style={{ flex: 'none', fontSize: 18, fontWeight: 700, color: COLORS.muted, whiteSpace: 'nowrap' }}>{formatUsd(b.entry)}</span>
+              <span style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minWidth: 28 }}>
                 <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
                 <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
                 {mult && (
@@ -296,7 +345,7 @@ function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle:
                   </span>
                 )}
               </span>
-              <span style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-.02em', color: modeColor }}>{formatUsd(b.pot)}</span>
+              <span style={{ flex: 'none', fontSize: 'clamp(22px,2vw,28px)', fontWeight: 700, letterSpacing: '-.02em', color: modeColor, whiteSpace: 'nowrap' }}>{formatUsd(b.pot)}</span>
             </div>
             <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.1em', color: '#7a8492', marginTop: 4 }}>
               {b.costLabel} → ESTIMATED POT
@@ -344,7 +393,7 @@ function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle:
         {b.action === 'watch' ? (
           <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
             style={{ border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, borderRadius: 12, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-            Watch
+            {b.battleStatus === 'settled' ? 'Result' : 'Watch'}
           </button>
         ) : b.canCancel && onCancel ? (
           <button onClick={(e) => { e.stopPropagation(); onCancel(b) }}

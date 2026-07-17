@@ -21,11 +21,18 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
     ? priceUsd * royaleTotalPulls(b.max_players)
     : priceUsd * b.max_players
   const full = b.players >= b.max_players
-  const status = full
-    ? { statusText: 'Live', statusColor: '#ff5e7a' }
-    : b.max_players > 2
-      ? { statusText: 'Filling', statusColor: '#f5b73d' }
-      : { statusText: 'Waiting for opponent', statusColor: '#00ffc4' }
+  // status is present on the /list feed; absent (open-only feed) → treat as an open lobby.
+  const isLobby = !b.status || b.status === 'lobby'
+  const finished = b.status === 'settled'
+  const live = b.status === 'running'
+  const status = finished
+    ? { statusText: 'Final', statusColor: '#8b95a3' }
+    : (live || full)
+      ? { statusText: 'Live', statusColor: '#ff5e7a' }
+      : b.max_players > 2
+        ? { statusText: 'Filling', statusColor: '#f5b73d' }
+        : { statusText: 'Waiting for opponent', statusColor: '#00ffc4' }
+  const canJoin = isLobby && !full
   return {
     id: b.id,
     mode: b.mode,
@@ -37,13 +44,21 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
     cards: b.mode === 'royale' ? ['🎴'] : ['🔥', '💧'],
     costLabel: b.mode === 'royale' ? 'ENTRY' : 'BUY-IN',
     costValue: entry,
-    action: full ? 'watch' : 'join',
-    canCancel: !!meWallet && b.creator_wallet === meWallet,
+    action: canJoin ? 'join' : 'watch',
+    canCancel: !!meWallet && b.creator_wallet === meWallet && isLobby,
     alreadyJoined: !!meWallet && (b.player_wallets ?? []).includes(meWallet),
     entry,
     pot: estPot,
     slots: `${b.players}/${b.max_players}`,
     machineCodes: (b.packs && b.packs.length) ? b.packs : [b.machine_code],
+    playerWallets: b.player_wallets ?? [],
+    creatorWallet: b.creator_wallet ?? undefined,
+    maxPlayers: b.max_players,
+    machinePrice: priceUsd,
+    battleStatus: b.status,
+    winner: b.winner ?? null,
+    createdAt: b.created_at,
+    settledAt: b.settled_at ?? null,
     ...status,
   }
 }

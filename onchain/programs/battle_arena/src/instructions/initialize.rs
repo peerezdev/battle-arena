@@ -74,6 +74,11 @@ pub fn handler(
         ErrorCode::StaleAttestation
     );
 
+    // El oráculo NO es elegible por el creador: debe ser el oráculo de confianza fijado
+    // en el programa. De lo contrario, un atacante firmaría su propia atestación inflada
+    // con un keypair propio y ganaría siempre (llevándose el NFT del rival).
+    require!(oracle == TRUSTED_ORACLE, ErrorCode::UntrustedOracle);
+
     // Verificación de la firma del oráculo por introspección.
     // El battle PDA se incluye en el mensaje para ligar la atestación a esta batalla
     // concreta y evitar el reuso de firmas en otras batallas (anti-replay).

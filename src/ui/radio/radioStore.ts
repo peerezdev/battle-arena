@@ -7,6 +7,7 @@ export type RadioState = {
   shuffle: boolean
   currentTime: number
   duration: number
+  collapsed: boolean
 }
 
 export type RadioStore = {
@@ -21,12 +22,14 @@ export type RadioStore = {
   select(i: number): void
   setVolume(v: number): void
   toggleShuffle(): void
+  setCollapsed(v: boolean): void
   tryAutoplay(): void
 }
 
 const KEY_INDEX = 'battlearena.radio.index'
 const KEY_VOLUME = 'battlearena.radio.volume'
 const KEY_SHUFFLE = 'battlearena.radio.shuffle'
+const KEY_COLLAPSED = 'battlearena.radio.collapsed'
 const DEFAULT_VOLUME = 0.6
 
 function readNumber(key: string, fallback: number): number {
@@ -69,6 +72,7 @@ export function createRadioStore(
     shuffle: readBool(KEY_SHUFFLE),
     currentTime: 0,
     duration: 0,
+    collapsed: readBool(KEY_COLLAPSED),
   }
   let snapshot: RadioState = { ...internal }
 
@@ -204,6 +208,12 @@ export function createRadioStore(
     emit()
   }
 
+  function setCollapsed(v: boolean): void {
+    internal.collapsed = v
+    write(KEY_COLLAPSED, v ? '1' : '0')
+    emit()
+  }
+
   function tryAutoplay(): void {
     if (internal.isPlaying || !tracks.length) return
     // Arm the gesture fallback first so a blocked attempt is covered synchronously.
@@ -229,7 +239,7 @@ export function createRadioStore(
     getState: () => snapshot,
     getTracks: () => tracks,
     subscribe(cb) { listeners.add(cb); return () => { listeners.delete(cb) } },
-    play, pause, toggle, next, prev, select, setVolume, toggleShuffle, tryAutoplay,
+    play, pause, toggle, next, prev, select, setVolume, toggleShuffle, setCollapsed, tryAutoplay,
   }
 }
 

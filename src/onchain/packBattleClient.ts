@@ -28,6 +28,9 @@ export interface OpenBattle {
   max_players: number; players: number; buyin: number; creator_wallet: string | null
   player_wallets: string[]
   packs?: string[]   // ordered bundle machine_codes (pack mode); empty for royale
+  // Present on the /pack-battles/list feed (open lobbies + live + recent settled); absent on /open.
+  status?: BattleStatus; winner?: string | null
+  created_at?: string; settled_at?: string | null   // ISO timestamps
 }
 
 export interface VerifyRound { round_number: number; client_seed: string; eliminated_wallet: string; tie_break_index: number | null }
@@ -94,6 +97,11 @@ export function joinAllBots(id: string): Promise<Battle> {
 
 export function listOpenBattles(): Promise<OpenBattle[]> {
   return battleFetch<OpenBattle[]>('/pack-battles/open')
+}
+
+/** Open lobbies + live games + recent finished — carries `status` for the Live-games filters. */
+export function listBattles(): Promise<OpenBattle[]> {
+  return battleFetch<OpenBattle[]>('/pack-battles/list')
 }
 
 export function getBattle(id: string): Promise<Battle> {

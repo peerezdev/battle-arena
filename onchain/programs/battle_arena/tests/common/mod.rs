@@ -293,6 +293,7 @@ pub mod err {
     pub const UNAUTHORIZED_TOKEN_ACCOUNT: u32 = 6016;
     pub const NOT_ALL_DEPOSITED: u32 = 6019;
     pub const BAD_VAULT: u32 = 6020;
+    pub const UNTRUSTED_ORACLE: u32 = 6024;
 }
 
 /// Afirma que los logs de una tx fallida contienen el error Anchor esperado,

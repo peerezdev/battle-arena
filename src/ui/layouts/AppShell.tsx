@@ -17,7 +17,6 @@ import { ChatDock } from '../screens/Hub/ChatDock'
 import { useChat } from '../../hooks/useChat'
 import { RematchToastHost } from '../components/RematchToast'
 import { OnboardingTutorial } from '../components/OnboardingTutorial'
-import { LiveDropsStrip } from '../screens/Hub/LiveDropsStrip'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
@@ -52,8 +51,11 @@ export function AppShell() {
 
   // Radio is a singleton store — subscribing here only tells us whether the
   // mobile mini-player (bottom stack) will render, to size the content padding.
-  const { tracks: radioTracks } = useRadio()
+  const { tracks: radioTracks, collapsed: radioCollapsed } = useRadio()
   const mobileRadio = !wideRail && radioTracks.length > 0
+  // When the mini-player is collapsed only the floating re-open button shows, so
+  // the content only needs to clear the nav (not the full radio bar).
+  const mobileRadioBar = mobileRadio && !radioCollapsed
 
   // First-visit onboarding — show the guided tour once per browser.
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
@@ -90,7 +92,7 @@ export function AppShell() {
 
   // ── Grid columns — mirrors Hub.tsx logic + collapsible dock column ──────────
   const showDock = wideRail && wideDock
-  const dockCol = showDock ? (dockCollapsed ? '36px' : '340px') : ''
+  const dockCol = showDock ? (dockCollapsed ? '36px' : '320px') : ''
   let gridCols: string
   if (wideRail && wideDock)  gridCols = `92px 1fr ${dockCol}`
   else if (wideRail)         gridCols = '92px 1fr'
@@ -141,6 +143,11 @@ export function AppShell() {
           style={{
             gridColumn: headerColumn,
             gridRow: '1 / 2',
+            // Topbar sits above page content so its dropdowns (profile menu, radio) overflow ON TOP.
+            // Grid siblings paint in DOM order, and <main> comes after — without this the menu
+            // renders under the content. Kept below the chat drawer / modals (z ≥ 100).
+            position: 'relative',
+            zIndex: 60,
             display: 'flex',
             alignItems: 'center',
             flexWrap: 'wrap',
@@ -159,15 +166,12 @@ export function AppShell() {
               Collector <span style={{ color: COLORS.green }}>Arena</span>
             </span>
           ) : (
-            <span
-              style={{
-                flex: 'none',
-                width: 30,
-                height: 30,
-                borderRadius: 10,
-                background: GRADIENT,
-                boxShadow: '0 0 14px -4px rgba(0,255,196,.7)',
-              }}
+            <img
+              src="/logo-rail.png"
+              alt="Collector Arena"
+              width={32}
+              height={32}
+              style={{ flex: 'none', objectFit: 'contain', display: 'block' }}
             />
           )}
 
@@ -266,11 +270,12 @@ export function AppShell() {
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            paddingBottom: wideRail ? 0 : mobileRadio ? 128 : 72, // space for the mobile bottom stack (nav + optional radio bar)
+            paddingBottom: wideRail ? 0 : mobileRadioBar ? 128 : 72, // space for the mobile bottom stack (nav + optional radio bar)
           }}
         >
           {/* Mobile: Live Drops strip at the top of the scroll (scrolls away on scroll down) */}
-          {!wideRail && <LiveDropsStrip />}
+          {/* Recent Drops strip removed from all screens (component kept: LiveDropsStrip.tsx).
+              To restore on mobile: import it and render `{!wideRail && <LiveDropsStrip />}` here. */}
           <Outlet />
         </main>
 

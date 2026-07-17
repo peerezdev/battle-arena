@@ -17,6 +17,7 @@ export function useRadio() {
     select: radio.select,
     setVolume: radio.setVolume,
     toggleShuffle: radio.toggleShuffle,
+    setCollapsed: radio.setCollapsed,
     tryAutoplay: radio.tryAutoplay,
   }
 }

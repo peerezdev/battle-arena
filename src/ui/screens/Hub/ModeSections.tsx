@@ -26,26 +26,26 @@ interface ModeSection {
 
 const SECTIONS: ModeSection[] = [
   {
-    n: '01', nav: 'royale', name: 'Battle Royale', tag: '2–10 PLAYERS', to: NAV_ROUTES.royale,
-    desc: 'Up to 10 players open packs in rounds. The lowest value drops each round — outlast everyone and the whole pot is yours.',
+    n: '', nav: 'royale', name: 'The first Battle Royale with NFT cards in history is now available…', tag: '', to: NAV_ROUTES.royale,
+    desc: '10 players… 9 rounds… 1 single winner…\n\nThe last one standing takes the ENTIRE pot that all 10 players build up during the 9 rounds, a total of 54 graded cards.\n\nDon’t worry if you still don’t get it, the best way for you to understand it is to see it for yourself, that’s why I’ve got a demo ready for you.\n\nThere’s only one game per day, don’t miss your spot… if there’s even a spot left by then, of course.',
     cta: 'Enter the Royale', rgb: '255,46,126', title: '#ff6ba4', ctaBg: '#ff2e7e', ctaHover: '#ff4d92', ctaText: '#fff',
   },
   {
-    n: '02', nav: 'pack', name: 'Pack Battle', tag: '1V1 · WINNER TAKES ALL', to: NAV_ROUTES.pack,
-    desc: 'The classic duel. You and one rival open the same pack — the higher pull walks away with both cards.',
-    cta: 'Find a rival', rgb: '60,232,168', title: '#3ce8a8', ctaBg: '#3ce8a8', ctaHover: '#5cf0bb', ctaText: '#06170f',
+    n: '', nav: 'pack', name: 'Pack Battle', tag: '', to: NAV_ROUTES.pack,
+    desc: 'Very simple, very easy, these are quick matches for 2 to 4 players.\n\nPlayers open one or more packs at the same time and whoever gets the highest accumulated value takes all the cards.\n\nBut that’s not all…\n\nYOU’VE GOT FUCKING EMOTES.\n\nYou pull a trash card? You don’t even have to cry yourself, Squirtle will do it for you.\n\nIf you’re not the crying type but you’re definitely the raging type, don’t worry, Charmander will rage for you.\n\nAnd there are a few more that are going to blow your mind… But careful, the only way to try them is by playing a match.',
+    cta: 'I want to see those emotes', rgb: '60,232,168', title: '#3ce8a8', ctaBg: '#3ce8a8', ctaHover: '#5cf0bb', ctaText: '#06170f',
   },
   {
-    n: '03', nav: 'gacha', name: 'Gacha', tag: 'PULL → PLAY', to: NAV_ROUTES.gacha,
-    desc: 'No opponents needed. Open Collector Crypt packs solo, then take your best pull straight into battle.',
-    cta: 'Spin the Gacha', rgb: '122,110,255', title: '#a99bff', ctaBg: '#7a6eff', ctaHover: '#8f84ff', ctaText: '#fff',
+    n: '', nav: 'gacha', name: 'Gacha', tag: '', to: NAV_ROUTES.gacha,
+    desc: 'I’m not explaining anything here.\n\nBecause if you don’t know what gacha is, you’re better off leaving fast before you find out… it’s way too addictive.\n\nIf you already know what it is… I’m sorry, it’s already too late for you…',
+    cta: 'One Pull Won’t Hurt… ', rgb: '122,110,255', title: '#a99bff', ctaBg: '#7a6eff', ctaHover: '#8f84ff', ctaText: '#fff',
   },
 ]
 
 // Text bridges shown between sections (index i sits after SECTIONS[i]).
 const CONNECTORS = [
-  'Too much chaos? Take it one rival at a time.',
-  'Or skip the matchmaking — pull solo and battle whatever you hit.',
+  'What the hell is up with you, bro? What kind of problem do you have with our Battle Royale?\n\nWell… I’ve still got more shit for you, pay attention.',
+  'Still scrolling? WTF bro… What the fuck are you looking for… Mimikyu?\n\nFine, I’ve still got one last bullet.',
 ]
 
 function ModeCta({ s }: { s: ModeSection }) {
@@ -91,18 +91,18 @@ export function ModeSections() {
                 </span>
                 <span style={{ fontFamily: FONTS.mono, fontSize: 96, fontWeight: 700, lineHeight: 1, color: `rgba(${s.rgb},.13)` }}>{s.n}</span>
               </span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap', marginBottom: 10 }}>
                 <span style={{ fontSize: 24, fontWeight: 700, color: s.title }}>{s.name}</span>
                 <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: '#7a8492' }}>{s.tag}</span>
               </div>
-              <p style={{ margin: '0 0 18px', maxWidth: 440, fontSize: 14.5, lineHeight: 1.6, color: '#aab3bf' }}>{s.desc}</p>
+              <p style={{ position: 'relative', margin: '0 0 18px', fontSize: 14.5, lineHeight: 1.6, color: '#aab3bf', whiteSpace: 'pre-line' }}>{s.desc}</p>
               <ModeCta s={s} />
             </section>
 
             {i < CONNECTORS.length && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, margin: 'clamp(22px,3vw,34px) 0' }}>
                 <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.14))' }} />
-                <p style={{ margin: 0, maxWidth: 400, textAlign: 'center', fontSize: 15, lineHeight: 1.55, color: '#8b95a3' }}>{CONNECTORS[i]}</p>
+                <p style={{ margin: 0, maxWidth: 700, textAlign: 'center', fontSize: 15, lineHeight: 1.55, color: '#8b95a3', whiteSpace: 'pre-line' }}>{CONNECTORS[i]}</p>
                 <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(255,255,255,.14),transparent)' }} />
               </div>
             )}

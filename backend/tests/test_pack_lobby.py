@@ -1,8 +1,9 @@
 import pytest
 from app.db import make_engine, make_session_factory, init_db
 from app.models import PackBattle, BattlePlayer
-from app.services.pack_lobby import (create_battle, join_battle, list_open, get_battle,
-                                      LobbyError, ModeNotSupported)
+from app.services.pack_lobby import (create_battle, join_battle, list_open, list_battles,
+                                      get_battle, LobbyError, ModeNotSupported)
+from datetime import datetime, timezone
 
 @pytest.fixture
 def session():
@@ -216,3 +217,23 @@ def test_create_battle_without_packs_is_single_box_bundle(session):
     b = create_battle(session, "WC", "wid-c", machine_code="m50", price=50_000_000, max_players=2)
     rows = session.query(BattlePack).filter_by(battle_id=b.id).all()
     assert [(r.machine_code, r.price, r.sequence) for r in rows] == [("m50", 50_000_000, 1)]
+
+
+def test_list_battles_covers_lobby_running_and_recent_settled(session):
+    lobby = create_battle(session, "WC", "wid-c", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    run = create_battle(session, "WD", "wid-d", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    join_battle(session, run.id, "WB", "wid-b")   # fills → running
+    done = create_battle(session, "WE", "wid-e", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    done.status, done.winner, done.settled_at = "settled", "WE", datetime.now(timezone.utc)
+    session.commit()
+
+    rows = {r["id"]: r for r in list_battles(session)}
+    assert rows[lobby.id]["status"] == "lobby"
+    assert rows[run.id]["status"] == "running"
+    assert rows[done.id]["status"] == "settled" and rows[done.id]["winner"] == "WE"
+    assert rows[done.id]["settled_at"] is not None
+
+    # voided/cancelled must NOT surface in the list
+    void = create_battle(session, "WF", "wid-f", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    void.status = "voided"; session.commit()
+    assert void.id not in {r["id"] for r in list_battles(session)}

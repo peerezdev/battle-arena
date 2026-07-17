@@ -5,8 +5,9 @@ import { COLORS, FONTS } from '../../theme'
 import type { LiveBattle, BattleMode } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
+import { RoyaleBattleWide } from './RoyaleBattleWide'
 import { showToast } from '../../toast'
-import { useOpenBattles } from '../../../onchain/useOpenBattles'
+import { useBattles } from '../../../onchain/useBattles'
 import { openBattleToLive } from './openBattleToLive'
 import { joinBattle, cancelBattle } from '../../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
@@ -24,7 +25,7 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   const navigate = useNavigate()
   const { identityToken } = useIdentityToken()
   const meWallet = useEmbeddedSolanaAddress()
-  const { battles } = useOpenBattles()
+  const { battles } = useBattles()
   const gate = useDelegationGate()
   const [createOpen, setCreateOpen] = useState(false)
   const [demoOpen, setDemoOpen] = useState(false)
@@ -36,6 +37,8 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   const liveBattles = battles
     .map((b) => openBattleToLive(b, meWallet))
     .filter((b) => b.mode === mode)
+  // The royale wide cards are join lobbies only — drop live/finished rows the /list feed now carries.
+  const royaleOpen = liveBattles.filter((b) => !b.battleStatus || b.battleStatus === 'lobby')
 
   function onCancel(b: LiveBattle) {
     setActionError(null)
@@ -68,7 +71,19 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
 
       <div>
         {actionError && (<div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red, margin: '0 0 12px' }}>{actionError}</div>)}
-        <LiveBattles battles={liveBattles} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
+        {/* Battle Royale uses the new wide lobby card; Pack Battle keeps the compact LiveBattles grid. */}
+        {mode === 'royale' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {royaleOpen.length === 0
+              ? <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>No open Battle Royale lobbies right now.</div>
+              : royaleOpen.map((b) => (
+                  <RoyaleBattleWide key={b.id} battle={b} meWallet={meWallet}
+                    onAction={onBattleAction} onCancel={onCancel} onOpen={(x) => navigate('/play/battle/' + x.id)} />
+                ))}
+          </div>
+        ) : (
+          <LiveBattles battles={liveBattles} meWallet={meWallet} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
+        )}
       </div>
 
       <DelegationGate gate={gate} />

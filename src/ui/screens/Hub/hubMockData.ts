@@ -13,6 +13,16 @@ export interface LiveBattle {
   alreadyJoined?: boolean
   entry: number; pot: number; slots: string; statusText: string; statusColor: string
   machineCodes?: string[]   // packs opened (pack: the bundle in order; royale: the single machine)
+  // Real-lobby extras (used by the wide royale card for named seats + per-round maths).
+  playerWallets?: string[]  // joined players, in seat order
+  creatorWallet?: string    // the host (shown as HOST)
+  maxPlayers?: number       // total seats
+  machinePrice?: number     // machine price in USD (royale = price per pull/round)
+  // Live-games filter fields (from /pack-battles/list). Absent → treated as an open lobby.
+  battleStatus?: 'lobby' | 'running' | 'settled' | 'voided' | 'cancelled'
+  winner?: string | null
+  createdAt?: string        // ISO — ordering for active games
+  settledAt?: string | null // ISO — ordering for Recent
 }
 
 export const MOCK_DROPS: DropItem[] = [

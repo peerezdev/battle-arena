@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { COLORS, FONTS, GRADIENT } from '../../theme'
+import { COLORS, FONTS } from '../../theme'
 import { NAV_ROUTES } from '../../layouts/navRoutes'
 import type { HubNav } from './hubMockData'
 
@@ -25,8 +25,8 @@ export const NAV_ICONS: Record<HubNav, ReactNode> = {
 
 const ITEMS: { id: HubNav; label: string }[] = [
   { id: 'lobby', label: 'Home' },
-  { id: 'pack', label: 'Pack Battle' },
   { id: 'royale', label: 'Battle Royale' },
+  { id: 'pack', label: 'Pack Battle' },
   { id: 'gacha', label: 'Gacha' },
   { id: 'ranks', label: 'Ranking' },
   { id: 'help', label: 'Help' },
@@ -47,17 +47,13 @@ export function LeftRail({ active }: { active: HubNav }) {
         height: '100vh',
       }}
     >
-      {/* Logo dot */}
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 14,
-          background: GRADIENT,
-          boxShadow: '0 0 26px -4px rgba(0,255,196,.6),inset 0 1px 0 rgba(255,255,255,.4)',
-          marginBottom: 16,
-          flexShrink: 0,
-        }}
+      {/* Brand emblem (transparent, loose on the rail) */}
+      <img
+        src="/logo-rail.png"
+        alt="Collector Arena"
+        width={46}
+        height={46}
+        style={{ marginBottom: 16, flexShrink: 0, objectFit: 'contain', display: 'block' }}
       />
 
       {/* Nav items */}

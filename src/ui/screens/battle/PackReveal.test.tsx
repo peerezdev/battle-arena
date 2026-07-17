@@ -18,7 +18,7 @@ const settled: RevealVM = {
   rounds: [],
   potValue: 310,
   machines: ['pokemon_50'],
-  buybackTotal: 0,
+  buybackTotal: 0, entry: 0,
 }
 
 describe('PackReveal', () => {

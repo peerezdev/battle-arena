@@ -8,6 +8,35 @@ pub const STALE_SECS: i64 = 300;
 /// Máximo rake permitido on-chain (5 %).
 pub const MAX_RAKE_BPS: u16 = 500;
 
+/// Oráculo de precios DE CONFIANZA. Solo las atestaciones firmadas por ESTA clave
+/// pueden fijar `value_usd`/`grade` on-chain. Antes, el oráculo se aceptaba como
+/// argumento del creador de la batalla y solo se guardaba (sin validar), lo que
+/// permitía a un atacante firmar su propia atestación inflada con un keypair propio
+/// y ganar siempre llevándose el NFT del rival. Aquí lo fijamos: cada instrucción que
+/// acepta una atestación exige que el oráculo coincida con `TRUSTED_ORACLE`.
+///
+/// Por defecto (build de producción / despliegue) es la clave real del servicio
+/// `oracle/` y DEBE coincidir con `VITE_ORACLE_PUBKEY` del frontend. Rotar el oráculo
+/// requiere actualizar esta constante y redeplegar el programa.
+///
+/// Bajo la feature `test-oracle` (solo para los tests de integración LiteSVM) se usa
+/// la clave derivada del seed `[7u8; 32]` que el harness emplea para firmar, de modo
+/// que `cargo test` pueda ejercitar el camino feliz sin conocer el secreto de producción.
+/// La feature NUNCA debe activarse en un build de despliegue.
+#[cfg(not(feature = "test-oracle"))]
+pub const TRUSTED_ORACLE: Pubkey = Pubkey::new_from_array([
+    71, 23, 61, 152, 212, 66, 197, 157, 177, 162, 49, 229, 243, 10, 211, 177,
+    220, 182, 116, 187, 4, 109, 59, 146, 82, 41, 254, 169, 38, 193, 168, 118,
+]); // 5nWW3DELE8nMpPK9yyC3GECkCfArQJ6k2iormwVx4sLy
+
+/// Oráculo de prueba: clave pública del seed Ed25519 `[7u8; 32]` que usa el harness
+/// de integración (`tests/common/mod.rs`). Solo activa bajo la feature `test-oracle`.
+#[cfg(feature = "test-oracle")]
+pub const TRUSTED_ORACLE: Pubkey = Pubkey::new_from_array([
+    234, 74, 108, 99, 226, 156, 82, 10, 190, 245, 80, 123, 19, 46, 197, 249,
+    149, 71, 118, 174, 190, 190, 123, 146, 66, 30, 234, 105, 20, 70, 210, 44,
+]); // GmaDrppBC7P5ARKV8g3djiwP89vz1jLK23V2GBjuAEGB
+
 /// Reparto de energía entre los tres frentes de una ronda.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Allocation {

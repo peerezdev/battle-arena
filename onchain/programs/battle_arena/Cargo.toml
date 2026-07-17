@@ -18,6 +18,9 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 anchor-debug = []
 custom-heap = []
 custom-panic = []
+# SOLO para los tests de integración LiteSVM: hace que TRUSTED_ORACLE sea la clave
+# derivada del seed [7u8;32] que firma el harness. NUNCA activar en un build de despliegue.
+test-oracle = []
 
 
 [dependencies]

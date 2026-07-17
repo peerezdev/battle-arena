@@ -69,18 +69,18 @@ const val = (c: MachineCard) => c.insured_value ?? 0
 /** Pack Battle demo: you vs one bot, one card each; higher insured value wins the pot. */
 export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, rng: () => number = Math.random): Battle {
   const byRarity = groupByRarity(pool)
-  const bot = fakeWallet(rng)
-  const meCard = pickCard(byRarity, odds, rng)
-  const botCard = pickCard(byRarity, odds, rng)
-  const pulls: BattlePullInfo[] = [toPull(meCard, 1, DEMO_ME), toPull(botCard, 1, bot)]
-  const meTotal = val(meCard), botTotal = val(botCard)
-  const players: BattlePlayerState[] = [
-    { wallet: DEMO_ME, eliminated_round: null, accumulated_value: meTotal },
-    { wallet: bot, eliminated_round: null, accumulated_value: botTotal },
-  ]
+  const TEMP_N = 5
+  const wallets = [DEMO_ME, ...Array.from({ length: TEMP_N - 1 }, () => fakeWallet(rng))]
+  const cards = wallets.map(() => pickCard(byRarity, odds, rng))
+  cards.sort((x, y) => (y.insured_value ?? 0) - (x.insured_value ?? 0))
+  const pulls: BattlePullInfo[] = wallets.map((w, i) => toPull(cards[i], 1, w))
+  pulls.slice(3).forEach((p) => { p.auto_sold = true })
+  const totals = cards.map(val)
+  const players: BattlePlayerState[] = wallets.map((w, i) => ({ wallet: w, eliminated_round: null, accumulated_value: totals[i] }))
   return {
-    id: 'demo', mode: 'pack', machine_code: machineCode, price, max_players: 2,
-    status: 'settled', winner: meTotal >= botTotal ? DEMO_ME : bot, creator_wallet: DEMO_ME,
+    id: 'demo', mode: 'pack', machine_code: machineCode, price, max_players: TEMP_N,
+    buyin: price * 1e6,
+    status: 'settled', winner: DEMO_ME, creator_wallet: DEMO_ME,
     players, rounds: [], server_seed_hash: null, pulls,
     packs: [{ machine_code: machineCode, sequence: 0, price }],
   }

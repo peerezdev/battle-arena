@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::error::ErrorCode;
 use crate::pack_state::*;
+use crate::state::TRUSTED_ORACLE;
 
 #[derive(Accounts)]
 #[instruction(nonce: u64)]
@@ -21,6 +22,9 @@ pub struct CreatePackBattle<'info> {
 
 pub fn handler(ctx: Context<CreatePackBattle>, nonce: u64, oracle: Pubkey, mode: PackMode) -> Result<()> {
     require!(mode == PackMode::Direct, ErrorCode::ModeNotSupported);
+    // El oráculo NO es elegible por el creador: debe ser el de confianza. Si no, el creador
+    // firmaría su propia atestación inflada en `deposit_card` y ganaría el settle directo.
+    require!(oracle == TRUSTED_ORACLE, ErrorCode::UntrustedOracle);
     let now = Clock::get()?.unix_timestamp;
     let p = &mut ctx.accounts.pack;
     p.player_a = ctx.accounts.player_a.key();

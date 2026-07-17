@@ -106,19 +106,44 @@ def _packs(session, battle_id):
             .order_by(BattlePack.sequence).all()]
 
 
+def _battle_row(session, b):
+    """Presentational row for a battle (open or otherwise). No seeds/secrets."""
+    players = session.query(BattlePlayer).filter_by(battle_id=b.id).all()
+    buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
+    packs = [p.machine_code for p in session.query(BattlePack)
+             .filter_by(battle_id=b.id).order_by(BattlePack.sequence).all()]
+    return {"id": b.id, "mode": b.mode, "machine_code": b.machine_code,
+            "price": b.price, "max_players": b.max_players,
+            "players": len(players), "buyin": buyin, "packs": packs,
+            "creator_wallet": b.creator_wallet,
+            "player_wallets": [p.player_wallet for p in players]}
+
+
 def list_open(session):
-    out = []
-    for b in session.query(PackBattle).filter_by(status="lobby").all():
-        players = session.query(BattlePlayer).filter_by(battle_id=b.id).all()
-        buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
-        packs = [p.machine_code for p in session.query(BattlePack)
-                 .filter_by(battle_id=b.id).order_by(BattlePack.sequence).all()]
-        out.append({"id": b.id, "mode": b.mode, "machine_code": b.machine_code,
-                    "price": b.price, "max_players": b.max_players,
-                    "players": len(players), "buyin": buyin, "packs": packs,
-                    "creator_wallet": b.creator_wallet,
-                    "player_wallets": [p.player_wallet for p in players]})
-    return out
+    return [_battle_row(session, b)
+            for b in session.query(PackBattle).filter_by(status="lobby").all()]
+
+
+def list_battles(session, recent_limit=25):
+    """Powers the Live-games filters. Returns open lobbies + live (running) games + the most
+    recent settled games (global, newest first, capped). Each row carries `status`, `winner`
+    and ISO `created_at`/`settled_at` so the client can filter (All / Ready to join / Mine /
+    Recent) and order. Never exposes seeds."""
+    actives = (session.query(PackBattle)
+               .filter(PackBattle.status.in_(["lobby", "running"]))
+               .order_by(PackBattle.created_at.desc()).all())
+    recents = (session.query(PackBattle)
+               .filter(PackBattle.status == "settled")
+               .order_by(PackBattle.settled_at.desc())
+               .limit(recent_limit).all())
+    rows = []
+    for b in actives + recents:
+        row = _battle_row(session, b)
+        row.update(status=b.status, winner=b.winner,
+                   created_at=b.created_at.isoformat() if b.created_at else None,
+                   settled_at=b.settled_at.isoformat() if b.settled_at else None)
+        rows.append(row)
+    return rows
 
 
 def get_battle(session, battle_id):

@@ -13,6 +13,11 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "cargo test"
+# Los tests de integración LiteSVM cargan el .so y firman atestaciones con el oráculo
+# de prueba (seed [7u8;32]). Por eso el .so DEBE construirse con la feature `test-oracle`
+# (hace que TRUSTED_ORACLE sea esa clave de prueba). Tras los tests reconstruimos el .so
+# con features por defecto para dejar el artefacto en estado DESPLEGABLE (oráculo real),
+# y que nadie despliegue por error un binario que confíe en la clave de prueba pública.
+test = "cargo build-sbf --manifest-path programs/battle_arena/Cargo.toml --features test-oracle && cargo test && cargo build-sbf --manifest-path programs/battle_arena/Cargo.toml"
 
 [hooks]

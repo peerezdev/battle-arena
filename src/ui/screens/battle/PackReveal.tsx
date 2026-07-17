@@ -81,6 +81,71 @@ export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
   const revealedPot = totals.reduce((s, v) => s + v, 0)
   const pot = useCountUp(revealedPot, !reducedMotion)
 
+  // ── Mobile (<560px): compact match header + 2-up player grid. Desktop keeps the wide layout below. ──
+  if (!wide) {
+    const n = vm.players.length
+    // 3 and 4 players are both 2 rows → same card size, sized so the grid still fits above the
+    // emote dock (the panels are chrome-less, so the card gets most of the cell).
+    const mCardW = n <= 2 ? 150 : 92
+    const mCardH = Math.round(mCardW * 1.4)
+    const pct = Math.round((Math.min(round + (cardShown ? 1 : 0), totalRounds) / totalRounds) * 100)
+    return (
+      <div style={{ padding: '10px 14px 0', display: 'flex', flexDirection: 'column', gap: 10, minHeight: '100%' }}>
+        {/* compact match header */}
+        <div style={{ flex: 'none', borderRadius: 15, background: 'linear-gradient(90deg,rgba(255,46,151,.10),rgba(0,255,196,.08))', border: '1px solid rgba(0,255,196,.25)', padding: '11px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+            <span style={{ flex: 'none', width: 30, height: 30, borderRadius: 9, overflow: 'hidden', background: 'linear-gradient(150deg,#2a2013,#171208)', border: '1px solid rgba(255,209,102,.35)', display: 'grid', placeItems: 'center' }}>
+              {machine?.thumb && <img src={machine.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+            </span>
+            <div style={{ minWidth: 0, lineHeight: 1.25 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 140 }}>{machine?.name ?? 'PACK BATTLE'}</span>
+                {!complete && <span style={{ flex: 'none', fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.08em', color: '#ff6ba4', border: '1px solid rgba(255,46,126,.45)', borderRadius: 999, padding: '2px 7px' }}>● LIVE</span>}
+              </div>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 9, color: COLORS.muted, marginTop: 1 }}>PACK BATTLE · {n} PLAYERS · CARD {Math.min(round + 1, totalRounds)}/{totalRounds}</div>
+            </div>
+            <div style={{ marginLeft: 'auto', textAlign: 'right', lineHeight: 1.2 }}>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 8.5, letterSpacing: '.12em', color: COLORS.muted }}>TOTAL POT</div>
+              <div style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: COLORS.green }}>{formatUsd(pot)}</div>
+            </div>
+          </div>
+          <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: GRADIENT, transition: 'width .5s ease' }} />
+          </div>
+          <div style={{ marginTop: 5, fontFamily: FONTS.mono, fontSize: 9, color: '#8b95a3' }}>
+            {complete ? 'Battle complete' : 'Opening the packs…'}
+          </div>
+        </div>
+
+        {/* player grid — 4:2×2 · 3:two + one centered · 2:side-by-side. Vertically centered when it
+            fits; scrolls inside this box if it can't (so the emote dock never overlaps a row). */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'safe center', padding: '12px 0 6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+            {vm.players.map((p, i) => (
+              <MiniPanel
+                key={p.wallet}
+                player={p}
+                name={name(p)}
+                round={round}
+                roundReady={roundReady}
+                shownRounds={shownRounds}
+                isHot={p.wallet === leaderWallet}
+                isWinner={complete && p.wallet === vm.winner}
+                reducedMotion={reducedMotion}
+                onCardShown={handleCardShown}
+                cardW={mCardW}
+                cardH={mCardH}
+                cellStyle={n === 3 && i === 2 ? { gridColumn: '1 / -1', justifySelf: 'center', width: 'calc(50% - 4px)' } : undefined}
+              />
+            ))}
+          </div>
+        </div>
+
+        {vm.meWallet && <EmoteDock meWallet={vm.meWallet} battleId={battleId} />}
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '18px clamp(14px,2.4vw,28px) 0', display: 'flex', flexDirection: 'column', gap: 18, minHeight: '100%' }}>
       {/* ── status bar ── */}
@@ -225,6 +290,74 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
         })}
         {shown.length < player.cards.length && (
           <div style={{ width: chip.w, height: chip.h, borderRadius: 7, border: '1px dashed rgba(255,255,255,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5c6675', fontSize: 16 }}>+</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Mobile-only compact player card: identity + small staged reveal + pull chips, for the 2-up grid.
+function MiniPanel({ player, name, round, roundReady, shownRounds, isHot, isWinner, reducedMotion, onCardShown, cardW, cardH, cellStyle }: {
+  player: RevealPlayerVM; name: string; round: number; roundReady: boolean; shownRounds: number
+  isHot: boolean; isWinner: boolean; reducedMotion: boolean; onCardShown: () => void
+  cardW: number; cardH: number; cellStyle?: React.CSSProperties
+}) {
+  const navigate = useNavigate()
+  const shown = player.cards.slice(0, shownRounds)
+  const target = shown.reduce((s, c) => s + (c.insuredValue ?? 0), 0)
+  const counted = useCountUp(target, !reducedMotion)
+  const currentCard = player.cards[round]
+
+  return (
+    <div data-player-anchor={player.wallet} style={{
+      position: 'relative', borderRadius: 15, background: 'transparent',
+      border: `1.5px solid ${isHot ? 'rgba(60,232,168,.55)' : COLORS.border}`,
+      padding: 5, display: 'flex', flexDirection: 'column', gap: 6, minHeight: 0,
+      animation: isHot && !reducedMotion ? 'ba-cardglow 2.4s infinite' : undefined,
+      ...cellStyle,
+    }}>
+      {isHot && (
+        <span style={{ position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)', fontFamily: FONTS.mono, fontSize: 8, fontWeight: 700, letterSpacing: '.1em', color: '#06221a', background: '#3ce8a8', borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' }}>
+          {isWinner ? '👑 WINNER' : '⚡ WINNING'}
+        </span>
+      )}
+
+      {/* identity */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+        <span style={{ flex: 'none', width: 26, height: 26, borderRadius: '50%', background: tintFor(player.wallet), display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 11, color: '#06170f', border: `2px solid ${player.isMe ? 'rgba(60,232,168,.7)' : 'rgba(255,255,255,.12)'}` }}>{name.slice(0, 1).toUpperCase()}</span>
+        <div style={{ minWidth: 0, lineHeight: 1.2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span onClick={() => navigate(`/profile/${player.wallet}`)} title="View profile" style={{ fontSize: 11.5, fontWeight: 700, color: player.isMe ? COLORS.green : COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80, cursor: 'pointer' }}>{name}</span>
+            {player.isMe && <span style={{ flex: 'none', fontFamily: FONTS.mono, fontSize: 7.5, fontWeight: 700, color: COLORS.green, border: '1px solid rgba(60,232,168,.4)', borderRadius: 5, padding: '1px 4px' }}>YOU</span>}
+          </div>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: isHot ? COLORS.green : '#cdd4dd', marginTop: 1 }}>{formatUsd(counted)}</div>
+        </div>
+      </div>
+
+      {/* card stage */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: cardW, height: cardH }}>
+          {roundReady && currentCard ? (
+            <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
+              reduced={reducedMotion} width={cardW} height={cardH} onCardShown={onCardShown}>
+              <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
+            </StagedCardReveal>
+          ) : (
+            <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="opening…" />
+          )}
+        </div>
+      </div>
+
+      {/* revealed chips */}
+      <div style={{ display: 'flex', gap: 5, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+        {shown.map((c, idx) => {
+          const r = rarOf(c.rarity)
+          return (
+            <span key={idx} style={{ flex: 'none', width: 24, height: 31, borderRadius: 6, background: `linear-gradient(160deg,${r.tint},rgba(8,10,14,.5))`, border: `1px solid ${r.border}`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 2, fontFamily: FONTS.mono, fontSize: 7, fontWeight: 700, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.7)' }}>{formatUsd(c.insuredValue ?? 0)}</span>
+          )
+        })}
+        {shown.length < player.cards.length && (
+          <span style={{ flex: 'none', width: 24, height: 31, borderRadius: 6, border: '1px dashed rgba(255,255,255,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4a525e', fontSize: 10 }}>+</span>
         )}
       </div>
     </div>

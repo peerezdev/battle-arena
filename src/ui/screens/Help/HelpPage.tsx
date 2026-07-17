@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT } from '../../theme'
+import { useIsWide } from '../../useIsWide'
 import { HELP_MODES, HELP_FEATURES } from './helpContent'
 
 const Icon = ({ d, size = 22 }: { d: string; size?: number }) => (
@@ -7,22 +8,27 @@ const Icon = ({ d, size = 22 }: { d: string; size?: number }) => (
 )
 
 export function HelpPage() {
+  // The anchor TOC only makes sense in the two-column desktop layout; below this
+  // width we drop it and let the article take the full width (single column).
+  const wide = useIsWide('(min-width: 860px)')
   return (
     <div style={{ padding: '20px clamp(16px,3vw,44px) 60px', maxWidth: 1120, margin: '0 auto', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 26, flexWrap: 'wrap' }}>
         <Link to="/home" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 15px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', color: '#cdd4dd', fontSize: 14, fontWeight: 600 }}>‹ Back to Home</Link>
         <span style={{ fontFamily: FONTS.display, fontSize: 17, fontWeight: 700 }}>Help & Guides</span>
       </div>
 
-      <div style={{ display: 'flex', gap: 34, alignItems: 'flex-start' }}>
-        <aside style={{ position: 'sticky', top: 12, flex: 'none', width: 210, display: 'flex', flexDirection: 'column', gap: 2 }} className="hp-toc">
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.2em', color: '#5c6675', padding: '0 12px 10px' }}>ON THIS PAGE</div>
-          <a href="#modes" style={tocLink}>Game modes</a>
-          {HELP_MODES.map((m) => <a key={m.id} href={`#${m.id}`} style={{ ...tocLink, paddingLeft: 24, fontSize: 13 }}>{m.name}</a>)}
-          <a href="#features" style={{ ...tocLink, marginTop: 6 }}>Features & fairness</a>
-        </aside>
+      <div style={{ display: 'flex', flexDirection: wide ? 'row' : 'column', gap: wide ? 34 : 0, alignItems: 'flex-start' }}>
+        {wide && (
+          <aside style={{ position: 'sticky', top: 12, flex: 'none', width: 210, display: 'flex', flexDirection: 'column', gap: 2 }} className="hp-toc">
+            <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.2em', color: '#5c6675', padding: '0 12px 10px' }}>ON THIS PAGE</div>
+            <a href="#modes" style={tocLink}>Game modes</a>
+            {HELP_MODES.map((m) => <a key={m.id} href={`#${m.id}`} style={{ ...tocLink, paddingLeft: 24, fontSize: 13 }}>{m.name}</a>)}
+            <a href="#features" style={{ ...tocLink, marginTop: 6 }}>Features & fairness</a>
+          </aside>
+        )}
 
-        <article style={{ flex: 1, minWidth: 0 }}>
+        <article style={{ flex: 1, minWidth: 0, width: '100%', alignSelf: 'stretch' }}>
           <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: '.26em', color: COLORS.green, marginBottom: 14 }}>HELP CENTER</div>
           <h1 style={{ margin: '0 0 14px', fontFamily: FONTS.display, fontSize: 'clamp(30px,4.4vw,46px)', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-.03em' }}>How Collector Arena works</h1>
           <p style={{ margin: '0 0 34px', maxWidth: 620, fontSize: 16.5, lineHeight: 1.62, color: '#9aa4b2' }}>Every game uses your graded Collector Crypt NFTs as the playing piece. Card value can give an edge, but skill and luck decide the winner — and settlement is trustless on Solana.</p>
@@ -30,7 +36,7 @@ export function HelpPage() {
           <h2 id="modes" style={{ ...h2, scrollMarginTop: 90 }}>Game modes</h2>
           <div style={hr} />
           {HELP_MODES.map((m) => (
-            <section key={m.id} id={m.id} style={{ scrollMarginTop: 90, marginBottom: 34, padding: 26, borderRadius: 20, background: `linear-gradient(180deg,${m.accent}0d,rgba(255,255,255,.008))`, border: `1px solid ${COLORS.border}` }}>
+            <section key={m.id} id={m.id} style={{ scrollMarginTop: 90, marginBottom: 34, padding: wide ? 26 : 18, borderRadius: 20, background: `linear-gradient(180deg,${m.accent}0d,rgba(255,255,255,.008))`, border: `1px solid ${COLORS.border}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
                 <span style={{ flex: 'none', width: 50, height: 50, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${m.accent}22`, border: `1px solid ${m.accent}59`, color: m.accent }}><Icon d={m.iconPaths} size={24} /></span>
                 <div>

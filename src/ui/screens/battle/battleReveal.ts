@@ -18,6 +18,7 @@ export interface RevealVM {
   players: RevealPlayerVM[]; rounds: RevealRoundVM[]; potValue: number
   machines: string[]   // machine_code per round (ordered); drives the per-round machine thumbnail
   buybackTotal: number // total auto-sell payout across the battle, in dollars
+  entry: number        // what each player paid to enter, in dollars (drives the result's ×N return)
 }
 
 export function battleToReveal(battle: Battle, meWallet: string | null): RevealVM {
@@ -90,5 +91,8 @@ export function battleToReveal(battle: Battle, meWallet: string | null): RevealV
     ? [...battle.packs].sort((a, b) => a.sequence - b.sequence).map((p) => p.machine_code)
     : [battle.machine_code]
 
-  return { mode: battle.mode, status: battle.status, winner: battle.winner, meWallet, players, rounds, potValue, machines, buybackTotal }
+  // buyin arrives in USDC base units (×1e6); 0 when the backend didn't send it (e.g. demos).
+  const entry = (battle.buyin ?? 0) / 1e6
+
+  return { mode: battle.mode, status: battle.status, winner: battle.winner, meWallet, players, rounds, potValue, machines, buybackTotal, entry }
 }

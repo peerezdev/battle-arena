@@ -5,7 +5,7 @@ use solana_sdk_ids::sysvar::instructions::ID as INSTRUCTIONS_SYSVAR_ID;
 use crate::error::ErrorCode;
 use crate::oracle::{attestation_msg, verify_oracle_ed25519};
 use crate::pack_state::*;
-use crate::state::STALE_SECS;
+use crate::state::{STALE_SECS, TRUSTED_ORACLE};
 
 #[derive(Accounts)]
 pub struct DepositCard<'info> {
@@ -48,6 +48,10 @@ pub fn handler(
     // Frescura + firma del oráculo (formato 81 bytes ligado a esta batalla).
     let now = Clock::get()?.unix_timestamp;
     require!(now >= ts && now - ts <= STALE_SECS, ErrorCode::StaleAttestation);
+    // Defensa en profundidad: `create_pack_battle` ya fija `p.oracle == TRUSTED_ORACLE`,
+    // pero revalidamos para que un pack creado por una versión anterior del programa no
+    // pueda depositarse/liquidarse con una atestación forjada por un oráculo arbitrario.
+    require!(p.oracle == TRUSTED_ORACLE, ErrorCode::UntrustedOracle);
     let msg = attestation_msg(&nft_mint, value_usd, grade, ts, &pack_key);
     verify_oracle_ed25519(
         &ctx.accounts.instructions_sysvar.to_account_info(),

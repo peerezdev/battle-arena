@@ -188,6 +188,59 @@ fn bad_oracle_sig_rejected() {
     assert_error(&logs, "BadOracleSig", err::BAD_ORACLE_SIG);
 }
 
+#[test]
+fn untrusted_oracle_rejected() {
+    // EXPLOIT C1: el atacante usa SU PROPIO keypair como oráculo (arg `oracle`) y firma
+    // con esa misma clave una atestación con un valor inflado. La firma Ed25519 es
+    // internamente válida (la pubkey embebida coincide con el firmante), así que el viejo
+    // código —que solo guardaba el oráculo elegido por el creador— la habría aceptado y el
+    // atacante habría ganado siempre, llevándose el NFT del rival. El programa DEBE rechazarla
+    // porque el oráculo declarado no es el de confianza (TRUSTED_ORACLE).
+    let mut h = Harness::new();
+    let m = Match::setup(&mut h, 100, 1000);
+
+    let attacker_oracle = SigningKey::from_bytes(&[42u8; 32]);
+    let attacker_oracle_pk = Pubkey::new_from_array(attacker_oracle.verifying_key().to_bytes());
+    assert_ne!(attacker_oracle_pk, h.oracle_pubkey, "el oráculo del atacante no debe ser el de confianza");
+
+    let value_a: u64 = 9_999_999;
+    let msg_a = attestation_msg(&m.pa.nft_mint, value_a, 9, FIXED_NOW, &m.battle_pda);
+    let ed_a = ed25519_attest_ix(&attacker_oracle, &msg_a); // firma coherente con la pubkey embebida
+    let init_ix = Instruction {
+        program_id: h.program_id,
+        accounts: battle_arena::accounts::InitializeBattle {
+            player_a: m.pa.kp.pubkey(),
+            battle: m.battle_pda,
+            stake_mint: m.stake_mint.pubkey(),
+            escrow_vault: m.vault_pda,
+            player_a_token: m.pa.stake_token,
+            nft_token_a: m.pa.nft_token,
+            instructions_sysvar: solana_sdk_ids::sysvar::instructions::ID,
+            token_program: TOKEN_PROGRAM_ID,
+            system_program: solana_sdk_ids::system_program::ID,
+            rent: solana_sdk_ids::sysvar::rent::ID,
+        }
+        .to_account_metas(None),
+        data: battle_arena::instruction::InitializeBattle {
+            nonce: m.nonce,
+            stake: m.stake,
+            cfg: default_cfg(),
+            oracle: attacker_oracle_pk, // <-- oráculo elegido por el atacante
+            treasury: m.treasury,
+            nft_mint_a: m.pa.nft_mint,
+            value_usd_a: value_a,
+            grade_a: 9,
+            ts_a: FIXED_NOW,
+            ed25519_ix_index: 0,
+        }
+        .data(),
+    };
+    let logs = h
+        .try_send(&[ed_a, init_ix], &m.pa.kp, &[&m.pa.kp])
+        .expect_err("un oráculo no confiable debe ser rechazado");
+    assert_error(&logs, "UntrustedOracle", err::UNTRUSTED_ORACLE);
+}
+
 // ---- Reveal: commit mismatch ----------------------------------------------
 
 #[test]

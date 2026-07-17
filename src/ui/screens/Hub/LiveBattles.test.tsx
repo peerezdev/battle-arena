@@ -41,4 +41,39 @@ describe('LiveBattles', () => {
     expect(screen.getByText('2 left')).toBeTruthy()                      // footer amber count
     expect(screen.queryByText(/ENTRY → ESTIMATED POT/i)).toBeNull()      // wide-only header label
   })
+
+  it('the segmented filters actually filter (All / Ready to join / Mine / Recent)', () => {
+    const lobby: LiveBattle = { ...b, id: 'lobby1', battleStatus: 'lobby', slots: '1/4', action: 'join', creatorWallet: 'ME' }
+    const running: LiveBattle = { ...b, id: 'run1', battleStatus: 'running', slots: '4/4', action: 'watch', statusText: 'Live' }
+    // A finished game I created — must appear in Recent but NOT in Mine (Mine = my active games).
+    const done: LiveBattle = { ...b, id: 'done1', battleStatus: 'settled', slots: '4/4', action: 'watch', statusText: 'Final', creatorWallet: 'ME', settledAt: '2026-07-10T00:00:00Z' }
+    render(<LiveBattles battles={[lobby, running, done]} meWallet="ME" onBattleAction={vi.fn()} onOpen={vi.fn()} />)
+
+    // All (default): active games only (lobby + running); the settled one is hidden.
+    expect(screen.getByText('2 live')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Join' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Result' })).toBeNull()
+
+    // Recent → only the finished game (shows a "Result" button, no "Join").
+    fireEvent.click(screen.getByText('Recent'))
+    expect(screen.getByRole('button', { name: 'Result' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull()
+
+    // Mine → only my games that haven't finished (the lobby). The settled game I created is excluded.
+    fireEvent.click(screen.getByText('Mine'))
+    expect(screen.getByRole('button', { name: 'Join' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Result' })).toBeNull()   // my settled game is NOT here
+
+    // Ready to join → joinable open lobbies not already joined.
+    fireEvent.click(screen.getByText('Ready to join'))
+    expect(screen.getByRole('button', { name: 'Join' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Watch' })).toBeNull()
+  })
+
+  it('shows an empty-state message when a filter matches nothing', () => {
+    const lobby: LiveBattle = { ...b, id: 'lobby1', battleStatus: 'lobby', slots: '1/4', action: 'join' }
+    render(<LiveBattles battles={[lobby]} onBattleAction={vi.fn()} onOpen={vi.fn()} />)
+    fireEvent.click(screen.getByText('Recent'))          // no settled games
+    expect(screen.getByText(/No finished games yet/i)).toBeTruthy()
+  })
 })

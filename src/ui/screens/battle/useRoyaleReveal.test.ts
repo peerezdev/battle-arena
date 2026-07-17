@@ -15,7 +15,7 @@ const vm2: RevealVM = {
     { wallet: 'B', isMe: false, accumulatedValue: 40, eliminatedRound: 1, cards: [], total: 40 },
   ],
   rounds: [{ roundNumber: 1, eliminatedWallet: 'B', cards: [card('A', true, 120, 'nA1'), card('B', false, 40, 'nB1')] }],
-  potValue: 160, machines: ['m'], buybackTotal: 0,
+  potValue: 160, machines: ['m'], buybackTotal: 0, entry: 0,
 }
 
 // 3 players, 2 rounds. C out round 1, B out round 2, A wins.
@@ -30,7 +30,7 @@ const vm3: RevealVM = {
     { roundNumber: 1, eliminatedWallet: 'C', cards: [card('A', true, 100, 'nA1'), card('B', false, 90, 'nB1'), card('C', false, 40, 'nC1')] },
     { roundNumber: 2, eliminatedWallet: 'B', cards: [card('A', true, 200, 'nA2'), card('B', false, 60, 'nB2')] },
   ],
-  potValue: 490, machines: ['m'], buybackTotal: 0,
+  potValue: 490, machines: ['m'], buybackTotal: 0, entry: 0,
 }
 
 // 3 players, round 1 ends in a tie for last: B and C both at 40 → C is the (pre-decided) loser.
@@ -45,7 +45,7 @@ const vmTie: RevealVM = {
     { roundNumber: 1, eliminatedWallet: 'C', cards: [card('A', true, 100, 'nA1'), card('B', false, 40, 'nB1'), card('C', false, 40, 'nC1')] },
     { roundNumber: 2, eliminatedWallet: 'B', cards: [card('A', true, 0, 'nA2'), card('B', false, 0, 'nB2')] },
   ],
-  potValue: 280, machines: ['m'], buybackTotal: 0,
+  potValue: 280, machines: ['m'], buybackTotal: 0, entry: 0,
 }
 
 describe('pure helpers', () => {

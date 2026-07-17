@@ -66,6 +66,11 @@ export function RadioPlayer() {
         <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: wide ? 104 : 68 }}>{title}</span>
       </div>
 
+      {/* Station switcher — opens the track list */}
+      <button type="button" aria-label="Cambiar emisora" onClick={() => setOpen((o) => !o)} style={{ ...iconBtn, width: 26, color: '#6c7682' }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+
       {wide && <span style={{ width: 1, height: 26, background: COLORS.border, margin: '0 2px' }} />}
 
       {/* Controls */}
@@ -102,11 +107,6 @@ export function RadioPlayer() {
             </>
           )}
         </span>
-
-        {/* Station switcher — opens the track list */}
-        <button type="button" aria-label="Cambiar emisora" onClick={() => setOpen((o) => !o)} style={{ ...iconBtn, width: 26, color: '#6c7682' }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-        </button>
       </div>
 
       <AnimatePresence>

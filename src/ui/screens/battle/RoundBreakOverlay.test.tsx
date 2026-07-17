@@ -9,7 +9,7 @@ const vm: RevealVM = {
     { wallet: 'A', isMe: true, accumulatedValue: 90, eliminatedRound: null, cards: [], total: 90 },
     { wallet: 'B', isMe: false, accumulatedValue: 40, eliminatedRound: null, cards: [], total: 40 },
   ],
-  rounds: [], potValue: 130, machines: ['m'], buybackTotal: 0,
+  rounds: [], potValue: 130, machines: ['m'], buybackTotal: 0, entry: 0,
 }
 const name = (p: RevealPlayerVM) => (p.isMe ? 'You' : p.wallet)
 

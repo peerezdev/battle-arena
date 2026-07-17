@@ -25,8 +25,9 @@ describe('WinningsBuyback', () => {
     render(<WinningsBuyback cards={[card('a'), card('b'), card('c', true)]} winnerWallet="W" lootTotal={180} />)
     expect(screen.getByText('Keep all')).toBeTruthy()
     expect(screen.getByText('Sell all')).toBeTruthy()
-    expect(screen.getByText(/2 to keep or sell/)).toBeTruthy()
-    expect(screen.getByText(/1 auto-sold/)).toBeTruthy()
+    // mobile layout (jsdom has no matchMedia → not wide): "2 KEEP · 1 AUTO-SOLD"
+    expect(screen.getByText(/2 KEEP/)).toBeTruthy()
+    expect(screen.getByText(/1 AUTO-SOLD/)).toBeTruthy()
     await waitFor(() => expect(fetchBuybackAvailable).toHaveBeenCalledTimes(2))   // only the 2 sellable
   })
 

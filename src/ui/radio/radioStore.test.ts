@@ -156,6 +156,40 @@ describe('radioStore core', () => {
   })
 })
 
+describe('radioStore collapsed', () => {
+  beforeEach(() => { try { localStorage.clear() } catch { /* ignore */ } })
+
+  it('starts expanded (collapsed=false) by default', () => {
+    const { store } = setup()
+    expect(store.getState().collapsed).toBe(false)
+  })
+
+  it('setCollapsed(true) collapses and persists, setCollapsed(false) expands and persists', () => {
+    const { store } = setup()
+    store.setCollapsed(true)
+    expect(store.getState().collapsed).toBe(true)
+    expect(localStorage.getItem('battlearena.radio.collapsed')).toBe('1')
+    store.setCollapsed(false)
+    expect(store.getState().collapsed).toBe(false)
+    expect(localStorage.getItem('battlearena.radio.collapsed')).toBe('0')
+  })
+
+  it('restores collapsed from localStorage on construction', () => {
+    localStorage.setItem('battlearena.radio.collapsed', '1')
+    const fake = new FakeAudio()
+    const store = createRadioStore(TRACKS, () => fake as unknown as HTMLAudioElement)
+    expect(store.getState().collapsed).toBe(true)
+  })
+
+  it('notifies subscribers when collapsed changes', () => {
+    const { store } = setup()
+    const cb = vi.fn()
+    store.subscribe(cb)
+    store.setCollapsed(true)
+    expect(cb).toHaveBeenCalled()
+  })
+})
+
 describe('radioStore shuffle', () => {
   beforeEach(() => { try { localStorage.clear() } catch { /* ignore */ } })
 

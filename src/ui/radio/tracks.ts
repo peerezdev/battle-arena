@@ -8,7 +8,7 @@ export type Track = {
 }
 
 export const TRACKS: Track[] = [
-  { id: 'neon-drive', title: 'Neon Drive', artist: 'TBD', url: 'https://cdn.example.com/neon-drive.mp3' },
-  { id: 'cyber-run', title: 'Cyber Run', artist: 'TBD', url: 'https://cdn.example.com/cyber-run.mp3' },
-  { id: 'synth-city', title: 'Synth City', artist: 'TBD', url: 'https://cdn.example.com/synth-city.mp3' },
+  { id: 'blue-red', title: 'Blue Red Battle', artist: 'TBD', url: 'https://archive.org/download/route-24_202606/blue-red.m4a' },
+  { id: 'lav-town', title: 'Lavender Town', artist: 'TBD', url: 'https://archive.org/download/route-24_202606/lavender-town.m4a' },
+  { id: 'route-24', title: 'Route 24', artist: 'TBD', url: 'https://archive.org/download/route-24_202606/route-24.m4a' },
 ]

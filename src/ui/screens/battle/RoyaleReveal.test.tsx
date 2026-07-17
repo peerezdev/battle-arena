@@ -15,7 +15,7 @@ const vm: RevealVM = {
     { wallet: 'A', isMe: true, nftAddress: 'nftA', rarity: 'Epic', insuredValue: 120, autoSold: false, grade: 10, year: '2018', name: 'Charizard' },
     { wallet: 'B', isMe: false, nftAddress: 'nftB', rarity: null, insuredValue: 40, autoSold: false, grade: null, year: null, name: null },
   ] }],
-  potValue: 160, machines: ['m'], buybackTotal: 0,
+  potValue: 160, machines: ['m'], buybackTotal: 0, entry: 0,
 }
 
 afterEach(() => vi.restoreAllMocks())
@@ -43,7 +43,7 @@ describe('RoyaleReveal', () => {
         ] },
         { wallet: 'B', isMe: true, accumulatedValue: 0, eliminatedRound: 1, total: 0, cards: [] },
       ],
-      rounds: [], potValue: 297, machines: ['m'], buybackTotal: 0,
+      rounds: [], potValue: 297, machines: ['m'], buybackTotal: 0, entry: 0,
     }
     render(<MemoryRouter><RoyaleResult vm={settled} battleId="b1" /></MemoryRouter>)
     expect(screen.getByText(/CHAMPION LOOT · 5 CARDS/)).toBeTruthy()   // 5 total

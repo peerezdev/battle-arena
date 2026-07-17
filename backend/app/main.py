@@ -32,6 +32,7 @@ from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
 from .services.pack_lobby import (
     create_battle, join_battle,
     list_open as lobby_list_open,
+    list_battles as lobby_list_battles,
     get_battle, cancel_battle, verification, LobbyError,
 )
 from .services.pack_orchestration import (
@@ -1159,6 +1160,11 @@ def create_app(session_factory, chain: ChainSource,
     @app.get("/pack-battles/open")
     async def open_pack_battles(s: Session = Depends(db)):
         return lobby_list_open(s)
+
+    @app.get("/pack-battles/list")
+    async def list_pack_battles(s: Session = Depends(db)):
+        # Open lobbies + live + recent finished — powers the Live-games filters.
+        return lobby_list_battles(s)
 
     @app.get("/pack-battles/{battle_id}")
     async def get_pack_battle(battle_id: str, s: Session = Depends(db)):

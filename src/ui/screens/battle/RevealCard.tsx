@@ -17,8 +17,10 @@ const PRESET: Record<RevealCardSize, { w: number; h: number }> = {
 
 /** A graded-card tile at a FIXED width×height (so face-down, staging and revealed states
  *  all line up). Pass explicit `w`/`h` for responsive sizing, else a `size` preset. */
-export function RevealCard({ card, reducedMotion, size = 'sm', w, h }: {
+export function RevealCard({ card, reducedMotion, size = 'sm', w, h, bare = false }: {
   card: RevealCardVM; reducedMotion: boolean; size?: RevealCardSize; w?: number; h?: number
+  /** Art only — drop the name/value footer for callers that render their own (result winnings). */
+  bare?: boolean
 }) {
   const [imgError, setImgError] = useState(false)
   const color = rarityColor(card.rarity)
@@ -58,6 +60,7 @@ export function RevealCard({ card, reducedMotion, size = 'sm', w, h }: {
           : <img src={ccCardImageUrl(card.nftAddress)} alt="Card" onError={() => setImgError(true)}
                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} />}
       </div>
+      {!bare && (
       <div style={{ height: footerH, flexShrink: 0, padding: '0 8px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
         {card.name && (
           <span style={{ fontFamily: FONTS.body, fontWeight: 600, fontSize: nameFont, color: COLORS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -69,6 +72,7 @@ export function RevealCard({ card, reducedMotion, size = 'sm', w, h }: {
           {card.autoSold && <span style={{ fontFamily: FONTS.mono, fontSize: autoFont, color: COLORS.muted, marginLeft: 6 }}>⚡</span>}
         </span>
       </div>
+      )}
     </div>
   )
 }

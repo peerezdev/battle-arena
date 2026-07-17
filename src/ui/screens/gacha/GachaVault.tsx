@@ -74,6 +74,32 @@ export default function GachaVault() {
   const [cardsLoading, setCardsLoading] = useState(false)
   const [cardsError, setCardsError] = useState(false)
 
+  // ── Machine row horizontal scroll (desktop mouse users get no visible scrollbar) ──
+  const machineRowRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  useEffect(() => {
+    const el = machineRowRef.current
+    if (!el) return
+    function update() {
+      if (!el) return
+      setCanScrollLeft(el.scrollLeft > 0)
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      el.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [machines])
+
+  function scrollMachineRow(dir: -1 | 1) {
+    machineRowRef.current?.scrollBy({ left: dir * 240, behavior: 'smooth' })
+  }
+
   // ── Load machines on mount + 60s availability poll ─────────────────────────
   useEffect(() => {
     let mounted = true
@@ -321,72 +347,81 @@ export default function GachaVault() {
       )}
 
       {machines !== null && machines.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 10,
-            overflowX: 'auto',
-            paddingBottom: 8,
-            marginBottom: 28,
-            scrollbarWidth: 'none',
-          }}
-        >
-          {[...machines].sort((a, b) => (a.price ?? 0) - (b.price ?? 0)).map((m) => {
-            const isActive = selected?.code === m.code
-            return (
-              <button
-                key={m.code}
-                onClick={() => setSelected(m)}
-                style={{
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  background: isActive ? COLORS.panel2 : COLORS.panel,
-                  border: isActive
-                    ? `1.5px solid ${COLORS.green}`
-                    : `1px solid ${COLORS.border}`,
-                  borderRadius: 12,
-                  padding: '10px 14px',
-                  cursor: 'pointer',
-                  color: COLORS.text,
-                  boxShadow: isActive ? SHADOW.glow(COLORS.green) : 'none',
-                  transition: 'border-color 0.15s, box-shadow 0.15s',
-                }}
-              >
-                {(m.thumbnailUrl ?? m.image) ? (
-                  <img
-                    src={(m.thumbnailUrl ?? m.image)!}
-                    alt={m.name}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      objectFit: 'contain',
-                      borderRadius: 6,
-                      border: `1px solid ${COLORS.border}`,
-                    }}
-                  />
-                ) : (
-                  <span style={{ fontSize: 24, lineHeight: 1 }}>🎰</span>
-                )}
-                <div style={{ textAlign: 'left' }}>
-                  <div
-                    style={{
-                      fontFamily: FONTS.display,
-                      fontWeight: 700,
-                      fontSize: 13,
-                      color: COLORS.text,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {m.shortName ?? m.name}
+        <div style={{ position: 'relative', marginBottom: 28 }}>
+          <div
+            ref={machineRowRef}
+            style={{
+              display: 'flex',
+              gap: 10,
+              overflowX: 'auto',
+              paddingBottom: 8,
+              scrollbarWidth: 'none',
+            }}
+          >
+            {[...machines].sort((a, b) => (a.price ?? 0) - (b.price ?? 0)).map((m) => {
+              const isActive = selected?.code === m.code
+              return (
+                <button
+                  key={m.code}
+                  onClick={() => setSelected(m)}
+                  style={{
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    background: isActive ? COLORS.panel2 : COLORS.panel,
+                    border: isActive
+                      ? `1.5px solid ${COLORS.green}`
+                      : `1px solid ${COLORS.border}`,
+                    borderRadius: 12,
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    color: COLORS.text,
+                    boxShadow: isActive ? SHADOW.glow(COLORS.green) : 'none',
+                    transition: 'border-color 0.15s, box-shadow 0.15s',
+                  }}
+                >
+                  {(m.thumbnailUrl ?? m.image) ? (
+                    <img
+                      src={(m.thumbnailUrl ?? m.image)!}
+                      alt={m.name}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        objectFit: 'contain',
+                        borderRadius: 6,
+                        border: `1px solid ${COLORS.border}`,
+                      }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 24, lineHeight: 1 }}>🎰</span>
+                  )}
+                  <div style={{ textAlign: 'left' }}>
+                    <div
+                      style={{
+                        fontFamily: FONTS.display,
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: COLORS.text,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {m.shortName ?? m.name}
+                    </div>
                   </div>
-                </div>
-              </button>
-            )
-          })}
+                </button>
+              )
+            })}
+          </div>
+
+          {canScrollLeft && (
+            <MachineRowArrow dir="left" onClick={() => scrollMachineRow(-1)} />
+          )}
+          {canScrollRight && (
+            <MachineRowArrow dir="right" onClick={() => scrollMachineRow(1)} />
+          )}
         </div>
       )}
 
@@ -484,6 +519,56 @@ export default function GachaVault() {
           />
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+// ── Machine row scroll arrow (desktop mouse users have no visible scrollbar) ──
+function MachineRowArrow({ dir, onClick }: { dir: 'left' | 'right'; onClick: () => void }) {
+  const isLeft = dir === 'left'
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 0,
+        bottom: 8,
+        left: isLeft ? 0 : undefined,
+        right: isLeft ? undefined : 0,
+        width: 52,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: isLeft ? 'flex-start' : 'flex-end',
+        background: isLeft
+          ? `linear-gradient(90deg, ${COLORS.bg} 20%, transparent 100%)`
+          : `linear-gradient(270deg, ${COLORS.bg} 20%, transparent 100%)`,
+        pointerEvents: 'none',
+        zIndex: 5,
+      }}
+    >
+      <button
+        onClick={onClick}
+        aria-label={isLeft ? 'Scroll machines left' : 'Scroll machines right'}
+        style={{
+          pointerEvents: 'auto',
+          width: 32,
+          height: 32,
+          flexShrink: 0,
+          borderRadius: '50%',
+          border: `1px solid ${COLORS.border}`,
+          background: COLORS.panel2,
+          color: COLORS.text,
+          fontFamily: FONTS.display,
+          fontSize: 16,
+          lineHeight: 1,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: SHADOW.panel,
+        }}
+      >
+        {isLeft ? '‹' : '›'}
+      </button>
     </div>
   )
 }

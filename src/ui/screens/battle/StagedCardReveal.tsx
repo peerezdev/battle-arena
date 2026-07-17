@@ -68,6 +68,15 @@ export function StagedCardReveal({
 
   const stageValue = stage === 'year' ? year : stage === 'grade' ? grade : rarity
 
+  // Stage text must fit the card on ONE line. Cards go down to ~76px wide on the mobile Pack
+  // Battle grid, where fixed sizes wrapped mid-word ("UNCO / MMON"). Size from the text length
+  // and the card width; the caps keep the original look on normal/desktop cards.
+  // 0.72 = measured avg glyph width per font-size in the display face (~0.69), plus margin.
+  const avail = Math.max(24, width - 16)
+  const fitSize = (text: string, max: number) =>
+    Math.max(9, Math.min(max, Math.floor(avail / (Math.max(1, text.length) * 0.72))))
+  const valueSize = fitSize(String(stageValue ?? ''), stage === 'rarity' ? 20 : 34)
+
   return (
     <div style={{ width, height, perspective: 1100 }}>
       <motion.div
@@ -90,12 +99,12 @@ export function StagedCardReveal({
                   onAnimationStart={(def) => { if (stage === 'rarity' && (def as { opacity?: number })?.opacity === 1) setAccentOn(true) }}
                   style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, userSelect: 'none' }}
                 >
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>{stage.toUpperCase()}</div>
+                  <div style={{ fontFamily: FONTS.mono, fontSize: Math.min(10, Math.max(7, Math.round(width / 18))), letterSpacing: '.14em', color: COLORS.muted, whiteSpace: 'nowrap' }}>{stage.toUpperCase()}</div>
                   <div style={{
                     fontFamily: FONTS.display, fontWeight: 900, lineHeight: 1.05,
-                    // rarity is a word ("UNCOMMON") → smaller so it never spills past the card
-                    fontSize: stage === 'rarity' ? 20 : 34,
-                    maxWidth: width - 16, textAlign: 'center', wordBreak: 'break-word',
+                    // Sized to fit the card width on one line (longest real value: "uncommon").
+                    fontSize: valueSize,
+                    maxWidth: avail, textAlign: 'center', whiteSpace: 'nowrap',
                     color: stage === 'rarity' ? rc : COLORS.text, textShadow: stage === 'rarity' ? SHADOW.glow(rc) : 'none',
                   }}>
                     {stageValue}

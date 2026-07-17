@@ -50,4 +50,6 @@ pub enum ErrorCode {
     SelfJoinNotAllowed,
     #[msg("El modo de duelo todavía no está soportado.")]
     ModeNotSupported,
+    #[msg("La atestación no está firmada por el oráculo de confianza.")]
+    UntrustedOracle,
 }
