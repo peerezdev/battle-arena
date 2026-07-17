@@ -17,3 +17,15 @@ describe('QuickMatch', () => {
     expect(screen.queryByText(/demo/i)).toBeNull()
   })
 })
+
+describe('QuickMatch royale create gate', () => {
+  it('shows the create CTA by default', () => {
+    render(<QuickMatch mode="royale" onCreate={() => {}} />)
+    expect(screen.queryByRole('button')).not.toBeNull()
+  })
+
+  it('hides the create CTA when canCreate is false', () => {
+    render(<QuickMatch mode="royale" onCreate={() => {}} canCreate={false} />)
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+})

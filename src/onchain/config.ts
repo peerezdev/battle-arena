@@ -63,4 +63,24 @@ export const config = {
    * to the regular Solana RPC (public devnet does not support DAS → empty inventory).
    */
   dasRpcUrl,
+  /**
+   * Launch-week gate: wallets allowed to CREATE Battle Royale lobbies (Privy embedded
+   * Solana addresses, comma-separated). Empty = open to everyone. Must mirror the backend
+   * ROYALE_CREATOR_ALLOWLIST. env: VITE_ROYALE_CREATOR_ALLOWLIST
+   */
+  royaleCreatorAllowlist: ((import.meta.env.VITE_ROYALE_CREATOR_ALLOWLIST as string | undefined) ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+}
+
+/** Pure: may this wallet create a Battle Royale, given the allowlist? Empty allowlist = open. */
+export function isRoyaleCreator(wallet: string | null | undefined, allowlist: string[]): boolean {
+  if (allowlist.length === 0) return true
+  return !!wallet && allowlist.includes(wallet)
+}
+
+/** Bound to the configured allowlist. False while the wallet is still loading (fail-closed). */
+export function canCreateRoyale(wallet: string | null | undefined): boolean {
+  return isRoyaleCreator(wallet, config.royaleCreatorAllowlist)
 }

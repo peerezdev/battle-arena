@@ -21,12 +21,15 @@ interface Props {
   onCreate: () => void
   /** When omitted, the free-demo link is hidden (e.g. Battle Royale has no demo). */
   onPlayDemo?: () => void
+  /** When false, the create CTA is hidden (e.g. Battle Royale creation gated during launch). */
+  canCreate?: boolean
 }
 
 export function QuickMatch({
   mode = 'pack',
   onCreate,
   onPlayDemo,
+  canCreate = true,
 }: Props) {
   const reducedMotion = useReducedMotion()
   const copy = MODE_COPY[mode]
@@ -85,33 +88,35 @@ export function QuickMatch({
 
         {/* CTA row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-          <button
-            onClick={onCreate}
-            style={{
-              position: 'relative',
-              overflow: 'hidden',
-              background: GRADIENT,
-              color: '#06120c',
-              border: 'none',
-              borderRadius: 12,
-              padding: '14px 28px',
-              fontFamily: FONTS.display,
-              fontWeight: 800,
-              fontSize: 14.5,
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ position: 'relative', zIndex: 1 }}>{copy.cta}</span>
-            <span
-              aria-hidden
+          {canCreate && (
+            <button
+              onClick={onCreate}
               style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent)',
-                animation: reducedMotion ? 'none' : 'ba-sweep 3.4s infinite',
+                position: 'relative',
+                overflow: 'hidden',
+                background: GRADIENT,
+                color: '#06120c',
+                border: 'none',
+                borderRadius: 12,
+                padding: '14px 28px',
+                fontFamily: FONTS.display,
+                fontWeight: 800,
+                fontSize: 14.5,
+                cursor: 'pointer',
               }}
-            />
-          </button>
+            >
+              <span style={{ position: 'relative', zIndex: 1 }}>{copy.cta}</span>
+              <span
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent)',
+                  animation: reducedMotion ? 'none' : 'ba-sweep 3.4s infinite',
+                }}
+              />
+            </button>
+          )}
           {onPlayDemo && (
             <button
               onClick={onPlayDemo}

@@ -16,6 +16,7 @@ import { DelegationGate } from '../../components/DelegationGate'
 import { CreateBattleModal } from './CreateBattleModal'
 import { DemoPicker } from './DemoPicker'
 import { loadMachineList } from '../../useMachines'
+import { canCreateRoyale } from '../../../onchain/config'
 
 /**
  * Mode-focused page (Pack Battle / Battle Royale): the adapted Quick Match (create locked to this
@@ -67,6 +68,7 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
         mode={mode}
         onCreate={() => setCreateOpen(true)}
         onPlayDemo={mode === 'pack' ? () => setDemoOpen(true) : undefined}
+        canCreate={mode === 'royale' ? canCreateRoyale(meWallet) : true}
       />
 
       <div>
