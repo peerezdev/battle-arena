@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { pollOpenPack, defaultDelayMs, type OpenPackResult } from './gachaClient'
+import { pollOpenPack, defaultDelayMs, type OpenPackResult , machineCardCount } from './gachaClient'
 import { fetchBuybackAvailable, requestBuyback, withdrawNft } from './gachaClient'
 import { generateYoloPacks, yoloTotalCost, clampCount } from './gachaClient'
 import { config } from './config'
@@ -128,5 +128,23 @@ describe('generateYoloPacks', () => {
     expect(init.headers.Authorization).toBe('Bearer TOKEN')
     expect(JSON.parse(init.body)).toEqual({ pack_type: 'pokemon_50', count: 2, turbo: true })
     vi.unstubAllGlobals()
+  })
+})
+
+describe('machineCardCount', () => {
+  it('suma el stock de todas las rarezas', () => {
+    // pokemon_250 real: el cartel decía 24 (el limit de la cuadrícula) en vez de 572.
+    expect(machineCardCount({ common: 19, uncommon: 77, rare: 459, epic: 17 })).toBe(572)
+  })
+  it('una máquina agotada da 0, no null (0 es informativo)', () => {
+    expect(machineCardCount({ common: 0, uncommon: 0, rare: 0, epic: 0 })).toBe(0)
+  })
+  it('sin stock devuelve null para poder ocultar el cartel', () => {
+    expect(machineCardCount(null)).toBeNull()
+    expect(machineCardCount(undefined)).toBeNull()
+    expect(machineCardCount({})).toBeNull()
+  })
+  it('ignora valores no numéricos en vez de propagar NaN', () => {
+    expect(machineCardCount({ rare: 5, roto: undefined as unknown as number })).toBe(5)
   })
 })

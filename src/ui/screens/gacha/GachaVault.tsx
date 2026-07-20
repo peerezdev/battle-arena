@@ -9,6 +9,7 @@ import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import {
   fetchMachines,
   fetchMachineCards,
+  machineCardCount,
   generateYoloPacks,
   submitTx,
   openPack,
@@ -437,7 +438,7 @@ export default function GachaVault() {
           <CardPoolGrid
             cards={cards}
             loading={cardsLoading}
-            liveCount={cards.length > 0 ? cards.length : undefined}
+            liveCount={machineCardCount(selected.stock) ?? undefined}
             error={cardsError}
             machineCode={selected.code}
           />

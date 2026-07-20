@@ -244,3 +244,17 @@ export function yoloTotalCost(price: number, count: number): number {
 export function clampCount(n: number): number {
   return Math.max(1, Math.min(10, Math.floor(n)))
 }
+
+/** Cartas que quedan en la máquina, sumando el stock por rareza.
+ *
+ *  Lo obvio —y lo que se hacía antes— era usar la longitud del array de cartas que pinta la
+ *  cuadrícula, pero ese array se pide con `limit`, así que el cartel acababa diciendo siempre
+ *  "24" en todas las máquinas: el tamaño de página, no el contenido. El campo `contains` tampoco
+ *  vale, es cartas por sobre (siempre 1). Devuelve null si no hay stock que sumar, para poder
+ *  ocultar el cartel en vez de afirmar un 0 que quizá no sea cierto. */
+export function machineCardCount(stock: Record<string, number> | null | undefined): number | null {
+  if (!stock) return null
+  const vals = Object.values(stock).filter((v): v is number => typeof v === 'number' && isFinite(v))
+  if (vals.length === 0) return null
+  return vals.reduce((a, b) => a + b, 0)
+}
