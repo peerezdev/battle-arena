@@ -194,6 +194,41 @@ def test_rate_limit_429(monkeypatch):
 
 
 @respx.mock
+def test_open_pack_polling_not_rate_limited(monkeypatch):
+    """The client POLLS open-pack (up to ~8×/pack) while CC settles the pack, so a single pull
+    hits it several times by design. It must NOT count against the per-wallet pull rate limit,
+    or the *next* pull 429s — the reported "I click open and nothing happens" bug."""
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+    respx.post(f"{BASE}/api/generatePack").mock(
+        return_value=Response(200, json={"memo": "slug-poll", "transaction": "dA=="}))
+    respx.post(f"{BASE}/api/openPack").mock(
+        return_value=Response(200, json={"code": "WAITING_FOR_WEBHOOK"}))  # pending → gets polled
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    # rate_limit=2 is a tiny budget: pre-fix the 2nd open-pack poll already tripped 429.
+    c, priv = _client(rate_limit=2)
+    hdrs = _hdrs(priv, WALLET_A)
+    assert c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs).status_code == 200
+    codes = [c.post("/gacha/open-pack", json={"memo": "slug-poll"}, headers=hdrs).status_code
+             for _ in range(6)]
+    assert codes == [200] * 6, codes  # every poll succeeds; none throttled
+
+
+@respx.mock
+def test_submit_tx_not_rate_limited():
+    """A YOLO of N packs calls submit-tx once per pack. It must not count against the pull limit."""
+    respx.post(f"{BASE}/api/submitTransaction").mock(
+        return_value=Response(200, json={"signature": "sig", "confirmationStatus": "confirmed"}))
+    c, priv = _client(rate_limit=2)
+    hdrs = _hdrs(priv, WALLET_A)
+    codes = [c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA=="}, headers=hdrs).status_code
+             for _ in range(6)]
+    assert codes == [200] * 6, codes  # pre-fix the 3rd submit-tx 429'd
+
+
+@respx.mock
 def test_machine_cards_ok():
     respx.get(f"{BASE}/api/getNfts").mock(return_value=Response(200, json={"nfts": [
         {"nft_address": "A", "name": "Card A", "image": "i", "rarity": "rare",

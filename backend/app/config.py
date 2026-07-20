@@ -1,3 +1,4 @@
+import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -51,6 +52,10 @@ class Settings(BaseSettings):
     min_withdraw_usdc: float = 1.0        # retiro mínimo (USDC); env: MIN_WITHDRAW_USDC
     withdraw_rate_limit: int = 5          # nº máx. de retiros por wallet y ventana
     withdraw_rate_window_s: float = 60.0  # ventana del rate-limit de retiros (segundos)
+    # Rate-limit del gacha por wallet (ventana fija de 60s). Solo cuenta INICIAR una tirada
+    # (generate-pack / yolo) y buyback; submit-tx y open-pack (polleada) NO cuentan → una
+    # tirada normal = 1 hit. Subir para pruebas o picos de tráfico. env: GACHA_RATE_LIMIT
+    gacha_rate_limit: int = 60
     # Fee de plataforma sobre cada withdraw de USDC: pct del importe retirado, descontado (el
     # destino recibe el resto) y enviado al fee_wallet_address (fallback al operador). 0 → sin fee.
     # env: WITHDRAW_FEE_PCT
@@ -66,4 +71,10 @@ class Settings(BaseSettings):
 
 
 def get_settings() -> Settings:
+    # Devnet and mainnet run as separate stacks (different ports + DB). The mainnet stack sets
+    # APP_NETWORK=mainnet, which layers backend/.env.mainnet (network-only overrides: RPC, CC gacha
+    # host, USDC mint, CAIP2, DATABASE_URL) ON TOP of the shared backend/.env (secrets + defaults).
+    # Devnet uses .env alone. Real env vars still win over both.
+    if os.environ.get("APP_NETWORK", "").lower() == "mainnet":
+        return Settings(_env_file=(".env", ".env.mainnet"))
     return Settings()

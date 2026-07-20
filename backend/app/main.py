@@ -250,6 +250,18 @@ def create_app(session_factory, chain: ChainSource,
         # so the "reserved" UI reflects every open battle without double-debiting available.
         return {"reserved": reserved_total(s, wallet), "locked_royale": royale_locked_total(s, wallet)}
 
+    @app.get("/users/me/usdc")
+    async def me_usdc(wallet: str = Depends(current_user)):
+        # Raw on-chain USDC balance of the caller's embedded wallet, read server-side.
+        # The browser cannot query the RPC directly on mainnet: the public endpoint
+        # (api.mainnet-beta.solana.com) returns 403 to browser Origins, and pointing the
+        # client at the wrong-network mint returns nothing. The backend has no Origin header
+        # and already holds the per-network rpc_url + usdc mint, so it reads the balance
+        # reliably for both devnet and mainnet. `reserved` (soft holds) is exposed separately
+        # by /users/me/balance and subtracted client-side, matching the previous behavior.
+        base_units = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
+        return {"base_units": base_units, "usdc": base_units / 1e6}
+
     @app.get("/users/{wallet}")
     async def get_user(wallet: str, s: Session = Depends(db)):
         return read_user_view(s, wallet, elo_start)
@@ -420,7 +432,9 @@ def create_app(session_factory, chain: ChainSource,
     @app.post("/gacha/submit-tx")
     async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_user)):
         svc = _gacha_or_503()
-        _gacha_throttle(wallet)
+        # NOT rate-limited: submit-tx is a mechanical follow-up of an already-throttled pull
+        # initiation (generate-pack / yolo), and a YOLO of N packs calls it once per pack.
+        # Throttling it here made a single multi-pack pull trip the per-wallet limit.
         try:
             return await svc.submit_tx(signed_transaction=body.signed_transaction)
         except GachaDisabled:
@@ -454,7 +468,11 @@ def create_app(session_factory, chain: ChainSource,
                          wallet: str = Depends(current_user),
                          s: Session = Depends(db)):
         svc = _gacha_or_503()
-        _gacha_throttle(wallet)
+        # NOT rate-limited: the client POLLS this endpoint (pollOpenPack, up to ~8 attempts per
+        # pack) while CC settles the pack, so a single pull hits it several times by design.
+        # Throttling it here burned the per-wallet budget and made the *next* pull 429 ("I click
+        # open and nothing happens"). Pull initiation (generate-pack / yolo) is what's throttled;
+        # ownership is still enforced below, so polling is safe and cannot spend money.
         pack = s.get(GachaPack, body.memo)
         if pack is None or pack.wallet != wallet:
             raise HTTPException(403, "memo no pertenece a esta wallet")
@@ -1416,6 +1434,7 @@ def build_default_app() -> FastAPI:
                       privy_operator_address=s.privy_operator_address,
                       escrow_seed_lamports=s.escrow_seed_lamports,
                       dev_endpoints_enabled=s.dev_endpoints_enabled,
+                      gacha_rate_limit=s.gacha_rate_limit,
                       min_withdraw_usdc=s.min_withdraw_usdc,
                       withdraw_rate_limit=s.withdraw_rate_limit,
                       withdraw_rate_window_s=s.withdraw_rate_window_s,

@@ -1269,3 +1269,30 @@ def test_pack_create_unaffected_by_royale_allowlist(monkeypatch):
     hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
     r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
     assert r.status_code == 200, r.text
+
+
+def test_me_usdc_reads_onchain_balance(client_priv, monkeypatch):
+    """GET /users/me/usdc returns the caller's on-chain USDC (base units + UI amount), read
+    server-side with the per-network rpc_url + mint. The browser can't query mainnet RPC
+    directly (403 to browser Origins), so the backend proxies the read."""
+    c, priv = client_priv
+    seen = {}
+
+    async def _balance(rpc_url, owner, mint, *args, **kwargs):
+        seen["rpc_url"], seen["owner"], seen["mint"] = rpc_url, owner, mint
+        return 2_500_000  # 2.5 USDC in base units
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _balance)
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.get("/users/me/usdc", headers=hdrs)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"base_units": 2_500_000, "usdc": 2.5}
+    # Reads with the injected per-network config, for the authenticated caller's wallet.
+    assert seen == {"rpc_url": DUMMY_RPC, "owner": WALLET_A, "mint": DUMMY_MINT}
+
+
+def test_me_usdc_requires_auth(client_priv):
+    """No Bearer token → 401 (never leaks a balance for an unauthenticated caller)."""
+    c, _ = client_priv
+    assert c.get("/users/me/usdc").status_code == 401
