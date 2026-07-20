@@ -196,11 +196,28 @@ servicio `GachaService.generate_pack`
 ([pack_engine.py:141](../../../backend/app/services/pack_engine.py#L141)), que no se ve
 afectado por ningún cambio de rutas.
 
-**No hace falta cablear `turbo` en ninguna ruta HTTP.** El método del servicio ya lo acepta
-(`generate_pack(..., turbo: bool = False)`,
-[gacha.py:115](../../../backend/app/services/gacha.py#L115)) y el worker se lo pasa
-directamente. El cableado de `GeneratePackBody` que se barajó antes de este diseño es
-innecesario.
+### Turbo: elección del usuario en gacha, siempre activo en batallas
+
+En el gacha el turbo lo **elige el usuario**: viaja en el body de `POST /gacha/pull`
+(`{machine_code, count, turbo}`) y el worker se lo pasa a `generate_pack(turbo=turbo)`. El
+toggle del frontend ya existe y solo se muestra si la máquina lo soporta
+(`machine.turboMode`), enviándose `machine.turboMode ? turbo : false`.
+
+En **Pack Battle y Battle Royale es siempre turbo**, hardcodeado, junto con
+`alt_player_address` (la carta va al escrow de la batalla, no al jugador):
+
+- [pack_engine.py:142](../../../backend/app/services/pack_engine.py#L142) — `turbo=True`
+- [royale_engine.py:44](../../../backend/app/services/royale_engine.py#L44) — `turbo=True`
+
+Esa asimetría es intencionada y se mantiene: en batalla no tiene sentido revelar carta a
+carta ni dejar elegir, porque lo que compite es el valor total; en gacha el jugador decide si
+quiere quedarse las Commons o auto-venderlas.
+
+Lo único que **no** hace falta es añadir `turbo` a `GeneratePackBody`, el body de la ruta
+legacy `/gacha/generate-pack`, que este diseño no usa. El método del servicio ya acepta el
+parámetro (`generate_pack(..., turbo: bool = False)`,
+[gacha.py:115](../../../backend/app/services/gacha.py#L115)), así que el gacha nuevo y las
+batallas lo usan sin tocar ninguna ruta existente.
 
 ## Modelos
 
