@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { COLORS, FONTS } from '../../theme'
 
 // Sobre de gacha con tilt 3D, en lugar del modal de progreso.
@@ -11,6 +11,7 @@ import { COLORS, FONTS } from '../../theme'
 const PACK_W = 280
 const PACK_H = 480
 const MAX_TILT = 16          // grados; más que esto y el sobre se deforma raro en los bordes
+const TEAR_MS = 880         // duración del desgarro; debe cuadrar con los keyframes ba-pack* de index.css
 
 /** Los dos colores de foil (arriba/abajo) por tramo de precio. La misma pieza de arte sirve
  *  para todas las máquinas: lo que cambia es la paleta, así que una de $1000 no se confunde
@@ -59,13 +60,25 @@ type Props = {
 
 export function GachaPackTilt({ machineCode, price, count, ready, done, total, onOpen, reduced }: Props) {
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, lx: 30, ly: 25, hovering: false })
+  const [opening, setOpening] = useState(false)
   const cardRef = useRef<HTMLDivElement | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pal = packPalette(price)
   const [prefix, suffix] = packTitle(machineCode)
   const titleSize = fitTitleSize(prefix, suffix)
 
+  // El desgarro se reproduce ANTES de encadenar al reveal. Sin reduced-motion se salta entero:
+  // quien pide menos animación quiere su carta, no el espectáculo.
+  function startOpen() {
+    if (!ready || opening) return          // el guard evita que un doble click encadene dos reveals
+    if (reduced) { onOpen(); return }
+    setOpening(true)
+    timerRef.current = setTimeout(onOpen, TEAR_MS)
+  }
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
   function onMove(e: React.MouseEvent) {
-    if (reduced) return
+    if (reduced || opening) return         // durante el desgarro el sobre queda quieto
     const r = cardRef.current?.getBoundingClientRect()
     if (!r) return
     const px = (e.clientX - r.left) / r.width
@@ -80,14 +93,16 @@ export function GachaPackTilt({ machineCode, price, count, ready, done, total, o
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26 }}>
-      <div style={{ perspective: 1100 }} onMouseMove={onMove} onMouseLeave={onLeave}>
+      <div style={{ perspective: 1100,
+        animation: opening ? `ba-packlift ${TEAR_MS}ms cubic-bezier(.22,1,.36,1) forwards` : undefined }}
+        onMouseMove={onMove} onMouseLeave={onLeave}>
         <div
           ref={cardRef}
-          onClick={ready ? onOpen : undefined}
+          onClick={ready ? startOpen : undefined}
           role={ready ? 'button' : undefined}
           tabIndex={ready ? 0 : undefined}
           aria-label={ready ? 'Open your pack' : undefined}
-          onKeyDown={ready ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } : undefined}
+          onKeyDown={ready ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startOpen() } } : undefined}
           style={{
             position: 'relative', width: PACK_W, height: PACK_H,
             transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`,
@@ -97,13 +112,27 @@ export function GachaPackTilt({ machineCode, price, count, ready, done, total, o
             cursor: ready ? 'pointer' : 'default',
           }}
         >
-          {/* foil superior */}
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 26,
-            background: `repeating-linear-gradient(90deg,#2a0a18 0,${pal.top} 3px,#3f0f24 6px,${pal.top}cc 9px,#2a0a18 12px)`,
-            boxShadow: 'inset 0 3px 3px rgba(255,255,255,.3),inset 0 -4px 5px rgba(0,0,0,.55)' }} />
-          <div style={{ position: 'absolute', top: 26, left: 0, right: 0, height: 8,
-            background: zig('#3f0f24'), backgroundSize: '11px 8px', backgroundRepeat: 'repeat-x',
-            filter: 'drop-shadow(0 2px 2px rgba(0,0,0,.5))' }} />
+          {/* Tira superior: banda + dentado van juntos en un contenedor porque se desgarran como
+              UNA pieza, justo por donde el sobre está pensado para rasgarse. */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 34, zIndex: 3,
+            transformOrigin: '80% 100%',
+            animation: opening ? `ba-packstrip ${TEAR_MS}ms cubic-bezier(.3,.7,.3,1) forwards` : undefined }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 26,
+              background: `repeating-linear-gradient(90deg,#2a0a18 0,${pal.top} 3px,#3f0f24 6px,${pal.top}cc 9px,#2a0a18 12px)`,
+              boxShadow: 'inset 0 3px 3px rgba(255,255,255,.3),inset 0 -4px 5px rgba(0,0,0,.55)' }} />
+            <div style={{ position: 'absolute', top: 26, left: 0, right: 0, height: 8,
+              background: zig('#3f0f24'), backgroundSize: '11px 8px', backgroundRepeat: 'repeat-x',
+              filter: 'drop-shadow(0 2px 2px rgba(0,0,0,.5))' }} />
+          </div>
+
+          {/* Rendija: la luz que asoma por donde estaba la tira. */}
+          {opening && (
+            <div style={{ position: 'absolute', top: 26, left: 6, right: 6, height: 14, zIndex: 2,
+              transformOrigin: 'top', borderRadius: '2px 2px 8px 8px',
+              background: `linear-gradient(180deg,#ffffff,${pal.topGlow} 55%,transparent)`,
+              boxShadow: `0 0 26px 6px ${pal.topGlow}aa, 0 0 60px 18px ${pal.topGlow}55`,
+              animation: `ba-packslit ${TEAR_MS}ms ease-out forwards` }} />
+          )}
           {/* foil inferior */}
           <div style={{ position: 'absolute', bottom: 26, left: 0, right: 0, height: 8, transform: 'scaleY(-1)',
             background: zig('#0e2b52'), backgroundSize: '11px 8px', backgroundRepeat: 'repeat-x',
@@ -148,17 +177,24 @@ export function GachaPackTilt({ machineCode, price, count, ready, done, total, o
               </span>
             </div>
 
-            {!reduced && (
+            {!reduced && !opening && (
               <div className="ba-packshine" style={{ position: 'absolute', top: 0, left: 0, width: 80, height: '100%',
                 background: 'linear-gradient(90deg,rgba(255,255,255,.14),transparent)', pointerEvents: 'none' }} />
+            )}
+
+            {/* La luz inunda el cuerpo desde arriba y encadena con el reveal sin corte seco. */}
+            {opening && (
+              <div style={{ position: 'absolute', inset: 0, transformOrigin: 'top', pointerEvents: 'none',
+                background: `linear-gradient(180deg,#ffffff 0%,${pal.topGlow} 22%,${pal.bottomGlow}88 45%,transparent 72%)`,
+                animation: `ba-packflood ${TEAR_MS}ms cubic-bezier(.4,0,.5,1) forwards` }} />
             )}
           </div>
         </div>
       </div>
 
       <button
-        onClick={ready ? onOpen : undefined}
-        disabled={!ready}
+        onClick={ready ? startOpen : undefined}
+        disabled={!ready || opening}
         style={{
           minWidth: 280, borderRadius: 12, padding: '14px 22px', fontSize: 15, fontWeight: 800,
           fontFamily: FONTS.display, letterSpacing: '.02em',
@@ -167,7 +203,7 @@ export function GachaPackTilt({ machineCode, price, count, ready, done, total, o
           background: ready ? `linear-gradient(90deg,${pal.topGlow},${pal.bottomGlow})` : COLORS.panel2,
           color: ready ? '#08111d' : COLORS.muted,
         }}>
-        {ready ? 'Open pack' : `Generating pack… ${Math.min(done + 1, total)}/${total}`}
+        {opening ? 'Opening…' : ready ? 'Open pack' : `Generating pack… ${Math.min(done + 1, total)}/${total}`}
       </button>
     </div>
   )

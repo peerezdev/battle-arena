@@ -218,3 +218,33 @@ textarea::placeholder {
   100% { transform: translateX(340%) skewX(-18deg); }
 }
 .ba-packshine { animation: ba-packshine 4.8s ease-in-out infinite; }
+
+/* ── Apertura del sobre de gacha (GachaPackTilt) ──────────────────────────────
+   La tira de arriba se desgarra por el borde dentado y sale volando; por la
+   abertura escapa luz que crece hasta tapar el sobre y encadenar con el reveal. */
+@keyframes ba-packtug {           /* anticipación: un tirón antes de rasgar */
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(3px) rotate(-.6deg); }
+  100% { transform: translateY(-2px) rotate(.4deg); }
+}
+@keyframes ba-packstrip {         /* la tira sale despedida hacia arriba */
+  0%   { transform: translate(0,0) rotate(0deg); opacity: 1; }
+  18%  { transform: translate(0,4px) rotate(-1deg); opacity: 1; }
+  100% { transform: translate(26px,-190px) rotate(-26deg); opacity: 0; }
+}
+@keyframes ba-packslit {          /* la rendija de luz que deja la tira al irse */
+  0%   { opacity: 0; transform: scaleY(0); }
+  30%  { opacity: 1; transform: scaleY(1); }
+  100% { opacity: .9; transform: scaleY(1); }
+}
+@keyframes ba-packflood {         /* la luz baja desde la rendija; sólo tapa el sobre al final */
+  0%   { opacity: 0;  transform: scaleY(.05); }
+  30%  { opacity: .3; transform: scaleY(.25); }
+  65%  { opacity: .6; transform: scaleY(.6); }
+  88%  { opacity: .9; transform: scaleY(1); }
+  100% { opacity: 1;  transform: scaleY(1.5); }
+}
+@keyframes ba-packlift {          /* el sobre se acerca un pelo mientras se abre */
+  0%   { transform: scale(1); }
+  100% { transform: scale(1.045); }
+}
