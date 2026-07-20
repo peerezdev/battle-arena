@@ -58,6 +58,10 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
         display: 'flex',
         flexDirection: 'column',
         gap: 20,
+        // En escritorio el panel se estrecha al 90% de su columna y se centra. La imagen sigue
+        // llenando el interior, así que el conjunto ocupa ese 90% sin dejar panel sobrante
+        // alrededor de la imagen. En móvil se mantiene a ancho completo: ahí el espacio escasea.
+        ...(mobile ? null : { width: '90%', margin: '0 auto' }),
       }}
     >
       {/* Pack image */}
@@ -105,23 +109,10 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
             fontWeight: 800,
             fontSize: 20,
             color: COLORS.text,
-            marginBottom: 4,
           }}
         >
           {machine.name}
         </div>
-        {machine.shortName && (
-          <div
-            style={{
-              fontFamily: FONTS.mono,
-              fontSize: 11,
-              color: COLORS.muted,
-              letterSpacing: '.06em',
-            }}
-          >
-            {machine.shortName}
-          </div>
-        )}
       </div>
 
       {/* EV + Price */}
@@ -187,7 +178,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
               color: COLORS.text,
             }}
           >
-            {formatUsd(machine.price)} USDC
+            {formatUsd(machine.price)}
           </div>
         </div>
       </div>
@@ -208,7 +199,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
 
       {onYolo && !mobile && (
         <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.1em', color: COLORS.muted, textTransform: 'uppercase' }}>YOLO · open multiple</div>
+          <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.1em', color: COLORS.muted, textTransform: 'uppercase' }}>Open multiple</div>
 
           {/* Stepper + presets */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -233,7 +224,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
             <button onClick={() => setTurbo((t) => !t)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 10, cursor: 'pointer',
                 border: `1px solid ${turbo ? COLORS.green : COLORS.border}`, background: turbo ? COLORS.panel2 : 'transparent', color: COLORS.text }}>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>⚡ Turbo — auto-sell Commons</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>⚡ Turbo (auto-sell Commons)</span>
               <span style={{ fontFamily: FONTS.mono, fontSize: 12, color: turbo ? COLORS.green : COLORS.muted }}>{turbo ? 'ON' : 'OFF'}</span>
             </button>
           )}
@@ -267,7 +258,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
             </div>
             {/* turbo toggle (only if supported) */}
             {machine.turboMode && (
-              <button onClick={() => setTurbo((t) => !t)} title="Turbo — auto-sell Commons" aria-pressed={turbo}
+              <button onClick={() => setTurbo((t) => !t)} title="Turbo (auto-sell Commons)" aria-pressed={turbo}
                 style={{ flexShrink: 0, width: 44, height: 36, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
                   border: `1px solid ${turbo ? COLORS.green : COLORS.border}`, background: turbo ? 'rgba(0,255,196,.12)' : COLORS.panel2, color: turbo ? COLORS.green : COLORS.muted }}>⚡</button>
             )}
