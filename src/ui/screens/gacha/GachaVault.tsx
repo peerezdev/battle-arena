@@ -26,6 +26,7 @@ import { useReducedMotion } from '../../useReducedMotion'
 import { HoloCard } from '../../components/HoloCard'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
+import { GachaPackTilt } from './GachaPackTilt'
 import { CardPoolGrid } from './CardPoolGrid'
 
 // Live Drops are no longer recorded locally on open — the backend broadcasts
@@ -44,7 +45,11 @@ type Phase =
   | { kind: 'opening'; step: 'firmando' | 'enviando' | 'abriendo' }
   | { kind: 'result'; result: YoloResult }
   | { kind: 'pending'; memo: string }
-  | { kind: 'yolo'; step: 'firmando' | 'enviando' | 'abriendo'; done: number; total: number }
+  // `results` null = todavía generando; no-null = listos, esperando a que el usuario abra.
+  // Es UNA sola fase a propósito: si "generando" y "listo" fueran fases distintas, React
+  // desmontaría y remontaría el sobre justo al terminar y se perdería el tilt y la posición
+  // del brillo en el momento de más atención. Así solo cambia el botón.
+  | { kind: 'yolo'; step: 'firmando' | 'enviando' | 'abriendo'; done: number; total: number; results: YoloResult[] | null }
   | { kind: 'yolo-reveal'; results: YoloResult[]; index: number }
   | { kind: 'yolo-summary'; results: YoloResult[] }
 
@@ -178,7 +183,7 @@ export default function GachaVault() {
     setOpenError(null)
     let resp: YoloPacksResponse
     try {
-      setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count })
+      setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count, results: null })
       resp = await generateYoloPacks(identityToken, selected.code, count, turbo)
     } catch (e) {
       setOpenError(`Couldn't start YOLO: ${e instanceof Error ? e.message : String(e)}.`)
@@ -190,9 +195,9 @@ export default function GachaVault() {
     let lastErr: string | null = null
     for (let i = 0; i < txs.length; i++) {
       try {
-        setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length })
+        setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length, results: null })
         const signed = await signTransactionBase64(txs[i].transaction)
-        setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length })
+        setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length, results: null })
         await submitTx(identityToken, signed)
         submitted.push(txs[i].memo)
       } catch (e) {
@@ -207,14 +212,15 @@ export default function GachaVault() {
     }
     const results: YoloResult[] = []
     for (let i = 0; i < submitted.length; i++) {
-      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: submitted.length })
+      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: submitted.length, results: null })
       try {
         const r = await pollOpenPack(() => openPack(identityToken, submitted[i]))
         if (!r.pending) { results.push(r) }
       } catch { /* skip */ }
     }
     if (results.length === 0) { setPhase({ kind: 'pending', memo: submitted[0] }); return }
-    setPhase({ kind: 'yolo-reveal', results, index: 0 })
+    // Listos, pero NO se revela solo: el sobre queda esperando a que el usuario lo abra.
+    setPhase({ kind: 'yolo', step: 'abriendo', done: results.length, total: results.length, results })
   }
 
   // ── Disabled state ──────────────────────────────────────────────────────────
@@ -488,7 +494,25 @@ export default function GachaVault() {
             onClose={() => setPhase({ kind: 'machines' })}
           />
         )}
-        {phase.kind === 'yolo' && <YoloProgressOverlay phase={phase} reduced={reduced} />}
+        {phase.kind === 'yolo' && (
+          <motion.div key="yolo-pack" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(6,8,11,0.94)', zIndex: 200,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
+            <GachaPackTilt
+              machineCode={selected?.code ?? ''}
+              price={selected?.price ?? 0}
+              count={phase.total}
+              ready={phase.results !== null}
+              done={phase.done}
+              total={phase.total}
+              reduced={reduced}
+              onOpen={() => {
+                const r = phase.results
+                if (r) setPhase({ kind: 'yolo-reveal', results: r, index: 0 })
+              }}
+            />
+          </motion.div>
+        )}
         {phase.kind === 'yolo-reveal' && (
           <YoloRevealOverlay
             results={phase.results}
@@ -1340,24 +1364,6 @@ function CardDetailsView({
   )
 }
 
-const YOLO_STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
-  firmando: 'Sign each pack in your wallet…',
-  enviando: 'Sending to Solana…',
-  abriendo: 'Opening packs…',
-}
-
-function YoloProgressOverlay({ phase, reduced }: { phase: Extract<Phase, { kind: 'yolo' }>; reduced: boolean }) {
-  return (
-    <motion.div key="yolo-progress" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(11,14,20,0.88)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: '44px 32px', textAlign: 'center', maxWidth: 360, width: '100%', boxShadow: SHADOW.panel }}>
-        <motion.div animate={reduced ? undefined : { opacity: [1, 0.35, 1] }} transition={{ repeat: Infinity, duration: 1.4 }} style={{ fontSize: 52, marginBottom: 20 }}>🎰</motion.div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.text, fontFamily: FONTS.body, marginBottom: 8 }}>{YOLO_STEP_LABEL[phase.step]}</div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>{phase.step} · {Math.min(phase.done + 1, phase.total)}/{phase.total}</div>
-      </div>
-    </motion.div>
-  )
-}
 
 function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onSkipAll }: {
   results: YoloResult[]

@@ -211,3 +211,10 @@ textarea::placeholder {
   .ob-mascot { display: none !important; }
   .ob-bubble { max-width: calc(100vw - 36px) !important; margin: 0 0 20px 0 !important; }
 }
+
+/* Barrido de brillo del sobre de gacha (GachaPackTilt). */
+@keyframes ba-packshine {
+  0%   { transform: translateX(-160%) skewX(-18deg); }
+  100% { transform: translateX(340%) skewX(-18deg); }
+}
+.ba-packshine { animation: ba-packshine 4.8s ease-in-out infinite; }
