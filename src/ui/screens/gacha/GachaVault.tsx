@@ -113,7 +113,7 @@ export default function GachaVault() {
       setSelected((cur) =>
         cur
           ? (ms.find((m) => m.code === cur.code) ?? cur)
-          : (ms[0] ?? null),
+          : (ms.find((m) => m.available !== false) ?? ms[0] ?? null),   // default to an OPEN machine
       )
     }
 
@@ -358,7 +358,7 @@ export default function GachaVault() {
               scrollbarWidth: 'none',
             }}
           >
-            {[...machines].sort((a, b) => (a.price ?? 0) - (b.price ?? 0)).map((m) => {
+            {[...machines].filter((m) => m.available !== false).sort((a, b) => (a.price ?? 0) - (b.price ?? 0)).map((m) => {
               const isActive = selected?.code === m.code
               return (
                 <button

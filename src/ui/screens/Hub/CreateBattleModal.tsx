@@ -49,8 +49,8 @@ export function CreateBattleModal({ onClose, onCreated, lockedMode }: {
     setPlayers((p) => (playerCounts.includes(p as never) ? p : DEFAULT_PLAYERS[isRoyale ? 'royale' : 'pack']))
   }, [isRoyale])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Default the royale machine selection once the catalogue is available.
-  useEffect(() => { setMachineCode((c) => c || machines[0]?.code || '') }, [machines])
+  // Default the royale machine to the first AVAILABLE one (off machines can't be created).
+  useEffect(() => { setMachineCode((c) => c || machines.find((m) => m.available !== false)?.code || '') }, [machines])
 
   const boxes = totalBoxes(counts)
   const costUsd = bundleCostUsd(counts, machines)
@@ -75,7 +75,9 @@ export function CreateBattleModal({ onClose, onCreated, lockedMode }: {
     })
   }
 
-  const createDisabled = busy || !identityToken || (isRoyale ? !machineCode : boxes === 0)
+  // Block creating on a machine that went off after selection (the picker only lists available ones).
+  const royaleMachineOff = isRoyale && machines.find((m) => m.code === machineCode)?.available === false
+  const createDisabled = busy || !identityToken || royaleMachineOff || (isRoyale ? !machineCode : boxes === 0)
 
   function submit() {
     if (!identityToken) return
