@@ -13,7 +13,11 @@ import path from 'path'
 const htmlBypass = (req: IncomingMessage) =>
   (req.headers.accept || '').includes('text/html') ? '/index.html' : undefined
 
-const api = { target: 'http://localhost:9090', changeOrigin: true, bypass: htmlBypass }
+// Backend port is 9090 by default (devnet). The mainnet stack runs its own backend on 9190 and
+// sets BACKEND_PORT=9190 so this same frontend proxies to the mainnet backend. Two networks side
+// by side: devnet frontend :5173 → backend :9090, mainnet frontend :5273 → backend :9190.
+const backendTarget = `http://localhost:${process.env.BACKEND_PORT || '9090'}`
+const api = { target: backendTarget, changeOrigin: true, bypass: htmlBypass }
 const backendProxy = {
   '/gacha': api,
   '/pack-battles': api,
@@ -25,7 +29,7 @@ const backendProxy = {
   '/elo': api,
   '/leaderboard': api,
   '/health': api,
-  '/ws': { target: 'http://localhost:9090', ws: true, changeOrigin: true },
+  '/ws': { target: backendTarget, ws: true, changeOrigin: true },
 }
 
 // https://vite.dev/config/
