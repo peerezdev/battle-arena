@@ -39,8 +39,14 @@ diseña por separado. Este spec solo garantiza que el resultado de una tirada qu
   `_require_available` (402 si no hay saldo). `POST /gacha/generate-pack`
   ([backend/app/main.py:406](../../../backend/app/main.py#L406)) sí hace ambas, igual que la
   creación y el join de batallas.
-- El navegador firma cada tx con la wallet embebida (`signTransactionBase64`) y hace él
-  mismo el bucle de `submit-tx` + `open-pack`.
+- **La firma ya ocurre en el servidor, y la delegación ya se exige.**
+  `signTransactionBase64` ([useWallet.ts:129-131](../../../src/wallet/useWallet.ts#L129))
+  hace `await ensureDelegated()` (que llama a `enable()` con prompt si aún no está delegada)
+  y luego `backendSign('sign', …)` → `POST /wallet/sign` → `privy_signer.sign_solana`. La
+  clave nunca está en el navegador para este flujo.
+- Lo que el navegador sí hace hoy es **orquestar el bucle**: generar → pedir la firma al
+  backend → `submit-tx` → `open-pack` en bucle, sobre por sobre. Eso es lo único que se
+  mueve al servidor.
 - El servidor **ya sabe** ejecutar una tirada por su cuenta:
   [pack_engine.py:141-156](../../../backend/app/services/pack_engine.py#L141) hace
   `generate_pack` → `signer.sign_solana(wallet_id, tx)` → `submit_tx` → `open_pack` para
@@ -171,14 +177,19 @@ que es el estado "pendiente" que ya existe hoy y que el usuario puede reintentar
 - `handleYolo` pasa a: `POST /gacha/pull` → polling de `GET /gacha/pull/{id}` → alimentar el
   overlay de progreso y el reveal **con los resultados del servidor**. Los componentes de
   reveal y de resumen no cambian de forma: reciben los mismos campos que hoy.
-- La acción se envuelve en `gate.requireDelegation(...)`.
+- La acción se envuelve en `gate.requireDelegation(...)` **antes** de lanzar el pull. Esto no
+  añade un requisito nuevo —el gacha ya exige delegación hoy—, sino que **adelanta el
+  momento del prompt**: hoy lo dispara implícitamente `ensureDelegated()` dentro de
+  `signTransactionBase64`, en el navegador y justo antes de firmar. Cuando firme el worker,
+  nada en el navegador dispararía ese prompt, así que hay que pedirla por adelantado.
 - El check de saldo del cliente pasa de comparar contra el saldo bruto a comparar contra
   **`disponible = usdc − reservado`** (`reserved` ya lo sirve `GET /users/me/balance`), con
   el mensaje "USDC disponible insuficiente". Esto es UX; la protección real es la del
   servidor.
 
-**Consecuencia aceptada:** el gacha pasa a **exigir delegación**, igual que los retiros de
-USDC y de NFTs. Quien la rechace no podrá tirar; hoy sí puede, porque firma su navegador.
+**No hay cambio en el modelo de confianza.** El gacha ya exige delegación y la firma ya la
+produce el servidor: nadie pierde acceso y no se pide ningún permiso nuevo. Lo único que se
+mueve es quién ejecuta el bucle.
 
 ### 6. Limpieza
 
