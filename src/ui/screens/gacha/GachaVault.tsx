@@ -7,10 +7,12 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
 import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import { holdBalance } from '../../../wallet/balanceHold'
+import { PendingPacksModal } from './PendingPacksModal'
 import {
   fetchMachines,
   fetchMachineCards,
   machineCardCount,
+  fetchPendingPacks,
   generatePack,
   generateYoloPacks,
   submitTx,
@@ -21,6 +23,7 @@ import {
   ccAssetUrl,
   type GachaMachine,
   type MachineCard,
+  type PendingPack,
   type OpenPackResult,
   type YoloPacksResponse,
 } from '../../../onchain/gachaClient'
@@ -85,6 +88,55 @@ export default function GachaVault() {
     if (!inPullFlow) return
     return holdBalance()
   }, [inPullFlow])
+
+  // ── Sobres pagados y sin abrir ─────────────────────────────────────────────
+  // Se consultan al entrar. Aparecen si el jugador abrió otra pestaña a mitad de una tirada o
+  // cerró la página antes de revelar; antes quedaban huérfanos, pagados y sin forma de llegar a
+  // ellos. El saldo se mantiene congelado mientras el modal está abierto, porque el auto-buyback
+  // del turbo ya habrá movido el USDC y verlo delataría lo que hay dentro.
+  const [pending, setPending] = useState<PendingPack[]>([])
+  const [pendingOpen, setPendingOpen] = useState(false)
+  const [pendingBusy, setPendingBusy] = useState(false)
+
+  useEffect(() => {
+    if (!identityToken) return
+    let cancelled = false
+    fetchPendingPacks(identityToken)
+      .then((ps) => { if (!cancelled && ps.length > 0) { setPending(ps); setPendingOpen(true) } })
+      .catch(() => { /* que no haya lista no debe impedir jugar */ })
+    return () => { cancelled = true }
+  }, [identityToken])
+
+  useEffect(() => {
+    if (!pendingOpen) return
+    return holdBalance()
+  }, [pendingOpen])
+
+  /** Abre los memos dados de uno en uno y encadena el reveal, igual que una tirada normal. */
+  async function openPendingMemos(memos: string[]) {
+    if (!identityToken || memos.length === 0) return
+    setPendingBusy(true)
+    const results: YoloResult[] = []
+    for (let i = 0; i < memos.length; i++) {
+      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: memos.length, results: null })
+      try {
+        const r = await pollOpenPack(() => openPack(identityToken, memos[i]))
+        if (!r.pending) results.push(r)
+      } catch { /* se salta: sigue en pendientes para reintentar */ }
+    }
+    setPendingBusy(false)
+    setPendingOpen(false)
+    // Refrescar la lista: lo que no se pudo abrir sigue ahí.
+    fetchPendingPacks(identityToken)
+      .then((ps) => { setPending(ps); if (ps.length > 0 && results.length === 0) setPendingOpen(true) })
+      .catch(() => { /* ignorar */ })
+    if (results.length === 0) {
+      showToast("Those packs aren't ready yet. Try again in a moment.", 'error')
+      setPhase({ kind: 'machines' })
+      return
+    }
+    setPhase({ kind: 'yolo-reveal', results, index: 0 })
+  }
   // Pending open awaiting the user's YES/NO confirmation.
   const [confirm, setConfirm] = useState<{ count: number; turbo: boolean } | null>(null)
 
@@ -220,7 +272,7 @@ export default function GachaVault() {
           setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length, results: null })
           const signed = await signTransactionBase64(txs[i].transaction)
           setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length, results: null })
-          await submitTx(identityToken, signed)
+          await submitTx(identityToken, signed, txs[i].memo)
           submitted.push(txs[i].memo)
         } catch (e) {
           lastErr = e instanceof Error ? e.message : String(e)
@@ -234,7 +286,7 @@ export default function GachaVault() {
           const pack = await generatePack(identityToken, selected.code)
           const signed = await signTransactionBase64(pack.transaction)
           setPhase({ kind: 'yolo', step: 'enviando', done: i, total: count, results: null })
-          await submitTx(identityToken, signed)
+          await submitTx(identityToken, signed, pack.memo)
           submitted.push(pack.memo)
         } catch (e) {
           // Se corta aquí: los sobres ya enviados se abren igual más abajo.
@@ -515,6 +567,15 @@ export default function GachaVault() {
             buybackPct={selected?.instantBuyback ?? null}
             onRetry={(memo) => void retryOpen(memo)}
             onClose={() => setPhase({ kind: 'machines' })}
+          />
+        )}
+        {pendingOpen && phase.kind === 'machines' && (
+          <PendingPacksModal
+            packs={pending}
+            busy={pendingBusy}
+            onOpenOne={(memo) => void openPendingMemos([memo])}
+            onOpenAll={() => void openPendingMemos(pending.map((p) => p.memo))}
+            onDismiss={() => setPendingOpen(false)}
           />
         )}
         {phase.kind === 'yolo' && (

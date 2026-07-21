@@ -125,6 +125,9 @@ class DevAnnounceBody(BaseModel):
 
 class SubmitTxBody(BaseModel):
     signed_transaction: str = Field(min_length=1, max_length=3000)
+    # Memo del sobre que se está pagando, cuando la tx es la compra de un sobre. Opcional porque
+    # esta ruta también envía buybacks y transferencias, que no tienen memo asociado.
+    memo: Optional[str] = Field(default=None, max_length=128)
 
     @model_validator(mode="after")
     def check_base64(self) -> "SubmitTxBody":
@@ -430,17 +433,28 @@ def create_app(session_factory, chain: ChainSource,
         return out
 
     @app.post("/gacha/submit-tx")
-    async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_user)):
+    async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_user),
+                           s: Session = Depends(db)):
         svc = _gacha_or_503()
         # NOT rate-limited: submit-tx is a mechanical follow-up of an already-throttled pull
         # initiation (generate-pack / yolo), and a YOLO of N packs calls it once per pack.
         # Throttling it here made a single multi-pack pull trip the per-wallet limit.
         try:
-            return await svc.submit_tx(signed_transaction=body.signed_transaction)
+            out = await svc.submit_tx(signed_transaction=body.signed_transaction)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream no disponible")
+        # El pago acaba de cuajar: se marca el sobre como pagado. La fila de GachaPack se crea al
+        # GENERAR, antes de pagar, así que `opened_at IS NULL` por sí solo no distingue un sobre
+        # pagado y pendiente de uno que se generó y nunca se llegó a comprar. Sin esta marca, la
+        # lista de pendientes le diría al usuario que tiene sobres que jamás pagó.
+        if body.memo:
+            pack = s.get(GachaPack, body.memo)
+            if pack is not None and pack.wallet == wallet and pack.submitted_at is None:
+                pack.submitted_at = datetime.now(timezone.utc)
+                s.commit()
+        return out
 
     @app.get("/gacha/buyback/available")
     async def gacha_buyback_available(wallet: str, nft: str):
@@ -451,6 +465,28 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream no disponible")
+
+    @app.get("/gacha/packs/pending")
+    async def gacha_pending_packs(wallet: str = Depends(current_user), s: Session = Depends(db)):
+        """Sobres que el usuario ya PAGÓ y todavía no ha abierto.
+
+        Sin throttle: se consulta al entrar al gacha, no en bucle.
+
+        El filtro exige `submitted_at` además de `opened_at IS NULL`, y eso es lo que hace la
+        lista honesta: la fila se crea al generar el sobre, antes de pagarlo, así que hay filas
+        de tiradas que el usuario abandonó sin comprar nada. Listarlas sería decirle que tiene
+        sobres —y por tanto dinero— que nunca gastó.
+        """
+        rows = (s.query(GachaPack)
+                .filter(GachaPack.wallet == wallet,
+                        GachaPack.submitted_at.isnot(None),
+                        GachaPack.opened_at.is_(None))
+                .order_by(GachaPack.submitted_at)
+                .limit(50)
+                .all())
+        return [{"memo": p.memo, "pack_type": p.pack_type,
+                 "submitted_at": p.submitted_at.isoformat() if p.submitted_at else None}
+                for p in rows]
 
     @app.post("/gacha/buyback")
     async def gacha_buyback(body: BuybackBody, wallet: str = Depends(current_user)):

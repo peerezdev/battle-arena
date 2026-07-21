@@ -78,6 +78,7 @@ class GachaPack(Base):
     wallet: Mapped[str] = mapped_column(String, index=True)
     pack_type: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     nft_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)           # USDC base units spent to open

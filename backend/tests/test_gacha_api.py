@@ -439,3 +439,99 @@ async def test_generate_pack_omits_alt_when_none():
     await svc.generate_pack(player_address="P", pack_type="pokemon_50")
     sent = json.loads(route.calls.last.request.content)
     assert "altPlayerAddress" not in sent
+
+
+# ── Sobres pendientes ─────────────────────────────────────────────────────────
+# La fila de GachaPack se crea al GENERAR, antes de pagar. Por eso "pendiente" exige
+# submitted_at: si no, la lista incluiría tiradas que el usuario abandonó sin comprar nada y le
+# estaríamos diciendo que tiene sobres —y dinero— que jamás gastó.
+
+def _mock_pack_upstream(memo="slug-p1"):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+    respx.post(f"{BASE}/api/generatePack").mock(
+        return_value=Response(200, json={"memo": memo, "transaction": "dA=="}))
+    respx.post(f"{BASE}/api/submitTransaction").mock(
+        return_value=Response(200, json={"signature": "sig", "confirmationStatus": "confirmed"}))
+
+
+@respx.mock
+def test_pending_excluye_los_sobres_generados_pero_nunca_pagados(monkeypatch):
+    _mock_pack_upstream()
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    c, priv = _client()
+    hdrs = _hdrs(priv, WALLET_A)
+
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
+    r = c.get("/gacha/packs/pending", headers=hdrs)
+    assert r.status_code == 200
+    assert r.json() == [], "un sobre generado y no pagado NO es un pendiente"
+
+
+@respx.mock
+def test_submit_tx_con_memo_marca_el_sobre_como_pagado(monkeypatch):
+    _mock_pack_upstream()
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    c, priv = _client()
+    hdrs = _hdrs(priv, WALLET_A)
+
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
+    assert c.post("/gacha/submit-tx",
+                  json={"signed_transaction": "dGVzdA==", "memo": "slug-p1"},
+                  headers=hdrs).status_code == 200
+
+    body = c.get("/gacha/packs/pending", headers=hdrs).json()
+    assert [p["memo"] for p in body] == ["slug-p1"]
+    assert body[0]["pack_type"] == "pokemon_50"
+    assert body[0]["submitted_at"]
+
+
+@respx.mock
+def test_submit_tx_sin_memo_sigue_funcionando(monkeypatch):
+    """Los buybacks y transferencias usan la misma ruta y no tienen memo asociado."""
+    _mock_pack_upstream()
+    c, priv = _client()
+    hdrs = _hdrs(priv, WALLET_A)
+    assert c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA=="},
+                  headers=hdrs).status_code == 200
+
+
+@respx.mock
+def test_pending_no_lista_un_sobre_ya_abierto(monkeypatch):
+    _mock_pack_upstream(memo="slug-p2")
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "success": True, "nft_address": "Mint" + "2" * 40, "rarity": "Rare",
+        "nftWon": {"content": {"metadata": {"name": "Pika"}}, "image": "https://x/p.png"}}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    c, priv = _client()
+    hdrs = _hdrs(priv, WALLET_A)
+
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
+    c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA==", "memo": "slug-p2"}, headers=hdrs)
+    assert len(c.get("/gacha/packs/pending", headers=hdrs).json()) == 1
+    c.post("/gacha/open-pack", json={"memo": "slug-p2"}, headers=hdrs)
+    assert c.get("/gacha/packs/pending", headers=hdrs).json() == []
+
+
+@respx.mock
+def test_pending_no_filtra_sobres_de_otra_wallet(monkeypatch):
+    _mock_pack_upstream(memo="slug-p3")
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    c, priv = _client()
+
+    hdrs_a = _hdrs(priv, WALLET_A)
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs_a)
+    c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA==", "memo": "slug-p3"}, headers=hdrs_a)
+
+    assert c.get("/gacha/packs/pending", headers=_hdrs(priv, WALLET_B)).json() == []
+    assert len(c.get("/gacha/packs/pending", headers=hdrs_a).json()) == 1
+
+
+def test_pending_requiere_auth():
+    c, _ = _client()
+    assert c.get("/gacha/packs/pending").status_code == 401

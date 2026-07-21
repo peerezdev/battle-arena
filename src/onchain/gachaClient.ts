@@ -140,10 +140,12 @@ export function generatePack(token: string, packType: string): Promise<GenerateP
   })
 }
 
-export function submitTx(token: string, signedTransaction: string): Promise<SubmitTxResponse> {
+/** `memo` solo cuando la tx es la compra de un sobre: permite al backend marcarlo como pagado,
+ *  que es lo que distingue un pendiente real de una tirada abandonada sin comprar. */
+export function submitTx(token: string, signedTransaction: string, memo?: string): Promise<SubmitTxResponse> {
   return gachaFetch<SubmitTxResponse>('/gacha/submit-tx', {
     method: 'POST', headers: authHeaders(token),
-    body: JSON.stringify({ signed_transaction: signedTransaction }),
+    body: JSON.stringify(memo ? { signed_transaction: signedTransaction, memo } : { signed_transaction: signedTransaction }),
   })
 }
 
@@ -257,4 +259,12 @@ export function machineCardCount(stock: Record<string, number> | null | undefine
   const vals = Object.values(stock).filter((v): v is number => typeof v === 'number' && isFinite(v))
   if (vals.length === 0) return null
   return vals.reduce((a, b) => a + b, 0)
+}
+
+export interface PendingPack { memo: string; pack_type: string; submitted_at: string | null }
+
+/** Sobres ya pagados y sin abrir. Sirve para recuperarlos desde otra pestaña o tras cerrar la
+ *  página a mitad de una tirada, que hoy los dejaba huérfanos e invisibles. */
+export function fetchPendingPacks(token: string): Promise<PendingPack[]> {
+  return gachaFetch<PendingPack[]>('/gacha/packs/pending', { headers: authHeaders(token) })
 }
