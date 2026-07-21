@@ -1645,7 +1645,11 @@ export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose 
               background: GRADIENT, color: '#06120c', boxShadow: '0 0 22px -6px rgba(0,255,196,.7)' }}>
             {claiming ? 'Claiming…'
               : pending.length > 0 ? `Claim · sell ${pending.length} (~${formatUsd(estimate)})`
-              : soldCount > 0 ? 'Done' : 'Keep all & continue'}
+              : soldCount > 0 ? 'Done'
+              // Sin cartas que decidir —con turbo, CC las recompra todas al abrir— no hay nada
+              // que "quedarse": prometerlo sería ofrecer algo que el jugador ya no tiene. Mismo
+              // criterio que oculta los botones Keep all / Sell all de arriba.
+              : sellable.length > 0 ? 'Keep all & continue' : 'Continue'}
           </button>
         </div>
       </div>
