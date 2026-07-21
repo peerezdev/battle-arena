@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
 import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
+import { holdBalance } from '../../../wallet/balanceHold'
 import {
   fetchMachines,
   fetchMachineCards,
@@ -74,6 +75,16 @@ export default function GachaVault() {
   const [disabled, setDisabled] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>({ kind: 'machines' })
+
+  // Mientras la tirada no esté revelada, el saldo mostrado se congela. Con turbo, CC recompra
+  // las commons nada más abrir el sobre por dentro, así que el USDC sube antes de que el jugador
+  // vea nada: si la cabecera lo refleja, le destripa el resultado. Se suelta al volver a la
+  // pantalla de máquinas, que es cuando ya ha visto lo que le tocó.
+  const inPullFlow = phase.kind === 'yolo' || phase.kind === 'yolo-reveal' || phase.kind === 'yolo-summary'
+  useEffect(() => {
+    if (!inPullFlow) return
+    return holdBalance()
+  }, [inPullFlow])
   // Pending open awaiting the user's YES/NO confirmation.
   const [confirm, setConfirm] = useState<{ count: number; turbo: boolean } | null>(null)
 

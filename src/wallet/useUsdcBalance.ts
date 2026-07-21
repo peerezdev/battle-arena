@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
+import { isBalanceHeld, useBalanceHeld } from './balanceHold'
 import { config } from '../onchain/config'
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -13,6 +14,9 @@ import { config } from '../onchain/config'
 // behavior on devnet and mainnet, and no RPC provider key exposed in the client.
 
 export function useUsdcBalance(): { usdc: number | null; loading: boolean } {
+  // Al soltar la congelación hay que repintar en cuanto se pueda: si no, el saldo real tardaría
+  // hasta 30s en aparecer y el usuario vería un número que ya no es el suyo.
+  const held = useBalanceHeld()
   const { identityToken } = useIdentityToken()
   const [usdc, setUsdc] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -46,7 +50,10 @@ export function useUsdcBalance(): { usdc: number | null; loading: boolean } {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
         const data = (await resp.json()) as { usdc?: number }
         if (!unmountedRef.current) {
-          setUsdc(typeof data.usdc === 'number' ? data.usdc : 0)
+          // Con una tirada sin revelar, el saldo se queda como estaba: el auto-buyback del turbo
+          // lo sube en cuanto CC abre el sobre por dentro, y verlo subir destripa el resultado
+          // antes del reveal. Se sigue consultando (así al soltar ya está fresco), pero no se pinta.
+          if (!isBalanceHeld()) setUsdc(typeof data.usdc === 'number' ? data.usdc : 0)
           setLoading(false)
         }
       } catch (err) {
@@ -66,7 +73,7 @@ export function useUsdcBalance(): { usdc: number | null; loading: boolean } {
     return () => {
       if (intervalId !== null) clearInterval(intervalId)
     }
-  }, [identityToken])
+  }, [identityToken, held])
 
   return { usdc, loading }
 }
