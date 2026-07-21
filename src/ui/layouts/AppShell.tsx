@@ -23,6 +23,7 @@ import { Toaster } from '../toast'
 import { PendingPacksModal } from '../screens/gacha/PendingPacksModal'
 import { fetchPendingPacks, type PendingPack } from '../../onchain/gachaClient'
 import { holdBalance } from '../../wallet/balanceHold'
+import { usePendingPacksVersion } from '../screens/gacha/pendingPacksBus'
 
 const DOCK_KEY = 'ba.dockCollapsed'
 const ONBOARD_KEY = 'ba.onboarded'   // set once the first-visit tutorial is finished/skipped
@@ -58,6 +59,7 @@ export function AppShell() {
   // pendiente hasta que el jugador lo VE: sin esto, ir al gacha a abrirlo volvía a levantar el
   // modal encima, obligando a cerrarlo dos veces. Solo se auto-abre si aparece alguno nuevo.
   const promptedRef = useRef<Set<string>>(new Set())
+  const pendingVersion = usePendingPacksVersion()
 
   useEffect(() => {
     if (!identityToken) { setPendingPacks([]); setPendingOpen(false); return }
@@ -74,14 +76,18 @@ export function AppShell() {
       })
       .catch(() => { /* que falle la lista no debe bloquear la navegación */ })
     return () => { cancelled = true }
-  }, [identityToken, pathname])   // al cambiar de ruta se refresca: recoge lo que ya se abrió
+  }, [identityToken, pathname, pendingVersion])   // ruta o aviso del gacha: recoge lo abierto
 
-  // El saldo sigue congelado mientras el modal está abierto: con turbo el auto-buyback ya movió
-  // el USDC, y verlo subir delataría lo que hay dentro antes de abrirlo.
+  // El saldo se congela mientras QUEDEN sobres sin abrir, no solo mientras el modal esté a la
+  // vista. Antes se soltaba al pulsar Open —el modal se cerraba para navegar al gacha— y el saldo
+  // se pintaba justo en el hueco previo a abrir, que es cuando más delata: con turbo el
+  // auto-buyback ya movió el USDC. Se suelta cuando la lista queda vacía, es decir, cuando el
+  // jugador ya ha visto sus cartas.
+  const hasPending = pendingPacks.length > 0
   useEffect(() => {
-    if (!pendingOpen) return
+    if (!hasPending) return
     return holdBalance()
-  }, [pendingOpen])
+  }, [hasPending])
 
   function goOpenPending(packs: PendingPack[]) {
     setPendingOpen(false)

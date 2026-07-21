@@ -7,6 +7,7 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
 import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import { holdBalance } from '../../../wallet/balanceHold'
+import { notifyPendingPacksChanged } from './pendingPacksBus'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   fetchMachines,
@@ -125,7 +126,9 @@ export default function GachaVault() {
     const memos = batchMemos.current
     batchMemos.current = []
     if (memos.length > 0 && identityToken) {
-      markPacksRevealed(identityToken, memos).catch(() => { /* se reintenta la próxima vez */ })
+      markPacksRevealed(identityToken, memos)
+        .then(notifyPendingPacksChanged)   // AppShell relee y suelta el saldo: ya las ha visto
+        .catch(() => { /* se reintenta la próxima vez */ })
     }
   }, [phase.kind, identityToken])
 
