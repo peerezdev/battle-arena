@@ -25,6 +25,7 @@ import {
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { HoloCard } from '../../components/HoloCard'
+import { showToast } from '../../toast'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { GachaPackTilt } from './GachaPackTilt'
@@ -71,7 +72,6 @@ export default function GachaVault() {
   const [selected, setSelected] = useState<GachaMachine | null>(null)
   const [disabled, setDisabled] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
-  const [openError, setOpenError] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>({ kind: 'machines' })
   // Pending open awaiting the user's YES/NO confirmation.
   const [confirm, setConfirm] = useState<{ count: number; turbo: boolean } | null>(null)
@@ -159,7 +159,6 @@ export default function GachaVault() {
   // ── Buy / open flow (mirrors GachaScreen.buy) ──────────────────────────────
   async function retryOpen(memo: string) {
     if (!identityToken) return
-    setOpenError(null)
     setPhase({ kind: 'opening', step: 'abriendo' })
     try {
       const result = await pollOpenPack(() => openPack(identityToken, memo))
@@ -169,7 +168,7 @@ export default function GachaVault() {
         setPhase({ kind: 'result', result })
       }
     } catch (e) {
-      setOpenError(e instanceof Error ? e.message : String(e))
+      showToast(e instanceof Error ? e.message : String(e), 'error')
       setPhase({ kind: 'pending', memo })
     }
   }
@@ -178,16 +177,16 @@ export default function GachaVault() {
     if (!selected || !identityToken) return
     const total = (selected.price ?? 0) * count
     if (usdc != null && usdc < total) {
-      setOpenError(`Insufficient USDC — ${count} packs cost $${total}. Deposit and try again.`)
+      showToast(`Insufficient USDC — ${count} pack${count === 1 ? '' : 's'} cost $${total}. Deposit and try again.`, 'error')
       return
     }
-    setOpenError(null)
     let resp: YoloPacksResponse
     try {
       setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count, results: null })
       resp = await generateYoloPacks(identityToken, selected.code, count, turbo)
     } catch (e) {
-      setOpenError(`Couldn't start YOLO: ${e instanceof Error ? e.message : String(e)}.`)
+      // "YOLO" es jerga interna: al usuario se le habla de sobres.
+      showToast(`Couldn't open the pack: ${e instanceof Error ? e.message : String(e)}`, 'error')
       setPhase({ kind: 'machines' })
       return
     }
@@ -207,7 +206,7 @@ export default function GachaVault() {
       }
     }
     if (submitted.length === 0) {
-      setOpenError(lastErr ? `Couldn't open the pack: ${lastErr}` : 'No packs were opened.')
+      showToast(lastErr ? `Couldn't open the pack: ${lastErr}` : 'No packs were opened.', 'error')
       setPhase({ kind: 'machines' })
       return
     }
@@ -468,21 +467,6 @@ export default function GachaVault() {
       })()}
 
       {/* ── OPEN ERROR BANNER ───────────────────────────────────────────────── */}
-      {openError && phase.kind === 'machines' && (
-        <div
-          style={{
-            marginTop: 16,
-            background: '#300a0f',
-            border: `1px solid ${COLORS.red}`,
-            color: COLORS.red,
-            borderRadius: 8,
-            padding: '12px 14px',
-            fontSize: 13,
-          }}
-        >
-          {openError}
-        </div>
-      )}
 
       {/* ── REVEAL OVERLAY ──────────────────────────────────────────────────── */}
       <AnimatePresence>
