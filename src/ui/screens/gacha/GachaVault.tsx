@@ -167,7 +167,10 @@ export default function GachaVault() {
       return
     }
     batchMemos.current = packs.map((p) => p.memo)
-    setPhase({ kind: 'yolo-reveal', results, index: 0 })
+    // Igual que una tirada normal: se queda en el sobre esperando el click, NO salta al reveal.
+    // Antes iba directo a 'yolo-reveal' y el sobre 3D aparecía y se abría solo, con la carta ya
+    // revelada: el momento de abrir es del jugador, venga de una tirada o de la lista.
+    setPhase({ kind: 'yolo', step: 'abriendo', done: results.length, total: results.length, results })
   }
   // Pending open awaiting the user's YES/NO confirmation.
   const [confirm, setConfirm] = useState<{ count: number; turbo: boolean } | null>(null)
@@ -1489,7 +1492,11 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
       {results.length > 1 && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, letterSpacing: '.1em' }}>PACK {index + 1} / {results.length}</div>
       )}
-      <RevealResult key={index} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} single={results.length === 1 && !result.auto_sold} onNext={onAdvance} />
+      {/* La clave incluye el mint, no solo la posición: si una misma posición pasa a mostrar otra
+          carta, React remonta y las etapas (año → grado → rareza) arrancan limpias. Con la
+          posición sola reutilizaba la instancia y la nueva carta entraba a media secuencia, que
+          es lo que se veía como "se relanza una sección". */}
+      <RevealResult key={`${index}-${result.nft_address ?? ''}`} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} single={results.length === 1 && !result.auto_sold} onNext={onAdvance} />
       <div style={{ display: 'flex', gap: 10 }}>
         <button onClick={() => setSkippedAt(index)}
           style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{results.length > 1 ? 'Skip pack ⏭' : 'Skip ⏭'}</button>
