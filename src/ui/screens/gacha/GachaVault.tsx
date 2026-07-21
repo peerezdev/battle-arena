@@ -14,7 +14,6 @@ import {
   fetchMachineCards,
   machineCardCount,
   generatePack,
-  fetchCardMetadata,
   markPacksRevealed,
   generateYoloPacks,
   submitTx,
@@ -35,7 +34,8 @@ import { HoloCard } from '../../components/HoloCard'
 import { showToast } from '../../toast'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
-import { GachaPackTilt, priceFromCode } from './GachaPackTilt'
+import { GachaPackTilt, packTitle, priceFromCode } from './GachaPackTilt'
+import { pendingPackToResult } from './pendingToResult'
 import { CardPoolGrid } from './CardPoolGrid'
 
 // Live Drops are no longer recorded locally on open — the backend broadcasts
@@ -148,28 +148,8 @@ export default function GachaVault() {
       const p = packs[i]
       setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: packs.length, machineCode: batchCode, price: batchPrice, results: null })
       try {
-        if (p.nft_address) {
-          const meta = await fetchCardMetadata(p.nft_address).catch(() => null)
-          results.push({
-            pending: false,
-            nft_address: p.nft_address,
-            name: meta?.name ?? p.name,
-            rarity: p.rarity ?? meta?.rarity ?? null,
-            image: meta?.image ?? null,
-            images: meta?.image ? [meta.image] : [],
-            insured_value: meta?.insured_value ?? p.insured_value,
-            grade: meta?.grade ?? null,
-            year: meta?.year ?? null,
-            grading_company: meta?.grading_company ?? null,
-            grading_id: meta?.grading_id ?? null,
-            authenticated: meta?.authenticated ?? null,
-            auto_sold: p.auto_sold,
-            buyback_amount: p.buyback_amount,
-          } as YoloResult)
-        } else {
-          const r = await pollOpenPack(() => openPack(identityToken, p.memo))
-          if (!r.pending) results.push(r)
-        }
+        const r = await pendingPackToResult(identityToken, p)
+        if (r) results.push(r)
       } catch { /* se salta: sigue pendiente y se reintenta */ }
     }
     if (results.length === 0) {
@@ -653,7 +633,7 @@ export default function GachaVault() {
           />
         )}
         {phase.kind === 'yolo-summary' && (
-          <YoloSummaryOverlay results={phase.results} buybackPct={selected?.instantBuyback ?? null} onClose={() => setPhase({ kind: 'machines' })} />
+          <YoloSummaryOverlay results={phase.results} machineCodes={phase.results.map(() => selected?.code ?? '')} buybackPct={selected?.instantBuyback ?? null} onClose={() => setPhase({ kind: 'machines' })} />
         )}
         {confirm && selected && (
           <ConfirmOpenModal
@@ -1527,7 +1507,14 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
   )
 }
 
-function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloResult[]; buybackPct: number | null; onClose: () => void }) {
+export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose }: {
+  results: YoloResult[]
+  /** Código de máquina de cada carta, en el mismo orden. Un lote de pendientes puede mezclar
+   *  máquinas, y sin la etiqueta no hay forma de saber de cuál salió cada una. */
+  machineCodes?: string[]
+  buybackPct: number | null
+  onClose: () => void
+}) {
   const { identityToken } = useIdentityToken()
   const { signTransactionBase64 } = useWallet()
   const pct = buybackPct ?? 90
@@ -1603,6 +1590,16 @@ function YoloSummaryOverlay({ results, buybackPct, onClose }: { results: YoloRes
             const buyback = (r.insured_value ?? 0) * pct / 100
             return (
               <div key={mint ?? i} style={{ background: COLORS.panel2, border: `1px solid ${glow ?? COLORS.border}`, borderRadius: 10, overflow: 'hidden', boxShadow: glow ? `0 0 16px -3px ${glow}, inset 0 0 12px -7px ${glow}` : undefined }}>
+                {machineCodes?.[i] && (() => {
+                  const [mp, ms] = packTitle(machineCodes[i])
+                  return (
+                    <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.12em',
+                      color: COLORS.muted, background: '#0c1019', padding: '5px 8px',
+                      borderBottom: `1px solid ${COLORS.border}`, textAlign: 'center' }}>
+                      {mp} {ms}
+                    </div>
+                  )
+                })()}
                 <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 }}>
                   {r.image ? <img src={r.image} alt={r.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 32 }}>🃏</span>}
                 </div>

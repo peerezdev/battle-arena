@@ -20,8 +20,10 @@ import { OnboardingTutorial } from '../components/OnboardingTutorial'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
-import { PendingPacksModal, type SkipResult } from '../screens/gacha/PendingPacksModal'
-import { fetchPendingPacks, markPacksRevealed, openPack, pollOpenPack, type PendingPack } from '../../onchain/gachaClient'
+import { PendingPacksModal } from '../screens/gacha/PendingPacksModal'
+import { YoloSummaryOverlay } from '../screens/gacha/GachaVault'
+import { pendingPacksToResults, type YoloResult } from '../screens/gacha/pendingToResult'
+import { fetchPendingPacks, markPacksRevealed, type PendingPack } from '../../onchain/gachaClient'
 import { holdBalance } from '../../wallet/balanceHold'
 import { usePendingPacksVersion } from '../screens/gacha/pendingPacksBus'
 
@@ -98,34 +100,24 @@ export function AppShell() {
   // resolver, se enseña qué tocó en texto y se marcan como vistos — que es lo que descongela el
   // saldo. Enseñar y descongelar en el MISMO paso es lo que evita que el número subiendo sea el
   // spoiler de algo que nunca llegó a verse.
-  const [skipResults, setSkipResults] = useState<SkipResult[] | null>(null)
+  const [skipSummary, setSkipSummary] = useState<{ results: YoloResult[]; machineCodes: string[] } | null>(null)
   const [pendingBusy, setPendingBusy] = useState(false)
 
   async function skipPending() {
     if (!identityToken || pendingPacks.length === 0) return
     setPendingBusy(true)
-    const out: SkipResult[] = []
-    for (const p of pendingPacks) {
-      if (p.nft_address) {
-        out.push({ pack_type: p.pack_type, name: p.name, insured_value: p.insured_value })
-        continue
-      }
-      try {
-        const r = await pollOpenPack(() => openPack(identityToken, p.memo))
-        if (!r.pending) out.push({ pack_type: p.pack_type, name: r.name, insured_value: r.insured_value })
-      } catch { /* si no se puede resolver, sigue pendiente para otra vez */ }
-    }
+    const summary = await pendingPacksToResults(identityToken, pendingPacks)
     try {
       await markPacksRevealed(identityToken, pendingPacks.map((x) => x.memo))
     } catch { /* se reintenta al recargar */ }
     setPendingBusy(false)
-    setSkipResults(out)
+    setSkipSummary(summary)
     setPendingPacks([])          // suelta la congelación: ya sabe lo que le tocó
   }
 
   function closePending() {
     setPendingOpen(false)
-    setSkipResults(null)
+    setSkipSummary(null)
   }
 
   const [depositOpen, setDepositOpen] = useState(false)
@@ -405,14 +397,23 @@ export function AppShell() {
       {/* ── TOASTS ────────────────────────────────────────────────────────── */}
       {/* Los toasts van abajo, por encima de la pila móvil (nav + barra de radio si está) y
           dejando hueco al RematchToast, que vive en bottom 28/84 con z-index menor. */}
-      {pendingOpen && (
+      {pendingOpen && !skipSummary && (
         <PendingPacksModal
           packs={pendingPacks}
           busy={pendingBusy}
-          skipResults={skipResults}
           onOpenOne={(memo) => goOpenPending(pendingPacks.filter((p) => p.memo === memo))}
           onOpenAll={() => goOpenPending(pendingPacks)}
           onSkip={() => void skipPending()}
+        />
+      )}
+
+      {/* Tras el Skip se enseña el MISMO resumen que al abrir varios sobres, con la máquina de
+          cada carta etiquetada: un lote de pendientes puede mezclar máquinas. */}
+      {skipSummary && (
+        <YoloSummaryOverlay
+          results={skipSummary.results}
+          machineCodes={skipSummary.machineCodes}
+          buybackPct={null}
           onClose={closePending}
         />
       )}
