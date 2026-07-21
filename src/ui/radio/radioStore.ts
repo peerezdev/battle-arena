@@ -30,6 +30,11 @@ const KEY_INDEX = 'battlearena.radio.index'
 const KEY_VOLUME = 'battlearena.radio.volume'
 const KEY_SHUFFLE = 'battlearena.radio.shuffle'
 const KEY_COLLAPSED = 'battlearena.radio.collapsed'
+// Si la música debe sonar al entrar. Un navegador nuevo no tiene la clave y arranca sonando;
+// en cuanto el usuario le da a pausa se guarda '0' y ya no vuelve a arrancar sola. Se guarda la
+// INTENCIÓN del usuario, no si el audio estaba sonando: un autoplay bloqueado por el navegador
+// no debe interpretarse como "no la quiere".
+const KEY_AUTOPLAY = 'battlearena.radio.autoplay'
 const DEFAULT_VOLUME = 0.6
 
 function readNumber(key: string, fallback: number): number {
@@ -54,6 +59,11 @@ function write(key: string, value: string): void {
 function clamp01(v: number): number {
   if (Number.isNaN(v)) return 0
   return Math.max(0, Math.min(1, v))
+}
+
+/** Preferencia de arranque. Ausente = navegador nuevo → sí. */
+export function wantsAutoplay(): boolean {
+  try { return localStorage.getItem(KEY_AUTOPLAY) !== '0' } catch { return true }
 }
 
 export function createRadioStore(
@@ -151,6 +161,7 @@ export function createRadioStore(
 
   function play(): void {
     if (!tracks.length) return
+    write(KEY_AUTOPLAY, '1')
     const el = ensureAudio()
     internal.isPlaying = true
     emit()
@@ -164,6 +175,7 @@ export function createRadioStore(
   }
 
   function pause(): void {
+    write(KEY_AUTOPLAY, '0')   // parada manual: no volver a arrancar sola en este navegador
     internal.isPlaying = false
     emit()
     disarm()   // a manual pause cancels any armed autoplay fallback (per spec)
@@ -216,6 +228,7 @@ export function createRadioStore(
 
   function tryAutoplay(): void {
     if (internal.isPlaying || !tracks.length) return
+    if (!wantsAutoplay()) return   // la paró a mano en su día: se respeta
     // Arm the gesture fallback first so a blocked attempt is covered synchronously.
     arm()
     const el = ensureAudio()

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createRadioStore, type RadioState } from './radioStore'
+import { createRadioStore, wantsAutoplay, type RadioState } from './radioStore'
 import type { Track } from './tracks'
 
 const TRACKS: Track[] = [
@@ -290,5 +290,49 @@ describe('radioStore autoplay', () => {
     document.dispatchEvent(new Event('pointerdown'))
     expect(store.getState().isPlaying).toBe(false)
     expect(fake.paused).toBe(true)
+  })
+})
+
+describe('preferencia de arranque automático', () => {
+  // Se guarda la INTENCIÓN del usuario, no si el audio sonaba: un autoplay bloqueado por el
+  // navegador no debe leerse como "no la quiere".
+  beforeEach(() => localStorage.clear())
+
+  it('un navegador nuevo arranca sonando', async () => {
+    expect(wantsAutoplay()).toBe(true)
+    const s = setup().store
+    s.tryAutoplay()
+    await Promise.resolve()   // play() resuelve en microtask; isPlaying se marca en su .then()
+    expect(s.getState().isPlaying).toBe(true)
+  })
+
+  it('pausar a mano lo recuerda, y ya no arranca sola', () => {
+    const s = setup().store
+    s.play()
+    s.pause()
+    expect(wantsAutoplay()).toBe(false)
+
+    const s2 = setup().store
+    s2.tryAutoplay()
+    expect(s2.getState().isPlaying).toBe(false)
+  })
+
+  it('volver a darle a play lo vuelve a permitir', async () => {
+    const s = setup().store
+    s.pause()
+    expect(wantsAutoplay()).toBe(false)
+    s.play()
+    expect(wantsAutoplay()).toBe(true)
+
+    const s2 = setup().store
+    s2.tryAutoplay()
+    await Promise.resolve()
+    expect(s2.getState().isPlaying).toBe(true)
+  })
+
+  it('el volumen sobrevive al recargar', () => {
+    const s = setup().store
+    s.setVolume(0.33)
+    expect(setup().store.getState().volume).toBeCloseTo(0.33)
   })
 })

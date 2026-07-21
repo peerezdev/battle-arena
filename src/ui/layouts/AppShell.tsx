@@ -128,7 +128,13 @@ export function AppShell() {
 
   // Radio is a singleton store — subscribing here only tells us whether the
   // mobile mini-player (bottom stack) will render, to size the content padding.
-  const { tracks: radioTracks, collapsed: radioCollapsed } = useRadio()
+  const { tracks: radioTracks, collapsed: radioCollapsed, tryAutoplay } = useRadio()
+
+  // Arranca la música al entrar, salvo que el usuario la parara a mano alguna vez en este
+  // navegador. tryAutoplay ya contempla que el navegador BLOQUEE el autoplay sin gesto previo:
+  // en ese caso deja armado un disparo al primer click o tecla, así que suena igualmente en
+  // cuanto el usuario toca algo. Y comprueba la preferencia por dentro.
+  useEffect(() => { tryAutoplay() }, [tryAutoplay])
   const mobileRadio = !wideRail && radioTracks.length > 0
   // When the mini-player is collapsed only the floating re-open button shows, so
   // the content only needs to clear the nav (not the full radio bar).
