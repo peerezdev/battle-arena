@@ -268,6 +268,9 @@ export interface PendingPack {
   /** No null = CC ya resolvió el sobre; el reveal se reproduce con lo guardado, sin reabrirlo. */
   nft_address: string | null
   name: string | null
+  /** Guardada al abrir: /gacha/nft/{mint} no la trae, así que sin esto un reveal reproducido
+   *  no podría mostrarla nunca. */
+  rarity: string | null
   insured_value: number | null
 }
 

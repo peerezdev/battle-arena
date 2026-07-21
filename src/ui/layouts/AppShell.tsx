@@ -54,6 +54,10 @@ export function AppShell() {
   const { identityToken } = useIdentityToken()
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
   const [pendingOpen, setPendingOpen] = useState(false)
+  // Sobres por los que ya se preguntó. La lista se refresca al cambiar de ruta, y un sobre sigue
+  // pendiente hasta que el jugador lo VE: sin esto, ir al gacha a abrirlo volvía a levantar el
+  // modal encima, obligando a cerrarlo dos veces. Solo se auto-abre si aparece alguno nuevo.
+  const promptedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (!identityToken) { setPendingPacks([]); setPendingOpen(false); return }
@@ -62,7 +66,11 @@ export function AppShell() {
       .then((ps) => {
         if (cancelled) return
         setPendingPacks(ps)
-        if (ps.length > 0) setPendingOpen(true)
+        const fresh = ps.filter((p) => !promptedRef.current.has(p.memo))
+        if (fresh.length > 0) {
+          ps.forEach((p) => promptedRef.current.add(p.memo))
+          setPendingOpen(true)
+        }
       })
       .catch(() => { /* que falle la lista no debe bloquear la navegación */ })
     return () => { cancelled = true }

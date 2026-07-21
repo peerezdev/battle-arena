@@ -572,3 +572,26 @@ def test_marcar_visto_es_idempotente_y_solo_afecta_a_tu_wallet(monkeypatch):
 def test_marcar_visto_requiere_auth():
     c, _ = _client()
     assert c.post("/gacha/packs/revealed", json={"memos": ["x"]}).status_code == 401
+
+
+@respx.mock
+def test_la_rareza_se_guarda_al_abrir_y_viaja_en_pendientes(monkeypatch):
+    """/gacha/nft/{mint} devuelve rarity null: la rareza SOLO la da CC al abrir. Si no se
+    persiste, un reveal reproducido más tarde no puede mostrarla nunca."""
+    _mock_pack_upstream(memo="slug-p5")
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "success": True, "nft_address": "Mint" + "5" * 40, "rarity": "Epic",
+        "nftWon": {"content": {"metadata": {"name": "Zard"}}, "image": "https://x/z.png"}}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    c, priv = _client()
+    hdrs = _hdrs(priv, WALLET_A)
+
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
+    c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA==", "memo": "slug-p5"}, headers=hdrs)
+    c.post("/gacha/open-pack", json={"memo": "slug-p5"}, headers=hdrs)
+
+    body = c.get("/gacha/packs/pending", headers=hdrs).json()
+    assert len(body) == 1
+    assert body[0]["rarity"] == "Epic", "sin esto el reveal reproducido sale sin rareza"
+    assert body[0]["name"] == "Zard"

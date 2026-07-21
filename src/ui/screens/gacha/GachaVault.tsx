@@ -143,7 +143,7 @@ export default function GachaVault() {
             pending: false,
             nft_address: p.nft_address,
             name: meta?.name ?? p.name,
-            rarity: meta?.rarity ?? null,
+            rarity: p.rarity ?? meta?.rarity ?? null,
             image: meta?.image ?? null,
             images: meta?.image ? [meta.image] : [],
             insured_value: meta?.insured_value ?? p.insured_value,

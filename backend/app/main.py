@@ -494,7 +494,7 @@ def create_app(session_factory, chain: ChainSource,
         return [{"memo": p.memo, "pack_type": p.pack_type,
                  "submitted_at": p.submitted_at.isoformat() if p.submitted_at else None,
                  "nft_address": p.nft_address, "name": p.name,
-                 "insured_value": p.insured_value}
+                 "rarity": p.rarity, "insured_value": p.insured_value}
                 for p in rows]
 
     @app.post("/gacha/packs/revealed")
@@ -550,6 +550,7 @@ def create_app(session_factory, chain: ChainSource,
             # Persist what it cost + what came out so the profile can track gacha (wager + history).
             pack.insured_value = out.get("insured_value")
             pack.name = out.get("name")
+            pack.rarity = out.get("rarity")
             try:
                 pack.price = await _machine_price(pack.pack_type)
             except Exception:

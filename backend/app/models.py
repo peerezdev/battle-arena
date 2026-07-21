@@ -88,6 +88,9 @@ class GachaPack(Base):
     price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)           # USDC base units spent to open
     insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # value of the card pulled (dollars)
     name: Mapped[Optional[str]] = mapped_column(String, nullable=True)             # pulled card name
+    # La rareza SOLO la da CC al abrir el sobre; /gacha/nft/{mint} devuelve rarity null. Si no se
+    # guarda aquí, un reveal reproducido más tarde no puede mostrarla nunca.
+    rarity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class PackBattle(Base):
