@@ -16,8 +16,12 @@ export function showToast(msg: string, kind: ToastKind = 'error', action?: Toast
 
 const ACCENT: Record<ToastKind, string> = { error: COLORS.red, info: COLORS.muted, success: COLORS.green }
 
-/** Mount once near the app root. Renders stacked, auto-dismissing toasts. */
-export function Toaster() {
+/** Mount once near the app root. Renders stacked, auto-dismissing toasts.
+ *
+ *  `bottomOffset` lo pasa quien monta el Toaster, porque es quien sabe qué hay apilado abajo
+ *  (nav móvil, barra de radio…). Si el toast se anclara a un valor fijo acabaría detrás de esa
+ *  pila justo en móvil, que es donde menos sitio hay. */
+export function Toaster({ bottomOffset = 24 }: { bottomOffset?: number } = {}) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   useEffect(() => {
     const l = (t: ToastItem) => {
@@ -33,7 +37,10 @@ export function Toaster() {
 
   return (
     <div style={{
-      position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
+      // Anclado abajo: el toast aparece cerca de donde el usuario acaba de pulsar, no en la
+      // otra punta de la pantalla. Al crecer hacia arriba, el más reciente queda siempre pegado
+      // al borde y los anteriores se desplazan, que es el orden que el ojo espera.
+      position: 'fixed', bottom: bottomOffset, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
       display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', pointerEvents: 'none',
     }}>
       {toasts.map((t) => (

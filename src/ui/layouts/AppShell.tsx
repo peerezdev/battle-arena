@@ -318,7 +318,9 @@ export function AppShell() {
       <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
 
       {/* ── TOASTS ────────────────────────────────────────────────────────── */}
-      <Toaster />
+      {/* Los toasts van abajo, por encima de la pila móvil (nav + barra de radio si está) y
+          dejando hueco al RematchToast, que vive en bottom 28/84 con z-index menor. */}
+      <Toaster bottomOffset={wideRail ? 24 : mobileRadioBar ? 148 : 92} />
       <RematchToastHost />   {/* app-wide rematch challenge toast (bottom-centre) */}
 
       {/* ── ONBOARDING — first-visit guided tour ──────────────────────────── */}
