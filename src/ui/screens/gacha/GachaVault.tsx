@@ -988,14 +988,18 @@ function RevealResult({
   const step = steps[i]
 
   // Pre-card stages: year / grade / rarity
-  if (step !== 'card') {
+  //
+  // UN solo AnimatePresence envuelve las dos ramas (etapas y carta), en vez de uno por rama
+  // dentro de cada return. AnimatePresence tiene que SOBREVIVIR al cambio para poder animar la
+  // salida del hijo que se va; si desaparece del árbol en el mismo commit —como pasaba al saltar
+  // de la rareza a la carta— el elemento saliente se corta de golpe en vez de salir.
+  const isCard = step === 'card'
+  const stageEl = isCard ? null : (() => {
     const label = step.toUpperCase()
     const value = step === 'year' ? result.year : step === 'grade' ? result.grade : result.rarity
     const valueColor = step === 'rarity' ? rarityColor : COLORS.text
     const valueShadow = step === 'rarity' ? SHADOW.glow(rarityColor) : 'none'
-
     return (
-      <AnimatePresence mode="wait">
         <motion.div
           key={step}
           initial={{ scale: 0.72, opacity: 0 }}
@@ -1035,13 +1039,13 @@ function RevealResult({
             {value}
           </div>
         </motion.div>
-      </AnimatePresence>
     )
-  }
+  })()
 
   // Card stage — rich Card Details view
   return (
     <AnimatePresence mode="wait">
+      {isCard ? (
       <motion.div
         key="card"
         initial={reduced ? undefined : { scale: 0.82, opacity: 0 }}
@@ -1067,6 +1071,7 @@ function RevealResult({
           onNext={onNext}
         />
       </motion.div>
+      ) : stageEl}
     </AnimatePresence>
   )
 }
