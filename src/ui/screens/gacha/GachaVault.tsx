@@ -10,6 +10,7 @@ import {
   fetchMachines,
   fetchMachineCards,
   machineCardCount,
+  generatePack,
   generateYoloPacks,
   submitTx,
   openPack,
@@ -180,29 +181,55 @@ export default function GachaVault() {
       showToast(`Insufficient USDC — ${count} pack${count === 1 ? '' : 's'} cost $${total}. Deposit and try again.`, 'error')
       return
     }
-    let resp: YoloPacksResponse
-    try {
-      setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count, results: null })
-      resp = await generateYoloPacks(identityToken, selected.code, count, turbo)
-    } catch (e) {
-      // "YOLO" es jerga interna: al usuario se le habla de sobres.
-      showToast(`Couldn't open the pack: ${e instanceof Error ? e.message : String(e)}`, 'error')
-      setPhase({ kind: 'machines' })
-      return
-    }
-    const txs = resp.transactions
     const submitted: string[] = []
     let lastErr: string | null = null
-    for (let i = 0; i < txs.length; i++) {
+
+    // Dos caminos, y el que decide es el turbo:
+    //
+    //  · turbo OFF → un generate-pack por sobre. YOLO auto-vende las commons, así que usarlo
+    //    para una tirada normal le quitaría cartas al usuario sin haberlas pedido. Cuesta N
+    //    peticiones en vez de 1, pero además esa ruta SÍ valida en servidor máquina apagada
+    //    (409) y saldo disponible (402), cosa que /gacha/yolo no hace.
+    //
+    //  · turbo ON → un solo /gacha/yolo para toda la tanda. Aquí el auto-buyback es justo lo
+    //    que el usuario ha pedido, y 5 sobres se resuelven en una petición en vez de cinco.
+    if (turbo) {
+      let resp: YoloPacksResponse
       try {
-        setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length, results: null })
-        const signed = await signTransactionBase64(txs[i].transaction)
-        setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length, results: null })
-        await submitTx(identityToken, signed)
-        submitted.push(txs[i].memo)
+        setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count, results: null })
+        resp = await generateYoloPacks(identityToken, selected.code, count, true)
       } catch (e) {
-        lastErr = e instanceof Error ? e.message : String(e)
-        break
+        showToast(`Couldn't open the pack: ${e instanceof Error ? e.message : String(e)}`, 'error')
+        setPhase({ kind: 'machines' })
+        return
+      }
+      const txs = resp.transactions
+      for (let i = 0; i < txs.length; i++) {
+        try {
+          setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length, results: null })
+          const signed = await signTransactionBase64(txs[i].transaction)
+          setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length, results: null })
+          await submitTx(identityToken, signed)
+          submitted.push(txs[i].memo)
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e)
+          break
+        }
+      }
+    } else {
+      for (let i = 0; i < count; i++) {
+        try {
+          setPhase({ kind: 'yolo', step: 'firmando', done: i, total: count, results: null })
+          const pack = await generatePack(identityToken, selected.code)
+          const signed = await signTransactionBase64(pack.transaction)
+          setPhase({ kind: 'yolo', step: 'enviando', done: i, total: count, results: null })
+          await submitTx(identityToken, signed)
+          submitted.push(pack.memo)
+        } catch (e) {
+          // Se corta aquí: los sobres ya enviados se abren igual más abajo.
+          lastErr = e instanceof Error ? e.message : String(e)
+          break
+        }
       }
     }
     if (submitted.length === 0) {
