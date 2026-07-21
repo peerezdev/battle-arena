@@ -20,8 +20,8 @@ import { OnboardingTutorial } from '../components/OnboardingTutorial'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
-import { PendingPacksModal } from '../screens/gacha/PendingPacksModal'
-import { fetchPendingPacks, type PendingPack } from '../../onchain/gachaClient'
+import { PendingPacksModal, type SkipResult } from '../screens/gacha/PendingPacksModal'
+import { fetchPendingPacks, markPacksRevealed, openPack, pollOpenPack, type PendingPack } from '../../onchain/gachaClient'
 import { holdBalance } from '../../wallet/balanceHold'
 import { usePendingPacksVersion } from '../screens/gacha/pendingPacksBus'
 
@@ -92,6 +92,40 @@ export function AppShell() {
   function goOpenPending(packs: PendingPack[]) {
     setPendingOpen(false)
     navigate('/play/gacha', { state: { openPacks: packs } })
+  }
+
+  // Skip: el jugador renuncia a la animación, no al resultado. Se resuelve lo que falte por
+  // resolver, se enseña qué tocó en texto y se marcan como vistos — que es lo que descongela el
+  // saldo. Enseñar y descongelar en el MISMO paso es lo que evita que el número subiendo sea el
+  // spoiler de algo que nunca llegó a verse.
+  const [skipResults, setSkipResults] = useState<SkipResult[] | null>(null)
+  const [pendingBusy, setPendingBusy] = useState(false)
+
+  async function skipPending() {
+    if (!identityToken || pendingPacks.length === 0) return
+    setPendingBusy(true)
+    const out: SkipResult[] = []
+    for (const p of pendingPacks) {
+      if (p.nft_address) {
+        out.push({ pack_type: p.pack_type, name: p.name, insured_value: p.insured_value })
+        continue
+      }
+      try {
+        const r = await pollOpenPack(() => openPack(identityToken, p.memo))
+        if (!r.pending) out.push({ pack_type: p.pack_type, name: r.name, insured_value: r.insured_value })
+      } catch { /* si no se puede resolver, sigue pendiente para otra vez */ }
+    }
+    try {
+      await markPacksRevealed(identityToken, pendingPacks.map((x) => x.memo))
+    } catch { /* se reintenta al recargar */ }
+    setPendingBusy(false)
+    setSkipResults(out)
+    setPendingPacks([])          // suelta la congelación: ya sabe lo que le tocó
+  }
+
+  function closePending() {
+    setPendingOpen(false)
+    setSkipResults(null)
   }
 
   const [depositOpen, setDepositOpen] = useState(false)
@@ -374,10 +408,12 @@ export function AppShell() {
       {pendingOpen && (
         <PendingPacksModal
           packs={pendingPacks}
-          busy={false}
+          busy={pendingBusy}
+          skipResults={skipResults}
           onOpenOne={(memo) => goOpenPending(pendingPacks.filter((p) => p.memo === memo))}
           onOpenAll={() => goOpenPending(pendingPacks)}
-          onDismiss={() => setPendingOpen(false)}
+          onSkip={() => void skipPending()}
+          onClose={closePending}
         />
       )}
 
