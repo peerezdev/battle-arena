@@ -1,7 +1,7 @@
 // GachaVault — Polished gacha entry screen.
 // Shows machine selector, pack detail, and card pool grid.
 // Opening a pack uses the same buy() → sign → submit → poll → reveal flow as GachaScreen.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
@@ -35,6 +35,7 @@ import { showToast } from '../../toast'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardBadge } from '../../components/CardBadge'
+import { GachaCardReveal } from './GachaCardReveal'
 import { GachaPackTilt, packTitle, priceFromCode } from './GachaPackTilt'
 import { pendingPackToResult } from './pendingToResult'
 import { CardPoolGrid } from './CardPoolGrid'
@@ -956,30 +957,21 @@ function RevealResult({
 }) {
   const rarityColor = RARITY_COLOR[result.rarity] ?? COLORS.muted
 
-  const steps = useMemo(() => {
-    const s: Array<'year' | 'grade' | 'rarity' | 'card'> = []
-    if (result.year) s.push('year')
-    if (result.grade) s.push('grade')
-    s.push('rarity')
-    s.push('card')
-    return s
-  }, [result.year, result.grade])
+  // La secuencia previa a la carta (año, grado, casilla de rareza, contador y volteo) vive en
+  // GachaCardReveal. Aquí solo se espera a que termine para dar paso al detalle de la carta.
+  const [revealed, setRevealed] = useState(reduced || !!skipToCard)
+  useEffect(() => { if (skipToCard) setRevealed(true) }, [skipToCard])
 
-  // Reduced motion: jump straight to the final card step
-  const [i, setI] = useState(reduced ? steps.length - 1 : 0)
-
-  useEffect(() => {
-    if (reduced) return
-    if (i >= steps.length - 1) return
-    const t = setTimeout(() => setI((n) => Math.min(n + 1, steps.length - 1)), 1700)
-    return () => clearTimeout(t)
-  }, [i, steps.length, reduced])
-
-  useEffect(() => {
-    if (skipToCard) setI(steps.length - 1)
-  }, [skipToCard, steps.length])
-
-  const step = steps[i]
+  if (!revealed) {
+    return (
+      <GachaCardReveal
+        result={result}
+        reduced={reduced}
+        skip={!!skipToCard}
+        onDone={() => setRevealed(true)}
+      />
+    )
+  }
 
   // Pre-card stages: year / grade / rarity
   //
@@ -987,59 +979,9 @@ function RevealResult({
   // dentro de cada return. AnimatePresence tiene que SOBREVIVIR al cambio para poder animar la
   // salida del hijo que se va; si desaparece del árbol en el mismo commit —como pasaba al saltar
   // de la rareza a la carta— el elemento saliente se corta de golpe en vez de salir.
-  const isCard = step === 'card'
-  const stageEl = isCard ? null : (() => {
-    const label = step.toUpperCase()
-    const value = step === 'year' ? result.year : step === 'grade' ? result.grade : result.rarity
-    const valueColor = step === 'rarity' ? rarityColor : COLORS.text
-    const valueShadow = step === 'rarity' ? SHADOW.glow(rarityColor) : 'none'
-    return (
-        <motion.div
-          key={step}
-          initial={{ scale: 0.72, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 1.12, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-          style={{
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 12,
-            userSelect: 'none',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: FONTS.mono,
-              fontSize: 11,
-              letterSpacing: '.14em',
-              textTransform: 'uppercase',
-              color: COLORS.muted,
-            }}
-          >
-            {label}
-          </div>
-          <div
-            style={{
-              fontFamily: FONTS.display,
-              fontWeight: 900,
-              fontSize: 52,
-              color: valueColor,
-              textShadow: valueShadow,
-              lineHeight: 1,
-            }}
-          >
-            {value}
-          </div>
-        </motion.div>
-    )
-  })()
-
   // Card stage — rich Card Details view
   return (
     <AnimatePresence mode="wait">
-      {isCard ? (
       <motion.div
         key="card"
         initial={reduced ? undefined : { scale: 0.82, opacity: 0 }}
@@ -1065,7 +1007,6 @@ function RevealResult({
           onNext={onNext}
         />
       </motion.div>
-      ) : stageEl}
     </AnimatePresence>
   )
 }
