@@ -261,10 +261,27 @@ export function machineCardCount(stock: Record<string, number> | null | undefine
   return vals.reduce((a, b) => a + b, 0)
 }
 
-export interface PendingPack { memo: string; pack_type: string; submitted_at: string | null }
+export interface PendingPack {
+  memo: string
+  pack_type: string
+  submitted_at: string | null
+  /** No null = CC ya resolvió el sobre; el reveal se reproduce con lo guardado, sin reabrirlo. */
+  nft_address: string | null
+  name: string | null
+  insured_value: number | null
+}
 
 /** Sobres ya pagados y sin abrir. Sirve para recuperarlos desde otra pestaña o tras cerrar la
  *  página a mitad de una tirada, que hoy los dejaba huérfanos e invisibles. */
 export function fetchPendingPacks(token: string): Promise<PendingPack[]> {
   return gachaFetch<PendingPack[]>('/gacha/packs/pending', { headers: authHeaders(token) })
+}
+
+/** Marca sobres como ya vistos por el jugador. Se llama al TERMINAR el reveal, no al empezarlo:
+ *  si se cierra a mitad, siguen pendientes y se pueden volver a ver — mejor repetir que perder. */
+export function markPacksRevealed(token: string, memos: string[]): Promise<{ marked: number }> {
+  return gachaFetch<{ marked: number }>('/gacha/packs/revealed', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ memos }),
+  })
 }

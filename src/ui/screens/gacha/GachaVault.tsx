@@ -13,6 +13,8 @@ import {
   fetchMachineCards,
   machineCardCount,
   generatePack,
+  fetchCardMetadata,
+  markPacksRevealed,
   generateYoloPacks,
   submitTx,
   openPack,
@@ -22,6 +24,7 @@ import {
   ccAssetUrl,
   type GachaMachine,
   type MachineCard,
+  type PendingPack,
   type OpenPackResult,
   type YoloPacksResponse,
 } from '../../../onchain/gachaClient'
@@ -98,29 +101,72 @@ export default function GachaVault() {
   const location = useLocation()
   const navigate = useNavigate()
   useEffect(() => {
-    const memos = (location.state as { openMemos?: string[] } | null)?.openMemos
-    if (!memos || memos.length === 0 || !identityToken) return
+    const packs = (location.state as { openPacks?: PendingPack[] } | null)?.openPacks
+    if (!packs || packs.length === 0 || !identityToken) return
     navigate(location.pathname, { replace: true, state: null })
-    void openPendingMemos(memos)
+    void openPendingPacks(packs)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, identityToken])
 
-  /** Abre los memos dados de uno en uno y encadena el reveal, igual que una tirada normal. */
-  async function openPendingMemos(memos: string[]) {
-    if (!identityToken || memos.length === 0) return
+  // Memos del lote que se está revelando. Se marcan como vistos al TERMINAR el reveal (volver a
+  // máquinas), no al empezarlo: si el jugador cierra a mitad siguen pendientes y los recupera.
+  // Ante la duda, repetir un reveal es inofensivo; perderlo no.
+  const batchMemos = useRef<string[]>([])
+  const prevPhase = useRef(phase.kind)
+  useEffect(() => {
+    const was = prevPhase.current
+    prevPhase.current = phase.kind
+    const cameFromReveal = was === 'yolo-reveal' || was === 'yolo-summary'
+    if (!cameFromReveal || phase.kind !== 'machines') return
+    const memos = batchMemos.current
+    batchMemos.current = []
+    if (memos.length > 0 && identityToken) {
+      markPacksRevealed(identityToken, memos).catch(() => { /* se reintenta la próxima vez */ })
+    }
+  }, [phase.kind, identityToken])
+
+  /** Abre (o reproduce) los sobres pendientes y encadena el reveal, como una tirada normal.
+   *
+   *  Los que CC ya resolvió NO se reabren: su carta está guardada, así que el reveal se
+   *  reconstruye con lo que hay en la fila más la metadata por mint. Volver a llamar a open-pack
+   *  para esos sería pedirle a CC algo que ya nos dio. */
+  async function openPendingPacks(packs: PendingPack[]) {
+    if (!identityToken || packs.length === 0) return
     const results: YoloResult[] = []
-    for (let i = 0; i < memos.length; i++) {
-      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: memos.length, results: null })
+    for (let i = 0; i < packs.length; i++) {
+      const p = packs[i]
+      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: packs.length, results: null })
       try {
-        const r = await pollOpenPack(() => openPack(identityToken, memos[i]))
-        if (!r.pending) results.push(r)
-      } catch { /* se salta: sigue en pendientes para reintentar */ }
+        if (p.nft_address) {
+          const meta = await fetchCardMetadata(p.nft_address).catch(() => null)
+          results.push({
+            pending: false,
+            nft_address: p.nft_address,
+            name: meta?.name ?? p.name,
+            rarity: meta?.rarity ?? null,
+            image: meta?.image ?? null,
+            images: meta?.image ? [meta.image] : [],
+            insured_value: meta?.insured_value ?? p.insured_value,
+            grade: meta?.grade ?? null,
+            year: meta?.year ?? null,
+            grading_company: meta?.grading_company ?? null,
+            grading_id: meta?.grading_id ?? null,
+            authenticated: meta?.authenticated ?? null,
+            auto_sold: false,
+            buyback_amount: null,
+          } as YoloResult)
+        } else {
+          const r = await pollOpenPack(() => openPack(identityToken, p.memo))
+          if (!r.pending) results.push(r)
+        }
+      } catch { /* se salta: sigue pendiente y se reintenta */ }
     }
     if (results.length === 0) {
       showToast("Those packs aren't ready yet. Try again in a moment.", 'error')
       setPhase({ kind: 'machines' })
       return
     }
+    batchMemos.current = packs.map((p) => p.memo)
     setPhase({ kind: 'yolo-reveal', results, index: 0 })
   }
   // Pending open awaiting the user's YES/NO confirmation.
@@ -296,6 +342,7 @@ export default function GachaVault() {
     }
     if (results.length === 0) { setPhase({ kind: 'pending', memo: submitted[0] }); return }
     // Listos, pero NO se revela solo: el sobre queda esperando a que el usuario lo abra.
+    batchMemos.current = submitted
     setPhase({ kind: 'yolo', step: 'abriendo', done: results.length, total: results.length, results })
   }
 

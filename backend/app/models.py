@@ -80,6 +80,10 @@ class GachaPack(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Cuándo lo VIO el jugador. Distinto de opened_at: el servidor abre el sobre en cuanto CC lo
+    # resuelve, pero el reveal espera a que el usuario pulse. Entre esos dos momentos la carta ya
+    # es suya y todavía no la ha visto; sin esta marca, cerrar ahí perdía el reveal para siempre.
+    revealed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     nft_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)           # USDC base units spent to open
     insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # value of the card pulled (dollars)

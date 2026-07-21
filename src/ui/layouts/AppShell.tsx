@@ -75,9 +75,9 @@ export function AppShell() {
     return holdBalance()
   }, [pendingOpen])
 
-  function goOpenPending(memos: string[]) {
+  function goOpenPending(packs: PendingPack[]) {
     setPendingOpen(false)
-    navigate('/play/gacha', { state: { openMemos: memos } })
+    navigate('/play/gacha', { state: { openPacks: packs } })
   }
 
   const [depositOpen, setDepositOpen] = useState(false)
@@ -361,8 +361,8 @@ export function AppShell() {
         <PendingPacksModal
           packs={pendingPacks}
           busy={false}
-          onOpenOne={(memo) => goOpenPending([memo])}
-          onOpenAll={() => goOpenPending(pendingPacks.map((p) => p.memo))}
+          onOpenOne={(memo) => goOpenPending(pendingPacks.filter((p) => p.memo === memo))}
+          onOpenAll={() => goOpenPending(pendingPacks)}
           onDismiss={() => setPendingOpen(false)}
         />
       )}

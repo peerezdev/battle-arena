@@ -123,6 +123,10 @@ class DevAnnounceBody(BaseModel):
     persist: bool = False
 
 
+class MarkRevealedBody(BaseModel):
+    memos: list[str] = Field(max_length=50)
+
+
 class SubmitTxBody(BaseModel):
     signed_transaction: str = Field(min_length=1, max_length=3000)
     # Memo del sobre que se está pagando, cuando la tx es la compra de un sobre. Opcional porque
@@ -480,13 +484,34 @@ def create_app(session_factory, chain: ChainSource,
         rows = (s.query(GachaPack)
                 .filter(GachaPack.wallet == wallet,
                         GachaPack.submitted_at.isnot(None),
-                        GachaPack.opened_at.is_(None))
+                        GachaPack.revealed_at.is_(None))
                 .order_by(GachaPack.submitted_at)
                 .limit(50)
                 .all())
+        # Se incluyen también los que CC ya resolvió: para el jugador siguen pendientes mientras
+        # no los haya VISTO. Si nft_address ya está, el cliente no necesita volver a abrir nada —
+        # reproduce el reveal con lo guardado.
         return [{"memo": p.memo, "pack_type": p.pack_type,
-                 "submitted_at": p.submitted_at.isoformat() if p.submitted_at else None}
+                 "submitted_at": p.submitted_at.isoformat() if p.submitted_at else None,
+                 "nft_address": p.nft_address, "name": p.name,
+                 "insured_value": p.insured_value}
                 for p in rows]
+
+    @app.post("/gacha/packs/revealed")
+    async def gacha_mark_revealed(body: MarkRevealedBody,
+                                  wallet: str = Depends(current_user),
+                                  s: Session = Depends(db)):
+        """Marca sobres como YA VISTOS por el jugador. Idempotente y acotado a su propia wallet."""
+        now = datetime.now(timezone.utc)
+        marked = 0
+        for memo in body.memos:
+            pack = s.get(GachaPack, memo)
+            if pack is not None and pack.wallet == wallet and pack.revealed_at is None:
+                pack.revealed_at = now
+                marked += 1
+        if marked:
+            s.commit()
+        return {"marked": marked}
 
     @app.post("/gacha/buyback")
     async def gacha_buyback(body: BuybackBody, wallet: str = Depends(current_user)):

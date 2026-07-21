@@ -500,7 +500,7 @@ def test_submit_tx_sin_memo_sigue_funcionando(monkeypatch):
 
 
 @respx.mock
-def test_pending_no_lista_un_sobre_ya_abierto(monkeypatch):
+def test_pending_sigue_listando_un_sobre_abierto_pero_no_visto(monkeypatch):
     _mock_pack_upstream(memo="slug-p2")
     respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
         "success": True, "nft_address": "Mint" + "2" * 40, "rarity": "Rare",
@@ -513,7 +513,18 @@ def test_pending_no_lista_un_sobre_ya_abierto(monkeypatch):
     c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
     c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA==", "memo": "slug-p2"}, headers=hdrs)
     assert len(c.get("/gacha/packs/pending", headers=hdrs).json()) == 1
+
+    # El servidor abre el sobre en cuanto CC lo resuelve, PERO el reveal espera al click del
+    # jugador. Si abrir lo quitara de pendientes, cerrar la pestaña en esa ventana —que es justo
+    # donde el sobre 3D se queda esperando— perdería el reveal para siempre.
     c.post("/gacha/open-pack", json={"memo": "slug-p2"}, headers=hdrs)
+    body = c.get("/gacha/packs/pending", headers=hdrs).json()
+    assert len(body) == 1, "abierto por CC pero no visto por el jugador: sigue pendiente"
+    assert body[0]["nft_address"], "trae la carta, para reproducir el reveal sin reabrirlo"
+
+    # Solo verlo lo saca de la lista.
+    assert c.post("/gacha/packs/revealed", json={"memos": ["slug-p2"]},
+                  headers=hdrs).json() == {"marked": 1}
     assert c.get("/gacha/packs/pending", headers=hdrs).json() == []
 
 
@@ -535,3 +546,29 @@ def test_pending_no_filtra_sobres_de_otra_wallet(monkeypatch):
 def test_pending_requiere_auth():
     c, _ = _client()
     assert c.get("/gacha/packs/pending").status_code == 401
+
+
+@respx.mock
+def test_marcar_visto_es_idempotente_y_solo_afecta_a_tu_wallet(monkeypatch):
+    _mock_pack_upstream(memo="slug-p4")
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    c, priv = _client()
+    hdrs_a = _hdrs(priv, WALLET_A)
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs_a)
+    c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA==", "memo": "slug-p4"}, headers=hdrs_a)
+
+    # otra wallet no puede marcarlo
+    assert c.post("/gacha/packs/revealed", json={"memos": ["slug-p4"]},
+                  headers=_hdrs(priv, WALLET_B)).json() == {"marked": 0}
+    assert len(c.get("/gacha/packs/pending", headers=hdrs_a).json()) == 1
+
+    assert c.post("/gacha/packs/revealed", json={"memos": ["slug-p4"]}, headers=hdrs_a).json() == {"marked": 1}
+    # repetir no vuelve a contar ni revienta
+    assert c.post("/gacha/packs/revealed", json={"memos": ["slug-p4"]}, headers=hdrs_a).json() == {"marked": 0}
+    assert c.get("/gacha/packs/pending", headers=hdrs_a).json() == []
+
+
+def test_marcar_visto_requiere_auth():
+    c, _ = _client()
+    assert c.post("/gacha/packs/revealed", json={"memos": ["x"]}).status_code == 401
