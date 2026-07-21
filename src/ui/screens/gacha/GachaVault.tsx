@@ -1438,11 +1438,14 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
           es lo que se veía como "se relanza una sección". */}
       <RevealResult key={`${index}-${result.nft_address ?? ''}`} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} single={results.length === 1 && !result.auto_sold} onNext={onAdvance} />
       <div style={{ display: 'flex', gap: 10 }}>
-        <button onClick={() => setSkippedAt(index)}
+        {/* Los dos van en color de texto, no en `muted`: el gris apagado es el que la app usa
+            para lo deshabilitado, y "Skip all" se leía como un botón muerto que nadie intenta
+            pulsar. Se distinguen por el borde, no por parecer uno de ellos inactivo. */}
+        <button className="ba-ghostbtn" onClick={() => setSkippedAt(index)}
           style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{results.length > 1 ? 'Skip pack ⏭' : 'Skip ⏭'}</button>
         {results.length > 1 && (
-          <button onClick={onSkipAll}
-            style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
+          <button className="ba-ghostbtn" onClick={onSkipAll}
+            style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.text}44`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
         )}
       </div>
     </motion.div>

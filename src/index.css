@@ -248,3 +248,9 @@ textarea::placeholder {
   0%   { transform: scale(1); }
   100% { transform: scale(1.045); }
 }
+
+/* Botón secundario "fantasma" (Skip pack / Skip all del reveal). Tiene hover porque sin él
+   un botón plano y sin relleno se lee como deshabilitado y el usuario ni lo intenta. */
+.ba-ghostbtn { transition: background .15s, border-color .15s, transform .1s; }
+.ba-ghostbtn:hover { background: #ffffff10; border-color: #ffffff33; }
+.ba-ghostbtn:active { transform: scale(.97); }
