@@ -7,12 +7,11 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
 import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import { holdBalance } from '../../../wallet/balanceHold'
-import { PendingPacksModal } from './PendingPacksModal'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   fetchMachines,
   fetchMachineCards,
   machineCardCount,
-  fetchPendingPacks,
   generatePack,
   generateYoloPacks,
   submitTx,
@@ -23,7 +22,6 @@ import {
   ccAssetUrl,
   type GachaMachine,
   type MachineCard,
-  type PendingPack,
   type OpenPackResult,
   type YoloPacksResponse,
 } from '../../../onchain/gachaClient'
@@ -94,28 +92,22 @@ export default function GachaVault() {
   // cerró la página antes de revelar; antes quedaban huérfanos, pagados y sin forma de llegar a
   // ellos. El saldo se mantiene congelado mientras el modal está abierto, porque el auto-buyback
   // del turbo ya habrá movido el USDC y verlo delataría lo que hay dentro.
-  const [pending, setPending] = useState<PendingPack[]>([])
-  const [pendingOpen, setPendingOpen] = useState(false)
-  const [pendingBusy, setPendingBusy] = useState(false)
-
+  // AppShell muestra el modal de pendientes en cualquier sección, pero abrirlos ocurre aquí,
+  // que es donde vive el reveal. Llega por router state y se consume una sola vez: si no se
+  // limpiara, volver atrás en el historial relanzaría la apertura.
+  const location = useLocation()
+  const navigate = useNavigate()
   useEffect(() => {
-    if (!identityToken) return
-    let cancelled = false
-    fetchPendingPacks(identityToken)
-      .then((ps) => { if (!cancelled && ps.length > 0) { setPending(ps); setPendingOpen(true) } })
-      .catch(() => { /* que no haya lista no debe impedir jugar */ })
-    return () => { cancelled = true }
-  }, [identityToken])
-
-  useEffect(() => {
-    if (!pendingOpen) return
-    return holdBalance()
-  }, [pendingOpen])
+    const memos = (location.state as { openMemos?: string[] } | null)?.openMemos
+    if (!memos || memos.length === 0 || !identityToken) return
+    navigate(location.pathname, { replace: true, state: null })
+    void openPendingMemos(memos)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, identityToken])
 
   /** Abre los memos dados de uno en uno y encadena el reveal, igual que una tirada normal. */
   async function openPendingMemos(memos: string[]) {
     if (!identityToken || memos.length === 0) return
-    setPendingBusy(true)
     const results: YoloResult[] = []
     for (let i = 0; i < memos.length; i++) {
       setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: memos.length, results: null })
@@ -124,12 +116,6 @@ export default function GachaVault() {
         if (!r.pending) results.push(r)
       } catch { /* se salta: sigue en pendientes para reintentar */ }
     }
-    setPendingBusy(false)
-    setPendingOpen(false)
-    // Refrescar la lista: lo que no se pudo abrir sigue ahí.
-    fetchPendingPacks(identityToken)
-      .then((ps) => { setPending(ps); if (ps.length > 0 && results.length === 0) setPendingOpen(true) })
-      .catch(() => { /* ignorar */ })
     if (results.length === 0) {
       showToast("Those packs aren't ready yet. Try again in a moment.", 'error')
       setPhase({ kind: 'machines' })
@@ -567,15 +553,6 @@ export default function GachaVault() {
             buybackPct={selected?.instantBuyback ?? null}
             onRetry={(memo) => void retryOpen(memo)}
             onClose={() => setPhase({ kind: 'machines' })}
-          />
-        )}
-        {pendingOpen && phase.kind === 'machines' && (
-          <PendingPacksModal
-            packs={pending}
-            busy={pendingBusy}
-            onOpenOne={(memo) => void openPendingMemos([memo])}
-            onOpenAll={() => void openPendingMemos(pending.map((p) => p.memo))}
-            onDismiss={() => setPendingOpen(false)}
           />
         )}
         {phase.kind === 'yolo' && (

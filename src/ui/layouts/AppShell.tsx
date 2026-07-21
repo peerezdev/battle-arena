@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Outlet, Link, useLocation } from 'react-router-dom'
-import { usePrivy } from '@privy-io/react-auth'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { usePrivy, useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd } from '../theme'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
 import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalance'
@@ -20,6 +20,9 @@ import { OnboardingTutorial } from '../components/OnboardingTutorial'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
+import { PendingPacksModal } from '../screens/gacha/PendingPacksModal'
+import { fetchPendingPacks, type PendingPack } from '../../onchain/gachaClient'
+import { holdBalance } from '../../wallet/balanceHold'
 
 const DOCK_KEY = 'ba.dockCollapsed'
 const ONBOARD_KEY = 'ba.onboarded'   // set once the first-visit tutorial is finished/skipped
@@ -42,6 +45,40 @@ export function AppShell() {
   // Breakpoints copied verbatim from Hub.tsx
   const wideRail = useIsWide('(min-width: 760px)')
   const wideDock = useIsWide('(min-width: 1100px)')
+
+  // ── Sobres pagados y sin abrir ─────────────────────────────────────────────
+  // Vive aquí y no en el gacha porque el jugador puede acabar en cualquier sección con sobres
+  // pendientes: abrió otra pestaña a mitad de una tirada, o cerró la página antes de revelar.
+  // Abrirlos sí ocurre en el gacha —es donde vive el reveal—, así que el modal lleva allí.
+  const navigate = useNavigate()
+  const { identityToken } = useIdentityToken()
+  const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
+  const [pendingOpen, setPendingOpen] = useState(false)
+
+  useEffect(() => {
+    if (!identityToken) { setPendingPacks([]); setPendingOpen(false); return }
+    let cancelled = false
+    fetchPendingPacks(identityToken)
+      .then((ps) => {
+        if (cancelled) return
+        setPendingPacks(ps)
+        if (ps.length > 0) setPendingOpen(true)
+      })
+      .catch(() => { /* que falle la lista no debe bloquear la navegación */ })
+    return () => { cancelled = true }
+  }, [identityToken, pathname])   // al cambiar de ruta se refresca: recoge lo que ya se abrió
+
+  // El saldo sigue congelado mientras el modal está abierto: con turbo el auto-buyback ya movió
+  // el USDC, y verlo subir delataría lo que hay dentro antes de abrirlo.
+  useEffect(() => {
+    if (!pendingOpen) return
+    return holdBalance()
+  }, [pendingOpen])
+
+  function goOpenPending(memos: string[]) {
+    setPendingOpen(false)
+    navigate('/play/gacha', { state: { openMemos: memos } })
+  }
 
   const [depositOpen, setDepositOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
@@ -320,6 +357,16 @@ export function AppShell() {
       {/* ── TOASTS ────────────────────────────────────────────────────────── */}
       {/* Los toasts van abajo, por encima de la pila móvil (nav + barra de radio si está) y
           dejando hueco al RematchToast, que vive en bottom 28/84 con z-index menor. */}
+      {pendingOpen && (
+        <PendingPacksModal
+          packs={pendingPacks}
+          busy={false}
+          onOpenOne={(memo) => goOpenPending([memo])}
+          onOpenAll={() => goOpenPending(pendingPacks.map((p) => p.memo))}
+          onDismiss={() => setPendingOpen(false)}
+        />
+      )}
+
       <Toaster bottomOffset={wideRail ? 24 : mobileRadioBar ? 148 : 92} />
       <RematchToastHost />   {/* app-wide rematch challenge toast (bottom-centre) */}
 
