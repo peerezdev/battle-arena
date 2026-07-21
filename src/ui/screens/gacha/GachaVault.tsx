@@ -34,7 +34,7 @@ import { HoloCard } from '../../components/HoloCard'
 import { showToast } from '../../toast'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
-import { GachaPackTilt } from './GachaPackTilt'
+import { GachaPackTilt, priceFromCode } from './GachaPackTilt'
 import { CardPoolGrid } from './CardPoolGrid'
 
 // Live Drops are no longer recorded locally on open — the backend broadcasts
@@ -139,7 +139,7 @@ export default function GachaVault() {
     // El sobre 3D pinta el del primer pendiente del lote. Si se abren varios de máquinas
     // distintas no hay un único sobre que los represente; el primero es el que se abre antes.
     const batchCode = packs[0].pack_type
-    const batchPrice = machines?.find((m) => m.code === batchCode)?.price ?? 0
+    const batchPrice = machines?.find((m) => m.code === batchCode)?.price ?? priceFromCode(batchCode) ?? 0
     const results: YoloResult[] = []
     for (let i = 0; i < packs.length; i++) {
       const p = packs[i]
@@ -160,8 +160,8 @@ export default function GachaVault() {
             grading_company: meta?.grading_company ?? null,
             grading_id: meta?.grading_id ?? null,
             authenticated: meta?.authenticated ?? null,
-            auto_sold: false,
-            buyback_amount: null,
+            auto_sold: p.auto_sold,
+            buyback_amount: p.buyback_amount,
           } as YoloResult)
         } else {
           const r = await pollOpenPack(() => openPack(identityToken, p.memo))

@@ -34,6 +34,8 @@ _ENSURE_COLUMNS = [
     ("gacha_packs", "submitted_at", "DATETIME"),
     ("gacha_packs", "revealed_at", "DATETIME"),
     ("gacha_packs", "rarity", "VARCHAR"),
+    ("gacha_packs", "auto_sold", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("gacha_packs", "buyback_amount", "INTEGER"),
     ("chat_messages", "kind", "VARCHAR NOT NULL DEFAULT 'user'"),
     ("chat_messages", "action", "VARCHAR"),
     ("chat_messages", "event", "VARCHAR"),

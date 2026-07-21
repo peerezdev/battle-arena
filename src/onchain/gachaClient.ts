@@ -272,6 +272,10 @@ export interface PendingPack {
    *  no podría mostrarla nunca. */
   rarity: string | null
   insured_value: number | null
+  /** Guardados al abrir: con turbo, CC recompra la carta en el acto. Sin esto un reveal
+   *  reproducido ofrecía "Keep" y "Sell" de un NFT que ya no es del jugador. */
+  auto_sold: boolean
+  buyback_amount: number | null
 }
 
 /** Sobres ya pagados y sin abrir. Sirve para recuperarlos desde otra pestaña o tras cerrar la

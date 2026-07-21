@@ -595,3 +595,27 @@ def test_la_rareza_se_guarda_al_abrir_y_viaja_en_pendientes(monkeypatch):
     assert len(body) == 1
     assert body[0]["rarity"] == "Epic", "sin esto el reveal reproducido sale sin rareza"
     assert body[0]["name"] == "Zard"
+
+
+@respx.mock
+def test_el_autosell_del_turbo_se_guarda_y_viaja_en_pendientes(monkeypatch):
+    """Con turbo CC recompra la carta al abrir. Si no se persiste, un reveal reproducido desde la
+    lista ofrece "Keep" y "Sell" de un NFT que ya no es del jugador."""
+    _mock_pack_upstream(memo="slug-p6")
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "code": "TURBO_MODE_BUYBACK", "buybackAmount": 12_500_000,
+        "nft_address": "Mint" + "6" * 40, "rarity": "Common",
+        "nftWon": {"content": {"metadata": {"name": "Pidgey"}}, "image": "https://x/p.png"}}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+    c, priv = _client()
+    hdrs = _hdrs(priv, WALLET_A)
+
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
+    c.post("/gacha/submit-tx", json={"signed_transaction": "dGVzdA==", "memo": "slug-p6"}, headers=hdrs)
+    c.post("/gacha/open-pack", json={"memo": "slug-p6"}, headers=hdrs)
+
+    body = c.get("/gacha/packs/pending", headers=hdrs).json()
+    assert len(body) == 1
+    assert body[0]["auto_sold"] is True
+    assert body[0]["buyback_amount"] == 12_500_000

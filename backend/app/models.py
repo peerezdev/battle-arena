@@ -91,6 +91,10 @@ class GachaPack(Base):
     # La rareza SOLO la da CC al abrir el sobre; /gacha/nft/{mint} devuelve rarity null. Si no se
     # guarda aquí, un reveal reproducido más tarde no puede mostrarla nunca.
     rarity: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # El turbo hace que CC recompre la carta al abrir. Sin guardarlo, un reveal reproducido más
+    # tarde ofrece "Keep" y "Sell" de un NFT que ya no es del jugador.
+    auto_sold: Mapped[bool] = mapped_column(Boolean, default=False)
+    buyback_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class PackBattle(Base):

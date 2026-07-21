@@ -45,6 +45,16 @@ export function fitTitleSize(prefix: string, suffix: string): number {
   return Math.max(20, Math.min(38, Math.floor(248 / (len * 0.58))))
 }
 
+/** Precio a partir del código de máquina (`pokemon_50` → 50).
+ *
+ *  Hace falta porque el sobre puede pintarse ANTES de que la lista de máquinas haya cargado —
+ *  pasa al abrir un pendiente desde el modal, que navega al gacha y abre en el acto. Sin esto el
+ *  precio caía a 0 y la paleta salía la del tramo más barato en vez de la de la máquina. */
+export function priceFromCode(machineCode: string): number | null {
+  const m = machineCode.match(/_(\d+)$/)
+  return m ? Number(m[1]) : null
+}
+
 type Props = {
   machineCode: string
   price: number
