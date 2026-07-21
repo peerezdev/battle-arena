@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
+import { CardBadge } from '../../components/CardBadge'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { RevealCard } from './RevealCard'
 import { useWallet } from '../../../wallet/useWallet'
@@ -133,14 +134,7 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
             const offer = offers[nft]
             return (
               <div key={i} style={{ position: 'relative', width: w, flexShrink: 0, opacity: st === 'sold' ? 0.5 : 1 }}>
-                {isBest && (
-                  <span style={{
-                    position: 'absolute', top: -11, left: '50%', transform: 'translateX(-50%)', zIndex: 2,
-                    fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700, letterSpacing: '.12em', color: '#2b2005',
-                    background: 'linear-gradient(90deg,#ffd166,#f0a832)', borderRadius: 999, padding: '4px 10px',
-                    whiteSpace: 'nowrap', boxShadow: '0 4px 14px rgba(255,209,102,.35)',
-                  }}>⚡ BEST PULL</span>
-                )}
+                {isBest && <CardBadge label="⚡ BEST PULL" color="#ffd166" />}
                 <div style={{ position: 'relative', borderRadius: 12, ...(isBest ? { boxShadow: '0 0 40px rgba(255,209,102,.2)' } : {}) }}>
                   <RevealCard card={c} reducedMotion={reducedMotion} w={w} h={h} bare />
                   {st === 'sold' && <div style={badge('#00c79a')}>SOLD{offer != null ? ` +${formatUsd(offer / 1e6)}` : ''}</div>}

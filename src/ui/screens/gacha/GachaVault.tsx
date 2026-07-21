@@ -34,6 +34,7 @@ import { HoloCard } from '../../components/HoloCard'
 import { showToast } from '../../toast'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
+import { CardBadge } from '../../components/CardBadge'
 import { GachaPackTilt, packTitle, priceFromCode } from './GachaPackTilt'
 import { pendingPackToResult } from './pendingToResult'
 import { CardPoolGrid } from './CardPoolGrid'
@@ -1589,21 +1590,22 @@ export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose 
             const glow = rarityGlow(r.rarity)   // same beam as Recent Drops (common = none)
             const buyback = (r.insured_value ?? 0) * pct / 100
             return (
-              <div key={mint ?? i} style={{ background: COLORS.panel2, border: `1px solid ${glow ?? COLORS.border}`, borderRadius: 10, overflow: 'hidden', boxShadow: glow ? `0 0 16px -3px ${glow}, inset 0 0 12px -7px ${glow}` : undefined }}>
-                {machineCodes?.[i] && (() => {
-                  const [mp, ms] = packTitle(machineCodes[i])
-                  return (
-                    <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.12em',
-                      color: COLORS.muted, background: '#0c1019', padding: '5px 8px',
-                      borderBottom: `1px solid ${COLORS.border}`, textAlign: 'center' }}>
-                      {mp} {ms}
-                    </div>
-                  )
-                })()}
-                <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8 }}>
+              <div key={mint ?? i} style={{ position: 'relative', background: COLORS.panel2, border: `1px solid ${glow ?? COLORS.border}`, borderRadius: 10, boxShadow: glow ? `0 0 16px -3px ${glow}, inset 0 0 12px -7px ${glow}` : undefined }}>
+                {/* Misma píldora que corona la mejor carta en el result de Pack Battle, pero
+                    anunciando la rareza: es el dato que el jugador busca de un vistazo aquí. */}
+                {r.rarity && <CardBadge label={r.rarity.toUpperCase()} color={RARITY_COLOR[r.rarity] ?? COLORS.muted} />}
+                <div style={{ aspectRatio: '3/4', background: '#0c1019', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 8, borderRadius: '9px 9px 0 0' }}>
                   {r.image ? <img src={r.image} alt={r.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: 32 }}>🃏</span>}
                 </div>
                 <div style={{ padding: '8px 9px 10px' }}>
+                  {/* La máquina va aquí y no coronando la carta: arriba la tapaba la píldora de
+                      rareza, que es el dato que se busca antes de un vistazo. */}
+                  {machineCodes?.[i] && (
+                    <div style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.12em',
+                      color: COLORS.muted, marginBottom: 3 }}>
+                      {packTitle(machineCodes[i]).join(' ')}
+                    </div>
+                  )}
                   <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name ?? '—'}</div>
                   {r.auto_sold ? (
                     <div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted, marginTop: 2 }}>⚡ Auto-sold {formatUsd((r.buyback_amount ?? 0) / 1e6)}</div>
