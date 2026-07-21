@@ -57,7 +57,11 @@ type Phase =
   // Es UNA sola fase a propósito: si "generando" y "listo" fueran fases distintas, React
   // desmontaría y remontaría el sobre justo al terminar y se perdería el tilt y la posición
   // del brillo en el momento de más atención. Así solo cambia el botón.
-  | { kind: 'yolo'; step: 'firmando' | 'enviando' | 'abriendo'; done: number; total: number; results: YoloResult[] | null }
+  // machineCode/price son los del sobre QUE SE ESTÁ ABRIENDO, no los de la máquina seleccionada
+  // en la vault: abriendo un pendiente de la lista pueden no coincidir, y el sobre 3D pintaba la
+  // máquina elegida en pantalla en vez de la del sobre.
+  | { kind: 'yolo'; step: 'firmando' | 'enviando' | 'abriendo'; done: number; total: number
+      machineCode: string; price: number; results: YoloResult[] | null }
   | { kind: 'yolo-reveal'; results: YoloResult[]; index: number }
   | { kind: 'yolo-summary'; results: YoloResult[] }
 
@@ -132,10 +136,14 @@ export default function GachaVault() {
    *  para esos sería pedirle a CC algo que ya nos dio. */
   async function openPendingPacks(packs: PendingPack[]) {
     if (!identityToken || packs.length === 0) return
+    // El sobre 3D pinta el del primer pendiente del lote. Si se abren varios de máquinas
+    // distintas no hay un único sobre que los represente; el primero es el que se abre antes.
+    const batchCode = packs[0].pack_type
+    const batchPrice = machines?.find((m) => m.code === batchCode)?.price ?? 0
     const results: YoloResult[] = []
     for (let i = 0; i < packs.length; i++) {
       const p = packs[i]
-      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: packs.length, results: null })
+      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: packs.length, machineCode: batchCode, price: batchPrice, results: null })
       try {
         if (p.nft_address) {
           const meta = await fetchCardMetadata(p.nft_address).catch(() => null)
@@ -170,7 +178,8 @@ export default function GachaVault() {
     // Igual que una tirada normal: se queda en el sobre esperando el click, NO salta al reveal.
     // Antes iba directo a 'yolo-reveal' y el sobre 3D aparecía y se abría solo, con la carta ya
     // revelada: el momento de abrir es del jugador, venga de una tirada o de la lista.
-    setPhase({ kind: 'yolo', step: 'abriendo', done: results.length, total: results.length, results })
+    setPhase({ kind: 'yolo', step: 'abriendo', done: results.length, total: results.length,
+               machineCode: batchCode, price: batchPrice, results })
   }
   // Pending open awaiting the user's YES/NO confirmation.
   const [confirm, setConfirm] = useState<{ count: number; turbo: boolean } | null>(null)
@@ -294,7 +303,7 @@ export default function GachaVault() {
     if (turbo) {
       let resp: YoloPacksResponse
       try {
-        setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count, results: null })
+        setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: count, machineCode: selected.code, price: selected.price ?? 0, results: null })
         resp = await generateYoloPacks(identityToken, selected.code, count, true)
       } catch (e) {
         showToast(`Couldn't open the pack: ${e instanceof Error ? e.message : String(e)}`, 'error')
@@ -304,9 +313,9 @@ export default function GachaVault() {
       const txs = resp.transactions
       for (let i = 0; i < txs.length; i++) {
         try {
-          setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length, results: null })
+          setPhase({ kind: 'yolo', step: 'firmando', done: i, total: txs.length, machineCode: selected.code, price: selected.price ?? 0, results: null })
           const signed = await signTransactionBase64(txs[i].transaction)
-          setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length, results: null })
+          setPhase({ kind: 'yolo', step: 'enviando', done: i, total: txs.length, machineCode: selected.code, price: selected.price ?? 0, results: null })
           await submitTx(identityToken, signed, txs[i].memo)
           submitted.push(txs[i].memo)
         } catch (e) {
@@ -317,10 +326,10 @@ export default function GachaVault() {
     } else {
       for (let i = 0; i < count; i++) {
         try {
-          setPhase({ kind: 'yolo', step: 'firmando', done: i, total: count, results: null })
+          setPhase({ kind: 'yolo', step: 'firmando', done: i, total: count, machineCode: selected.code, price: selected.price ?? 0, results: null })
           const pack = await generatePack(identityToken, selected.code)
           const signed = await signTransactionBase64(pack.transaction)
-          setPhase({ kind: 'yolo', step: 'enviando', done: i, total: count, results: null })
+          setPhase({ kind: 'yolo', step: 'enviando', done: i, total: count, machineCode: selected.code, price: selected.price ?? 0, results: null })
           await submitTx(identityToken, signed, pack.memo)
           submitted.push(pack.memo)
         } catch (e) {
@@ -337,7 +346,7 @@ export default function GachaVault() {
     }
     const results: YoloResult[] = []
     for (let i = 0; i < submitted.length; i++) {
-      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: submitted.length, results: null })
+      setPhase({ kind: 'yolo', step: 'abriendo', done: i, total: submitted.length, machineCode: selected.code, price: selected.price ?? 0, results: null })
       try {
         const r = await pollOpenPack(() => openPack(identityToken, submitted[i]))
         if (!r.pending) { results.push(r) }
@@ -346,7 +355,8 @@ export default function GachaVault() {
     if (results.length === 0) { setPhase({ kind: 'pending', memo: submitted[0] }); return }
     // Listos, pero NO se revela solo: el sobre queda esperando a que el usuario lo abra.
     batchMemos.current = submitted
-    setPhase({ kind: 'yolo', step: 'abriendo', done: results.length, total: results.length, results })
+    setPhase({ kind: 'yolo', step: 'abriendo', done: results.length, total: results.length,
+               machineCode: selected.code, price: selected.price ?? 0, results })
   }
 
   // ── Disabled state ──────────────────────────────────────────────────────────
@@ -610,8 +620,8 @@ export default function GachaVault() {
             style={{ position: 'fixed', inset: 0, background: 'rgba(6,8,11,0.94)', zIndex: 200,
               display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, overflowY: 'auto' }}>
             <GachaPackTilt
-              machineCode={selected?.code ?? ''}
-              price={selected?.price ?? 0}
+              machineCode={phase.machineCode}
+              price={phase.price}
               count={phase.total}
               ready={phase.results !== null}
               done={phase.done}
