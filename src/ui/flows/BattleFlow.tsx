@@ -148,6 +148,24 @@ export function BattleFlow() {
   // not stacked, once its animation finishes).
   const vm = battleToReveal(battle, meWallet)
 
+  // El resultado necesita que la batalla esté 'settled', que lo marca el settle on-chain. Si ese
+  // settle va lento (en devnet, un NFT que tarda en confirmarse en el escrow puede tardar
+  // minutos) el reveal termina ANTES de que la batalla esté settled, y sin esto el jugador se
+  // quedaba mirando las últimas cartas congeladas sin saber si estaba roto. El poll de useBattle
+  // sigue vivo, así que en cuanto settlee salta solo al resultado.
+  const revealFinished = vm.mode === 'pack' ? revealDone : royaleRevealDone
+  if (battle.status !== 'settled' && revealFinished) {
+    return <Centered>
+      <div className="ba-spin" style={{ width: 26, height: 26, borderRadius: '50%',
+        border: `2.5px solid ${COLORS.border}`, borderTopColor: COLORS.green }} />
+      <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 16 }}>Finalizing results…</div>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, maxWidth: 320 }}>
+        Settling the winnings on-chain. This can take a moment — you can wait here or come back to it.
+      </div>
+      <button onClick={exit} style={backBtn}>Back to home</button>
+    </Centered>
+  }
+
   if (vm.mode === 'pack') {
     return (
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>

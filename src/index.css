@@ -254,3 +254,7 @@ textarea::placeholder {
 .ba-ghostbtn { transition: background .15s, border-color .15s, transform .1s; }
 .ba-ghostbtn:hover { background: #ffffff10; border-color: #ffffff33; }
 .ba-ghostbtn:active { transform: scale(.97); }
+
+/* Spinner del estado "Finalizing results…" de una batalla cuyo settle on-chain va lento. */
+@keyframes ba-spin { to { transform: rotate(360deg); } }
+.ba-spin { animation: ba-spin .8s linear infinite; }
