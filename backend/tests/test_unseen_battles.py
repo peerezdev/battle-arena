@@ -119,3 +119,33 @@ def test_endpoints_exigen_auth():
     c = TestClient(app)
     assert c.get("/users/me/battles/unseen").status_code in (401, 503)
     assert c.post("/users/me/battles/seen", json={"battle_ids": ["x"]}).status_code in (401, 503)
+
+
+def test_backfill_marca_como_vistas_las_batallas_que_ya_existian():
+    """Al añadir seen_at a una DB con historial, esas batallas se dan por vistas: son historia,
+    y sin esto el modal listaría toda la trayectoria del jugador."""
+    from sqlalchemy import inspect, text
+    engine = create_engine("sqlite:///:memory:",
+                           connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    # battle_players en forma ANTIGUA (sin seen_at) con una fila ya existente; init_db crea el
+    # resto de tablas con su forma completa.
+    with engine.begin() as c:
+        c.execute(text("CREATE TABLE battle_players (id INTEGER PRIMARY KEY, battle_id VARCHAR, "
+                       "player_wallet VARCHAR, wallet_id VARCHAR, joined_at DATETIME, "
+                       "eliminated_round INTEGER, accumulated_value FLOAT)"))
+        c.execute(text("INSERT INTO battle_players (battle_id,player_wallet) VALUES ('old', :w)"),
+                  {"w": WA})
+    init_db(engine)
+    assert "seen_at" in {c["name"] for c in inspect(engine).get_columns("battle_players")}
+    s = make_session_factory(engine)()
+    # la batalla 'old' se añade AHORA como terminada; su fila de jugador es preexistente y el
+    # backfill la marcó como vista, así que no debe aparecer.
+    s.add(PackBattle(id="old", mode="pack", machine_code="pokemon_50", price=50_000_000,
+                     max_players=2, status="settled", winner=WA,
+                     settled_at=datetime.now(timezone.utc)))
+    s.commit()
+    assert read_unseen_battles(s, WA) == [], "las batallas históricas no deben aparecer sin ver"
+
+    # pero una batalla NUEVA (posterior) sí aparece: el backfill fue de una sola vez
+    _battle(s, "new", winner=WA, players=(WA,))
+    assert [r["battle_id"] for r in read_unseen_battles(s, WA)] == ["new"]

@@ -92,14 +92,29 @@ def _backfill_refunded(engine):
         ))
 
 
+def _backfill_battles_seen(engine):
+    """One-shot al añadir battle_players.seen_at: todas las batallas que ya existían se dan por
+    VISTAS. Son historia — el jugador ya las jugó, y sin esto el modal de 'sin ver' listaría
+    toda su trayectoria. Solo se llama cuando la columna acaba de crearse — ver init_db."""
+    insp = inspect(engine)
+    if "battle_players" not in set(insp.get_table_names()):
+        return
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE battle_players SET seen_at = CURRENT_TIMESTAMP WHERE seen_at IS NULL"))
+
+
 def init_db(engine):
     # importa los modelos para registrarlos en Base.metadata antes de create_all
     from . import models  # noqa: F401
     insp = inspect(engine)
     had_refunded = ("battle_pulls" in set(insp.get_table_names())
                     and "refunded" in {c["name"] for c in insp.get_columns("battle_pulls")})
+    had_seen = ("battle_players" in set(insp.get_table_names())
+                and "seen_at" in {c["name"] for c in insp.get_columns("battle_players")})
     Base.metadata.create_all(engine)
     _ensure_columns(engine)
     if not had_refunded:
         _backfill_refunded(engine)
+    if not had_seen:
+        _backfill_battles_seen(engine)
     _backfill_gacha_price(engine)
