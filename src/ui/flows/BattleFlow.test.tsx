@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 vi.mock('../../onchain/useBattle', () => ({ useBattle: vi.fn() }))
 vi.mock('../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'A' }))
 const nav = vi.hoisted(() => vi.fn())
-vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => nav }))
+vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => nav, useSearchParams: () => [new URLSearchParams()] }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 // The winner's result mounts WinningsBuyback (wallet/buyback); this flow test only checks the result renders.
 vi.mock('../screens/battle/WinningsBuyback', () => ({ WinningsBuyback: () => null }))

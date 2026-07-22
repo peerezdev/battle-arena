@@ -1,9 +1,9 @@
-import { type ReactNode, type CSSProperties, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { type ReactNode, type CSSProperties, useEffect, useRef, useState } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../theme'
 import { useBattle } from '../../onchain/useBattle'
-import { cancelBattle, joinBot, joinAllBots, joinBattle } from '../../onchain/packBattleClient'
+import { cancelBattle, joinBot, joinAllBots, joinBattle, markBattlesSeen } from '../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
 import { useReducedMotion } from '../useReducedMotion'
 import { battleToReveal } from '../screens/battle/battleReveal'
@@ -13,6 +13,7 @@ import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { WaitingRoom } from '../screens/battle/WaitingRoom'
 import { showToast } from '../toast'
+import { notifyUnseenBattlesChanged } from '../screens/battle/unseenBattlesBus'
 
 function Centered({ children }: { children: ReactNode }) {
   return (
@@ -32,9 +33,30 @@ export function BattleFlow() {
   const { identityToken } = useIdentityToken()
   useBattleEmotes(battleId)   // render emotes thrown by other players in this battle
 
+  const [searchParams] = useSearchParams()
+  const straightToResult = searchParams.get('view') === 'result'
+
   const [cancelError, setCancelError] = useState<string | null>(null)
-  const [revealDone, setRevealDone] = useState(false)
-  const [royaleRevealDone, setRoyaleRevealDone] = useState(false)
+  const [revealDone, setRevealDone] = useState(straightToResult)
+  const [royaleRevealDone, setRoyaleRevealDone] = useState(straightToResult)
+
+  // Marca la batalla como VISTA al llegar a un estado terminal que el jugador ya está mirando:
+  // el resultado (tras el reveal) o la pantalla de anulada. Se dispara igual si viene del modal
+  // o si la vio en directo, así que el modal no vuelve a dar la lata con una que acaba de ver.
+  const seenFired = useRef(false)
+  useEffect(() => {
+    if (!battle || !identityToken || seenFired.current) return
+    const settledSeen = battle.status === 'settled' &&
+      (battle.mode === 'royale' ? royaleRevealDone : revealDone)
+    const ended = battle.status === 'voided' || battle.status === 'cancelled'
+    if (settledSeen || ended) {
+      seenFired.current = true
+      markBattlesSeen(identityToken, [battle.id])
+        .then(notifyUnseenBattlesChanged)   // AppShell relee y suelta el saldo
+        .catch(() => { /* se reintenta la próxima vez que se abra la batalla */ })
+    }
+  }, [battle, identityToken, revealDone, royaleRevealDone])
+
   const [joiningBot, setJoiningBot] = useState(false)
   const [joiningAll, setJoiningAll] = useState(false)
   const [botError, setBotError] = useState<string | null>(null)

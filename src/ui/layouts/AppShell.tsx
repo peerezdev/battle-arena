@@ -20,10 +20,12 @@ import { OnboardingTutorial } from '../components/OnboardingTutorial'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
-import { PendingPacksModal } from '../screens/gacha/PendingPacksModal'
+import { UnseenModal } from '../components/UnseenModal'
 import { YoloSummaryOverlay } from '../screens/gacha/GachaVault'
 import { pendingPacksToResults, type YoloResult } from '../screens/gacha/pendingToResult'
 import { fetchPendingPacks, markPacksRevealed, type PendingPack } from '../../onchain/gachaClient'
+import { fetchUnseenBattles, type UnseenBattle } from '../../onchain/packBattleClient'
+import { useUnseenBattlesVersion } from '../screens/battle/unseenBattlesBus'
 import { holdBalance } from '../../wallet/balanceHold'
 import { usePendingPacksVersion } from '../screens/gacha/pendingPacksBus'
 
@@ -62,34 +64,53 @@ export function AppShell() {
   // modal encima, obligando a cerrarlo dos veces. Solo se auto-abre si aparece alguno nuevo.
   const promptedRef = useRef<Set<string>>(new Set())
   const pendingVersion = usePendingPacksVersion()
+  const [unseenBattles, setUnseenBattles] = useState<UnseenBattle[]>([])
+  const battlesVersion = useUnseenBattlesVersion()
 
   useEffect(() => {
-    if (!identityToken) { setPendingPacks([]); setPendingOpen(false); return }
+    if (!identityToken) { setPendingPacks([]); setUnseenBattles([]); setPendingOpen(false); return }
     let cancelled = false
-    fetchPendingPacks(identityToken)
-      .then((ps) => {
+    // Un ítem sigue pendiente hasta que el jugador lo VE, así que la lista se refresca al cambiar
+    // de ruta o cuando un reveal avisa. El modal solo se AUTO-abre si aparece algo nuevo (por
+    // memo o battle_id): sin esto, ir a verlo levantaría el modal encima al volver.
+    Promise.allSettled([fetchPendingPacks(identityToken), fetchUnseenBattles(identityToken)])
+      .then(([pr, br]) => {
         if (cancelled) return
+        const ps = pr.status === 'fulfilled' ? pr.value : []
+        const bs = br.status === 'fulfilled' ? br.value : []
         setPendingPacks(ps)
-        const fresh = ps.filter((p) => !promptedRef.current.has(p.memo))
-        if (fresh.length > 0) {
-          ps.forEach((p) => promptedRef.current.add(p.memo))
+        setUnseenBattles(bs)
+        const freshIds = [
+          ...ps.map((p) => `pack:${p.memo}`),
+          ...bs.map((b) => `battle:${b.battle_id}`),
+        ].filter((k) => !promptedRef.current.has(k))
+        if (freshIds.length > 0) {
+          [...ps.map((p) => `pack:${p.memo}`), ...bs.map((b) => `battle:${b.battle_id}`)]
+            .forEach((k) => promptedRef.current.add(k))
           setPendingOpen(true)
         }
       })
-      .catch(() => { /* que falle la lista no debe bloquear la navegación */ })
     return () => { cancelled = true }
-  }, [identityToken, pathname, pendingVersion])   // ruta o aviso del gacha: recoge lo abierto
+  }, [identityToken, pathname, pendingVersion, battlesVersion])
 
   // El saldo se congela mientras QUEDEN sobres sin abrir, no solo mientras el modal esté a la
   // vista. Antes se soltaba al pulsar Open —el modal se cerraba para navegar al gacha— y el saldo
   // se pintaba justo en el hueco previo a abrir, que es cuando más delata: con turbo el
   // auto-buyback ya movió el USDC. Se suelta cuando la lista queda vacía, es decir, cuando el
   // jugador ya ha visto sus cartas.
-  const hasPending = pendingPacks.length > 0
+  // Se congela el saldo mientras QUEDE algo sin ver: un sobre por abrir (el turbo ya movió el
+  // USDC) o una batalla sin ver (ganar acredita el botín antes de que lo veas). Se suelta cuando
+  // ambas listas quedan vacías, es decir cuando ya vio todo.
+  const hasUnseen = pendingPacks.length > 0 || unseenBattles.length > 0
   useEffect(() => {
-    if (!hasPending) return
+    if (!hasUnseen) return
     return holdBalance()
-  }, [hasPending])
+  }, [hasUnseen])
+
+  function goBattle(b: UnseenBattle, straightToResult: boolean) {
+    setPendingOpen(false)
+    navigate(`/play/battle/${encodeURIComponent(b.battle_id)}${straightToResult ? '?view=result' : ''}`)
+  }
 
   function goOpenPending(packs: PendingPack[]) {
     setPendingOpen(false)
@@ -403,13 +424,16 @@ export function AppShell() {
       {/* ── TOASTS ────────────────────────────────────────────────────────── */}
       {/* Los toasts van abajo, por encima de la pila móvil (nav + barra de radio si está) y
           dejando hueco al RematchToast, que vive en bottom 28/84 con z-index menor. */}
-      {pendingOpen && !skipSummary && (
-        <PendingPacksModal
+      {pendingOpen && !skipSummary && (pendingPacks.length > 0 || unseenBattles.length > 0) && (
+        <UnseenModal
           packs={pendingPacks}
+          battles={unseenBattles}
           busy={pendingBusy}
-          onOpenOne={(memo) => goOpenPending(pendingPacks.filter((p) => p.memo === memo))}
-          onOpenAll={() => goOpenPending(pendingPacks)}
-          onSkip={() => void skipPending()}
+          onOpenPack={(memo) => goOpenPending(pendingPacks.filter((p) => p.memo === memo))}
+          onOpenAllPacks={() => goOpenPending(pendingPacks)}
+          onSkipPacks={() => void skipPending()}
+          onWatchBattle={(b) => goBattle(b, false)}
+          onResultBattle={(b) => goBattle(b, true)}
         />
       )}
 

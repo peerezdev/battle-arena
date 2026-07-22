@@ -115,3 +115,31 @@ export function verifyBattle(id: string): Promise<Verification> {
 export function fetchReservedBalance(token: string): Promise<{ reserved: number; locked_royale?: number }> {
   return battleFetch<{ reserved: number; locked_royale?: number }>('/users/me/balance', { headers: authHeaders(token) })
 }
+
+// ── Batallas sin ver ─────────────────────────────────────────────────────────
+// Batallas terminadas o anuladas en las que participaste y cuyo resultado aún no has visto.
+// Sirve para el modal de "cosas que no has visto" y para no volver a dar la lata con una que
+// ya viste en directo. Espejo de fetchPendingPacks del gacha.
+
+export interface UnseenBattle {
+  battle_id: string
+  mode: 'pack' | 'royale'
+  machine_code: string
+  status: 'settled' | 'voided'
+  won: boolean
+  amount_usd: number
+  settled_at: string | null
+}
+
+export function fetchUnseenBattles(token: string): Promise<UnseenBattle[]> {
+  return battleFetch<UnseenBattle[]>('/users/me/battles/unseen', { headers: authHeaders(token) })
+}
+
+/** Marca batallas como ya vistas. Se llama al LLEGAR al resultado —desde el modal o en directo—,
+ *  que es lo que las saca de la lista. Idempotente en el servidor. */
+export function markBattlesSeen(token: string, battleIds: string[]): Promise<{ marked: number }> {
+  return battleFetch<{ marked: number }>('/users/me/battles/seen', {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ battle_ids: battleIds }),
+  })
+}
