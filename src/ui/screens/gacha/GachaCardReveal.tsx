@@ -22,12 +22,12 @@ const RARITY_HEX: Record<Rarity, string> = {
 const ROW = 38   // alto de fila de la casilla; debe cuadrar con el alto del .reelItem de abajo
 
 /** Guion de la secuencia, en ms. Un solo sitio que tocar para recalibrar ritmos. */
-export const REVEAL_T = { year: 250, grade: 900, rarity: 1550, gap: 250, roll: 1600, hold: 2500, flip: 750 }
+export const REVEAL_T = { year: 100, grade: 900, rarity: 1550, gap: 250, roll: 1600, hold: 1000, flip: 750 }
 
 /** Lo que tarda la casilla en parar, por rareza. Escala a propósito: una común para casi en
  *  seco y una épica coquetea con las bajas antes de deslizarse. Es lo que hace que una épica se
  *  SIENTA distinta sin añadir etapas nuevas. */
-export const SPIN_MS: Record<Rarity, number> = { common: 900, uncommon: 1200, rare: 1700, epic: 2300 }
+export const SPIN_MS: Record<Rarity, number> = { common: 2500, uncommon: 3000, rare: 3000, epic: 3000 }
 
 function norm(rarity: string | null | undefined): Rarity | null {
   const k = (rarity ?? '').toLowerCase()
