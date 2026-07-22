@@ -43,6 +43,7 @@ _ENSURE_COLUMNS = [
     ("chat_messages", "machine", "VARCHAR"),
     ("chat_messages", "mult", "FLOAT"),
     ("battle_pulls", "refunded", "BOOLEAN NOT NULL DEFAULT 0"),
+    ("battle_players", "seen_at", "DATETIME"),
 ]
 
 

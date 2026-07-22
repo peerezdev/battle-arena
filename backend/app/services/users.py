@@ -123,6 +123,69 @@ def read_user_stats(session: Session, wallet: str) -> dict:
     }
 
 
+from datetime import datetime, timezone
+
+
+def read_unseen_battles(session: Session, wallet: str, limit: int = 30) -> list[dict]:
+    """Batallas TERMINADAS (settled) o ANULADAS (voided) en las que el jugador participó y cuyo
+    resultado todavía no ha visto (BattlePlayer.seen_at is null).
+
+    Se guía por seen_at, no por el estado de la batalla: si mirara solo el estado, listaría las
+    que el jugador acaba de ver en directo. Es la misma lección del gacha (opened_at vs
+    revealed_at) — 'terminada' no es lo mismo que 'vista'.
+    """
+    from ..models import PackBattle, BattlePlayer, BattlePull
+    USDC = 1_000_000
+
+    rows = list(session.execute(
+        select(PackBattle, BattlePlayer.id)
+        .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
+        .where(BattlePlayer.player_wallet == wallet,
+               BattlePlayer.seen_at.is_(None),
+               PackBattle.status.in_(("settled", "voided")))
+        .order_by(desc(PackBattle.settled_at), desc(PackBattle.created_at))
+        .limit(limit)
+    ))
+    out = []
+    for b, _ in rows:
+        voided = b.status == "voided"
+        won = (not voided) and b.winner == wallet
+        if voided:
+            amount = _entry_base_units(b) / USDC          # entrada devuelta (informativo)
+        elif won:
+            amount = (session.scalar(
+                select(func.coalesce(func.sum(BattlePull.insured_value), 0.0))
+                .where(BattlePull.battle_id == b.id)) or 0.0)
+        else:
+            amount = -(_entry_base_units(b) / USDC)
+        out.append({
+            "battle_id": b.id, "mode": b.mode, "machine_code": b.machine_code,
+            "status": b.status, "won": won, "amount_usd": amount,
+            "settled_at": (b.settled_at or b.created_at).isoformat() if (b.settled_at or b.created_at) else None,
+        })
+    return out
+
+
+def mark_battles_seen(session: Session, wallet: str, battle_ids: list[str]) -> int:
+    """Marca como vistas las filas del jugador en esas batallas. Idempotente y acotado a su propia
+    wallet: solo toca sus BattlePlayer, nunca los de otros. Devuelve cuántas marcó."""
+    from ..models import BattlePlayer
+    if not battle_ids:
+        return 0
+    now = datetime.now(timezone.utc)
+    rows = session.execute(
+        select(BattlePlayer)
+        .where(BattlePlayer.player_wallet == wallet,
+               BattlePlayer.battle_id.in_(battle_ids),
+               BattlePlayer.seen_at.is_(None))
+    ).scalars().all()
+    for r in rows:
+        r.seen_at = now
+    if rows:
+        session.commit()
+    return len(rows)
+
+
 def read_user_battles(session: Session, wallet: str, limit: int = 20) -> list[dict]:
     """The wallet's most recent activity for the History tab: settled battles + gacha opens, newest
     first. amountUsd is signed — battle win = combined loot, battle loss = minus the entry buy-in,

@@ -131,6 +131,11 @@ class BattlePlayer(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     eliminated_round: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     accumulated_value: Mapped[float] = mapped_column(Float, default=0.0)
+    # Cuándo VIO este jugador el resultado de la batalla. Null = terminó y aún no lo ha visto.
+    # Distinto de PackBattle.settled_at (cuándo terminó): si nos guiáramos por eso, el modal daría
+    # la lata con batallas que el jugador acaba de ver en directo. Es la misma distinción que en
+    # el gacha entre opened_at (CC lo resolvió) y revealed_at (el jugador lo vio).
+    seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class BattlePull(Base):

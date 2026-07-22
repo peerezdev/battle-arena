@@ -18,6 +18,7 @@ from .privy import PrivyVerifier, PrivyAuthError
 from .chain.base import ChainSource
 from .chain.mock import MockChainSource
 from .services.users import (
+    read_unseen_battles, mark_battles_seen,
     get_or_create_user, read_user_view, read_user_stats, read_user_battles, set_alias,
     set_withdraw_address, leaderboard, history, AliasTakenError,
 )
@@ -125,6 +126,10 @@ class DevAnnounceBody(BaseModel):
 
 class MarkRevealedBody(BaseModel):
     memos: list[str] = Field(max_length=50)
+
+
+class MarkSeenBody(BaseModel):
+    battle_ids: list[str] = Field(max_length=50)
 
 
 class SubmitTxBody(BaseModel):
@@ -280,6 +285,18 @@ def create_app(session_factory, chain: ChainSource,
     @app.get("/users/{wallet}/battles")
     async def get_user_battles(wallet: str, s: Session = Depends(db)):
         return read_user_battles(s, wallet)
+
+    @app.get("/users/me/battles/unseen")
+    async def me_unseen_battles(wallet: str = Depends(current_user), s: Session = Depends(db)):
+        """Batallas terminadas o anuladas en las que el jugador participó y aún no ha visto.
+        Sin throttle: se consulta al entrar, no en bucle."""
+        return read_unseen_battles(s, wallet)
+
+    @app.post("/users/me/battles/seen")
+    async def me_mark_battles_seen(body: MarkSeenBody, wallet: str = Depends(current_user),
+                                   s: Session = Depends(db)):
+        """Marca batallas como ya vistas por el jugador. Idempotente y acotado a su wallet."""
+        return {"marked": mark_battles_seen(s, wallet, body.battle_ids)}
 
     @app.post("/users/me/withdraw-address")
     async def me_withdraw_address(body: WithdrawAddressBody, wallet: str = Depends(current_user), s: Session = Depends(db)):
