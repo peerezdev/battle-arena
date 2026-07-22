@@ -772,6 +772,19 @@ def create_app(session_factory, chain: ChainSource,
         except Exception:
             logger.exception("deferred reconcile failed for %s", battle_id)
 
+    # Referencia fuerte a las tareas de fondo de batalla. El event loop solo mantiene referencias
+    # DÉBILES a las tareas creadas con create_task, así que una sin referenciar puede ser recogida
+    # por el GC en pleno vuelo — y como se cancelaría con CancelledError (un BaseException que el
+    # `except Exception` del worker no captura), moriría en silencio dejando la batalla en
+    # 'running' sin rastro en el log. Guardarlas aquí y soltarlas al terminar lo impide.
+    _bg_tasks: set = set()
+
+    def _spawn(coro):
+        t = asyncio.create_task(coro)
+        _bg_tasks.add(t)
+        t.add_done_callback(_bg_tasks.discard)
+        return t
+
     async def _run_bg(battle_id: str):
         """Background task for pack battles."""
         s2 = session_factory()
@@ -1035,7 +1048,7 @@ def create_app(session_factory, chain: ChainSource,
                     logger.warning("join refund failed for %s in %s", wallet, battle_id)
                 raise HTTPException(409, str(e))
             if filled:
-                asyncio.create_task(_run_royale_bg(battle_id))
+                _spawn(_run_royale_bg(battle_id))
             return get_battle(s, battle_id)
 
         # Default: pack mode
@@ -1046,7 +1059,7 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(409, str(e))
         reserve(s, wallet, battle_id, b.price)
         if filled:
-            asyncio.create_task(_run_bg(battle_id))
+            _spawn(_run_bg(battle_id))
         return get_battle(s, battle_id)
 
     def _rematch_body(fin: PackBattle, s: Session) -> CreateBattleBody:
@@ -1169,7 +1182,7 @@ def create_app(session_factory, chain: ChainSource,
                     logger.warning("join-bot refund failed for %s in %s", bw, b.id)
                 raise HTTPException(409, str(e))
             if filled:
-                asyncio.create_task(_run_royale_bg(b.id))
+                _spawn(_run_royale_bg(b.id))
         else:
             try:
                 _b2, filled = join_battle(s, b.id, bw, bid)
@@ -1177,7 +1190,7 @@ def create_app(session_factory, chain: ChainSource,
                 raise HTTPException(409, str(e))
             reserve(s, bw, b.id, b.price)
             if filled:
-                asyncio.create_task(_run_bg(b.id))
+                _spawn(_run_bg(b.id))
         return filled
 
     @app.post("/pack-battles/{battle_id}/join-bot")
@@ -1460,7 +1473,7 @@ def create_app(session_factory, chain: ChainSource,
                     release_reservations(s2, battle_id)
                     s2.close()
 
-            asyncio.create_task(_resume_one())
+            _spawn(_resume_one())
 
         # Barrido de reconciliación: batallas voided con refunds/pulls pendientes (p.ej. un void
         # en caliente cuya reconciliación diferida no llegó a correr antes de un reinicio).
@@ -1486,7 +1499,7 @@ def create_app(session_factory, chain: ChainSource,
                 s2.close()
 
         for bid in voided_ids:
-            asyncio.create_task(_sweep_one(battle_id=bid))
+            _spawn(_sweep_one(battle_id=bid))
 
     return app
 
