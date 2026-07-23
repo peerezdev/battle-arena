@@ -192,6 +192,10 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
         </div>
       ))}
 
+      {/* next battle — above the standings on mobile: after the winnings, the useful next tap is
+          jumping into another game, not scrolling past the full table to find it. */}
+      <NextBattlePanel mode="pack" currentBattleId={battleId} meWallet={vm.meWallet} compact />
+
       {/* standings */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
         <span style={{ fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: '.16em', color: COLORS.text }}>RESULTS · {vm.players.length} PLAYERS</span>
@@ -226,9 +230,6 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
           )
         })}
       </div>
-
-      {/* next battle */}
-      <NextBattlePanel mode="pack" currentBattleId={battleId} meWallet={vm.meWallet} compact />
     </div>
   )
 }
