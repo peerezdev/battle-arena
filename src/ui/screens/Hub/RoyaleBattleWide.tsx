@@ -66,17 +66,17 @@ export function RoyaleBattleWide({ battle: b, meWallet, onAction, onCancel, onOp
     }}>
       <span aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '26%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.045),transparent)', animation: 'ba-sweep 3.6s infinite', pointerEvents: 'none' }} />
 
-      {/* top row — identity · money · machine · CTA */}
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'clamp(16px,2.2vw,30px)', padding: '20px clamp(18px,2.4vw,28px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
-          <span style={{ display: 'inline-flex', padding: '5px 12px', borderRadius: 8, fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.08em', color: PINK_L, background: 'rgba(255,46,126,.12)', border: '1px solid rgba(255,46,126,.4)' }}>BATTLE ROYALE</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: b.statusColor }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.statusColor, boxShadow: `0 0 6px ${b.statusColor}`, animation: 'ba-pulse 1.4s infinite' }} />{b.statusText}
-          </span>
-        </div>
+      {/* identity strip — mode badge pinned left, live status pinned right. Keeping these out of
+          the content row is what lets the money, the machine and the CTA share one centre line. */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px clamp(18px,2.4vw,28px) 0' }}>
+        <span style={{ display: 'inline-flex', padding: '5px 12px', borderRadius: 8, fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.08em', color: PINK_L, background: 'rgba(255,46,126,.12)', border: '1px solid rgba(255,46,126,.4)' }}>BATTLE ROYALE</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: b.statusColor }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.statusColor, boxShadow: `0 0 6px ${b.statusColor}`, animation: 'ba-pulse 1.4s infinite' }} />{b.statusText}
+        </span>
+      </div>
 
-        {wideRow && divider}
-
+      {/* content row — money · machine · CTA */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'clamp(16px,2.2vw,30px)', padding: '14px clamp(18px,2.4vw,28px) 20px' }}>
         {/* money — labels row over the figures row (the two figures + arrow share a vertical
             centre line, so the differently-sized numbers read as level and the arrow points
             through the middle of both), arrow (+ ×N) between */}
