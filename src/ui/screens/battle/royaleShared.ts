@@ -17,6 +17,9 @@ export function tintFor(w: string): string {
   return TINTS[h % TINTS.length]
 }
 
+/** The pot is the prize — same gold as the champion badge and the #1 medal. */
+export const POT_GOLD = '#f5c542'
+
 export function medalColor(rank: number): string {
   return rank === 1 ? '#f5c542' : rank === 2 ? '#c8d0da' : rank === 3 ? '#e8964e' : COLORS.muted
 }

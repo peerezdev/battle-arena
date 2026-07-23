@@ -10,7 +10,7 @@ import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
 import { useAliases } from '../../useAliases'
 import { EmoteDock } from '../../emotes/EmoteDock'
-import { shortWallet, tintFor, medalColor } from './royaleShared'
+import { shortWallet, tintFor, medalColor, POT_GOLD } from './royaleShared'
 import { useIsWide } from '../../useIsWide'
 import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
 import { RoyaleRevealMobile } from './RoyaleRevealMobile'
@@ -180,9 +180,7 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
         )}
         <div>
           <div style={statLabel}>POT</div>
-          {/* The gradient stays exclusive to the pot — it's the prize, and it should out-read
-              the entry sitting right above it. */}
-          <div style={{ ...statValue, background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(proj.potValue)}</div>
+          <div style={{ ...statValue, color: POT_GOLD }}>{formatUsd(proj.potValue)}</div>
         </div>
       </div>
     </section>
@@ -218,7 +216,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
             rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} dwellMs={CARD_DWELL_MS} stacked onCardShown={onCardShown}>
-            <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
+            <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} valueColor={COLORS.text} />
           </StagedCardReveal>
         : <CardBack width={W} height={H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}
     </div>

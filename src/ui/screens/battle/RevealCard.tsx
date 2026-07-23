@@ -17,8 +17,11 @@ const PRESET: Record<RevealCardSize, { w: number; h: number }> = {
 
 /** A graded-card tile at a FIXED width×height (so face-down, staging and revealed states
  *  all line up). Pass explicit `w`/`h` for responsive sizing, else a `size` preset. */
-export function RevealCard({ card, reducedMotion, size = 'sm', w, h, bare = false }: {
+export function RevealCard({ card, reducedMotion, size = 'sm', w, h, bare = false, valueColor }: {
   card: RevealCardVM; reducedMotion: boolean; size?: RevealCardSize; w?: number; h?: number
+  /** Overrides the price colour. Defaults to the rarity tint, which also draws the border — the
+   *  royale stage wants a plain white figure without repainting every other card in the app. */
+  valueColor?: string
   /** Art only — drop the name/value footer for callers that render their own (result winnings). */
   bare?: boolean
 }) {
@@ -67,7 +70,7 @@ export function RevealCard({ card, reducedMotion, size = 'sm', w, h, bare = fals
             {card.name}
           </span>
         )}
-        <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: valFont, color }}>
+        <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: valFont, color: valueColor ?? color }}>
           {formatUsd(card.insuredValue ?? 0)}
           {card.autoSold && <span style={{ fontFamily: FONTS.mono, fontSize: autoFont, color: COLORS.muted, marginLeft: 6 }}>⚡</span>}
         </span>

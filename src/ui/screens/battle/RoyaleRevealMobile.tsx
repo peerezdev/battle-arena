@@ -3,7 +3,7 @@ import { COLORS, FONTS, formatUsd } from '../../theme'
 import { RevealCard } from './RevealCard'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
-import { tintFor, shortWallet, pullTitle } from './royaleShared'
+import { tintFor, shortWallet, pullTitle, POT_GOLD } from './royaleShared'
 import { revealOrderWallets, totalRounds, type RoyaleRevealState } from './useRoyaleReveal'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
@@ -118,7 +118,7 @@ function StatHeader({ round, rounds, alive, total, pot }: {
       </div>
       <div style={{ lineHeight: 1.2, textAlign: 'right' }}>
         {label('POT')}
-        <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.green }}>{formatUsd(pot)}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: POT_GOLD }}>{formatUsd(pot)}</div>
       </div>
     </div>
   )
@@ -151,7 +151,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
             rarity={stagingCard.rarity} reduced={reducedMotion} width={CARD_W} height={CARD_H}
             dwellMs={CARD_DWELL_MS} stacked onCardShown={onCardShown}>
-            <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={CARD_W} h={CARD_H} />
+            <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={CARD_W} h={CARD_H} valueColor={COLORS.text} />
           </StagedCardReveal>
         : <CardBack width={CARD_W} height={CARD_H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}
 
@@ -205,7 +205,7 @@ function StandingsHeader({ round, rounds, pot }: { round: number; rounds: number
         R{round}/{rounds}
       </span>
       <span style={{ fontSize: 13, fontWeight: 700 }}>Battle Royale</span>
-      <span style={{ marginLeft: 'auto', fontSize: 15, fontWeight: 700, color: COLORS.green }}>{formatUsd(pot)}</span>
+      <span style={{ marginLeft: 'auto', fontSize: 15, fontWeight: 700, color: POT_GOLD }}>{formatUsd(pot)}</span>
     </div>
   )
 }
