@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { COLORS, FONTS, GRADIENT, RARITY, formatUsd } from '../../theme'
 import { useIsWide } from '../../useIsWide'
 import { useMachineList } from '../../useMachines'
@@ -32,6 +32,9 @@ function groupBundle(battle: Battle, byCode: Map<string, GachaMachine>): PackGro
 function machineImg(m: GachaMachine | undefined): string | null {
   return m?.thumbnailUrl ?? m?.image ?? null
 }
+
+/** One machine's card pool as loaded so far. `done` = the last page came back short. */
+interface PoolState { cards: MachineCard[]; page: number; loading: boolean; error: boolean; done: boolean }
 
 export function WaitingRoom({
   battle, meWallet, onJoinSelf, onJoinBot, onJoinAllBots, onCancel, onExit, onBack,
@@ -72,18 +75,35 @@ export function WaitingRoom({
   const accent = isPB ? COLORS.violet : RARITY.epic   // pack = magenta, royale = violet/epic
 
   // ── card pool modal (lazy fetch per machine, cached) ──
+  // These pools run into the hundreds — pokemon_50 has 730 cards — so a single request showed a
+  // sliver of the pack and read as "these are the cards". Load a page at a time instead; 100 is
+  // the most the backend serves per request.
+  const POOL_PAGE = 100
   const [poolCode, setPoolCode] = useState<string | null>(null)
-  const [pools, setPools] = useState<Record<string, { cards: MachineCard[]; loading: boolean; error: boolean }>>({})
+  const [pools, setPools] = useState<Record<string, PoolState>>({})
+
+  const loadPoolPage = useCallback((code: string, page: number) => {
+    setPools((p) => ({ ...p, [code]: {
+      cards: p[code]?.cards ?? [], page, loading: true, error: false, done: false } }))
+    fetchMachineCards(code, { page, limit: POOL_PAGE })
+      .then((batch) => setPools((p) => {
+        const prev = p[code]?.cards ?? []
+        // Dedupe by mint: a pool can repeat a card across pages, and duplicates would both
+        // inflate the count and collide on the grid's key.
+        const seen = new Set(prev.map((c) => c.nft_address))
+        const merged = prev.concat(batch.filter((c) => !c.nft_address || !seen.has(c.nft_address)))
+        // A short page is the end of the pool — there's no total in the response to compare to.
+        return { ...p, [code]: { cards: merged, page, loading: false, error: false, done: batch.length < POOL_PAGE } }
+      }))
+      .catch(() => setPools((p) => ({ ...p, [code]: {
+        cards: p[code]?.cards ?? [], page: page - 1, loading: false, error: true, done: false } })))
+  }, [])
+
   function openPool() {
     const code = selGroup?.code
     if (!code) return
     setPoolCode(code)
-    if (!pools[code]) {
-      setPools((p) => ({ ...p, [code]: { cards: [], loading: true, error: false } }))
-      fetchMachineCards(code, { limit: 24 })
-        .then((cards) => setPools((p) => ({ ...p, [code]: { cards, loading: false, error: false } })))
-        .catch(() => setPools((p) => ({ ...p, [code]: { cards: [], loading: false, error: true } })))
-    }
+    if (!pools[code]) loadPoolPage(code, 1)
   }
   useEffect(() => { if (poolCode) { const h = (e: KeyboardEvent) => e.key === 'Escape' && setPoolCode(null); window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h) } }, [poolCode])
 
@@ -281,13 +301,46 @@ export function WaitingRoom({
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: `1px solid ${COLORS.border}` }}>
               <div style={{ lineHeight: 1.25 }}>
                 <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.text }}>Card pool</div>
-                <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: '#7a8492' }}>{(selMachine?.name ?? poolCode)} · {formatUsd(selMachine?.price ?? 0)}</div>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: '#7a8492' }}>
+                  {(selMachine?.name ?? poolCode)} · {formatUsd(selMachine?.price ?? 0)}
+                  {/* "+" while more pages remain, so the count never claims to be the whole pool. */}
+                  {!!pools[poolCode]?.cards.length && <> · {pools[poolCode].cards.length}{pools[poolCode].done ? '' : '+'} CARDS</>}
+                </div>
               </div>
               <span style={{ flex: 1 }} />
               <button onClick={() => setPoolCode(null)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 9, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.03)', color: COLORS.muted, cursor: 'pointer', fontSize: 14 }}>✕</button>
             </div>
             <div style={{ overflowY: 'auto', padding: '18px 22px' }}>
-              <CardPoolGrid cards={pools[poolCode]?.cards ?? []} loading={pools[poolCode]?.loading ?? true} error={pools[poolCode]?.error} machineCode={poolCode} />
+              {/* `loading` only for the FIRST page — otherwise loading page 2 would swap the cards
+                  already on screen for a spinner. */}
+              <CardPoolGrid
+                cards={pools[poolCode]?.cards ?? []}
+                loading={(pools[poolCode]?.loading ?? true) && !pools[poolCode]?.cards.length}
+                error={pools[poolCode]?.error && !pools[poolCode]?.cards.length}
+                machineCode={poolCode}
+              />
+              {!!pools[poolCode]?.cards.length && !pools[poolCode].done && (
+                <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 18 }}>
+                  <button
+                    type="button"
+                    onClick={() => loadPoolPage(poolCode, pools[poolCode].page + 1)}
+                    disabled={pools[poolCode].loading}
+                    style={{
+                      border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.03)',
+                      color: pools[poolCode].loading ? COLORS.muted : COLORS.text,
+                      borderRadius: 11, padding: '10px 22px', fontFamily: FONTS.body,
+                      fontSize: 13, fontWeight: 600, cursor: pools[poolCode].loading ? 'default' : 'pointer',
+                    }}
+                  >
+                    {pools[poolCode].loading ? 'Loading…' : 'Load more'}
+                  </button>
+                </div>
+              )}
+              {pools[poolCode]?.error && !!pools[poolCode].cards.length && (
+                <div style={{ textAlign: 'center', paddingTop: 12, fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>
+                  Couldn't load more cards. Try again.
+                </div>
+              )}
             </div>
           </div>
         </div>
