@@ -25,10 +25,18 @@ export interface InventoryCard {
   authenticated: boolean | null
 }
 
-/** Keep only assets that belong to the given Collector Crypt collection (DAS grouping). */
-export function filterCollectorCryptAssets(assets: DasAsset[], collectionMint: string): DasAsset[] {
+/** Keep only assets that belong to a Collector Crypt collection (DAS grouping).
+ *
+ *  Acepta VARIAS colecciones porque CC usa una distinta según el estándar del NFT: la clásica
+ *  para los SPL y otra para los Metaplex Core. Con una sola, las cartas Core no aparecían en
+ *  ningún inventario — ni las del jugador ni las de un escrow — aunque DAS sí las devuelve. */
+export function filterCollectorCryptAssets(
+  assets: DasAsset[],
+  collectionMints: string | readonly string[],
+): DasAsset[] {
+  const wanted = new Set(typeof collectionMints === 'string' ? [collectionMints] : collectionMints)
   return assets.filter((a) =>
-    (a.grouping ?? []).some((g) => g.group_key === 'collection' && g.group_value === collectionMint),
+    (a.grouping ?? []).some((g) => g.group_key === 'collection' && wanted.has(g.group_value)),
   )
 }
 

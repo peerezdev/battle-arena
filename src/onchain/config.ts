@@ -59,6 +59,15 @@ export const config = {
   ccCollectionMint:
     import.meta.env.VITE_CC_COLLECTION_MINT ?? 'CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf',
   /**
+   * Todas las colecciones de Collector Crypt. CC usa una por estándar de NFT: la clásica para
+   * los SPL y `CCryptUfe…` para los Metaplex Core. El inventario mira las dos; con solo la
+   * primera, las cartas Core eran invisibles aunque estuvieran en la wallet.
+   */
+  ccCollectionMints: [
+    import.meta.env.VITE_CC_COLLECTION_MINT ?? 'CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf',
+    import.meta.env.VITE_CC_CORE_COLLECTION_MINT ?? 'CCryptUfeFSZ3Fgc9FLeKrhLVAP67FSqi1GuVoj9CRac',
+  ] as const,
+  /**
    * DAS-capable RPC (e.g. Helius) for reading NFTs via getAssetsByOwner. Falls back
    * to the regular Solana RPC (public devnet does not support DAS → empty inventory).
    */

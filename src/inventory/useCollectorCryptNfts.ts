@@ -25,7 +25,7 @@ export function useCollectorCryptNfts(): { cards: OwnedCard[]; loading: boolean;
     Promise.all(
       wallets.map(async (w) => {
         const assets = await getAssetsByOwner(config.dasRpcUrl, w.address)
-        return filterCollectorCryptAssets(assets, config.ccCollectionMint).map((a) => ({
+        return filterCollectorCryptAssets(assets, config.ccCollectionMints).map((a) => ({
           ...dasAssetToCard(a),
           source: w.source,
         }))

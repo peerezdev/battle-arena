@@ -96,3 +96,27 @@ describe('getAssetsByOwner', () => {
     expect(await getAssetsByOwner('https://rpc', 'OWNER')).toEqual([])
   })
 })
+
+describe('filterCollectorCryptAssets · varias colecciones', () => {
+  const SPL = 'CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf'
+  const CORE = 'CCryptUfeFSZ3Fgc9FLeKrhLVAP67FSqi1GuVoj9CRac'
+  const asset = (id: string, collection: string) =>
+    ({ id, grouping: [{ group_key: 'collection', group_value: collection }] }) as never
+
+  it('acepta las dos colecciones de CC (SPL y Core)', () => {
+    // CC usa una colección por estándar; con solo la SPL, las cartas Core eran invisibles
+    // en el inventario aunque estuvieran realmente en la wallet.
+    const out = filterCollectorCryptAssets([asset('a', SPL), asset('b', CORE)], [SPL, CORE])
+    expect(out.map((a) => a.id)).toEqual(['a', 'b'])
+  })
+
+  it('sigue descartando lo que no es de CC', () => {
+    const out = filterCollectorCryptAssets([asset('x', 'OtraColeccion1111111111111111111111111111')], [SPL, CORE])
+    expect(out).toEqual([])
+  })
+
+  it('mantiene la firma antigua de una sola colección', () => {
+    const out = filterCollectorCryptAssets([asset('a', SPL), asset('b', CORE)], SPL)
+    expect(out.map((a) => a.id)).toEqual(['a'])
+  })
+})

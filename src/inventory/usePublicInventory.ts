@@ -18,7 +18,7 @@ export function usePublicInventory(wallet: string | null): { cards: InventoryCar
     getAssetsByOwner(config.dasRpcUrl, wallet)
       .then((assets) => {
         if (cancelled) return
-        setCards(filterCollectorCryptAssets(assets, config.ccCollectionMint).map(dasAssetToCard))
+        setCards(filterCollectorCryptAssets(assets, config.ccCollectionMints).map(dasAssetToCard))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
