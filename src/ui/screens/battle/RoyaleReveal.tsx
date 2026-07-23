@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { startRematch } from '../../battle/startRematch'
@@ -48,7 +48,10 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
   const rv = useRoyaleReveal(vm, { reducedMotion, onComplete })
   const proj = rv.projection
   const alive = proj.players.filter((p) => p.eliminatedRound == null).length
-  const entry = vm.players.length ? vm.potValue / vm.players.length : 0
+  // What each player actually paid. NOT pot/players: the pot is the loot revealed so far, so that
+  // division drifts with every card and never equals the buy-in (a $1,350 entry showed $1,364.60).
+  // vm.entry is the buy-in the backend sent, and it's what BattleResult already uses for the ×N.
+  const entry = vm.entry
   const blurred = (rv.phase === 'roundBreak' || rv.phase === 'tieBreak') && !reducedMotion
 
   // The one card revealing right now — shown big + centered in the spotlight while the grid
@@ -113,6 +116,10 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
 }
 
 // ─────────────────────────── BATTLE BAR (vertical, left of the stage) ───────────────────────────
+// Shared look for the rail's stat blocks (ALIVE / ENTRY / POT): small tracked label, big figure.
+const statLabel: CSSProperties = { fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }
+const statValue: CSSProperties = { fontSize: 22, fontWeight: 700, letterSpacing: '-.02em' }
+
 function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, settled }: {
   proj: RevealVM; totalPlayers: number; alive: number; entry: number; revealRound: number; rounds: number; settled: boolean
 }) {
@@ -124,23 +131,24 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
       background: 'linear-gradient(160deg,rgba(255,46,151,.16),rgba(13,17,22,.55) 55%,rgba(0,255,196,.10))',
       border: `1px solid ${COLORS.border}`,
     }}>
-      {/* mark + LIVE */}
+      {/* mark + title, LIVE under it */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 'none', width: 42, height: 42, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,#2a1f47,#160f2b)', border: '1px solid rgba(255,46,151,.5)', boxShadow: '0 0 24px -8px rgba(255,46,151,.7)' }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff6bb5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
         </div>
-        {!settled && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,94,122,.12)', border: '1px solid rgba(255,94,122,.32)', fontFamily: FONTS.mono, fontSize: 11, color: '#ff8198' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5e7a', boxShadow: '0 0 6px #ff5e7a' }} />LIVE
-          </span>
-        )}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 700, letterSpacing: '-.01em', whiteSpace: 'nowrap' }}>Battle Royale</div>
+          {/* LIVE sits under the title: the rail is 224px, so icon + title + badge on one line
+              would push the badge out. */}
+          {!settled && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,94,122,.12)', border: '1px solid rgba(255,94,122,.32)', fontFamily: FONTS.mono, fontSize: 11, color: '#ff8198' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff5e7a', boxShadow: '0 0 6px #ff5e7a' }} />LIVE
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* title + sub */}
-      <div>
-        <div style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 700, letterSpacing: '-.01em' }}>Battle Royale</div>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted, marginTop: 3 }}>entry {formatUsd(entry)} · last one standing</div>
-      </div>
+      <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>last one standing</div>
 
       {rule}
 
@@ -157,15 +165,24 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
 
       {rule}
 
-      {/* alive + pot */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+      {/* alive → entry → pot, stacked as one column of stats */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }}>ALIVE</div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em' }}><span style={{ color: COLORS.green }}>{alive}</span><span style={{ color: '#5c6675', fontSize: 16 }}> / {totalPlayers}</span></div>
+          <div style={statLabel}>ALIVE</div>
+          <div style={statValue}><span style={{ color: COLORS.green }}>{alive}</span><span style={{ color: '#5c6675', fontSize: 16 }}> / {totalPlayers}</span></div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }}>POT</div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em', background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(proj.potValue)}</div>
+        {/* Hidden when unknown (demos carry no buy-in) — same guard BattleResult uses. */}
+        {entry > 0 && (
+          <div>
+            <div style={statLabel}>ENTRY</div>
+            <div style={{ ...statValue, color: COLORS.text }}>{formatUsd(entry)}</div>
+          </div>
+        )}
+        <div>
+          <div style={statLabel}>POT</div>
+          {/* The gradient stays exclusive to the pot — it's the prize, and it should out-read
+              the entry sitting right above it. */}
+          <div style={{ ...statValue, background: GRADIENT, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{formatUsd(proj.potValue)}</div>
         </div>
       </div>
     </section>
