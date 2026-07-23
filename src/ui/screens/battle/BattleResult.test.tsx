@@ -48,6 +48,45 @@ describe('BattleResult', () => {
     expect(onExit).toHaveBeenCalled()
   })
 
+  // The loss hero is the red mirror of the green winner hero. The box is border + background, so
+  // assert the red tint lands on both — and does NOT on a win.
+  // The eyebrow sits at different depths on mobile vs desktop; climb to the box (the gradient div).
+  const heroBox = () => {
+    let el: HTMLElement | null = screen.getByText('PACK BATTLE · RESULT')
+    while (el && !el.style.background.includes('radial-gradient')) el = el.parentElement
+    return el as HTMLElement
+  }
+  // The loss hero wears the Next-Battle magenta (#ff2e7e). Green stays the winner colour.
+  const RED = '255, 46, 126', GREEN = '60, 232, 168'
+
+  it('el recuadro de "you lost" es rojo (la antítesis del verde de "you won")', () => {
+    render(<MemoryRouter><BattleResult vm={{ ...baseVm, meWallet: 'B' }} battleId="b1" onExit={() => {}} /></MemoryRouter>)
+    const box = heroBox()
+    expect(box.style.background).toContain(RED)
+    expect(box.style.border).toContain(RED)
+    expect(box.style.background).not.toContain(GREEN)
+  })
+
+  it('el recuadro de "you won" es verde, no rojo', () => {
+    render(<MemoryRouter><BattleResult vm={baseVm} battleId="b1" onExit={() => {}} /></MemoryRouter>)
+    const box = heroBox()
+    expect(box.style.background).toContain(GREEN)
+    expect(box.style.background).not.toContain(RED)
+  })
+
+  it('un espectador ("Battle over") deja el recuadro neutro, ni rojo ni verde', () => {
+    // Ningún jugador soy yo (isMe todo false) → no es derrota, es "Battle over" de espectador.
+    const spectator: RevealVM = {
+      ...baseVm, meWallet: 'Z', winner: 'A',
+      players: baseVm.players.map((p) => ({ ...p, isMe: false })),
+    }
+    render(<MemoryRouter><BattleResult vm={spectator} battleId="b1" onExit={() => {}} /></MemoryRouter>)
+    expect(screen.getByText(/battle over/i)).toBeTruthy()
+    const box = heroBox()
+    expect(box.style.background).not.toContain(RED)
+    expect(box.style.background).not.toContain(GREEN)
+  })
+
   it('desktop: shows the ×N return, the standings margin, and suggests the fullest open lobby', () => {
     mocks.wide = true
     mocks.open = [

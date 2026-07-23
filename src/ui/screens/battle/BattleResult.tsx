@@ -24,6 +24,9 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
 
   const iAmPlayer = vm.players.some((p) => p.isMe)
   const iWon = vm.winner != null && vm.winner === vm.meWallet
+  // A player who lost — NOT the spectator "Battle over" case, which stays neutral. Drives the
+  // magenta loss hero (the Next-Battle magenta), the counterpart to the green winner hero.
+  const iLost = iAmPlayer && !iWon
   const name = (p: RevealPlayerVM) => (p.isMe ? aliases[p.wallet] ?? 'You' : aliases[p.wallet] ?? shortWallet(p.wallet))
 
   const ranked = [...vm.players].sort((a, b) => b.total - a.total)
@@ -41,16 +44,18 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
     return (
       <div style={{ padding: 36, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1440, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr .9fr .7fr', gap: 20, alignItems: 'stretch' }}>
-          {/* hero */}
+          {/* hero — green when I won, the Next-Battle magenta when I lost, neutral for a spectator */}
           <div style={{
             borderRadius: 20,
-            border: `1px solid ${iWon ? 'rgba(60,232,168,.25)' : COLORS.border}`,
+            border: `1px solid ${iWon ? 'rgba(60,232,168,.25)' : iLost ? 'rgba(255,46,126,.3)' : COLORS.border}`,
             background: iWon
               ? 'radial-gradient(600px 360px at 30% 0%,rgba(60,232,168,.12),transparent),linear-gradient(160deg,#0b1a16,#0a0d13)'
-              : 'radial-gradient(600px 360px at 30% 0%,rgba(255,255,255,.05),transparent),linear-gradient(160deg,#12151d,#0a0d13)',
+              : iLost
+                ? 'radial-gradient(600px 360px at 30% 0%,rgba(255,46,126,.13),transparent),linear-gradient(160deg,#1a0a12,#0a0d13)'
+                : 'radial-gradient(600px 360px at 30% 0%,rgba(255,255,255,.05),transparent),linear-gradient(160deg,#12151d,#0a0d13)',
             padding: '36px 42px', display: 'flex', flexDirection: 'column', justifyContent: 'center',
           }}>
-            <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, letterSpacing: '.22em', color: iWon ? COLORS.green : COLORS.muted }}>
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, letterSpacing: '.22em', color: iWon ? COLORS.green : iLost ? '#ff6ba4' : COLORS.muted }}>
               PACK BATTLE · RESULT
             </span>
             <h1 style={{ margin: '12px 0 6px', fontFamily: FONTS.display, fontSize: 48, fontWeight: 700, lineHeight: 1.05 }}>
@@ -131,13 +136,15 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
 
   return (
     <div style={{ padding: '10px 14px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* compact hero — trophy + prize inline + actions */}
+      {/* compact hero — trophy + prize inline + actions. Green won / Next-Battle magenta lost / neutral spectator. */}
       <div style={{
         position: 'relative', overflow: 'hidden', borderRadius: 18, padding: '18px 16px 16px',
         background: iWon
           ? 'radial-gradient(120% 100% at 50% 0%,rgba(60,232,168,.12),transparent 60%),#0a0d13'
-          : 'radial-gradient(120% 100% at 50% 0%,rgba(255,255,255,.05),transparent 60%),#0a0d13',
-        border: `1px solid ${iWon ? 'rgba(60,232,168,.3)' : COLORS.border}`,
+          : iLost
+            ? 'radial-gradient(120% 100% at 50% 0%,rgba(255,46,126,.13),transparent 60%),#0a0d13'
+            : 'radial-gradient(120% 100% at 50% 0%,rgba(255,255,255,.05),transparent 60%),#0a0d13',
+        border: `1px solid ${iWon ? 'rgba(60,232,168,.3)' : iLost ? 'rgba(255,46,126,.3)' : COLORS.border}`,
       }}>
         {iWon && CONF.map((col, i) => (
           <span key={i} aria-hidden style={{

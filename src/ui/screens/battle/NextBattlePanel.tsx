@@ -8,6 +8,12 @@ import type { BattleMode } from '../../../onchain/packBattleClient'
 
 const MAX_AVATARS = 5
 
+// Panel accent = the app's palette blue (#4ea8ff, the button/rarity blue). The loss hero over in
+// BattleResult now wears the magenta this panel used to have — warm loss, cool next-up.
+const BLUE = '#4ea8ff'
+const BLUE_INK = '#7cc0ff'   // lighter blue for the eyebrow
+const BLUE_RGB = '78,168,255'
+
 /** "Next battle" suggestion for the result screen: of the lobbies still filling, recommend the one
  *  closest to starting (fewest free seats). The CTA opens that lobby's waiting room, where the
  *  player joins — we never join on their behalf from here. */
@@ -88,7 +94,7 @@ export function NextBattlePanel({ mode, currentBattleId, meWallet, compact = fal
           onClick={() => navigate('/play/battle/' + next.id)}
           style={{
             width: '100%', padding: 12, borderRadius: 12, border: 0,
-            background: '#ff2e7e', color: '#fff', fontFamily: FONTS.display, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+            background: BLUE, color: '#06121f', fontFamily: FONTS.display, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
           }}
         >
           View lobby →
@@ -109,7 +115,7 @@ export function NextBattlePanel({ mode, currentBattleId, meWallet, compact = fal
         onClick={() => navigate('/play/battle/' + next.id)}
         style={{
           marginTop: 'auto', width: '100%', padding: 12, borderRadius: 12, border: 0,
-          background: '#ff2e7e', color: '#fff', fontFamily: FONTS.display, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          background: BLUE, color: '#06121f', fontFamily: FONTS.display, fontSize: 13, fontWeight: 700, cursor: 'pointer',
         }}
       >
         View lobby →
@@ -135,13 +141,13 @@ function Pill({ label, value, color }: { label: string; value: string; color?: s
 function Shell({ title, children, compact = false }: { title: string; children: React.ReactNode; compact?: boolean }) {
   return (
     <div style={{
-      borderRadius: compact ? 16 : 20, border: '1px solid rgba(255,46,126,.3)',
+      borderRadius: compact ? 16 : 20, border: `1px solid rgba(${BLUE_RGB},.3)`,
       background: compact
-        ? 'radial-gradient(300px 200px at 50% 0%,rgba(255,46,126,.12),transparent),#0a0d13'
-        : 'radial-gradient(400px 260px at 50% 0%,rgba(255,46,126,.12),transparent),#0c0f15',
+        ? `radial-gradient(300px 200px at 50% 0%,rgba(${BLUE_RGB},.12),transparent),#0a0d13`
+        : `radial-gradient(400px 260px at 50% 0%,rgba(${BLUE_RGB},.12),transparent),#0c0f15`,
       padding: compact ? 14 : 20, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0,
     }}>
-      <span style={{ fontFamily: FONTS.mono, fontSize: compact ? 9.5 : 11, fontWeight: 700, letterSpacing: '.16em', color: '#ff6ba4' }}>⚡ {title}</span>
+      <span style={{ fontFamily: FONTS.mono, fontSize: compact ? 9.5 : 11, fontWeight: 700, letterSpacing: '.16em', color: BLUE_INK }}>⚡ {title}</span>
       {children}
     </div>
   )
