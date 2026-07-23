@@ -2,7 +2,7 @@
 checks live in the endpoint layer (they need RPC/Privy). Generates the Provably-Fair server seed."""
 from __future__ import annotations
 import uuid
-from sqlalchemy import update
+from sqlalchemy import update, func, select
 from app.models import PackBattle, BattlePlayer, BattleRound, BattlePull, BattlePack
 from app.services.provably_fair import gen_server_seed, verify_commit
 from app.services.royale_funding import royale_buyin
@@ -124,6 +124,19 @@ def list_open(session):
             for b in session.query(PackBattle).filter_by(status="lobby").all()]
 
 
+def _loot_by_battle(session, battle_ids):
+    """Botín REAL de cada batalla: la suma del valor asegurado de todas sus cartas, que es lo que
+    se lleva el ganador. Una sola consulta agrupada — hacerlo por batalla serían N consultas por
+    cada listado. Devuelve USD (insured_value ya va en USD, no en unidades base)."""
+    if not battle_ids:
+        return {}
+    rows = session.execute(
+        select(BattlePull.battle_id, func.coalesce(func.sum(BattlePull.insured_value), 0.0))
+        .where(BattlePull.battle_id.in_(battle_ids))
+        .group_by(BattlePull.battle_id))
+    return {bid: float(total or 0.0) for bid, total in rows}
+
+
 def list_battles(session, recent_limit=25):
     """Powers the Live-games filters. Returns open lobbies + live (running) games + the most
     recent settled games (global, newest first, capped). Each row carries `status`, `winner`
@@ -136,12 +149,17 @@ def list_battles(session, recent_limit=25):
                .filter(PackBattle.status == "settled")
                .order_by(PackBattle.settled_at.desc())
                .limit(recent_limit).all())
+    # Solo las terminadas tienen botín cerrado; en una partida en curso la suma iría creciendo
+    # ronda a ronda y no sería "lo que se ganó".
+    loot = _loot_by_battle(session, [b.id for b in recents])
     rows = []
     for b in actives + recents:
         row = _battle_row(session, b)
         row.update(status=b.status, winner=b.winner,
                    created_at=b.created_at.isoformat() if b.created_at else None,
                    settled_at=b.settled_at.isoformat() if b.settled_at else None)
+        if b.status == "settled":
+            row["loot_usd"] = loot.get(b.id, 0.0)
         rows.append(row)
     return rows
 

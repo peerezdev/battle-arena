@@ -23,6 +23,8 @@ export interface LiveBattle {
   winner?: string | null
   createdAt?: string        // ISO — ordering for active games
   settledAt?: string | null // ISO — ordering for Recent
+  /** Real loot won (USD), settled games only. `pot` is the ESTIMATE; this is what actually dropped. */
+  lootUsd?: number
 }
 
 export const MOCK_DROPS: DropItem[] = [

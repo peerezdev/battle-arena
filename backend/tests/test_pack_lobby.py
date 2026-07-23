@@ -237,3 +237,35 @@ def test_list_battles_covers_lobby_running_and_recent_settled(session):
     void = create_battle(session, "WF", "wid-f", machine_code="pokemon_50", price=50_000_000, max_players=2)
     void.status = "voided"; session.commit()
     assert void.id not in {r["id"] for r in list_battles(session)}
+
+
+def test_una_batalla_terminada_lleva_el_botin_real_de_sus_cartas(session):
+    """loot_usd es la suma del valor asegurado, que es lo que se lleva el ganador — no el bote
+    estimado que el cliente calcula con precio × tiradas."""
+    from app.models import BattlePull
+    b = create_battle(session, "WA", "wid-a", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    b.status, b.winner, b.settled_at = "settled", "WA", datetime.now(timezone.utc)
+    session.add(BattlePull(battle_id=b.id, player_wallet="WA", memo="m1", round_number=1, insured_value=120.5))
+    session.add(BattlePull(battle_id=b.id, player_wallet="WB", memo="m2", round_number=1, insured_value=30.25))
+    session.commit()
+
+    row = {r["id"]: r for r in list_battles(session)}[b.id]
+    assert row["loot_usd"] == 150.75
+
+
+def test_una_terminada_sin_cartas_lleva_botin_cero_no_ausente(session):
+    """Sin esto el cliente no distingue 'no hubo botín' de 'el backend no lo manda'."""
+    b = create_battle(session, "WA", "wid-a", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    b.status, b.winner, b.settled_at = "settled", "WA", datetime.now(timezone.utc)
+    session.commit()
+    assert {r["id"]: r for r in list_battles(session)}[b.id]["loot_usd"] == 0.0
+
+
+def test_las_partidas_en_curso_no_llevan_botin(session):
+    """En una partida viva la suma crecería ronda a ronda; no es 'lo que se ganó'."""
+    lobby = create_battle(session, "WC", "wid-c", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    run = create_battle(session, "WD", "wid-d", machine_code="pokemon_50", price=50_000_000, max_players=2)
+    join_battle(session, run.id, "WB", "wid-b")   # se llena → running
+    rows = {r["id"]: r for r in list_battles(session)}
+    assert "loot_usd" not in rows[lobby.id]
+    assert "loot_usd" not in rows[run.id]

@@ -59,6 +59,7 @@ export function openBattleToLive(b: OpenBattle, meWallet: string | null = null):
     winner: b.winner ?? null,
     createdAt: b.created_at,
     settledAt: b.settled_at ?? null,
+    lootUsd: b.loot_usd,   // settled rows only; `pot` above stays the estimate
     ...status,
   }
 }

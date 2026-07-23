@@ -31,6 +31,9 @@ export interface OpenBattle {
   // Present on the /pack-battles/list feed (open lobbies + live + recent settled); absent on /open.
   status?: BattleStatus; winner?: string | null
   created_at?: string; settled_at?: string | null   // ISO timestamps
+  // Real loot (USD): sum of the insured value of every card pulled. Settled rows only — while a
+  // game runs the sum keeps growing, so it isn't "what was won". Absent on every other status.
+  loot_usd?: number
 }
 
 export interface VerifyRound { round_number: number; client_seed: string; eliminated_wallet: string; tie_break_index: number | null }
