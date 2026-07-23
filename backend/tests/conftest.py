@@ -48,3 +48,8 @@ def privy_auth_headers(priv, app_id, wallet_addr):
     """Devuelve un dict de headers Authorization para autenticar como `wallet_addr`."""
     token = make_id_token(priv, app_id, [solana_embedded(wallet_addr)])
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"

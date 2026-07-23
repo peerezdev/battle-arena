@@ -114,6 +114,16 @@ MPL_CORE_PROGRAM = "CoREENxT6tW1HoK8ypY1SxRMZTcVPm7R94rH4PZNhX7d"
 _MPL_CORE_PK = Pubkey.from_string(MPL_CORE_PROGRAM)
 
 
+def read_core_owner(data: bytes) -> Optional[Pubkey]:
+    """MPL Core AssetV1: key(1) + owner(32). El dueño vive en el PROPIO asset — un Core no tiene
+    token account, así que es la única forma de saber quién lo tiene.
+    Devuelve None si el buffer está truncado."""
+    try:
+        return Pubkey(data[1:33])
+    except Exception:
+        return None
+
+
 def read_core_collection(data: bytes) -> Optional[Pubkey]:
     """MPL Core AssetV1: key(1) + owner(32) + update_authority enum.
     Variant 2 == Collection → next 32 bytes are the collection pubkey; variants 0/1 → None.
@@ -220,12 +230,26 @@ async def build_transfer(rpc_url: str, escrow: str, winner: str, mint: str, bloc
 
 
 async def nft_in_owner(rpc_url: str, owner: str, mint: str) -> bool:
-    """True iff `owner` holds >=1 of `mint` (any token program) on-chain."""
+    """True iff `owner` holds `mint` on-chain, sea cual sea el estándar.
+
+    Los Metaplex Core NO tienen token account: son una cuenta única del programa Core que guarda
+    su dueño dentro. Preguntando solo por token accounts (como hacía esto antes) un Core es
+    invisible por mucho que se sondee, así que el settle esperaba en balde y daba la carta por no
+    entregable — dejándola atrapada en el escrow aunque estuviera justo ahí.
+    """
+    info = await _get_account(rpc_url, mint)
+    if info is not None and info.get("owner") == MPL_CORE_PROGRAM:
+        holder = read_core_owner(base64.b64decode(info["data"][0]))
+        return holder is not None and str(holder) == owner
+
+    # SPL / Token-2022: el saldo vive en una token account del dueño.
     async with httpx.AsyncClient() as c:
         r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
                                         "params": [owner, {"mint": mint}, {"encoding": "jsonParsed"}]}, timeout=20)
         r.raise_for_status()
-        for a in (r.json().get("result") or {}).get("value", []):
+        # `.get("value", [])` NO protege de un null: si la clave existe con valor nulo devuelve
+        # None y el for revienta. Un RPC que responda value:null tumbaría el settle.
+        for a in ((r.json().get("result") or {}).get("value") or []):
             amt = a["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmountString"]
             if amt and float(amt) >= 1:
                 return True

@@ -231,8 +231,15 @@ from app.services.nft_transfer import nft_in_owner
 @respx.mock
 @pytest.mark.asyncio
 async def test_nft_in_owner_returns_true_when_holding():
-    """Returns True when a token account holds amount >= 1."""
+    """Returns True when a token account holds amount >= 1.
+
+    nft_in_owner mira primero el estándar (getAccountInfo) porque un Metaplex Core no tiene
+    token account; aquí el mint es SPL clásico, así que sigue resolviéndose por token accounts."""
     def handler(request):
+        import json as _j
+        if _j.loads(request.content)["method"] == "getAccountInfo":
+            return Response(200, json={"result": {"value": {
+                "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "data": ["", "base64"]}}})
         return Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"value": [
             {"account": {"data": {"parsed": {"info": {"tokenAmount": {"uiAmountString": "1"}}}}}}
         ]}})
@@ -244,5 +251,11 @@ async def test_nft_in_owner_returns_true_when_holding():
 @pytest.mark.asyncio
 async def test_nft_in_owner_returns_false_when_empty():
     """Returns False when the value list is empty (no token accounts found)."""
-    respx.post(RPC).mock(return_value=Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"value": []}}))
+    def handler(request):
+        import json as _j
+        if _j.loads(request.content)["method"] == "getAccountInfo":
+            return Response(200, json={"result": {"value": {
+                "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "data": ["", "base64"]}}})
+        return Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"value": []}})
+    respx.post(RPC).mock(side_effect=handler)
     assert await nft_in_owner(RPC, ESCROW, MINTS) is False
