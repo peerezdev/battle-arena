@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: null }) }))
 import { RoyaleReveal, RoyaleResult } from './RoyaleReveal'
@@ -20,9 +20,23 @@ const vm: RevealVM = {
 
 afterEach(() => vi.restoreAllMocks())
 
+// jsdom has no matchMedia, so useIsWide would silently report "narrow" and every test would
+// exercise the phone layout. Pin the viewport explicitly instead.
+function stubViewport(wide: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: wide, media: query,
+    addEventListener: () => {}, removeEventListener: () => {},
+    addListener: () => {}, removeListener: () => {}, onchange: null,
+    dispatchEvent: () => false,
+  }))
+}
+const stubFetch = () =>
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+
 describe('RoyaleReveal', () => {
   it('reduced motion shows the full board: alive count, me, and the eliminated player', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+    stubFetch()
+    stubViewport(true)
     render(<MemoryRouter><RoyaleReveal vm={vm} reducedMotion /></MemoryRouter>)
     expect(screen.getByText(/ALIVE/i)).toBeTruthy()                          // battle bar
     expect(screen.getAllByText('You')).toHaveLength(2)                       // standings row + player chip
@@ -53,9 +67,56 @@ describe('RoyaleReveal', () => {
   })
 
   it('reduced motion on a settled battle fires onComplete (prop wired into the hook)', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+    stubFetch()
+    stubViewport(true)
     const onComplete = vi.fn()
     render(<MemoryRouter><RoyaleReveal vm={{ ...vm, status: 'settled' }} reducedMotion onComplete={onComplete} /></MemoryRouter>)
     expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('RoyaleReveal · layout de móvil', () => {
+  const renderMobile = () => {
+    stubFetch()
+    stubViewport(false)
+    return render(<MemoryRouter><RoyaleReveal vm={vm} reducedMotion /></MemoryRouter>)
+  }
+
+  it('arranca en la pestaña Battle con la cabecera de ronda/vivos/bote', () => {
+    renderMobile()
+    expect(screen.getByRole('button', { name: /battle/i })).toBeTruthy()
+    expect(screen.getByText('ROUND')).toBeTruthy()
+    expect(screen.getByText('ALIVE')).toBeTruthy()
+    expect(screen.getByText('POT')).toBeTruthy()
+    // El panel lateral del desktop NO debe aparecer aquí: en móvil vive en su pestaña.
+    expect(screen.queryByText('STANDINGS')).toBeNull()
+  })
+
+  it('la pestaña Standings muestra la tabla con puesto, estado y total', () => {
+    renderMobile()
+    fireEvent.click(screen.getByRole('button', { name: /standings/i }))
+    expect(screen.getByText('OUT·R1')).toBeTruthy()   // B cayó en la ronda 1
+    expect(screen.getByText('$120')).toBeTruthy()     // total de A
+    expect(screen.getAllByText('no pulls yet')).toHaveLength(2)   // el fixture no trae tiradas
+  })
+
+  it('la vista Battle SIGUE MONTADA al pasar a Standings', () => {
+    // La ceremonia de la carta avanza con setTimeout y llama a onCardShown para mover el reveal.
+    // Si al cambiar de pestaña se desmontara, la batalla se congelaría mientras se lee la tabla.
+    renderMobile()
+    fireEvent.click(screen.getByRole('button', { name: /standings/i }))
+    expect(screen.getByText('ROUND')).toBeTruthy()
+  })
+
+  it('las anclas de emotes siguen a la pestaña visible, sin duplicarse', () => {
+    // throwEmote mide el rect del ancla: si las dos vistas estuvieran ancladas a la vez, cogería
+    // la oculta (0×0) y las burbujas caerían en la esquina.
+    renderMobile()
+    const anchors = () => [...document.querySelectorAll('[data-player-anchor]')]
+    expect(anchors()).toHaveLength(2)                       // un chip por jugador
+    const enChips = anchors()[0]!.textContent
+    fireEvent.click(screen.getByRole('button', { name: /standings/i }))
+    expect(anchors()).toHaveLength(2)                       // ahora las filas, no los chips
+    expect(anchors()[0]!.textContent).not.toBe(enChips)
   })
 })

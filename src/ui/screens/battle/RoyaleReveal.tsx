@@ -13,6 +13,7 @@ import { EmoteDock } from '../../emotes/EmoteDock'
 import { shortWallet, tintFor, medalColor } from './royaleShared'
 import { useIsWide } from '../../useIsWide'
 import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
+import { RoyaleRevealMobile } from './RoyaleRevealMobile'
 import { RoundBreakOverlay } from './RoundBreakOverlay'
 import { TieBreakRoulette } from './TieBreakRoulette'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
@@ -66,18 +67,24 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
 
   return (
     <div style={{ ...screenStyle, position: 'relative', minHeight: '100%', paddingBottom: 0 }}>
-      <div style={{ filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
-        {/* vertical battle bar (left) · stage (center) · standings (right) */}
-        <div style={{ display: 'grid', gridTemplateColumns: wide ? '224px minmax(0,1fr) 300px' : '1fr', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
-          <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
-            revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
-          <Stage activePlayer={activePlayer} activeName={activeName} isOpening={isOpening}
-            stagingCard={rv.stagingCard} revealKey={rv.stagingKey} reducedMotion={reducedMotion}
-            onCardShown={rv.onCardShown} />
-          <Standings vm={proj} name={name} activeWallet={activeWallet} />
-        </div>
-        {/* 1a · fila de chips de jugador (uno por jugador, ancla de emotes) */}
-        <ChipsRow players={proj.players} name={name} activeWallet={activeWallet} justEliminated={rv.justEliminated} reducedMotion={reducedMotion} />
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, filter: blurred ? 'blur(6px)' : 'none', transition: 'filter .3s ease' }}>
+        {wide ? (
+          <>
+            {/* vertical battle bar (left) · stage (center) · standings (right) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '224px minmax(0,1fr) 300px', gap: 16, alignItems: 'stretch', marginBottom: 16 }}>
+              <BattleBar proj={proj} totalPlayers={vm.players.length} alive={alive} entry={entry}
+                revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
+              <Stage activePlayer={activePlayer} activeName={activeName} isOpening={isOpening}
+                stagingCard={rv.stagingCard} revealKey={rv.stagingKey} reducedMotion={reducedMotion}
+                onCardShown={rv.onCardShown} />
+              <Standings vm={proj} name={name} activeWallet={activeWallet} />
+            </div>
+            {/* 1a · fila de chips de jugador (uno por jugador, ancla de emotes) */}
+            <ChipsRow players={proj.players} name={name} activeWallet={activeWallet} justEliminated={rv.justEliminated} reducedMotion={reducedMotion} />
+          </>
+        ) : (
+          <RoyaleRevealMobile vm={vm} proj={proj} rv={rv} name={name} reducedMotion={reducedMotion} />
+        )}
       </div>
       {rv.phase === 'roundBreak' && !reducedMotion && <RoundBreakOverlay vm={proj} name={name} upcomingRound={rv.upcomingRound} countdown={rv.countdown} />}
       {rv.phase === 'tieBreak' && !reducedMotion && <TieBreakRoulette tied={rv.tiedWallets} eliminated={rv.tieEliminated} nameOf={nameByWallet} reducedMotion={reducedMotion} />}

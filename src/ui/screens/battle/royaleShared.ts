@@ -20,3 +20,21 @@ export function tintFor(w: string): string {
 export function medalColor(rank: number): string {
   return rank === 1 ? '#f5c542' : rank === 2 ? '#c8d0da' : rank === 3 ? '#e8964e' : COLORS.muted
 }
+
+/**
+ * What to call a pull in a one-line summary: "Charizard VMAX", or "Common" when there's no usable
+ * name. Bot and mock pulls store the insured value in `name`, so the obvious template would render
+ * "150 · $150" — the same number twice, which reads like a bug. The rarity is always present and
+ * actually adds something, so it's the fallback.
+ *
+ * Returns the label only; callers render the value themselves so a long card name can truncate
+ * without swallowing the amount.
+ */
+export function pullTitle(
+  card: { name: string | null; rarity: string | null; insuredValue: number | null } | null,
+): string | null {
+  if (!card) return null
+  const name = card.name?.trim()
+  const isJustTheValue = !!name && Number(name) === (card.insuredValue ?? 0)
+  return name && !isJustTheValue ? name : (card.rarity ?? 'card')
+}
