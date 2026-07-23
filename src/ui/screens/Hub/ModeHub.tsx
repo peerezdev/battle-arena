@@ -82,7 +82,11 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
         </div>
         {lastRoyale && (
           <div style={{ flex: 'none', width: sideBySide ? 340 : 'auto' }}>
-            <LastRoyaleCard battle={lastRoyale} onOpen={(b) => navigate(`/play/battle/${b.id}?view=result`)} />
+            <LastRoyaleCard
+              battle={lastRoyale}
+              onOpen={(b) => navigate(`/play/battle/${b.id}?view=result`)}
+              onReplay={(b) => navigate(`/play/battle/${b.id}`)}
+            />
           </div>
         )}
       </div>

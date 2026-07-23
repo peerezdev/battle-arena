@@ -36,7 +36,11 @@ function agoLabel(iso?: string | null): string | null {
  * Live-games grid, but it answers one question: what did the entry cost, and what did the winner
  * actually take home.
  */
-export function LastRoyaleCard({ battle: b, onOpen }: { battle: LiveBattle; onOpen: (b: LiveBattle) => void }) {
+export function LastRoyaleCard({ battle: b, onOpen, onReplay }: {
+  battle: LiveBattle
+  onOpen: (b: LiveBattle) => void      // straight to the final standings
+  onReplay: (b: LiveBattle) => void    // play the round-by-round reveal again
+}) {
   const { machines } = useMachineList()
   const machine = useMemo(() => {
     const code = b.machineCodes?.[0] ?? b.title
@@ -134,15 +138,30 @@ export function LastRoyaleCard({ battle: b, onOpen }: { battle: LiveBattle; onOp
             </span>
           </div>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onOpen(b) }}
-          style={{
-            flex: 'none', border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text,
-            borderRadius: 12, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-          }}
-        >
-          Result
-        </button>
+        <div style={{ flex: 'none', display: 'flex', gap: 8 }}>
+          {/* Replay = the battle route without ?view=result, which lets the reveal run again. */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onReplay(b) }}
+            title="Watch the reveal again"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted,
+              borderRadius: 12, padding: '10px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5v14l11-7z" /></svg>
+            Replay
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpen(b) }}
+            style={{
+              border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text,
+              borderRadius: 12, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            Result
+          </button>
+        </div>
       </div>
     </div>
   )
