@@ -91,7 +91,7 @@ export function NextBattlePanel({ mode, currentBattleId, meWallet, compact = fal
             background: '#ff2e7e', color: '#fff', fontFamily: FONTS.display, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
           }}
         >
-          Join battle →
+          View lobby →
         </button>
       </Shell>
     )
@@ -112,7 +112,7 @@ export function NextBattlePanel({ mode, currentBattleId, meWallet, compact = fal
           background: '#ff2e7e', color: '#fff', fontFamily: FONTS.display, fontSize: 13, fontWeight: 700, cursor: 'pointer',
         }}
       >
-        Join next battle →
+        View lobby →
       </button>
     </Shell>
   )
