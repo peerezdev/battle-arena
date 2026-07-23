@@ -13,8 +13,12 @@ export function Hub() {
   // Warm the machine catalogue so the Pack/Royale pages open with machines ready.
   useEffect(() => { void loadMachineList() }, [])
 
+  // flexShrink 0 matters: <main> is a flex column with a fixed height and a bottom padding that
+  // reserves room for the mobile nav + radio bar. As a shrinkable flex item this page collapsed to
+  // that padded height and spilled its content OUT of the padding box, so the last banner's CTA
+  // ended up underneath the bottom nav. Laying out at natural height keeps it inside.
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       {/* Ticker hidden for now — re-add <BigPullTicker meWallet={useEmbeddedSolanaAddress()} /> to bring it back. */}
       <div style={{ padding: '24px clamp(16px,3vw,32px) 0', display: 'flex', flexDirection: 'column', gap: 26 }}>
         <Banner
