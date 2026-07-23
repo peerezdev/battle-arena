@@ -21,13 +21,12 @@ describe('CardPoolGrid · paginación', () => {
     expect(screen.queryByRole('button', { name: /load more/i })).toBeNull()
   })
 
-  it('dice cuántas se ven del total mientras falten páginas', () => {
-    // El total pelado se leía como "y aquí están las cartas", que es justo el fallo original.
+  it('la cabecera muestra el total de la máquina, aunque falten páginas por cargar', () => {
     render(<CardPoolGrid {...base} cards={cards(100)} liveCount={733} onLoadMore={vi.fn()} hasMore />)
-    expect(screen.getByText(/100 OF 733 CARDS SHOWN/)).toBeTruthy()
+    expect(screen.getByText(/733 - CARDS IN THIS MACHINE/)).toBeTruthy()
   })
 
-  it('con el pool entero cargado vuelve al total a secas y esconde el botón', () => {
+  it('con el pool entero cargado la cabecera sigue igual y se esconde el botón', () => {
     render(<CardPoolGrid {...base} cards={cards(118)} liveCount={118} onLoadMore={vi.fn()} hasMore={false} />)
     expect(screen.getByText(/118 - CARDS IN THIS MACHINE/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /load more/i })).toBeNull()

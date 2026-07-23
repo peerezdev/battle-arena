@@ -95,11 +95,7 @@ export function CardPoolGrid({
                 display: 'inline-block',
               }}
             />
-            {/* While the pool is still loading in pages, say how many of them are actually on
-                screen — the bare total read as "and here they are". */}
-            {cards.length > 0 && cards.length < liveCount
-              ? `${cards.length} OF ${liveCount} CARDS SHOWN`
-              : `${liveCount} - CARDS IN THIS MACHINE`}
+            {liveCount} - CARDS IN THIS MACHINE
           </span>
         )}
       </div>
