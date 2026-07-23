@@ -142,7 +142,10 @@ export function WaitingRoom({
 
         <div style={{ display: 'grid', gridTemplateColumns: wide ? `minmax(0,1fr) ${battle.max_players > 5 ? 448 : 330}px` : '1fr' }}>
           {/* ── left: packs + odds ── */}
-          <div style={{ padding: 'clamp(18px,2.2vw,26px) clamp(18px,2.4vw,30px)' }}>
+          {/* On mobile (single column) the players rail is ordered ABOVE this, so the seats and the
+              join/cancel buttons land first, without scrolling past the pack detail. On desktop
+              both order 0 → source order → packs on the left, rail on the right, unchanged. */}
+          <div style={{ order: wide ? 0 : 2, padding: 'clamp(18px,2.2vw,26px) clamp(18px,2.4vw,30px)' }}>
             {/* lineup / sequence */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14, minHeight: 36, flexWrap: 'wrap' }}>
               <span style={lbl}>{isPB ? `OPENING SEQUENCE · ${totalBoxes} PACK${totalBoxes > 1 ? 'S' : ''}` : 'ROOM PACK'}</span>
@@ -225,8 +228,10 @@ export function WaitingRoom({
             </div>
           </div>
 
-          {/* ── right rail: players ── */}
-          <div style={{ padding: 'clamp(18px,2.2vw,26px) 24px', borderLeft: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.015)', display: 'flex', flexDirection: 'column' }}>
+          {/* ── right rail: players (mobile: ordered first, see the note above) ── */}
+          {/* Border follows the position: a divider on the LEFT of the desktop column, but BELOW it
+              on mobile where it sits on top of the pack detail. */}
+          <div style={{ order: wide ? 0 : 1, padding: 'clamp(18px,2.2vw,26px) 24px', borderLeft: wide ? `1px solid ${COLORS.border}` : 'none', borderBottom: wide ? 'none' : `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.015)', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
               <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.24em', color: COLORS.muted }}>PLAYERS</span>
               <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.text, fontWeight: 700 }}>{battle.players.length}<span style={{ color: '#5c6675' }}>/{battle.max_players}</span></span>
@@ -254,7 +259,7 @@ export function WaitingRoom({
                       <div style={{ fontSize: 12.5, color: COLORS.muted }}>Open slot</div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 9, color: '#5c6675' }}>SLOT {i + 1}</div>
                     </div>
-                    <button onClick={onJoinBot} disabled={joiningBot} style={{ flex: 'none', padding: '6px 11px', borderRadius: 9, border: `1px solid ${COLORS.violet}73`, background: `${COLORS.violet}1a`, color: COLORS.violet, cursor: joiningBot ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11.5, fontWeight: 700 }}>{joiningBot ? '…' : '+ Bot'}</button>
+                    {/* <button onClick={onJoinBot} disabled={joiningBot} style={{ flex: 'none', padding: '6px 11px', borderRadius: 9, border: `1px solid ${COLORS.violet}73`, background: `${COLORS.violet}1a`, color: COLORS.violet, cursor: joiningBot ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11.5, fontWeight: 700 }}>{joiningBot ? '…' : '+ Bot'}</button> */}
                   </div>
                 )
               }
