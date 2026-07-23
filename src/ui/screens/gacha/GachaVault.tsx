@@ -1,7 +1,7 @@
 // GachaVault — Polished gacha entry screen.
 // Shows machine selector, pack detail, and card pool grid.
 // Opening a pack uses the same buy() → sign → submit → poll → reveal flow as GachaScreen.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { useWallet } from '../../../wallet/useWallet'
@@ -236,18 +236,40 @@ export default function GachaVault() {
   }, [])
 
   // ── Load card pool when selected machine changes ────────────────────────────
-  useEffect(() => {
-    if (!selected) return
-    let cancelled = false
+  // A page at a time: these pools hold hundreds of cards (pokemon_50 has 733), and the heading
+  // already announces that total — so loading a single page of 24 claimed a pool it wasn't
+  // showing. 100 is the most the backend serves per request.
+  const POOL_PAGE = 100
+  const [poolPage, setPoolPage] = useState(1)
+  const [poolDone, setPoolDone] = useState(false)
+  const poolReq = useRef(0)
+
+  const loadPoolPage = useCallback((code: string, page: number) => {
+    const req = ++poolReq.current       // a machine switch mid-flight must not append to the new pool
     setCardsLoading(true)
     setCardsError(false)
+    fetchMachineCards(code, { page, limit: POOL_PAGE })
+      .then((batch) => {
+        if (req !== poolReq.current) return
+        setCards((prev) => {
+          const base = page === 1 ? [] : prev
+          const seen = new Set(base.map((c) => c.nft_address))
+          return base.concat(batch.filter((c) => !c.nft_address || !seen.has(c.nft_address)))
+        })
+        setPoolPage(page)
+        setPoolDone(batch.length < POOL_PAGE)   // short page = end of pool; the response has no total
+      })
+      .catch(() => { if (req === poolReq.current) setCardsError(true) })
+      .finally(() => { if (req === poolReq.current) setCardsLoading(false) })
+  }, [])
+
+  useEffect(() => {
+    if (!selected) return
     setCards([])
-    fetchMachineCards(selected.code, { limit: 24 })
-      .then((data) => { if (!cancelled) setCards(data) })
-      .catch(() => { if (!cancelled) setCardsError(true) })
-      .finally(() => { if (!cancelled) setCardsLoading(false) })
-    return () => { cancelled = true }
-  }, [selected?.code])
+    setPoolPage(1)
+    setPoolDone(false)
+    loadPoolPage(selected.code, 1)
+  }, [selected?.code, loadPoolPage])
 
   // ── Buy / open flow (mirrors GachaScreen.buy) ──────────────────────────────
   async function retryOpen(memo: string) {
@@ -557,10 +579,14 @@ export default function GachaVault() {
         const poolEl = (
           <CardPoolGrid
             cards={cards}
-            loading={cardsLoading}
+            loading={cardsLoading && cards.length === 0}
             liveCount={machineCardCount(selected.stock) ?? undefined}
-            error={cardsError}
+            error={cardsError && cards.length === 0}
             machineCode={selected.code}
+            onLoadMore={() => loadPoolPage(selected.code, poolPage + 1)}
+            hasMore={!poolDone}
+            loadingMore={cardsLoading}
+            loadMoreError={cardsError && cards.length > 0}
           />
         )
         const panelEl = (

@@ -12,6 +12,12 @@ interface Props {
   liveCount?: number
   error?: boolean
   machineCode: string
+  // Paging. These pools hold hundreds of cards, so callers load them a page at a time and pass
+  // the controls in; omit them all and the grid just renders whatever `cards` it was given.
+  onLoadMore?: () => void
+  hasMore?: boolean
+  loadingMore?: boolean
+  loadMoreError?: boolean
 }
 
 const RARITY_COLOR: Record<string, string> = {
@@ -21,7 +27,10 @@ const RARITY_COLOR: Record<string, string> = {
   common: RARITY.common,
 }
 
-export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: Props) {
+export function CardPoolGrid({
+  cards, loading, liveCount, error, machineCode,
+  onLoadMore, hasMore = false, loadingMore = false, loadMoreError = false,
+}: Props) {
   const reduced = useReducedMotion()
   const wideCols = useIsWide('(min-width: 560px)')
   const [selected, setSelected] = useState<MachineCard | null>(null)
@@ -86,7 +95,11 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
                 display: 'inline-block',
               }}
             />
-            {liveCount} - CARDS IN THIS MACHINE
+            {/* While the pool is still loading in pages, say how many of them are actually on
+                screen — the bare total read as "and here they are". */}
+            {cards.length > 0 && cards.length < liveCount
+              ? `${cards.length} OF ${liveCount} CARDS SHOWN`
+              : `${liveCount} - CARDS IN THIS MACHINE`}
           </span>
         )}
       </div>
@@ -273,6 +286,30 @@ export function CardPoolGrid({ cards, loading, liveCount, error, machineCode }: 
             )
           })}
         </motion.div>
+      )}
+
+      {/* Paging footer — only when the caller wired it up */}
+      {!loading && !error && cards.length > 0 && onLoadMore && (hasMore || loadMoreError) && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingTop: 18 }}>
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            style={{
+              border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.03)',
+              color: loadingMore ? COLORS.muted : COLORS.text, borderRadius: 11,
+              padding: '10px 22px', fontFamily: FONTS.body, fontSize: 13, fontWeight: 600,
+              cursor: loadingMore ? 'default' : 'pointer',
+            }}
+          >
+            {loadingMore ? 'Loading…' : loadMoreError ? 'Try again' : 'Load more'}
+          </button>
+          {loadMoreError && (
+            <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>
+              Couldn't load more cards.
+            </span>
+          )}
+        </div>
       )}
       {selected && <CardDetailsModal card={selected} onClose={() => setSelected(null)} />}
     </div>

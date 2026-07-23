@@ -318,29 +318,11 @@ export function WaitingRoom({
                 loading={(pools[poolCode]?.loading ?? true) && !pools[poolCode]?.cards.length}
                 error={pools[poolCode]?.error && !pools[poolCode]?.cards.length}
                 machineCode={poolCode}
+                onLoadMore={() => loadPoolPage(poolCode, (pools[poolCode]?.page ?? 0) + 1)}
+                hasMore={!pools[poolCode]?.done}
+                loadingMore={!!pools[poolCode]?.loading}
+                loadMoreError={!!pools[poolCode]?.error && !!pools[poolCode]?.cards.length}
               />
-              {!!pools[poolCode]?.cards.length && !pools[poolCode].done && (
-                <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 18 }}>
-                  <button
-                    type="button"
-                    onClick={() => loadPoolPage(poolCode, pools[poolCode].page + 1)}
-                    disabled={pools[poolCode].loading}
-                    style={{
-                      border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.03)',
-                      color: pools[poolCode].loading ? COLORS.muted : COLORS.text,
-                      borderRadius: 11, padding: '10px 22px', fontFamily: FONTS.body,
-                      fontSize: 13, fontWeight: 600, cursor: pools[poolCode].loading ? 'default' : 'pointer',
-                    }}
-                  >
-                    {pools[poolCode].loading ? 'Loading…' : 'Load more'}
-                  </button>
-                </div>
-              )}
-              {pools[poolCode]?.error && !!pools[poolCode].cards.length && (
-                <div style={{ textAlign: 'center', paddingTop: 12, fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red }}>
-                  Couldn't load more cards. Try again.
-                </div>
-              )}
             </div>
           </div>
         </div>
