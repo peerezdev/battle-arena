@@ -150,7 +150,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
             rarity={stagingCard.rarity} reduced={reducedMotion} width={CARD_W} height={CARD_H}
-            dwellMs={CARD_DWELL_MS} onCardShown={onCardShown}>
+            dwellMs={CARD_DWELL_MS} stacked onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={CARD_W} h={CARD_H} />
           </StagedCardReveal>
         : <CardBack width={CARD_W} height={CARD_H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}

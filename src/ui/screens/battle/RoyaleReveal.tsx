@@ -196,10 +196,10 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
   activePlayer: RevealPlayerVM | null; activeName: string | null; isOpening: boolean
   stagingCard: RevealCardVM | null; revealKey: string | null; reducedMotion: boolean; onCardShown: () => void
 }) {
-  const W = 200, H = 280
+  const W = 200, H = 330
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
       borderRadius: 16, minHeight: H + 88, padding: 'clamp(16px,2vw,24px)',
       background: 'radial-gradient(60% 90% at 50% 40%,rgba(0,255,196,.08),transparent 70%)', border: `1px solid ${COLORS.border}`,
     }}>
@@ -217,7 +217,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {/* card ceremony */}
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
-            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} dwellMs={CARD_DWELL_MS} onCardShown={onCardShown}>
+            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} dwellMs={CARD_DWELL_MS} stacked onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} />
           </StagedCardReveal>
         : <CardBack width={W} height={H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}
