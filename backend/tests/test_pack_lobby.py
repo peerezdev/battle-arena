@@ -2,7 +2,7 @@ import pytest
 from app.db import make_engine, make_session_factory, init_db
 from app.models import PackBattle, BattlePlayer
 from app.services.pack_lobby import (create_battle, join_battle, list_open, list_battles,
-                                      get_battle, LobbyError, ModeNotSupported)
+                                      get_battle, join_event, LobbyError, ModeNotSupported)
 from datetime import datetime, timezone
 
 @pytest.fixture
@@ -269,3 +269,27 @@ def test_las_partidas_en_curso_no_llevan_botin(session):
     rows = {r["id"]: r for r in list_battles(session)}
     assert "loot_usd" not in rows[lobby.id]
     assert "loot_usd" not in rows[run.id]
+
+
+# ── join_event: qué se avisa por WS cuando alguien entra a un lobby ──────────────
+def test_join_event_pack_avisa_cada_union():
+    ev = join_event(battle_id="b", mode="pack", players=["A", "B"],
+                    joiner_wallet="B", joiner_name="Bob", filled=False)
+    assert ev["type"] == "battle_join"
+    assert ev["joiner"] == "B" and ev["joiner_name"] == "Bob"
+    assert ev["players"] == ["A", "B"] and ev["battle_id"] == "b"
+
+
+def test_join_event_royale_calla_hasta_llenarse():
+    # Un royale que se va llenando dispararía un toast por asiento → silencio hasta que arranque.
+    assert join_event(battle_id="b", mode="royale", players=["A", "B"],
+                      joiner_wallet="B", joiner_name="Bob", filled=False) is None
+
+
+def test_join_event_al_llenarse_avisa_arranque_en_ambos_modos():
+    for mode in ("pack", "royale"):
+        ev = join_event(battle_id="b", mode=mode, players=["A", "B"],
+                        joiner_wallet="B", joiner_name="Bob", filled=True)
+        assert ev["type"] == "battle_start" and ev["mode"] == mode
+        assert "joiner" not in ev   # el arranque no nombra a nadie
+        assert ev["players"] == ["A", "B"]

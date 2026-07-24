@@ -31,7 +31,7 @@ from .models import GachaPack, PackBattle, BattlePlayer, BattlePack
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
                    recent_chat_messages, big_hit_multiple)
 from .services.pack_lobby import (
-    create_battle, join_battle,
+    create_battle, join_battle, join_event,
     list_open as lobby_list_open,
     list_battles as lobby_list_battles,
     get_battle, cancel_battle, verification, LobbyError,
@@ -1049,6 +1049,7 @@ def create_app(session_factory, chain: ChainSource,
                 raise HTTPException(409, str(e))
             if filled:
                 _spawn(_run_royale_bg(battle_id))
+            await _broadcast_join_event(s, b, wallet, filled)
             return get_battle(s, battle_id)
 
         # Default: pack mode
@@ -1060,6 +1061,7 @@ def create_app(session_factory, chain: ChainSource,
         reserve(s, wallet, battle_id, b.price)
         if filled:
             _spawn(_run_bg(battle_id))
+        await _broadcast_join_event(s, b, wallet, filled)
         return get_battle(s, battle_id)
 
     def _rematch_body(fin: PackBattle, s: Session) -> CreateBattleBody:
@@ -1338,6 +1340,21 @@ def create_app(session_factory, chain: ChainSource,
             await _chat_mgr.broadcast(msg)
         except Exception:
             logger.exception("chat announce failed")
+
+    async def _broadcast_join_event(s: Session, battle, joiner_wallet: str, filled: bool) -> None:
+        """Push a WS event so a lobby's participants get toasted when someone joins (pack) or the
+        lobby fills and starts (any mode). Client-side filtered by `players`, like the rematch toast.
+        Never raises — a failed broadcast must not fail the join."""
+        try:
+            players = [p.player_wallet for p in
+                       s.query(BattlePlayer).filter_by(battle_id=battle.id).all()]
+            name = read_user_view(s, joiner_wallet, elo_start).get("alias") or abbreviate(joiner_wallet)
+            ev = join_event(battle_id=battle.id, mode=battle.mode, players=players,
+                            joiner_wallet=joiner_wallet, joiner_name=name, filled=filled)
+            if ev is not None:
+                await _chat_mgr.broadcast(ev)
+        except Exception:
+            logger.exception("battle join/start broadcast failed")
 
     async def _announce_created(battle, stake_base: int, mode: str, creator_name: str) -> None:
         """Live-only ping when a joinable battle is created — rendered as a chat event

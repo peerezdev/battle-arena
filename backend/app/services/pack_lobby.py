@@ -63,6 +63,19 @@ def join_battle(session, battle_id, player_wallet, player_wallet_id):
     return b, filled
 
 
+def join_event(*, battle_id, mode, players, joiner_wallet, joiner_name, filled):
+    """The WS event a successful join should broadcast to the lobby's participants — or None to
+    stay quiet. Pack Battle announces each human join ('battle_join'); a royale stays silent until
+    it fills, since a filling royale would fire a toast to every seat. A join that fills the lobby
+    announces only the start ('battle_start'), never a join too. Pure so the mode split is testable."""
+    if filled:
+        return {"type": "battle_start", "battle_id": battle_id, "mode": mode, "players": players}
+    if mode == "pack":
+        return {"type": "battle_join", "battle_id": battle_id, "mode": mode,
+                "players": players, "joiner": joiner_wallet, "joiner_name": joiner_name}
+    return None
+
+
 def cancel_battle(session, battle_id, wallet) -> PackBattle:
     b = session.get(PackBattle, battle_id)
     if b is None:

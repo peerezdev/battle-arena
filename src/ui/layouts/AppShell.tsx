@@ -16,6 +16,7 @@ import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
 import { useChat } from '../../hooks/useChat'
 import { RematchToastHost } from '../components/RematchToast'
+import { BattleAlertsHost } from '../components/BattleAlertsHost'
 import { OnboardingTutorial } from '../components/OnboardingTutorial'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
@@ -450,6 +451,7 @@ export function AppShell() {
 
       <Toaster bottomOffset={wideRail ? 24 : mobileRadioBar ? 148 : 92} />
       <RematchToastHost />   {/* app-wide rematch challenge toast (bottom-centre) */}
+      <BattleAlertsHost />   {/* app-wide join / battle-starting toasts */}
 
       {/* ── ONBOARDING — first-visit guided tour ──────────────────────────── */}
       {showOnboarding && <OnboardingTutorial onClose={dismissOnboarding} reducedMotion={reducedMotion} />}
