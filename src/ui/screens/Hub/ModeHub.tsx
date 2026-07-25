@@ -34,7 +34,6 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   const sideBySide = useIsWide('(min-width: 980px)')
   const [createOpen, setCreateOpen] = useState(false)
   const [demoOpen, setDemoOpen] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
 
   // Warm the machine catalogue so Create Battle opens with machines ready.
   useEffect(() => { void loadMachineList() }, [])
@@ -47,23 +46,25 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   // Recap card beside Quick Match. Royale page only, and only once a royale has actually finished.
   const lastRoyale = mode === 'royale' ? lastSettledRoyale(liveBattles) : null
 
+  // Los fallos de estas acciones van SIEMPRE por toast. El aviso nace de pulsar un botón de una
+  // card, y un banner sobre la lista deja el mensaje lejos de lo que lo provocó — y encima
+  // desplaza las cards al aparecer.
+  const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
   function onCancel(b: LiveBattle) {
-    setActionError(null)
-    if (!identityToken) { setActionError('Sign in to cancel.'); return }
-    cancelBattle(identityToken, b.id).catch((e) => setActionError(e instanceof Error ? e.message : String(e)))
+    if (!identityToken) { showToast('Sign in to cancel'); return }
+    cancelBattle(identityToken, b.id).catch((e) => showToast(errMsg(e)))
   }
 
   function onBattleAction(b: LiveBattle) {
-    setActionError(null)
     if (b.action === 'watch') { navigate('/play/battle/' + b.id); return }
-    if (!identityToken) { setActionError('Sign in to join.'); return }
+    if (!identityToken) { showToast('Sign in to join'); return }
     gate.requireDelegation(async () => {
       try {
         await joinBattle(identityToken, b.id)
         navigate('/play/battle/' + b.id)
       } catch (e) {
-        const m = e instanceof Error ? e.message : String(e)
-        setActionError(m); showToast(m)
+        showToast(errMsg(e))   // p. ej. fondos insuficientes, o alguien llenó el hueco antes
       }
     })
   }
@@ -92,7 +93,6 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
       </div>
 
       <div>
-        {actionError && (<div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.red, margin: '0 0 12px' }}>{actionError}</div>)}
         {/* Battle Royale uses the new wide lobby card; Pack Battle keeps the compact LiveBattles grid. */}
         {mode === 'royale' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
