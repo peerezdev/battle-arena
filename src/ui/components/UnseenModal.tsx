@@ -59,9 +59,13 @@ export function UnseenModal({
               {sectionLabel(`${nb} battle${nb === 1 ? '' : 's'} to see`)}
               {battles.map((b) => {
                 const [prefix, suffix] = packTitle(b.machine_code)
-                const voided = b.status === 'voided'
-                const tint = voided ? COLORS.muted : b.won ? COLORS.green : COLORS.red
-                const label = voided ? 'Voided · refunded' : b.won ? 'You won' : 'You lost'
+                // Anulada y cancelada comparten trato: entrada devuelta, nada que revelar → una
+                // sola acción ("View"), que sólo confirma qué pasó con la partida.
+                const refunded = b.status === 'voided' || b.status === 'cancelled'
+                const tint = refunded ? COLORS.muted : b.won ? COLORS.green : COLORS.red
+                const label = b.status === 'cancelled' ? 'Cancelled · refunded'
+                  : b.status === 'voided' ? 'Voided · refunded'
+                  : b.won ? 'You won' : 'You lost'
                 return (
                   <div key={b.battle_id} style={{ display: 'flex', alignItems: 'center', gap: 10,
                     background: COLORS.panel2, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: '10px 12px' }}>
@@ -70,10 +74,10 @@ export function UnseenModal({
                         {b.mode === 'royale' ? 'Royale' : 'Pack Battle'} · {prefix} {suffix}
                       </div>
                       <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: tint, marginTop: 2 }}>
-                        {label}{!voided && ` · ${b.amount_usd >= 0 ? '+' : '−'}${formatUsd(Math.abs(b.amount_usd))}`}
+                        {label}{!refunded && ` · ${b.amount_usd >= 0 ? '+' : '−'}${formatUsd(Math.abs(b.amount_usd))}`}
                       </div>
                     </div>
-                    {voided
+                    {refunded
                       ? ghost('View', () => onResultBattle(b))
                       : (<div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                           {ghost('Watch', () => onWatchBattle(b), 'w')}

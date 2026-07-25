@@ -128,7 +128,7 @@ export interface UnseenBattle {
   battle_id: string
   mode: 'pack' | 'royale'
   machine_code: string
-  status: 'settled' | 'voided'
+  status: 'settled' | 'voided' | 'cancelled'
   won: boolean
   amount_usd: number
   settled_at: string | null

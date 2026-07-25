@@ -102,11 +102,15 @@ export function AppShell() {
   // Se congela el saldo mientras QUEDE algo sin ver: un sobre por abrir (el turbo ya movió el
   // USDC) o una batalla sin ver (ganar acredita el botín antes de que lo veas). Se suelta cuando
   // ambas listas quedan vacías, es decir cuando ya vio todo.
-  const hasUnseen = pendingPacks.length > 0 || unseenBattles.length > 0
+  // …pero SOLO por lo que puede destripar algo. Un reembolso (anulada o cancelada por el creador)
+  // devuelve la entrada y no tiene resultado que revelar, así que congelar el saldo por él no
+  // protege nada: solo deja un "—" donde debería ir el dinero, y encima al recargar, porque en
+  // frío el saldo ni llega a cargarse.
+  const hasSpoiler = pendingPacks.length > 0 || unseenBattles.some((b) => b.status === 'settled')
   useEffect(() => {
-    if (!hasUnseen) return
+    if (!hasSpoiler) return
     return holdBalance()
-  }, [hasUnseen])
+  }, [hasSpoiler])
 
   function goBattle(b: UnseenBattle, straightToResult: boolean) {
     setPendingOpen(false)

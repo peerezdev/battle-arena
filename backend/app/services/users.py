@@ -142,15 +142,18 @@ def read_unseen_battles(session: Session, wallet: str, limit: int = 30) -> list[
         .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
         .where(BattlePlayer.player_wallet == wallet,
                BattlePlayer.seen_at.is_(None),
-               PackBattle.status.in_(("settled", "voided")))
+               PackBattle.status.in_(("settled", "voided", "cancelled")))
         .order_by(desc(PackBattle.settled_at), desc(PackBattle.created_at))
         .limit(limit)
     ))
     out = []
     for b, _ in rows:
-        voided = b.status == "voided"
-        won = (not voided) and b.winner == wallet
-        if voided:
+        # Anulada o cancelada por el creador: en ambas se devuelve la entrada y no hay resultado
+        # que enseñar. Se listan igual para que el jugador se entere de que su partida ya no existe
+        # — sin esto, una batalla a la que se unió desaparecía sin explicación.
+        refunded = b.status in ("voided", "cancelled")
+        won = (not refunded) and b.winner == wallet
+        if refunded:
             amount = _entry_base_units(b) / USDC          # entrada devuelta (informativo)
         elif won:
             amount = (session.scalar(

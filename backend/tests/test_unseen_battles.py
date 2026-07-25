@@ -149,3 +149,22 @@ def test_backfill_marca_como_vistas_las_batallas_que_ya_existian():
     # pero una batalla NUEVA (posterior) sí aparece: el backfill fue de una sola vez
     _battle(s, "new", winner=WA, players=(WA,))
     assert [r["battle_id"] for r in read_unseen_battles(s, WA)] == ["new"]
+
+
+def test_una_cancelada_por_el_creador_aparece_con_la_entrada_devuelta():
+    """Si otro cancela el lobby al que me uní, la partida desaparecía sin más. Ahora se lista
+    para que el jugador se entere de qué pasó con su dinero."""
+    s = _session()
+    _battle(s, "c1", status="cancelled", players=(WA, WB), price=50_000_000)
+    rows = read_unseen_battles(s, WA)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "cancelled"
+    assert rows[0]["won"] is False
+    assert rows[0]["amount_usd"] == 50.0     # la entrada, devuelta (no en negativo)
+
+
+def test_una_cancelada_se_puede_marcar_como_vista():
+    s = _session()
+    _battle(s, "c1", status="cancelled", players=(WA,))
+    assert mark_battles_seen(s, WA, ["c1"]) == 1
+    assert read_unseen_battles(s, WA) == []
