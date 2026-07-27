@@ -3,6 +3,7 @@
 // no signing and NO FUNDS. The output is a `Battle` fed straight into battleToReveal().
 import type { Battle, BattlePullInfo, BattlePlayerState, BattleRoundInfo } from '../onchain/packBattleClient'
 import type { MachineCard } from '../onchain/gachaClient'
+import { royaleEntryUsd } from '../ui/screens/Hub/createBattleBody'
 
 export const DEMO_ME = 'You'
 
@@ -113,6 +114,9 @@ export function buildRoyaleDemo(pool: MachineCard[], odds: Record<string, number
   const players: BattlePlayerState[] = wallets.map((w) => ({ wallet: w, eliminated_round: elimRound[w], accumulated_value: acc[w] }))
   return {
     id: 'demo', mode: 'royale', machine_code: machineCode, price, max_players: numPlayers,
+    // Sin buyin, vm.entry sale 0 y el rail esconde el bloque ENTRY: la demo no enseñaba lo que
+    // costaría jugar, que es justo lo que el jugador necesita saber antes de pagar una plaza.
+    buyin: Math.round(royaleEntryUsd(numPlayers, price) * 1e6),
     status: 'settled', winner: alive[0], creator_wallet: DEMO_ME,
     players, rounds, server_seed_hash: null, pulls,
   }

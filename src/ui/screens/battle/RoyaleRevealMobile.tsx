@@ -3,6 +3,7 @@ import { COLORS, FONTS, formatUsd } from '../../theme'
 import { RevealCard } from './RevealCard'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
+import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { tintFor, shortWallet, pullTitle, POT_GOLD } from './royaleShared'
 import { revealOrderWallets, totalRounds, type RoyaleRevealState } from './useRoyaleReveal'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
@@ -150,7 +151,9 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
             rarity={stagingCard.rarity} reduced={reducedMotion} width={CARD_W} height={CARD_H}
-            dwellMs={CARD_DWELL_MS} stacked onCardShown={onCardShown}>
+            dwellMs={CARD_DWELL_MS} stacked
+            preloadSrc={stagingCard.nftAddress ? ccCardImageUrl(stagingCard.nftAddress) : undefined}
+            onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={CARD_W} h={CARD_H} valueColor={COLORS.text} />
           </StagedCardReveal>
         : <CardBack width={CARD_W} height={CARD_H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}

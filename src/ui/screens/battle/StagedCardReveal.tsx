@@ -21,7 +21,7 @@ export const STACK_T = { first: 120, step: 780, hold: 900 }
  *  Off by default — Pack Battle's small cards have no room for three stacked rows. */
 export function StagedCardReveal({
   year, grade, rarity, reduced, stepMs = 1700, dwellMs = 550, width = 180, height = 252,
-  stacked = false, onCardShown, children,
+  stacked = false, preloadSrc, onCardShown, children,
 }: {
   year: string | null
   grade: number | string | null
@@ -32,6 +32,8 @@ export function StagedCardReveal({
   width?: number
   height?: number
   stacked?: boolean   // show year/grade/rarity as a persistent column instead of one at a time
+  /** Imagen de la carta, para precargarla mientras corre la ceremonia (ver abajo). */
+  preloadSrc?: string
   onCardShown?: () => void
   children: ReactNode
 }) {
@@ -75,6 +77,15 @@ export function StagedCardReveal({
     at(STACK_T.first + Math.max(0, rows.length - 1) * STACK_T.step + STACK_T.hold, () => setFlipped(true))
     return () => timers.forEach(clearTimeout)
   }, [stacked, reduced, rows])
+
+  // La imagen se descargaba al montar la carta, o sea AL VOLTEAR: se veía el hueco vacío hasta
+  // que llegaba. Aquí se pide durante el año/grado/rareza, que dura segundos, así que al voltear
+  // ya está en caché del navegador. Si falla, RevealCard enseña su marcador — no hay que hacer nada.
+  useEffect(() => {
+    if (!preloadSrc) return
+    const img = new Image()
+    img.src = preloadSrc
+  }, [preloadSrc])
 
   const stage = stages[i]
   const onCard = stacked ? flipped : stage === 'card'

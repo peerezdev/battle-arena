@@ -215,7 +215,9 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {/* card ceremony */}
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
-            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} dwellMs={CARD_DWELL_MS} stacked onCardShown={onCardShown}>
+            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} dwellMs={CARD_DWELL_MS} stacked
+            preloadSrc={stagingCard.nftAddress ? ccCardImageUrl(stagingCard.nftAddress) : undefined}
+            onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} valueColor={COLORS.text} />
           </StagedCardReveal>
         : <CardBack width={W} height={H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}

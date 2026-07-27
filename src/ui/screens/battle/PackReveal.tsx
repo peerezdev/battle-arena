@@ -5,6 +5,7 @@ import { RevealCard, rarityColor } from './RevealCard'
 import { EmoteDock } from '../../emotes/EmoteDock'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
+import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { shortWallet } from './RoyaleReveal'
 import { useAliases } from '../../useAliases'
 import { useCountUp } from '../../useCountUp'
@@ -270,7 +271,9 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
       <div style={{ width: cardW, height: cardH }}>
         {roundReady && currentCard ? (
           <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
-            reduced={reducedMotion} width={cardW} height={cardH} onCardShown={onCardShown}>
+            reduced={reducedMotion} width={cardW} height={cardH}
+            preloadSrc={currentCard.nftAddress ? ccCardImageUrl(currentCard.nftAddress) : undefined}
+            onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
           </StagedCardReveal>
         ) : (
@@ -339,7 +342,9 @@ function MiniPanel({ player, name, round, roundReady, shownRounds, isHot, isWinn
         <div style={{ width: cardW, height: cardH }}>
           {roundReady && currentCard ? (
             <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
-              reduced={reducedMotion} width={cardW} height={cardH} onCardShown={onCardShown}>
+              reduced={reducedMotion} width={cardW} height={cardH}
+            preloadSrc={currentCard.nftAddress ? ccCardImageUrl(currentCard.nftAddress) : undefined}
+            onCardShown={onCardShown}>
               <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
             </StagedCardReveal>
           ) : (
