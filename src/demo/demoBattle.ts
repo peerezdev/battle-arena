@@ -73,15 +73,24 @@ export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>,
   const TEMP_N = 5
   const wallets = [DEMO_ME, ...Array.from({ length: TEMP_N - 1 }, () => fakeWallet(rng))]
   const cards = wallets.map(() => pickCard(byRarity, odds, rng))
-  cards.sort((x, y) => (y.insured_value ?? 0) - (x.insured_value ?? 0))
   const pulls: BattlePullInfo[] = wallets.map((w, i) => toPull(cards[i], 1, w))
-  pulls.slice(3).forEach((p) => { p.auto_sold = true })
+  // El ⚡ de auto-vendida se sortea por carta. Antes se marcaban las dos últimas de la lista
+  // ordenada, o sea siempre los mismos asientos: se leía como un guion, no como suerte.
+  pulls.forEach((p) => { p.auto_sold = rng() < 0.4 })
   const totals = cards.map(val)
   const players: BattlePlayerState[] = wallets.map((w, i) => ({ wallet: w, eliminated_round: null, accumulated_value: totals[i] }))
+  // Gana el valor más alto, como en el backend real (determine_winner suma por jugador y compara).
+  // Antes se ordenaban las cartas para dar la mejor al jugador y el ganador venía fijado: la demo
+  // enseñaba una partida que no se podía perder, y de paso el jugador veía siempre el valor más
+  // alto de la tirada — que es lo que hacía parecer que los valores estuvieran cableados.
+  const best = Math.max(...totals)
+  const tied = wallets.filter((_, i) => totals[i] === best)
+  // Empate: el backend lo resuelve con la semilla Provably-Fair; aquí no hay, así que se sortea.
+  const winner = tied[Math.floor(rng() * tied.length)]
   return {
     id: 'demo', mode: 'pack', machine_code: machineCode, price, max_players: TEMP_N,
     buyin: price * 1e6,
-    status: 'settled', winner: DEMO_ME, creator_wallet: DEMO_ME,
+    status: 'settled', winner, creator_wallet: DEMO_ME,
     players, rounds: [], server_seed_hash: null, pulls,
     packs: [{ machine_code: machineCode, sequence: 0, price }],
   }
