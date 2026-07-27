@@ -10,8 +10,12 @@ import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
 
-const DEMO_MACHINE = 'pokemon_50'
+const DEMO_MACHINE = 'pokemon_25'
 const ROYALE_PLAYERS = 10
+// Hasta qué página se muestrea cada rareza. Un pool grande (mainnet: 700 commons a 24 por
+// página) tiene ~30; en uno pequeño la página sale vacía y simplemente no aporta nada. Cuanto más
+// ancho el rango, menos veces cae dentro del bloque de cartas más caras (que son todas iguales).
+const MAX_SAMPLE_PAGE = 24
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -57,8 +61,18 @@ export function DemoFlow() {
         if (!m) throw new Error('No machines available')
         // Fetch per-rarity so the pool spans every tier (the unfiltered endpoint groups by rarity),
         // then the weighted pick reproduces the machine's real odds (mostly commons, rare epics).
+        //
+        // Y de cada rareza se piden DOS páginas, una fija y otra al azar, porque CC devuelve las
+        // cartas ORDENADAS POR VALOR: pedir solo la primera página daba las N más caras, que en
+        // mainnet son idénticas (las 24 primeras commons de pokemon_25 valen todas $29). Así la
+        // demo enseñaba siempre el mismo importe y parecía un número cableado.
         const rarities = Object.keys(m.odds)
-        const byRarity = await Promise.all(rarities.map((r) => fetchMachineCards(m.code, { rarity: r, limit: 24 }).catch(() => [] as MachineCard[])))
+        const pages = rarities.flatMap((r) => [
+          { rarity: r, page: 1 },
+          { rarity: r, page: 2 + Math.floor(Math.random() * MAX_SAMPLE_PAGE) },
+        ])
+        const byRarity = await Promise.all(pages.map(({ rarity, page }) =>
+          fetchMachineCards(m.code, { rarity, page, limit: 24 }).catch(() => [] as MachineCard[])))
         let cards: MachineCard[] = byRarity.flat()
         if (!cards.length) cards = await fetchMachineCards(m.code, { limit: 80 }).catch(() => [])
         if (!cards.length) throw new Error('No cards in the pool')
@@ -92,7 +106,7 @@ export function DemoFlow() {
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <DemoBadge onExit={exit} />
+      {/* <DemoBadge onExit={exit} /> */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {isRoyale ? (
           done
