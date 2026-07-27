@@ -366,10 +366,12 @@ function LootShowcase({ cards }: { cards: RevealCardVM[] }) {
         {featured.map((c, i) => (
           // La mejor se corona con el MISMO badge que ve el ganador (CardBadge dorado, encima de
           // la carta) en vez de un texto debajo: ganes o pierdas, "la mejor carta" se señala igual.
+          // Y con el mismo TAMAÑO que las demás: destaca por el badge y el brillo, no por ser
+          // más grande —igual que en la pantalla del ganador, donde todas miden 150×210.
           <div key={c.nftAddress ?? i} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             {i === 0 && <CardBadge label="⚡ BEST PULL" color="#ffd166" />}
             <div style={i === 0 ? { borderRadius: 12, boxShadow: '0 0 40px rgba(255,209,102,.2)' } : undefined}>
-              <RevealCard card={c} reducedMotion w={i === 0 ? 126 : 112} h={i === 0 ? 176 : 156} />
+              <RevealCard card={c} reducedMotion w={112} h={156} />
             </div>
           </div>
         ))}
