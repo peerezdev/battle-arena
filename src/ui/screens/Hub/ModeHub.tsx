@@ -7,6 +7,7 @@ import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
 import { RoyaleBattleWide } from './RoyaleBattleWide'
 import { LastRoyaleCard } from './LastRoyaleCard'
+import { RoyaleDemoNotice } from './RoyaleDemoNotice'
 import { lastSettledRoyale } from './lastRoyale'
 import { useIsWide } from '../../useIsWide'
 import { showToast } from '../../toast'
@@ -71,6 +72,9 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
 
   return (
     <div style={{ padding: '24px clamp(14px,2.4vw,28px) 44px', display: 'flex', flexDirection: 'column', gap: 26 }}>
+      {/* Arriba del todo: ver la demo ANTES de encontrarse con el precio y el botón de unirse. */}
+      {mode === 'royale' && <RoyaleDemoNotice />}
+
       {/* Quick Match with the last-royale recap to its right; stacks under it when there's no room. */}
       <div style={{ display: 'flex', flexDirection: sideBySide ? 'row' : 'column', alignItems: sideBySide ? 'center' : 'stretch', gap: 26 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
