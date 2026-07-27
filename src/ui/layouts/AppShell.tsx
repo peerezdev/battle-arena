@@ -25,7 +25,7 @@ import { UnseenModal } from '../components/UnseenModal'
 import { YoloSummaryOverlay } from '../screens/gacha/GachaVault'
 import { pendingPacksToResults, type YoloResult } from '../screens/gacha/pendingToResult'
 import { fetchPendingPacks, markPacksRevealed, type PendingPack } from '../../onchain/gachaClient'
-import { fetchUnseenBattles, type UnseenBattle } from '../../onchain/packBattleClient'
+import { fetchUnseenBattles, markBattlesSeen, type UnseenBattle } from '../../onchain/packBattleClient'
 import { useUnseenBattlesVersion } from '../screens/battle/unseenBattlesBus'
 import { holdBalance } from '../../wallet/balanceHold'
 import { usePendingPacksVersion } from '../screens/gacha/pendingPacksBus'
@@ -139,6 +139,19 @@ export function AppShell() {
     setPendingBusy(false)
     setSkipSummary(summary)
     setPendingPacks([])          // suelta la congelación: ya sabe lo que le tocó
+  }
+
+  // Salida en bloque de las batallas: el modal ya enseña el resultado de cada una en su fila, así
+  // que entrar en ellas es opcional. Marcarlas vistas es lo que las quita de la lista y, si no
+  // quedan sobres, suelta la congelación del saldo.
+  async function seeAllBattles() {
+    if (!identityToken || unseenBattles.length === 0) return
+    setPendingBusy(true)
+    try {
+      await markBattlesSeen(identityToken, unseenBattles.map((b) => b.battle_id))
+    } catch { /* se reintenta: siguen sin ver al recargar */ }
+    setPendingBusy(false)
+    setUnseenBattles([])
   }
 
   function closePending() {
@@ -439,6 +452,7 @@ export function AppShell() {
           onSkipPacks={() => void skipPending()}
           onWatchBattle={(b) => goBattle(b, false)}
           onResultBattle={(b) => goBattle(b, true)}
+          onSeeAllBattles={() => void seeAllBattles()}
         />
       )}
 

@@ -14,7 +14,7 @@ import { packTitle } from '../screens/gacha/GachaPackTilt'
 export function UnseenModal({
   packs, battles, busy,
   onOpenPack, onOpenAllPacks, onSkipPacks,
-  onWatchBattle, onResultBattle,
+  onWatchBattle, onResultBattle, onSeeAllBattles,
 }: {
   packs: PendingPack[]
   battles: UnseenBattle[]
@@ -24,9 +24,13 @@ export function UnseenModal({
   onSkipPacks: () => void
   onWatchBattle: (b: UnseenBattle) => void      // ver la batalla completa (reveal)
   onResultBattle: (b: UnseenBattle) => void     // ir directo al resultado
+  onSeeAllBattles: () => void                   // darlas todas por vistas sin entrar en ninguna
 }) {
   const np = packs.length
   const nb = battles.length
+  // Sin ninguna jugada (todo anuladas/canceladas) no hay resultado que asumir: la salida es un
+  // simple "Continue". Con alguna jugada, el botón dice que estás dando por vistos resultados.
+  const allRefunded = nb > 0 && battles.every((b) => b.status === 'voided' || b.status === 'cancelled')
 
   const sectionLabel = (t: string) => (
     <div style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.16em', color: COLORS.muted,
@@ -86,6 +90,16 @@ export function UnseenModal({
                   </div>
                 )
               })}
+              {/* Salida en bloque. Cada fila YA dice qué pasó ("You won · +$160"), así que no hay
+                  nada que revelar aquí: entrar en cada batalla es opcional, no un peaje. El texto
+                  cambia según lo que hay — si todo son reembolsos no hay resultado que asumir. */}
+              <button className="ba-ghostbtn" onClick={onSeeAllBattles} disabled={busy}
+                style={{ width: '100%', borderRadius: 12, padding: '11px 18px', fontSize: 13, fontWeight: 700,
+                  fontFamily: FONTS.body, cursor: busy ? 'default' : 'pointer', marginTop: 2,
+                  border: `1px solid ${COLORS.border}`, background: 'transparent',
+                  color: busy ? COLORS.muted : COLORS.text }}>
+                {allRefunded ? 'Continue' : nb > 1 ? `Resolve all ${nb}` : 'Resolve'}
+              </button>
             </div>
           )}
 
