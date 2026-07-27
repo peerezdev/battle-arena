@@ -12,10 +12,8 @@ import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
 
 const DEMO_MACHINE = 'pokemon_25'
 const ROYALE_PLAYERS = 10
-// Hasta qué página se muestrea cada rareza. Un pool grande (mainnet: 700 commons a 24 por
-// página) tiene ~30; en uno pequeño la página sale vacía y simplemente no aporta nada. Cuanto más
-// ancho el rango, menos veces cae dentro del bloque de cartas más caras (que son todas iguales).
-const MAX_SAMPLE_PAGE = 24
+// Cartas por página al muestrear el pool de la demo.
+const SAMPLE_PAGE_SIZE = 24
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -67,12 +65,19 @@ export function DemoFlow() {
         // mainnet son idénticas (las 24 primeras commons de pokemon_25 valen todas $29). Así la
         // demo enseñaba siempre el mismo importe y parecía un número cableado.
         const rarities = Object.keys(m.odds)
-        const pages = rarities.flatMap((r) => [
-          { rarity: r, page: 1 },
-          { rarity: r, page: 2 + Math.floor(Math.random() * MAX_SAMPLE_PAGE) },
-        ])
+        // El stock por rareza dice cuántas páginas hay DE VERDAD, así que se muestrea todo el
+        // rango en vez de adivinar un tope: en mainnet una rareza puede tener 4.000+ cartas (169
+        // páginas) y los valores bajos viven al final. Con un tope corto la demo solo enseñaba las
+        // más caras. Pools pequeños (una página) se piden enteros.
+        const pages = rarities.flatMap((r) => {
+          const maxPage = Math.max(1, Math.ceil((m.stock?.[r] ?? 0) / SAMPLE_PAGE_SIZE))
+          const randomPage = () => 1 + Math.floor(Math.random() * maxPage)
+          return maxPage === 1
+            ? [{ rarity: r, page: 1 }]
+            : [{ rarity: r, page: randomPage() }, { rarity: r, page: randomPage() }]
+        })
         const byRarity = await Promise.all(pages.map(({ rarity, page }) =>
-          fetchMachineCards(m.code, { rarity, page, limit: 24 }).catch(() => [] as MachineCard[])))
+          fetchMachineCards(m.code, { rarity, page, limit: SAMPLE_PAGE_SIZE }).catch(() => [] as MachineCard[])))
         let cards: MachineCard[] = byRarity.flat()
         if (!cards.length) cards = await fetchMachineCards(m.code, { limit: 80 }).catch(() => [])
         if (!cards.length) throw new Error('No cards in the pool')
