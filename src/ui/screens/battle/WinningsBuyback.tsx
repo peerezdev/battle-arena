@@ -123,7 +123,10 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
           These cards are yours. Keep them, or sell any back for instant USDC.
         </p>
 
-        <div style={{ display: 'flex', gap: 14, marginTop: 22, alignItems: 'flex-end', overflowX: 'auto', padding: '12px 2px 6px' }}>
+        {/* Sin scroll horizontal: las cartas envuelven en filas para que se vean TODAS de golpe.
+            Son las que el ganador tiene que decidir si vende, y lo que queda fuera del viewport
+            no se decide. El rowGap deja hueco al badge de BEST PULL, que sobresale por arriba. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '26px 14px', marginTop: 22, alignItems: 'flex-end', padding: '12px 2px 6px' }}>
           {keepable.map((c, i) => {
             const nft = c.nftAddress!
             const isBest = i === 0   // best pull stands out by badge/gold, not by size
