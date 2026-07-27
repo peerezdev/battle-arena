@@ -224,9 +224,13 @@ export function ccAssetUrl(mint: string): string {
 }
 
 // CollectorCrypt serves the card front image by mint (302 → CDN image; placeholder if missing).
-// Devnet base; usable directly as an <img src>. https://docs.collectorcrypt.com/metadata
+// Usable directly as an <img src>. https://docs.collectorcrypt.com/metadata
+//
+// El host es POR RED y el de devnet estaba fijo aquí: en mainnet devolvía 404 para todos los
+// mints, así que ninguna carta mostraba imagen (reveal, inventario, perfil, buyback). El backend
+// ya lo tenía configurable (CC_NFT_BASE_URL); esto es su equivalente en cliente.
 export function ccCardImageUrl(mint: string): string {
-  return `https://nft-dev.collectorcrypt.com/front/${mint}`
+  return `${config.ccNftBase}/front/${mint}`
 }
 
 export interface YoloTx { memo: string; transaction: string }

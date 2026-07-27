@@ -97,9 +97,21 @@ describe('ccAssetUrl', () => {
 })
 
 describe('ccCardImageUrl', () => {
-  it('returns the CC devnet front-image endpoint for a mint', () => {
-    expect(ccCardImageUrl('7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH'))
-      .toBe('https://nft-dev.collectorcrypt.com/front/7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH')
+  const MINT = '7mNc3Hr1Aqr16u8Y5VKQDinLHbBumUxV6T6kxFRz2xGH'
+
+  it('construye la URL desde el host configurado, no desde uno fijo', () => {
+    // El host es POR RED. Estaba fijado a devnet y en mainnet devolvía 404 para todo mint:
+    // ninguna carta mostraba imagen en el reveal, el inventario, el perfil ni el buyback.
+    expect(ccCardImageUrl(MINT)).toBe(`${config.ccNftBase}/front/${MINT}`)
+  })
+
+  it('por defecto (sin VITE_CC_NFT_BASE) apunta a devnet', () => {
+    expect(config.ccNftBase).toBe('https://nft-dev.collectorcrypt.com')
+  })
+
+  it('el host nunca acaba en barra, para no generar // en la ruta', () => {
+    expect(config.ccNftBase.endsWith('/')).toBe(false)
+    expect(ccCardImageUrl(MINT)).not.toContain('//front/')
   })
 })
 

@@ -73,6 +73,13 @@ export const config = {
    */
   dasRpcUrl,
   /**
+   * Host de Collector Crypt que sirve la imagen frontal de una carta por mint. Es POR RED
+   * (devnet: nft-dev…; mainnet: nft…) — con el de devnet, un mint de mainnet da 404 y la carta
+   * sale sin imagen. Espejo del CC_NFT_BASE_URL del backend. env: VITE_CC_NFT_BASE
+   */
+  ccNftBase: ((import.meta.env.VITE_CC_NFT_BASE as string | undefined) ??
+    'https://nft-dev.collectorcrypt.com').replace(/\/+$/, ''),
+  /**
    * Launch-week gate: wallets allowed to CREATE Battle Royale lobbies (Privy embedded
    * Solana addresses, comma-separated). Empty = open to everyone. Must mirror the backend
    * ROYALE_CREATOR_ALLOWLIST. env: VITE_ROYALE_CREATOR_ALLOWLIST
