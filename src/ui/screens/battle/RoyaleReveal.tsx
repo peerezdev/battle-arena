@@ -6,6 +6,7 @@ import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { RevealCard, rarityColor } from './RevealCard'
 import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { WinningsBuyback } from './WinningsBuyback'
+import { CardBadge } from '../../components/CardBadge'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
 import { PotGain } from './PotGain'
@@ -182,7 +183,7 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
         <div>
           <div style={statLabel}>POT</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ ...statValue, color: POT_GOLD }}>{formatUsd(proj.potValue)}</span>
+            <span style={{ ...statValue, color: POT_GOLD, fontSize: 35 }}>{formatUsd(proj.potValue)}</span>
             <PotGain pot={proj.potValue} />
           </div>
         </div>
@@ -363,11 +364,13 @@ function LootShowcase({ cards }: { cards: RevealCardVM[] }) {
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         {featured.map((c, i) => (
-          <div key={c.nftAddress ?? i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <div style={i === 0 ? { borderRadius: 12, boxShadow: '0 0 34px -10px rgba(245,197,66,.7)' } : undefined}>
+          // La mejor se corona con el MISMO badge que ve el ganador (CardBadge dorado, encima de
+          // la carta) en vez de un texto debajo: ganes o pierdas, "la mejor carta" se señala igual.
+          <div key={c.nftAddress ?? i} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            {i === 0 && <CardBadge label="⚡ BEST PULL" color="#ffd166" />}
+            <div style={i === 0 ? { borderRadius: 12, boxShadow: '0 0 40px rgba(255,209,102,.2)' } : undefined}>
               <RevealCard card={c} reducedMotion w={i === 0 ? 126 : 112} h={i === 0 ? 176 : 156} />
             </div>
-            {i === 0 && <span style={{ fontFamily: FONTS.mono, fontSize: 10.5, color: '#f5c542' }}>{formatUsd(c.insuredValue ?? 0)} · TOP PULL</span>}
           </div>
         ))}
 
@@ -458,14 +461,15 @@ function ResultView({ vm, name, ranked, onRematch, onExit }: {
             </div>
           </div>
           {!iWon && <LootShowcase cards={allLoot} />}
+          {/* Al ganador, el botín va DENTRO de esta misma caja —igual que el LootShowcase del
+              perdedor— en vez de en un panel aparte debajo: campeón y lo que se lleva son una
+              sola cosa, y separarlos partía la lectura en dos bloques dorados seguidos. */}
+          {iWon && allLoot.length > 0 && (
+            <div style={{ flex: '1 1 360px', minWidth: 280 }}>
+              <WinningsBuyback cards={allLoot} winnerWallet={vm.meWallet} lootTotal={lootTotal} />
+            </div>
+          )}
         </section>
-      )}
-
-      {/* Champion (me) can keep or sell each won card back for USDC */}
-      {iWon && allLoot.length > 0 && (
-        <div style={{ marginBottom: 22 }}>
-          <WinningsBuyback cards={allLoot} winnerWallet={vm.meWallet} lootTotal={lootTotal} />
-        </div>
       )}
 
       <div style={{ borderRadius: 18, overflow: 'hidden', border: `1px solid ${COLORS.border}`, background: 'linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.008))' }}>

@@ -61,7 +61,9 @@ describe('RoyaleReveal', () => {
     }
     render(<MemoryRouter><RoyaleResult vm={settled} battleId="b1" /></MemoryRouter>)
     expect(screen.getByText(/CHAMPION LOOT · 5 CARDS/)).toBeTruthy()   // 5 total
-    expect(screen.getByText(/TOP PULL/)).toBeTruthy()                  // the epic $97 leads
+    // La mejor lleva el MISMO badge que ve el ganador, no un texto propio debajo.
+    expect(screen.getByText(/BEST PULL/)).toBeTruthy()                 // the epic $97 leads
+    expect(screen.queryByText(/TOP PULL/)).toBeNull()
     expect(screen.getByText('×3')).toBeTruthy()                        // 2 commons + 1 null = 3 packed
     expect(screen.getByText('COMMONS')).toBeTruthy()
   })
