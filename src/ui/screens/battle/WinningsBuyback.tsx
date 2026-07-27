@@ -46,7 +46,11 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
 
   const [sell, setSell] = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<Record<string, 'sold' | 'failed'>>({})
-  const [offers, setOffers] = useState<Record<string, number | null>>({})   // nft → USDC base units
+  // nft → importe en unidades base | null (CC no ofrece recompra por esa carta) | 'unchecked'
+  // (no se pudo preguntar). La distinción importa: `null` es un NO firme del backend y bloquea
+  // el Sell, mientras que 'unchecked' es un fallo de red y no debe quitarle al ganador la opción
+  // de intentarlo. Sin valor todavía = aún cargando.
+  const [offers, setOffers] = useState<Record<string, number | null | 'unchecked'>>({})
   const [busy, setBusy] = useState(false)
   const [autoOpen, setAutoOpen] = useState(false)   // desktop: expand the packed auto-sold stack
 
@@ -57,8 +61,9 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
     Promise.all(sellable.map(async (c) => {
       try {
         const r = await fetchBuybackAvailable(winnerWallet, c.nftAddress!)
-        return [c.nftAddress!, r.available ? r.amount : null] as const
-      } catch { return [c.nftAddress!, null] as const }
+        if (!r.available) return [c.nftAddress!, null] as const
+        return [c.nftAddress!, r.amount ?? 'unchecked'] as const
+      } catch { return [c.nftAddress!, 'unchecked'] as const }
     })).then((pairs) => { if (!cancelled) setOffers(Object.fromEntries(pairs)) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,13 +71,20 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
 
   if (sellable.length === 0 && autoSoldCount === 0) return null
 
-  const pending = sellable.filter((c) => sell[c.nftAddress!] && status[c.nftAddress!] !== 'sold')
-  const pendingUsd = pending.reduce((s, c) => s + ((offers[c.nftAddress!] ?? 0) / 1e6), 0)
+  /** CC ha respondido que no compra esa carta. Pedir el buyback devuelve 400, así que no se vende. */
+  const noBuyback = (nft: string) => offers[nft] === null
+  const offerUsd = (nft: string) => { const o = offers[nft]; return typeof o === 'number' ? o / 1e6 : null }
+
+  // Una carta que CC no compra nunca entra en el lote: ni marcándola a mano, ni con "Sell all".
+  const pending = sellable.filter((c) => sell[c.nftAddress!] && status[c.nftAddress!] !== 'sold' && !noBuyback(c.nftAddress!))
+  const pendingUsd = pending.reduce((s, c) => s + (offerUsd(c.nftAddress!) ?? 0), 0)
   const soldCount = Object.values(status).filter((v) => v === 'sold').length
 
   const setAll = (v: boolean) => setSell(() => {
     const m: Record<string, boolean> = {}
-    sellable.forEach((c) => { if (status[c.nftAddress!] !== 'sold') m[c.nftAddress!] = v })
+    sellable.forEach((c) => {
+      if (status[c.nftAddress!] !== 'sold' && !noBuyback(c.nftAddress!)) m[c.nftAddress!] = v
+    })
     return m
   })
   const toggle = (nft: string) => setSell((s) => ({ ...s, [nft]: !s[nft] }))
@@ -140,13 +152,14 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
             const h = 210
             const st = status[nft]
             const picked = !!sell[nft] && st !== 'sold'
-            const offer = offers[nft]
+            const offer = offerUsd(nft)
+            const noBb = noBuyback(nft)
             return (
               <div key={i} style={{ position: 'relative', width: w, flexShrink: 0, opacity: st === 'sold' ? 0.5 : 1 }}>
                 {isBest && <CardBadge label="⚡ BEST PULL" color="#ffd166" />}
                 <div style={{ position: 'relative', borderRadius: 12, ...(isBest ? { boxShadow: '0 0 40px rgba(255,209,102,.2)' } : {}) }}>
                   <RevealCard card={c} reducedMotion={reducedMotion} w={w} h={h} bare />
-                  {st === 'sold' && <div style={badge('#00c79a')}>SOLD{offer != null ? ` +${formatUsd(offer / 1e6)}` : ''}</div>}
+                  {st === 'sold' && <div style={badge('#00c79a')}>SOLD{offer != null ? ` +${formatUsd(offer)}` : ''}</div>}
                   {st === 'failed' && <div style={badge(COLORS.red)}>FAILED</div>}
                 </div>
                 <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 600, color: '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -154,14 +167,19 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, gap: 8 }}>
                   <span style={{ fontSize: 15, fontWeight: 700, color: isBest ? '#ffd166' : COLORS.text }}>{formatUsd(c.insuredValue ?? 0)}</span>
-                  {st !== 'sold' && (
+                  {/* Igual que en la rejilla compacta: si CC no compra la carta se dice y el
+                      botón se apaga, en vez de dejar pulsar un Sell que devolvería 400. */}
+                  {st !== 'sold' && noBb && (
+                    <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#6b7480' }} title="Collector Crypt no compra esta carta">no buyback</span>
+                  )}
+                  {st !== 'sold' && !noBb && (
                     <button onClick={() => toggle(nft)} disabled={busy} style={{
                       padding: '6px 12px', borderRadius: 8, cursor: busy ? 'default' : 'pointer',
                       fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
                       border: `1px solid ${picked ? 'rgba(245,197,66,.6)' : 'rgba(60,232,168,.4)'}`,
                       background: picked ? 'rgba(245,197,66,.14)' : 'transparent',
                       color: picked ? '#f5c542' : COLORS.green,
-                    }}>{picked ? `Sell${offer != null ? ` · ${formatUsd(offer / 1e6)}` : ''}` : 'Keep'}</button>
+                    }}>{picked ? `Sell${offer != null ? ` · ${formatUsd(offer)}` : ''}` : 'Keep'}</button>
                   )}
                 </div>
               </div>
@@ -254,7 +272,8 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
           const isBest = i === 0   // best pull stands out by badge/gold, not by size
           const st = status[nft]
           const picked = !!sell[nft] && st !== 'sold'
-          const offer = offers[nft]
+          const offer = offerUsd(nft)
+          const noBb = noBuyback(nft)
           return (
             <div key={i} style={{
               position: 'relative', flex: 'none', width: CARD_W, borderRadius: 12, background: '#0e1219',
@@ -265,7 +284,7 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
               {isBest && <CardBadge label="⚡ BEST PULL" color="#ffd166" />}
               <div style={{ position: 'relative', display: 'grid', placeItems: 'center' }}>
                 <RevealCard card={c} reducedMotion={reducedMotion} w={CARD_W - 16} h={ART_H} bare />
-                {st === 'sold' && <div style={badge('#00c79a')}>SOLD{offer != null ? ` +${formatUsd(offer / 1e6)}` : ''}</div>}
+                {st === 'sold' && <div style={badge('#00c79a')}>SOLD{offer != null ? ` +${formatUsd(offer)}` : ''}</div>}
                 {st === 'failed' && <div style={badge(COLORS.red)}>FAILED</div>}
               </div>
               <div style={{ lineHeight: 1.3, minWidth: 0 }}>
@@ -275,9 +294,10 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
                     que pide el control de abajo. El buyback solo sale cuando el backend lo ha dado. */}
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6, marginTop: 2 }}>
                   <span style={{ fontFamily: FONTS.mono, fontSize: 12, fontWeight: 700, color: isBest ? '#ffd166' : COLORS.text }}>{formatUsd(c.insuredValue ?? 0)}</span>
-                  {offer != null && (
-                    <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }} title="Buyback value">↩ {formatUsd(offer / 1e6)}</span>
-                  )}
+                  {offer != null && <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }} title="Buyback value">↩ {formatUsd(offer)}</span>}
+                  {/* Un hueco vacío se lee como "no ha cargado". Si CC ha dicho que no compra esa
+                      carta, se dice; es la razón por la que abajo no se puede pulsar Sell. */}
+                  {noBb && <span style={{ fontFamily: FONTS.mono, fontSize: 9, color: '#6b7480' }} title="Collector Crypt no compra esta carta">no buyback</span>}
                 </div>
               </div>
               {st !== 'sold' && (
@@ -287,8 +307,10 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
                   <button onClick={() => setSell((s) => ({ ...s, [nft]: false }))} disabled={busy}
                     style={{ flex: 1, padding: '6px 0', border: 0, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
                       background: !picked ? 'rgba(0,255,196,.16)' : 'transparent', color: !picked ? COLORS.green : COLORS.muted }}>Keep</button>
-                  <button onClick={() => setSell((s) => ({ ...s, [nft]: true }))} disabled={busy}
-                    style={{ flex: 1, padding: '6px 0', border: 0, borderLeft: `1px solid ${COLORS.border}`, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
+                  <button onClick={() => setSell((s) => ({ ...s, [nft]: true }))} disabled={busy || noBb}
+                    title={noBb ? 'Collector Crypt no compra esta carta' : undefined}
+                    style={{ flex: 1, padding: '6px 0', border: 0, borderLeft: `1px solid ${COLORS.border}`,
+                      cursor: busy || noBb ? 'default' : 'pointer', opacity: noBb ? 0.4 : 1, fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
                       background: picked ? 'rgba(255,46,151,.18)' : 'transparent', color: picked ? '#c4adff' : COLORS.muted }}>Sell</button>
                 </div>
               )}

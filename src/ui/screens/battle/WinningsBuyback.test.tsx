@@ -4,7 +4,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 const { requestBuyback, submitTx, fetchBuybackAvailable } = vi.hoisted(() => ({
   requestBuyback: vi.fn(async () => ({ serialized_transaction: 'tx', refund_amount: null, memo: null })),
   submitTx: vi.fn(async () => ({})),
-  fetchBuybackAvailable: vi.fn(async () => ({ available: true, amount: 50_000_000 })),   // $50
+  // Tipada con los dos argumentos reales: un test cambia la respuesta según el nft.
+  fetchBuybackAvailable: vi.fn(async (_wallet: string, _nft: string) =>
+    ({ available: true, amount: 50_000_000 as number | null })),   // $50
 }))
 vi.mock('../../../onchain/gachaClient', () => ({ requestBuyback, submitTx, fetchBuybackAvailable }))
 vi.mock('../../../wallet/useWallet', () => ({ useWallet: () => ({ signTransactionBase64: vi.fn(async () => 'signed') }) }))
@@ -18,7 +20,13 @@ const card = (nft: string, autoSold = false) => ({
   grade: null, year: null, name: nft,
 })
 
-beforeEach(() => { requestBuyback.mockClear(); submitTx.mockClear(); fetchBuybackAvailable.mockClear() })
+beforeEach(() => {
+  requestBuyback.mockClear(); submitTx.mockClear()
+  // mockReset y no mockClear: un test cambia la implementación (carta sin recompra) y sin esto
+  // se la dejaría puesta a los siguientes.
+  fetchBuybackAvailable.mockReset()
+  fetchBuybackAvailable.mockImplementation(async () => ({ available: true, amount: 50_000_000 }))   // $50
+})
 
 describe('WinningsBuyback', () => {
   it('shows keep/sell controls for sellable cards + notes auto-sold ones', async () => {
@@ -51,6 +59,23 @@ describe('WinningsBuyback', () => {
     expect(screen.getAllByText('Sell')).toHaveLength(2)
     fireEvent.click(screen.getAllByText('Sell')[0]!)
     expect(await screen.findByText(/Sell 1/)).toBeTruthy()   // solo la pulsada
+  })
+
+  it('una carta que CC no compra lo dice y no se puede meter en el lote', async () => {
+    // CC devuelve available:false para cartas fuera de su ventana de recompra; pedir el buyback
+    // igualmente responde 400. Antes el hueco quedaba vacío —indistinguible de "no ha cargado"—
+    // y el Sell seguía pulsable, así que la venta fallaba al final.
+    fetchBuybackAvailable.mockImplementation(async (_w: string, nft: string) =>
+      nft === 'a' ? { available: false, amount: null } : { available: true, amount: 50_000_000 })
+    render(<WinningsBuyback cards={[card('a'), card('b')]} winnerWallet="W" lootTotal={120} />)
+
+    expect(await screen.findByText('no buyback')).toBeTruthy()
+    expect(screen.getAllByText(/↩ \$50/)).toHaveLength(1)          // solo la vendible
+    expect(screen.getAllByText('Sell')[0]).toHaveProperty('disabled', true)
+
+    // "Sell all" tampoco la arrastra: el lote queda en 1, no en 2.
+    fireEvent.click(screen.getByText('Sell all'))
+    expect(await screen.findByText(/Sell 1/)).toBeTruthy()
   })
 
   it('renders nothing when there are no cards', () => {
