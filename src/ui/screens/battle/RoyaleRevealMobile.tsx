@@ -3,6 +3,7 @@ import { COLORS, FONTS, formatUsd } from '../../theme'
 import { RevealCard } from './RevealCard'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
+import { PotGain } from './PotGain'
 import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { tintFor, shortWallet, pullTitle, POT_GOLD } from './royaleShared'
 import { revealOrderWallets, totalRounds, type RoyaleRevealState } from './useRoyaleReveal'
@@ -119,7 +120,10 @@ function StatHeader({ round, rounds, alive, total, pot }: {
       </div>
       <div style={{ lineHeight: 1.2, textAlign: 'right' }}>
         {label('POT')}
-        <div style={{ fontSize: 15, fontWeight: 700, color: POT_GOLD }}>{formatUsd(pot)}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 6 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: POT_GOLD }}>{formatUsd(pot)}</span>
+          <PotGain pot={pot} />
+        </div>
       </div>
     </div>
   )

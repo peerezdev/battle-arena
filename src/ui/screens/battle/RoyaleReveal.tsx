@@ -8,6 +8,7 @@ import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import { WinningsBuyback } from './WinningsBuyback'
 import { StagedCardReveal } from './StagedCardReveal'
 import { CardBack } from './CardBack'
+import { PotGain } from './PotGain'
 import { useAliases } from '../../useAliases'
 import { EmoteDock } from '../../emotes/EmoteDock'
 import { shortWallet, tintFor, medalColor, POT_GOLD } from './royaleShared'
@@ -180,7 +181,10 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
         )}
         <div>
           <div style={statLabel}>POT</div>
-          <div style={{ ...statValue, color: POT_GOLD }}>{formatUsd(proj.potValue)}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ ...statValue, color: POT_GOLD }}>{formatUsd(proj.potValue)}</span>
+            <PotGain pot={proj.potValue} />
+          </div>
         </div>
       </div>
     </section>
