@@ -447,7 +447,6 @@ export function AppShell() {
           packs={pendingPacks}
           battles={unseenBattles}
           busy={pendingBusy}
-          onOpenPack={(memo) => goOpenPending(pendingPacks.filter((p) => p.memo === memo))}
           onOpenAllPacks={() => goOpenPending(pendingPacks)}
           onSkipPacks={() => void skipPending()}
           onWatchBattle={(b) => goBattle(b, false)}
