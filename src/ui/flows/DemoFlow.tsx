@@ -9,12 +9,9 @@ import { battleToReveal } from '../screens/battle/battleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
-import { useEmotes } from '../emotes/useEmotes'
-import { throwEmote } from '../emotes/throwEmote'
 
 const DEMO_MACHINE = 'pokemon_50'
 const ROYALE_PLAYERS = 10
-const RIVAL_EMOTE_MS = 3200
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -76,19 +73,9 @@ export function DemoFlow() {
     return () => { cancelled = true }
   }, [isRoyale])
 
-  // Flavour: the bots throw random emotes during the demo (there's no real broadcast to receive).
-  const { catalog } = useEmotes()
-  useEffect(() => {
-    if (!battle || catalog.length === 0) return
-    const rivals = battle.players.map((p) => p.wallet).filter((w) => w !== DEMO_ME)
-    if (!rivals.length) return
-    const t = setInterval(() => {
-      const w = rivals[Math.floor(Math.random() * rivals.length)]
-      const e = catalog[Math.floor(Math.random() * catalog.length)]
-      throwEmote(w, e)
-    }, RIVAL_EMOTE_MS)
-    return () => clearInterval(t)
-  }, [battle, catalog])
+  // Los rivales de la demo NO lanzan emotes. Un emote es una acción de una persona; ponerlo en
+  // boca de un bot finge que hay alguien al otro lado. En una batalla real un bot tampoco puede:
+  // el endpoint exige token de Privy y los bots no inician sesión.
 
   if (error) {
     return (
