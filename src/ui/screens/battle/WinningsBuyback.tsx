@@ -239,7 +239,10 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 14px 2px', alignItems: 'flex-end' }}>
+      {/* Sin scroll horizontal: envuelven en filas para que se vean TODAS. Esta rama no es solo
+          móvil —el resultado de royale la monta también en escritorio, porque RoyaleResult no
+          calcula ancho—, así que aquí es donde de verdad se nota. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px 8px', padding: '8px 14px 2px', alignItems: 'flex-end' }}>
         {keepableM.map((c, i) => {
           const nft = c.nftAddress!
           const isBest = i === 0   // best pull stands out by badge/gold, not by size
