@@ -41,6 +41,18 @@ describe('WinningsBuyback', () => {
     await waitFor(() => expect(screen.getAllByText(/SOLD/).length).toBe(2))
   })
 
+  it('cada carta enseña su buyback y el par Keep|Sell marca solo esa', async () => {
+    render(<WinningsBuyback cards={[card('a'), card('b')]} winnerWallet="W" lootTotal={120} />)
+    // Lo que daría el buyback, por carta, en cuanto responde el backend: es la mitad de la
+    // decisión (vale $60 · te dan $50) y sin ella el Sell se pulsa a ciegas.
+    await waitFor(() => expect(screen.getAllByText(/↩ \$50/)).toHaveLength(2))
+    // Keep y Sell conviven como en el resumen de gacha, no es un botón que alterna.
+    expect(screen.getAllByText('Keep')).toHaveLength(2)
+    expect(screen.getAllByText('Sell')).toHaveLength(2)
+    fireEvent.click(screen.getAllByText('Sell')[0]!)
+    expect(await screen.findByText(/Sell 1/)).toBeTruthy()   // solo la pulsada
+  })
+
   it('renders nothing when there are no cards', () => {
     const { container } = render(<WinningsBuyback cards={[]} winnerWallet="W" lootTotal={0} />)
     expect(container.firstChild).toBeNull()

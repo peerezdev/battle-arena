@@ -19,6 +19,12 @@ const badge = (bg: string) => ({
   fontFamily: FONTS.display, fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap',
 } as const)
 
+// Rejilla compacta (móvil, y también el resultado de royale, que no pide `wide`). Un poco más
+// grande que la tira original de 104px: ahora cada carta lleva valor, buyback y el control
+// Keep|Sell, y a 104 se apretaban.
+const CARD_W = 134
+const ART_H = 148
+
 /**
  * Winner-only "keep or sell" for a settled battle's haul — mirrors the gacha multi-pull summary.
  * The winner already owns every non-auto-sold card (transferred at settle); here they can sell any
@@ -242,47 +248,49 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
       {/* Sin scroll horizontal: envuelven en filas para que se vean TODAS. Esta rama no es solo
           móvil —el resultado de royale la monta también en escritorio, porque RoyaleResult no
           calcula ancho—, así que aquí es donde de verdad se nota. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px 8px', padding: '8px 14px 2px', alignItems: 'flex-end' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '22px 10px', padding: '8px 14px 2px', alignItems: 'flex-end' }}>
         {keepableM.map((c, i) => {
           const nft = c.nftAddress!
           const isBest = i === 0   // best pull stands out by badge/gold, not by size
-          const cw = 104
-          const artH = 112
           const st = status[nft]
           const picked = !!sell[nft] && st !== 'sold'
           const offer = offers[nft]
           return (
             <div key={i} style={{
-              position: 'relative', flex: 'none', width: cw, borderRadius: 12, background: '#0e1219',
+              position: 'relative', flex: 'none', width: CARD_W, borderRadius: 12, background: '#0e1219',
               border: `1.5px solid ${isBest ? 'rgba(255,209,102,.55)' : 'rgba(60,232,168,.5)'}`,
               boxShadow: isBest ? '0 0 26px rgba(255,209,102,.18)' : undefined,
-              padding: 7, display: 'flex', flexDirection: 'column', gap: 6, opacity: st === 'sold' ? 0.5 : 1,
+              padding: 8, display: 'flex', flexDirection: 'column', gap: 7, opacity: st === 'sold' ? 0.5 : 1,
             }}>
-              {isBest && (
-                <span style={{
-                  position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)', zIndex: 2,
-                  fontFamily: FONTS.mono, fontSize: 7.5, fontWeight: 700, letterSpacing: '.1em', color: '#2b2005',
-                  background: 'linear-gradient(90deg,#ffd166,#f0a832)', borderRadius: 999, padding: '3px 8px',
-                  whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(255,209,102,.35)',
-                }}>⚡ BEST PULL</span>
-              )}
+              {isBest && <CardBadge label="⚡ BEST PULL" color="#ffd166" />}
               <div style={{ position: 'relative', display: 'grid', placeItems: 'center' }}>
-                <RevealCard card={c} reducedMotion={reducedMotion} w={cw - 14} h={artH} bare />
+                <RevealCard card={c} reducedMotion={reducedMotion} w={CARD_W - 16} h={ART_H} bare />
                 {st === 'sold' && <div style={badge('#00c79a')}>SOLD{offer != null ? ` +${formatUsd(offer / 1e6)}` : ''}</div>}
                 {st === 'failed' && <div style={badge(COLORS.red)}>FAILED</div>}
               </div>
-              <div style={{ lineHeight: 1.25, minWidth: 0 }}>
-                <div style={{ fontSize: 9.5, fontWeight: 600, color: '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name ?? '—'}</div>
-                <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 700, color: isBest ? '#ffd166' : COLORS.text }}>{formatUsd(c.insuredValue ?? 0)}</div>
+              <div style={{ lineHeight: 1.3, minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name ?? '—'}</div>
+                {/* Valor y buyback en la misma línea, como en el resumen de gacha: lo que vale la
+                    carta y lo que te darían por ella se comparan de un vistazo, que es la decisión
+                    que pide el control de abajo. El buyback solo sale cuando el backend lo ha dado. */}
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6, marginTop: 2 }}>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: 12, fontWeight: 700, color: isBest ? '#ffd166' : COLORS.text }}>{formatUsd(c.insuredValue ?? 0)}</span>
+                  {offer != null && (
+                    <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }} title="Buyback value">↩ {formatUsd(offer / 1e6)}</span>
+                  )}
+                </div>
               </div>
               {st !== 'sold' && (
-                <button onClick={() => toggle(nft)} disabled={busy} style={{
-                  padding: 6, borderRadius: 8, cursor: busy ? 'default' : 'pointer',
-                  fontFamily: FONTS.body, fontSize: 10, fontWeight: 700,
-                  border: `1px solid ${picked ? 'rgba(245,197,66,.6)' : 'rgba(60,232,168,.4)'}`,
-                  background: picked ? 'rgba(245,197,66,.14)' : 'rgba(60,232,168,.07)',
-                  color: picked ? '#f5c542' : COLORS.green,
-                }}>{picked ? 'Sell' : 'Keep'}</button>
+                // Control segmentado Keep|Sell igual que el del resumen de gacha: los dos estados
+                // se ven a la vez, en vez de un botón que hay que pulsar para saber qué hace.
+                <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
+                  <button onClick={() => setSell((s) => ({ ...s, [nft]: false }))} disabled={busy}
+                    style={{ flex: 1, padding: '6px 0', border: 0, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
+                      background: !picked ? 'rgba(0,255,196,.16)' : 'transparent', color: !picked ? COLORS.green : COLORS.muted }}>Keep</button>
+                  <button onClick={() => setSell((s) => ({ ...s, [nft]: true }))} disabled={busy}
+                    style={{ flex: 1, padding: '6px 0', border: 0, borderLeft: `1px solid ${COLORS.border}`, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
+                      background: picked ? 'rgba(255,46,151,.18)' : 'transparent', color: picked ? '#c4adff' : COLORS.muted }}>Sell</button>
+                </div>
               )}
             </div>
           )
@@ -290,18 +298,18 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
 
         {/* auto-sold → one packed stack (same idea as the royale champion loot) */}
         {goneM.length > 0 && (
-          <div style={{ flex: 'none', width: 104 }}>
+          <div style={{ flex: 'none', width: CARD_W }}>
             <button onClick={() => setAutoOpen((e) => !e)} title={autoOpen ? 'Hide auto-sold' : 'Show auto-sold'}
-              style={{ position: 'relative', width: 104, height: 146, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>
+              style={{ position: 'relative', width: CARD_W, height: 184, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>
               <span style={{ position: 'absolute', inset: 0, transform: 'translate(9px,-7px) rotate(5deg)', borderRadius: 12, background: '#12151d', border: `1px solid ${COLORS.border}` }} />
               <span style={{ position: 'absolute', inset: 0, transform: 'translate(4px,-3px) rotate(2.5deg)', borderRadius: 12, background: '#161a24', border: `1px solid ${COLORS.border}` }} />
               <span style={{
                 position: 'absolute', inset: 0, borderRadius: 12, background: 'linear-gradient(160deg,#1b1020,#101018)',
                 border: '1px solid rgba(255,46,126,.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, color: COLORS.text,
               }}>
-                <span style={{ fontSize: 20, fontWeight: 700 }}>×{goneM.length}</span>
-                <span style={{ fontFamily: FONTS.mono, fontSize: 7.5, fontWeight: 700, letterSpacing: '.08em', color: '#ff6ba4' }}>AUTO-SOLD</span>
-                <span style={{ fontFamily: FONTS.mono, fontSize: 7.5, color: COLORS.muted }}>{autoOpen ? 'hide ↑' : 'see all ↓'}</span>
+                <span style={{ fontSize: 24, fontWeight: 700 }}>×{goneM.length}</span>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.08em', color: '#ff6ba4' }}>AUTO-SOLD</span>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, color: COLORS.muted }}>{autoOpen ? 'hide ↑' : 'see all ↓'}</span>
               </span>
             </button>
             <div style={{ marginTop: 7, fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: '#7d8794' }}>{formatUsd(goneTotalM)} ⚡</div>
