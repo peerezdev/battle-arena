@@ -120,3 +120,34 @@ describe('RoyaleReveal · layout de móvil', () => {
     expect(anchors()[0]!.textContent).not.toBe(enChips)
   })
 })
+
+describe('RoyaleReveal · móvil · separador de eliminados', () => {
+  const vmWith = (players: RevealVM['players']): RevealVM => ({ ...vm, players })
+  const player = (w: string, elim: number | null, total = 100): RevealVM['players'][number] =>
+    ({ wallet: w, isMe: false, accumulatedValue: total, eliminatedRound: elim, cards: [], total })
+
+  const renderStandings = (players: RevealVM['players']) => {
+    stubFetch(); stubViewport(false)
+    const r = render(<MemoryRouter><RoyaleReveal vm={vmWith(players)} reducedMotion /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /standings/i }))
+    return r
+  }
+
+  it('sin eliminados no hay separador', () => {
+    renderStandings([player('A', null, 120), player('B', null, 80)])
+    expect(screen.queryByText('ELIMINATED')).toBeNull()
+  })
+
+  it('con vivos y eliminados aparece UNA sola vez', () => {
+    renderStandings([player('A', null, 120), player('B', 2, 60), player('C', 1, 40)])
+    expect(screen.getAllByText('ELIMINATED')).toHaveLength(1)
+  })
+
+  it('el separador va entre el último vivo y el primer eliminado', () => {
+    const { container } = renderStandings([player('A', null, 120), player('B', 1, 40)])
+    const text = (container.textContent ?? '')
+    // …vivo … ELIMINATED … fuera
+    expect(text.indexOf('DONE')).toBeLessThan(text.indexOf('ELIMINATED'))
+    expect(text.indexOf('ELIMINATED')).toBeLessThan(text.indexOf('OUT·R1'))
+  })
+})

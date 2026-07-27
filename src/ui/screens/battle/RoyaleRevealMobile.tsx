@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import { RevealCard } from './RevealCard'
 import { StagedCardReveal } from './StagedCardReveal'
@@ -241,8 +241,19 @@ function StandingsList({ players, name, activeWallet, revealRound, anchored }: {
         // Each alive player pulls once per round, so "has a card for this round" = already opened.
         const pulled = p.cards.length >= revealRound
         const status = cur ? 'OPENING' : out ? `OUT·R${p.eliminatedRound}` : pulled ? 'DONE' : 'WAIT'
+        // Primera fila eliminada: la lista ya los ordena abajo, pero sin corte la frontera entre
+        // "sigo vivo" y "fuera" hay que deducirla leyendo estado por estado.
+        const firstOut = out && i > 0 && sorted[i - 1].eliminatedRound == null
         return (
-          <div key={p.wallet} {...(anchored ? { 'data-player-anchor': p.wallet } : {})} style={{
+          <Fragment key={p.wallet}>
+          {firstOut && (
+            <div aria-hidden style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' }}>
+              <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
+              <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, letterSpacing: '.18em', color: '#5d6674' }}>ELIMINATED</span>
+              <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.08)' }} />
+            </div>
+          )}
+          <div {...(anchored ? { 'data-player-anchor': p.wallet } : {})} style={{
             flex: 'none', display: 'flex', alignItems: 'center', gap: 9, padding: '0 12px', minHeight: 52, borderRadius: 11,
             background: atRisk ? 'rgba(255,94,122,.07)' : leader ? 'rgba(245,197,66,.09)' : cur ? 'rgba(0,255,196,.07)' : '#0c0f15',
             border: `1px solid ${leader ? 'rgba(245,197,66,.4)' : atRisk ? 'rgba(255,94,122,.45)' : cur ? 'rgba(0,255,196,.45)' : COLORS.border}`,
@@ -269,6 +280,7 @@ function StandingsList({ players, name, activeWallet, revealRound, anchored }: {
               {formatUsd(p.total)}
             </span>
           </div>
+          </Fragment>
         )
       })}
     </div>
