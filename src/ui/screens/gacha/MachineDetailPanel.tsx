@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { useIsWide } from '../../useIsWide'
 import type { GachaMachine } from '../../../onchain/gachaClient'
 import { yoloTotalCost, clampCount } from '../../../onchain/gachaClient'
-import { showToast } from '../../toast'
+import { showToast, dismissToast, setToastInset } from '../../toastBus'
 
 interface Props {
   machine: GachaMachine
@@ -33,6 +33,25 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
 
   const [yoloCount, setYoloCount] = useState(1)
   const [turbo, setTurbo] = useState(false)
+  // Id del aviso del turbo, para poder retirarlo si se apaga antes de que expire.
+  const turboToast = useRef<number | null>(null)
+  // La barra de acciones tapa la parte de abajo, así que se mide y se declara para que los
+  // toasts salgan POR ENCIMA de ella. Se mide en vez de codificar su alto: cambia con el
+  // safe-area del móvil y con el tamaño de fuente del sistema.
+  const barRef = useRef<HTMLDivElement | null>(null)
+
+  const showBar = !!onYolo && mobile && machine.turboMode !== undefined
+  useEffect(() => {
+    const bar = barRef.current
+    if (!bar) { setToastInset(0); return }
+    const apply = () => setToastInset(Math.round(bar.getBoundingClientRect().height))
+    apply()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null
+    ro?.observe(bar)
+    // Al salir de la pantalla se devuelve el hueco: si no, los toasts de otras pantallas
+    // seguirían flotando donde ya no hay barra.
+    return () => { ro?.disconnect(); setToastInset(0) }
+  }, [showBar])
   const yoloTotal = yoloTotalCost(machine.price ?? 0, yoloCount)
   const yoloBlocked = !authed || machine.available === false || (usdc != null && usdc < yoloTotal)
   const openLabel = !authed ? 'Log in to open'
@@ -246,7 +265,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
 
       {/* Mobile: sticky action bar above the bottom nav (Open + turbo + counter), always on screen */}
       {onYolo && mobile && (
-          <div style={{
+          <div ref={barRef} style={{
             position: 'fixed', left: 0, right: 0, bottom: 60, zIndex: 90,
             display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px calc(10px + env(safe-area-inset-bottom,0px))',
             background: 'rgba(10,13,20,.96)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderTop: `1px solid ${COLORS.border}`,
@@ -266,7 +285,13 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
               // falta: nadie necesita que le confirmen que ha vuelto a lo normal.
               // Fuera del updater de setState a propósito: React puede invocarlo dos veces y
               // saldrían dos toasts.
-              <button onClick={() => { const on = !turbo; setTurbo(on); if (on) showToast(TURBO_ON_MSG, 'success') }}
+              <button onClick={() => {
+                  const on = !turbo
+                  setTurbo(on)
+                  // Al apagar se retira el aviso: describe un estado, y ese estado ya no es cierto.
+                  if (on) turboToast.current = showToast(TURBO_ON_MSG, 'success')
+                  else { dismissToast(turboToast.current); turboToast.current = null }
+                }}
                 title="Turbo (auto-sell Commons)" aria-pressed={turbo}
                 style={{ flexShrink: 0, width: 44, height: 36, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
                   border: `1px solid ${turbo ? COLORS.green : COLORS.border}`, background: turbo ? 'rgba(0,255,196,.12)' : COLORS.panel2, color: turbo ? COLORS.green : COLORS.muted }}>⚡</button>

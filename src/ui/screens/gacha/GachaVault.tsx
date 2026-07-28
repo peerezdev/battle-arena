@@ -31,7 +31,7 @@ import {
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { HoloCard } from '../../components/HoloCard'
-import { showToast } from '../../toast'
+import { showToast } from '../../toastBus'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
 import { CardBadge } from '../../components/CardBadge'

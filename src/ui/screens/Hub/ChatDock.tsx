@@ -5,7 +5,7 @@ import { useChat } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
 import { useProfile } from '../../../hooks/useProfile'
 import { useReducedMotion } from '../../useReducedMotion'
-import { showToast } from '../../toast'
+import { showToast } from '../../toastBus'
 import { UsernameModal } from '../../components/UsernameModal'
 import type { LiveDrop } from '../../drops/dropsStore'
 

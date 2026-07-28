@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
 const showToast = vi.fn()
-vi.mock('../../toast', () => ({ showToast: (...a: unknown[]) => showToast(...a) }))
+const dismissToast = vi.fn()
+vi.mock('../../toastBus', () => ({
+  showToast: (...a: unknown[]) => { showToast(...a); return 7 },
+  dismissToast: (...a: unknown[]) => dismissToast(...a),
+  setToastInset: () => {},
+}))
 
 import { MachineDetailPanel } from './MachineDetailPanel'
 import type { GachaMachine } from '../../../onchain/gachaClient'
@@ -27,7 +32,7 @@ function viewport(wide: boolean) {
 const turboIcon = () => screen.getAllByTitle('Turbo (auto-sell Commons)').find((b) => b.textContent === '⚡')!
 
 describe('MachineDetailPanel · aviso del turbo en móvil', () => {
-  beforeEach(() => { showToast.mockClear(); viewport(false) })
+  beforeEach(() => { showToast.mockClear(); dismissToast.mockClear(); viewport(false) })
 
   const mount = () => render(<MachineDetailPanel machine={machine} authed usdc={500} onYolo={vi.fn()} />)
 
@@ -38,12 +43,15 @@ describe('MachineDetailPanel · aviso del turbo en móvil', () => {
     expect(showToast).toHaveBeenCalledWith('Turbo activated — Commons will be auto-sold', 'success')
   })
 
-  it('al apagarlo no avisa: volver a lo normal no necesita confirmación', () => {
+  it('al apagarlo RETIRA el aviso en vez de sacar otro', () => {
+    // El aviso describe un estado. Si el usuario lo deshace enseguida, dejarlo en pantalla
+    // estaría diciendo algo que ya no es verdad.
     mount()
     const b = turboIcon()
-    fireEvent.click(b)      // ON  → avisa
-    fireEvent.click(b)      // OFF → calla
-    expect(showToast).toHaveBeenCalledTimes(1)
+    fireEvent.click(b)      // ON
+    fireEvent.click(b)      // OFF
+    expect(showToast).toHaveBeenCalledTimes(1)   // no sale un segundo aviso…
+    expect(dismissToast).toHaveBeenCalledWith(7) // …y el primero se retira
   })
 
   it('una máquina sin turbo no monta el botón', () => {

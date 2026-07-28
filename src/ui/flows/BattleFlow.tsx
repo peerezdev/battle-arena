@@ -12,7 +12,7 @@ import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { WaitingRoom } from '../screens/battle/WaitingRoom'
-import { showToast } from '../toast'
+import { showToast } from '../toastBus'
 import { notifyUnseenBattlesChanged } from '../screens/battle/unseenBattlesBus'
 
 function Centered({ children }: { children: ReactNode }) {

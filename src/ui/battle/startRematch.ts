@@ -1,6 +1,6 @@
 import type { NavigateFunction } from 'react-router-dom'
 import { rematchBattle } from '../../onchain/packBattleClient'
-import { showToast } from '../toast'
+import { showToast } from '../toastBus'
 
 /** Rematch from a finished battle's result screen. In the demo (battleId === 'demo') it just
  *  restarts a fresh demo; otherwise it create-or-joins the real rematch and navigates to it. */

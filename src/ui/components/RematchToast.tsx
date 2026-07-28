@@ -4,7 +4,7 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../theme'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
 import { rematchBattle } from '../../onchain/packBattleClient'
-import { showToast } from '../toast'
+import { showToast } from '../toastBus'
 import { useServerEvents } from '../../hooks/useServerEvents'
 import { useIsWide } from '../useIsWide'
 

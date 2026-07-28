@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useServerEvents } from '../../hooks/useServerEvents'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
-import { showToast } from '../toast'
+import { showToast } from '../toastBus'
 import { battleAlertFor } from '../battle/battleAlerts'
 
 /**

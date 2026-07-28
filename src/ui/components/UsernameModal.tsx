@@ -4,7 +4,7 @@ import { COLORS, FONTS, GRADIENT } from '../theme'
 import { useProfile } from '../../hooks/useProfile'
 import { validateUsername } from '../../profile/username'
 import { config } from '../../onchain/config'
-import { showToast } from '../toast'
+import { showToast } from '../toastBus'
 
 /** Quick "set your username" modal — same POST /users/me/alias as Settings, so the user can
  *  pick a name without leaving the chat / current screen. */

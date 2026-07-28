@@ -19,7 +19,7 @@ import { useDelegationGate } from './useDelegationGate'
 import { DelegationGate } from './DelegationGate'
 import { config } from '../../onchain/config'
 import { formatUsd } from '../theme'
-import { showToast } from '../toast'
+import { showToast } from '../toastBus'
 
 interface WithdrawModalProps {
   open: boolean
