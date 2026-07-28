@@ -844,6 +844,9 @@ function RevealOverlay({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 20,
+        // Como el overlay del sobre: con la carta al tamaño del sobre (480 de alto) una pantalla
+        // baja no da para todo, y sin esto se recortaba por arriba en vez de poder desplazar.
+        overflowY: 'auto',
       }}
     >
       {/* Opening */}
@@ -1268,7 +1271,7 @@ function CardDetailsView({
       <span style={{ fontSize: wide ? 14 : 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
         {selling ? 'Selling…' : `${wide ? 'Sell back' : 'Sell'} · ${formatUsd(buybackOffer ?? 0)}`}
       </span>
-      <span style={{ fontFamily: FONTS.mono, fontSize: wide ? 9 : 8, letterSpacing: '.12em', opacity: .75 }}>INSTANT · {buybackPct}%</span>
+      <span style={{ fontFamily: FONTS.mono, fontSize: wide ? 9 : 11, letterSpacing: '.08em', opacity: .75 }}>BUYBACK · {buybackPct}%</span>
     </button>
   )
 

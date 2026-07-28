@@ -8,8 +8,10 @@ import { COLORS, FONTS } from '../../theme'
 // sobres están listos NO se revela solo — el usuario decide cuándo, pulsando el botón o el
 // propio sobre. Ese click es el momento de la tirada, y quitárselo es quitarle la gracia.
 
-const PACK_W = 280
-const PACK_H = 480
+// Exportados: la carta del reveal se monta con estas mismas medidas para que el sobre se
+// convierta en una carta del mismo tamaño, sin salto. Si cambian aquí, cambian allí.
+export const PACK_W = 280
+export const PACK_H = 480
 const MAX_TILT = 16          // grados; más que esto y el sobre se deforma raro en los bordes
 const TEAR_MS = 880         // duración del desgarro; debe cuadrar con los keyframes ba-pack* de index.css
 

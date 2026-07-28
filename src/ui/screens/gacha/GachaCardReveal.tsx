@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { COLORS, FONTS, RARITY } from '../../theme'
 import type { YoloResult } from './pendingToResult'
+import { PACK_W, PACK_H } from './GachaPackTilt'
 
 // Reveal del gacha: dorso con año, grado y rareza APILADOS, casilla de rareza tipo rodillo,
 // contador de valor y volteo final.
@@ -21,14 +22,12 @@ const RARITY_HEX: Record<Rarity, string> = {
 
 const ROW = 38   // alto de fila de la casilla; debe cuadrar con el alto del .reelItem de abajo
 
-// Alto de la carta. Se lleva lo que sobra de pantalla: `100vh` menos el resto de la ceremonia
-// —casilla, contador y paddings del overlay, unos 100px medidos— y menos 200 de aire, para que
-// la carta no quede pegada a los bordes: son ~100px arriba y otros ~100 abajo.
-// Suelo para pantallas bajas y techo para que en un monitor grande no se vuelva absurda.
-// El segundo término la limita por ANCHO: en móvil manda el ancho, no el alto.
-// El ancho no se declara: sale del aspect-ratio, así no hay dos números que puedan discrepar.
-const CARD_RATIO = '196 / 274'
-const CARD_H = 'min(clamp(240px, calc(100vh - 300px), 620px), calc(92vw * 274 / 196))'
+// La carta se monta EXACTAMENTE con las medidas del sobre: el sobre se abre y en su sitio
+// aparece una carta del mismo tamaño, sin salto. Vienen importadas y no copiadas para que no
+// puedan separarse. De paso encajan mejor: una losa PSA es ~0.60 de proporción y el sobre 0.583,
+// mucho más cerca que el 0.715 que tenía la caja antes.
+const CARD_W = PACK_W
+const CARD_H = PACK_H
 
 /** Guion de la secuencia, en ms. Un solo sitio que tocar para recalibrar ritmos. */
 // Las tres primeras van sincronizadas con el reveal de batallas (STACK_T): la ceremonia es
@@ -162,7 +161,7 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-      <div style={{ perspective: 1200, position: 'relative', height: CARD_H, aspectRatio: CARD_RATIO }}>
+      <div style={{ perspective: 1200, position: 'relative', width: CARD_W, height: CARD_H }}>
         <div style={{
           width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d',
           transform: flipped ? 'rotateY(0)' : 'rotateY(180deg)',
@@ -204,7 +203,8 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
             <div style={{
               // Proporcional a la carta (150/196 del original): con una carta grande, una
               // casilla de 150 fijos se quedaba raquítica debajo.
-              height: ROW, width: `calc(${CARD_H} * 196 / 274 * 0.765)`, overflow: 'hidden', position: 'relative', marginTop: 3,
+              // Proporcional al ancho de la carta, como lo era al original (150/196).
+              height: ROW, width: Math.round(CARD_W * 0.765), overflow: 'hidden', position: 'relative', marginTop: 3,
               borderTop: '1px solid #ffffff1a', borderBottom: '1px solid #ffffff1a',
               WebkitMaskImage: 'linear-gradient(180deg,transparent,#000 26%,#000 74%,transparent)',
               maskImage: 'linear-gradient(180deg,transparent,#000 26%,#000 74%,transparent)',
