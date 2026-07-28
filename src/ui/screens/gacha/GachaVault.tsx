@@ -1254,8 +1254,14 @@ function CardDetailsView({
   const sellButton = (
     <button onClick={sell} disabled={selling}
       style={{
-        flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: wide ? 2 : 1,
-        padding: wide ? '12px 18px' : '0 16px', borderRadius: wide ? 12 : 13, border: 0, cursor: selling ? 'wait' : 'pointer',
+        // En móvil comparte la fila al 50% con "Keep and Continue"; en escritorio va dentro del
+        // bloque de valor y solo ocupa lo que necesita.
+        // Sin padding horizontal en móvil, y no por estética: Chromium reparte el flex-basis:0
+        // de un <button> sobre su contenido y le suma el padding por fuera, así que cualquier
+        // padding aquí lo dejaba más ancho que "Keep and Continue" y rompía el 50/50.
+        flex: wide ? 'none' : '1 1 0', minWidth: 0, boxSizing: 'border-box',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: wide ? 2 : 1,
+        padding: wide ? '12px 18px' : 0, borderRadius: wide ? 12 : 13, border: 0, cursor: selling ? 'wait' : 'pointer',
         fontFamily: FONTS.body, color: '#06170f', background: 'linear-gradient(135deg,#3df0a0,#13c98a)',
         boxShadow: `0 0 ${wide ? 20 : 18}px -6px rgba(47,226,138,.7)`,
       }}>
@@ -1266,33 +1272,51 @@ function CardDetailsView({
     </button>
   )
 
-  const valueBlock = (result.insured_value != null || buybackOffer != null) && (
+  const soldChip = (
+    <span style={{
+      flex: 'none', display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6,
+      padding: wide ? '12px 18px' : '7px 12px', borderRadius: wide ? 12 : 10,
+      background: 'rgba(47,226,138,.08)', border: '1px solid rgba(47,226,138,.4)',
+      fontSize: wide ? 14 : 12.5, fontWeight: 700, color: COLORS.green, whiteSpace: 'nowrap',
+    }}>
+      <svg width={wide ? 15 : 13} height={wide ? 15 : 13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
+      Sold · {formatUsd(buybackOffer ?? 0)}
+    </span>
+  )
+  const insuredValue = result.insured_value != null ? formatUsd(result.insured_value) : '—'
+  const hasValueBlock = result.insured_value != null || buybackOffer != null
+
+  const valueBlock = hasValueBlock && (
     <div style={{
-      marginTop: wide ? 16 : 12, borderRadius: wide ? 15 : 14, padding: wide ? 16 : '13px 15px',
+      marginTop: 16, borderRadius: 15, padding: 16,
       display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       background: 'linear-gradient(135deg,rgba(139,92,246,.22),rgba(139,92,246,.08))',
       border: '1px solid rgba(139,92,246,.4)',
     }}>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: FONTS.mono, fontSize: wide ? 10 : 9, letterSpacing: '.2em', color: '#b9a5e8' }}>INSURED VALUE</span>
-        <span style={{ display: 'block', fontSize: wide ? 32 : 26, fontWeight: 700, color: '#ff4d9d', marginTop: 2 }}>
-          {result.insured_value != null ? formatUsd(result.insured_value) : '—'}
-        </span>
+        <span style={{ display: 'block', fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: '#b9a5e8' }}>INSURED VALUE</span>
+        <span style={{ display: 'block', fontSize: 32, fontWeight: 700, color: '#ff4d9d', marginTop: 2 }}>{insuredValue}</span>
       </span>
-      {/* En móvil el botón de vender no vive aquí sino abajo, junto a "Keep and Continue": las
-          dos salidas de la pantalla están en el mismo sitio y al alcance del pulgar. */}
-      {canSell && wide && sellButton}
-      {sold && (
-        <span style={{
-          flex: 'none', display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6,
-          padding: wide ? '12px 18px' : '11px 15px', borderRadius: wide ? 12 : 11,
-          background: 'rgba(47,226,138,.08)', border: '1px solid rgba(47,226,138,.4)',
-          fontSize: wide ? 14 : 13, fontWeight: 700, color: COLORS.green,
-        }}>
-          <svg width={wide ? 15 : 14} height={wide ? 15 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
-          Sold · {formatUsd(buybackOffer ?? 0)}
-        </span>
-      )}
+      {canSell && sellButton}
+      {sold && soldChip}
+    </div>
+  )
+
+  // Móvil: una sola línea —etiqueta a la izquierda, importe a la derecha— y pegada a los
+  // botones. El bloque alto de dos plantas se comía la altura que necesita la ficha, y aquí
+  // no tiene que albergar el botón de vender, que vive abajo.
+  const valueRow = hasValueBlock && (
+    <div style={{
+      borderRadius: 14, padding: '11px 15px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+      background: 'linear-gradient(135deg,rgba(139,92,246,.22),rgba(139,92,246,.08))',
+      border: '1px solid rgba(139,92,246,.4)',
+    }}>
+      <span style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.2em', color: '#b9a5e8' }}>INSURED VALUE</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+        {sold && soldChip}
+        <span style={{ fontSize: 22, fontWeight: 700, color: '#ff4d9d', lineHeight: 1 }}>{insuredValue}</span>
+      </span>
     </div>
   )
 
@@ -1373,10 +1397,13 @@ function CardDetailsView({
       // Móvil: el botón queda fijo abajo mientras la ficha rueda por detrás, con el degradado
       // del diseño para que el contenido no aparezca cortado a ras del borde.
       : { flex: 'none', display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 18px 20px', background: 'linear-gradient(180deg,transparent,#08090d 35%)' }}>
+      {/* Los dos reparten el ancho a partes iguales: ninguna de las dos salidas es "la
+          secundaria", y con `flex-basis:0` el reparto no depende de lo largo que sea el texto. */}
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={onNext}
           style={{
-            flex: 1, minWidth: 0, padding: wide ? '13px 0' : '15px 0', borderRadius: wide ? 12 : 13,
+            flex: '1 1 0', minWidth: 0, boxSizing: 'border-box',
+            padding: wide ? '13px 0' : '15px 0', borderRadius: wide ? 12 : 13,
             border: 0, cursor: 'pointer', fontFamily: FONTS.display,
             fontSize: wide ? 14 : 15, fontWeight: 700, color: '#1a0a2e',
             background: 'linear-gradient(135deg,#ff5c98,#b84ef0)', boxShadow: '0 0 22px -6px rgba(184,78,240,.8)',
@@ -1388,8 +1415,9 @@ function CardDetailsView({
   )
 
   if (!wide) {
-    // Columna de teléfono: cabecera, carta y valor fijos arriba; la ficha rueda en el hueco que
-    // sobra; el botón anclado abajo. Así "continuar" está siempre a un toque, sin buscarlo.
+    // Columna de teléfono: cabecera, carta y título fijos arriba; la ficha rueda en el hueco que
+    // sobra; valor y botones anclados abajo. El valor baja junto a los botones porque es el dato
+    // que sostiene la decisión: se lee justo antes de pulsar, no doce filas más arriba.
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ flex: 'none', padding: '18px 18px 0' }}>{header}</div>
@@ -1403,13 +1431,14 @@ function CardDetailsView({
           <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.01em', lineHeight: 1.2 }}>
             {result.name ?? 'Unknown Card'}
           </div>
-          {valueBlock}
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '6px 18px 12px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 18px 12px' }}>
           {sections}
           {ccLink}
         </div>
+
+        <div style={{ flex: 'none', padding: '0 18px' }}>{valueRow}</div>
 
         {action}
       </div>
