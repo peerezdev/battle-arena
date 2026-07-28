@@ -21,6 +21,15 @@ const RARITY_HEX: Record<Rarity, string> = {
 
 const ROW = 38   // alto de fila de la casilla; debe cuadrar con el alto del .reelItem de abajo
 
+// Alto de la carta. Se lleva lo que sobra de pantalla: `100vh` menos el resto de la ceremonia
+// —casilla, contador y paddings del overlay, unos 100px medidos— y menos 200 de aire, para que
+// la carta no quede pegada a los bordes: son ~100px arriba y otros ~100 abajo.
+// Suelo para pantallas bajas y techo para que en un monitor grande no se vuelva absurda.
+// El segundo término la limita por ANCHO: en móvil manda el ancho, no el alto.
+// El ancho no se declara: sale del aspect-ratio, así no hay dos números que puedan discrepar.
+const CARD_RATIO = '196 / 274'
+const CARD_H = 'min(clamp(240px, calc(100vh - 300px), 620px), calc(92vw * 274 / 196))'
+
 /** Guion de la secuencia, en ms. Un solo sitio que tocar para recalibrar ritmos. */
 // Las tres primeras van sincronizadas con el reveal de batallas (STACK_T): la ceremonia es
 // distinta —aquí hay ruleta y contador— pero el arranque tiene que sonar igual.
@@ -153,9 +162,9 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-      <div style={{ perspective: 1200, position: 'relative', width: 196, height: 274 }}>
+      <div style={{ perspective: 1200, position: 'relative', height: CARD_H, aspectRatio: CARD_RATIO }}>
         <div style={{
-          width: 196, height: 274, position: 'relative', transformStyle: 'preserve-3d',
+          width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d',
           transform: flipped ? 'rotateY(0)' : 'rotateY(180deg)',
           transition: `transform ${REVEAL_T.flip}ms cubic-bezier(.4,0,.2,1)`,
         }}>
@@ -193,7 +202,9 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
           {hasGrade && row('Grade', big(String(result.grade)), shown >= 2)}
           {rarity && row('Rarity', (
             <div style={{
-              height: ROW, width: 150, overflow: 'hidden', position: 'relative', marginTop: 3,
+              // Proporcional a la carta (150/196 del original): con una carta grande, una
+              // casilla de 150 fijos se quedaba raquítica debajo.
+              height: ROW, width: `calc(${CARD_H} * 196 / 274 * 0.765)`, overflow: 'hidden', position: 'relative', marginTop: 3,
               borderTop: '1px solid #ffffff1a', borderBottom: '1px solid #ffffff1a',
               WebkitMaskImage: 'linear-gradient(180deg,transparent,#000 26%,#000 74%,transparent)',
               maskImage: 'linear-gradient(180deg,transparent,#000 26%,#000 74%,transparent)',
