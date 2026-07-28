@@ -29,7 +29,6 @@ const screenStyle = { padding: '18px clamp(14px,2.4vw,28px) 28px', display: 'fle
 
 // ⏱️ Cuánto se queda la carta central mostrándose antes de pasar al siguiente jugador (ms).
 // Cambia este número para ajustar el tiempo del reveal (3000 = 3 segundos).
-const CARD_DWELL_MS = 1500
 
 function useRanked(vm: RevealVM) {
   // Finish ranking: still-alive on top by value; eliminated below by when they went out.
@@ -227,7 +226,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {/* card ceremony */}
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
-            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} dwellMs={CARD_DWELL_MS} stacked
+            rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} stacked
             preloadSrc={stagingCard.nftAddress ? ccCardImageUrl(stagingCard.nftAddress) : undefined}
             onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} valueColor={COLORS.text} />

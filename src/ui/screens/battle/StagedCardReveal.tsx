@@ -4,7 +4,7 @@ import { COLORS, FONTS, SHADOW } from '../../theme'
 import { rarityColor } from './RevealCard'
 import { CardBack } from './CardBack'
 import { RarityBand } from './RarityBand'
-import { STACK_T, BAND_T, EPIC_SPIN_DEG, FLIP_MS, bandRarity, bandColorFor } from './revealTiming'
+import { PHASE, EPIC_SPIN_DEG, bandRarity, bandColorFor, buildTimeline } from './revealTiming'
 import { playEpicSpin, playFlipThump, stopReveal } from '../../sfx'
 
 type Stage = 'year' | 'grade' | 'rarity' | 'card'
@@ -18,7 +18,7 @@ type Stage = 'year' | 'grade' | 'rarity' | 'card'
  *  previous one and STAYS, so the card is read as year + grade + rarity together before it flips.
  *  Off by default — Pack Battle's small cards have no room for three stacked rows. */
 export function StagedCardReveal({
-  year, grade, rarity, reduced, dwellMs = 550, width = 180, height = 252,
+  year, grade, rarity, reduced, dwellMs = PHASE.hold, width = 180, height = 252,
   stacked = false, preloadSrc, onCardShown, children,
 }: {
   year: string | null
@@ -66,58 +66,41 @@ export function StagedCardReveal({
   const [band, setBand] = useState<null | 'in' | 'out'>(null)
   const [spinning, setSpinning] = useState(false)   // Epic: giro de varias vueltas acelerando
 
-  /** Guion de la franja, común a los dos modos. `rarityAt` es cuándo se lee la rareza. */
-  const bandSchedule = (rarityAt: number, at: (ms: number, fn: () => void) => void, land: () => void) => {
-    // El sonido arranca CON la rareza, antes de que entre la franja: así el audio va por delante
-    // de la imagen y la franja cae dentro del sonido. Solo Epic.
-    if (bandKey === 'epic') at(rarityAt, playEpicSpin)
-    at(rarityAt + BAND_T.band, () => setBand('in'))
-    // El golpe grave cierra la ceremonia: suena cuando la carta queda de cara, no al empezar
-    // a girar. Es el segundo ♪ del diseño.
-    const landed = () => { land(); playFlipThump() }
-    if (bandKey === 'epic') {
-      // La franja se va AL RITMO del giro: las dos cosas arrancan en el mismo instante.
-      at(rarityAt + BAND_T.epicSpin, () => { setSpinning(true); setBand('out') })
-      at(rarityAt + BAND_T.epicLand, landed)
-    } else {
-      at(rarityAt + BAND_T.rareFlip, () => { setBand('out'); landed() })
-    }
-  }
+  // Un solo guion para los dos modos: las fases salen de sus DURACIONES (revealTiming.PHASE),
+  // encadenadas sobre las filas que trae esta carta.
+  const rowKeys = useMemo(() => rows.map((r) => r.key), [rows])
+  const tl = useMemo(() => buildTimeline(rowKeys, rarity), [rowKeys, rarity])
 
-  /** Cuándo entra el escalón `k`. La rareza siempre va la última y se hace esperar un poco
-   *  más: es la que remata. Mismo reloj para los dos modos, para que Pack Battle y Battle
-   *  Royale suenen igual —antes el no apilado iba a `stepMs` fijo y llegaba muy tarde. */
-  const stepAt = (k: number, isRarity: boolean) =>
-    STACK_T.first + k * STACK_T.step + (isRarity ? STACK_T.rarityExtra : 0)
-
-  // Modo NO apilado (Pack Battle): un escalón a la vez, con el mismo reloj que el apilado.
   useEffect(() => {
-    if (reduced || stacked) return
+    if (reduced) return
     const timers: ReturnType<typeof setTimeout>[] = []
     const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
-    const pre = stages.slice(0, -1)               // year/grade/rarity que existan
-    at(STACK_T.first, () => setPreStarted(true))  // el primero también espera: nada antes
-    pre.forEach((s, k) => { if (k > 0) at(stepAt(k, s === 'rarity'), () => setI(k)) })
-    const rarityAt = stepAt(Math.max(0, pre.length - 1), pre[pre.length - 1] === 'rarity')
-    if (bandKey) bandSchedule(rarityAt, at, () => setI(stages.length - 1))
-    else at(rarityAt + STACK_T.hold, () => setI(stages.length - 1))
-    return () => { timers.forEach(clearTimeout); stopReveal() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stages, reduced, stacked, bandKey])
 
-  // Stacked schedule: drop each row in turn, hold the full column, then flip.
-  useEffect(() => {
-    if (!stacked || reduced) return
-    const timers: ReturnType<typeof setTimeout>[] = []
-    const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
-    rows.forEach((_, k) => at(stepAt(k, rows[k]?.key === 'Rarity'), () => setShown(k + 1)))
-    const rarityAt = stepAt(Math.max(0, rows.length - 1), rows[rows.length - 1]?.key === 'Rarity')
-    if (bandKey) bandSchedule(rarityAt, at, () => setFlipped(true))
-    else at(rarityAt + STACK_T.hold, () => setFlipped(true))
+    tl.rowAt.forEach((ms, k) => at(ms, () => {
+      if (stacked) setShown(k + 1)
+      else { setPreStarted(true); setI(k) }
+    }))
+    // El sonido arranca CON la rareza, antes de que entre la franja: el audio va por delante de
+    // la imagen y la franja cae dentro del sonido. Solo Epic.
+    if (bandKey === 'epic') at(tl.rowAt[tl.rowAt.length - 1] ?? 0, playEpicSpin)
+
+    if (tl.bandAt != null) at(tl.bandAt, () => setBand('in'))
+    at(tl.turnAt, () => {
+      setBand((b) => (b ? 'out' : b))       // la franja se va AL RITMO del giro
+      if (bandKey === 'epic') setSpinning(true)
+      else if (stacked) setFlipped(true)
+      else setI(stages.length - 1)
+    })
+    // El golpe grave cierra la ceremonia: suena al quedar de cara, no al empezar a moverse.
+    at(tl.faceUpAt, () => {
+      if (bandKey === 'epic') { if (stacked) setFlipped(true); else setI(stages.length - 1) }
+      if (bandKey) playFlipThump()
+    })
+
     // Al desmontar —o sea, al pasar a la carta siguiente— se corta lo que esté sonando.
     return () => { timers.forEach(clearTimeout); stopReveal() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stacked, reduced, rows, bandKey])
+  }, [tl, reduced, stacked, bandKey])
 
   // La imagen se descargaba al montar la carta, o sea AL VOLTEAR: se veía el hueco vacío hasta
   // que llegaba. Aquí se pide durante el año/grado/rareza, que dura segundos, así que al voltear
@@ -171,8 +154,9 @@ export function StagedCardReveal({
         transition={
           reduced ? { duration: 0 }
             // Epic: varias vueltas COGIENDO VELOCIDAD, así que ease-in y no el muelle de siempre.
-            : spinning ? { duration: (BAND_T.epicLand - BAND_T.epicSpin) / 1000, ease: [0.45, 0, 0.95, 0.5] }
-              : { type: 'spring', stiffness: 160, damping: 20 }
+            : spinning ? { duration: tl.turnMs / 1000, ease: [0.45, 0, 0.95, 0.5] }
+              // El volteo normal dura lo que diga su fase, en vez de un muelle libre.
+              : { duration: tl.turnMs / 1000, ease: [0.2, 0.8, 0.25, 1] }
         }
         style={{ position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d' }}
       >
@@ -257,7 +241,7 @@ export function StagedCardReveal({
           label={bandKey.toUpperCase()}
           color={bandColorFor(bandKey)}
           w={width} h={height} phase={band} reduced={reduced}
-          turnMs={bandKey === 'epic' ? BAND_T.epicLand - BAND_T.epicSpin : FLIP_MS}
+          turnMs={tl.turnMs}
         />
       )}
     </div>

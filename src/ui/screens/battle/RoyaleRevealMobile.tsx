@@ -12,7 +12,6 @@ import type { RevealVM, RevealPlayerVM } from './battleReveal'
 // Phone-sized card. 5:7 like every other card in the app; 220 still clears the padding on a
 // 320px-wide screen, the narrowest phone we support.
 const CARD_W = 220, CARD_H = 308
-const CARD_DWELL_MS = 1500   // matches the desktop reveal's dwell
 
 type Tab = 'battle' | 'standings'
 
@@ -157,7 +156,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
       {stagingCard
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
             rarity={stagingCard.rarity} reduced={reducedMotion} width={CARD_W} height={CARD_H}
-            dwellMs={CARD_DWELL_MS} stacked
+            stacked
             preloadSrc={stagingCard.nftAddress ? ccCardImageUrl(stagingCard.nftAddress) : undefined}
             onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={CARD_W} h={CARD_H} valueColor={COLORS.text} />

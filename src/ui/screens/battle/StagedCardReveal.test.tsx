@@ -9,7 +9,7 @@ vi.mock('../../sfx', () => ({
   stopReveal: () => stopReveal(),
 }))
 import { StagedCardReveal } from './StagedCardReveal'
-import { STACK_T, BAND_T } from './revealTiming'
+import { PHASE, buildTimeline } from './revealTiming'
 
 describe('StagedCardReveal', () => {
   it('reduced-motion jumps straight to the card and fires onCardShown', () => {
@@ -24,19 +24,20 @@ describe('StagedCardReveal', () => {
     expect(onCardShown).toHaveBeenCalled()
   })
 
-  it('non-reduced starts on the first pre-card stage (YEAR), y no antes de su turno', () => {
+  it('non-reduced starts on the first pre-card stage (YEAR)', () => {
     vi.useFakeTimers()
     render(
       <StagedCardReveal year="2018" grade={10} rarity="Epic" reduced={false}>
         <div>THE CARD</div>
       </StagedCardReveal>,
     )
-    // El año ya no se pinta en el ms 0: espera su turno igual que en el modo apilado, que es
-    // lo que hace que las dos ceremonias suenen iguales.
-    expect(screen.queryByText('2018')).toBeNull()
-    act(() => { vi.advanceTimersByTime(STACK_T.first) })
+    // Con el modelo de duraciones, `year: 500` es lo que DURA la fila, no lo que espera: entra
+    // en el ms 0 y se va cuando entra el grado.
+    act(() => { vi.advanceTimersByTime(0) })
     expect(screen.getByText('2018')).toBeTruthy()       // first stage = year
     expect(screen.queryByText('THE CARD')).toBeNull()   // card not yet
+    act(() => { vi.advanceTimersByTime(PHASE.year) })
+    expect(screen.getByText('10')).toBeTruthy()         // ahora el grado
     vi.useRealTimers()
   })
 
@@ -47,7 +48,7 @@ describe('StagedCardReveal', () => {
         <div>THE CARD</div>
       </StagedCardReveal>,
     )
-    act(() => { vi.advanceTimersByTime(STACK_T.first) })
+    act(() => { vi.advanceTimersByTime(0) })
     expect(screen.getByText('2018')).toBeTruthy()
     expect(screen.queryByText('10')).toBeNull()         // el grado aún no está montado
     expect(screen.queryByText('EPIC')).toBeNull()
@@ -117,28 +118,42 @@ describe('StagedCardReveal · franja de rareza', () => {
       <div>THE CARD</div>
     </StagedCardReveal>,
   )
-  // Con las tres filas, la rareza cae a los 1750 ms: 500 + 2×500 + 250 de propina.
-  const RARITY_AT = STACK_T.first + 2 * STACK_T.step + STACK_T.rarityExtra
+  const TL = (r: string) => buildTimeline(['Year', 'Grade', 'Rarity'], r)
 
-  it('la rareza aterriza a los 1750 ms, que es de donde cuelga todo lo demás', () => {
-    expect(RARITY_AT).toBe(1750)
-    expect(RARITY_AT + BAND_T.band).toBe(2100)        // franja
-    expect(RARITY_AT + BAND_T.epicSpin).toBe(2700)    // giro de Epic
-    expect(RARITY_AT + BAND_T.epicLand).toBe(4500)    // Epic de cara
-    expect(RARITY_AT + BAND_T.rareFlip).toBe(3500)    // Rare de cara
+  it('las duraciones se encadenan en los instantes esperados', () => {
+    // Duraciones (PHASE) → instantes. Si tocas una fase, esto dice a dónde se mueve todo.
+    const e = TL('Epic'), r = TL('Rare'), c = TL('Common')
+    expect(e.rowAt).toEqual([0, 500, 1000])     // year 0 · grade 500 · rarity 1000
+    expect(e.bandAt).toBe(1750)                 // + rarity 750
+    expect(e.turnAt).toBe(2700)                 // + band 350 + epicWait 600
+    expect(e.faceUpAt).toBe(4500)               // + epicTurn 1800
+
+    expect(r.bandAt).toBe(1750)
+    expect(r.turnAt).toBe(2100)                 // + band 350, sin espera
+    expect(r.faceUpAt).toBe(2900)               // + rareTurn 800
+
+    expect(c.bandAt).toBeNull()                 // Common no lleva franja
+    expect(c.turnAt).toBe(1750)
+    expect(c.faceUpAt).toBe(2750)               // + plainTurn 1000
+  })
+
+  it('una carta sin año sube todo en bloque, sin hueco muerto', () => {
+    const sinAnio = buildTimeline(['Grade', 'Rarity'], 'Epic')
+    expect(sinAnio.rowAt).toEqual([0, 500])
+    expect(sinAnio.bandAt).toBe(1250)           // 500 de grado + 750 de rareza
   })
 
   it('en Rare la franja sale a los 2100 y se va con el volteo', () => {
     renderStacked('Rare')
     // La fila de la carta YA escribe "RARE" en mayúsculas, así que la franja se cuenta, no se
     // busca: una aparición es solo la fila; dos, la fila más la franja.
-    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.band - 1) })
+    act(() => { vi.advanceTimersByTime(TL('Rare').bandAt! - 1) })
     expect(screen.getAllByText('RARE')).toHaveLength(1)
 
     act(() => { vi.advanceTimersByTime(1) })
     expect(screen.getAllByText('RARE')).toHaveLength(2)   // franja dentro
 
-    act(() => { vi.advanceTimersByTime(BAND_T.rareFlip - BAND_T.band) })
+    act(() => { vi.advanceTimersByTime(TL('Rare').faceUpAt - TL('Rare').bandAt!) })
     expect(screen.getByText('THE CARD')).toBeTruthy() // volteo
   })
 
@@ -146,7 +161,7 @@ describe('StagedCardReveal · franja de rareza', () => {
     renderStacked('Common')
     // En el instante en que una Rare ya tendría franja, aquí sigue habiendo una sola aparición:
     // la fila de la carta. Se mira ANTES del volteo, que desmonta el dorso y con él la fila.
-    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.band + 100) })
+    act(() => { vi.advanceTimersByTime(TL('Common').turnAt - 50) })
     expect(screen.getAllByText('COMMON')).toHaveLength(1)
 
     act(() => { vi.advanceTimersByTime(6000) })
@@ -163,11 +178,11 @@ describe('StagedCardReveal · sonido de Epic', () => {
       <div>THE CARD</div>
     </StagedCardReveal>,
   )
-  const RARITY_AT = STACK_T.first + 2 * STACK_T.step + STACK_T.rarityExtra
+  const TL = (r: string) => buildTimeline(['Year', 'Grade', 'Rarity'], r)
 
   it('suena CON la rareza, no con la franja', () => {
     play('Epic')
-    act(() => { vi.advanceTimersByTime(RARITY_AT - 1) })
+    act(() => { vi.advanceTimersByTime(TL('Epic').rowAt[2] - 1) })
     expect(playEpicSpin).not.toHaveBeenCalled()
 
     act(() => { vi.advanceTimersByTime(1) })
@@ -203,20 +218,20 @@ describe('StagedCardReveal · golpe del volteo y corte al cambiar de carta', () 
       <div>THE CARD</div>
     </StagedCardReveal>,
   )
-  const RARITY_AT = STACK_T.first + 2 * STACK_T.step + STACK_T.rarityExtra
+  const TL = (r: string) => buildTimeline(['Year', 'Grade', 'Rarity'], r)
 
   it('el golpe suena cuando la carta queda DE CARA, no al empezar a girar', () => {
     mount('Epic')
-    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.epicSpin + 50) })
+    act(() => { vi.advanceTimersByTime(TL('Epic').turnAt + 50) })
     expect(playFlipThump).not.toHaveBeenCalled()   // ya está girando, pero aún no de cara
 
-    act(() => { vi.advanceTimersByTime(BAND_T.epicLand - BAND_T.epicSpin) })
+    act(() => { vi.advanceTimersByTime(TL('Epic').faceUpAt - TL('Epic').turnAt) })
     expect(playFlipThump).toHaveBeenCalledTimes(1)
   })
 
   it('en Rare suena con su volteo', () => {
     mount('Rare')
-    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.rareFlip) })
+    act(() => { vi.advanceTimersByTime(TL('Rare').faceUpAt) })
     expect(playFlipThump).toHaveBeenCalledTimes(1)
   })
 
@@ -232,7 +247,7 @@ describe('StagedCardReveal · golpe del volteo y corte al cambiar de carta', () 
   it('al cambiar de carta se corta lo que esté sonando', () => {
     // Era el problema: el sonido de una épica seguía sonando encima de la tirada siguiente.
     const { unmount } = mount('Epic')
-    act(() => { vi.advanceTimersByTime(RARITY_AT + 100) })
+    act(() => { vi.advanceTimersByTime(TL('Epic').rowAt[2] + 100) })
     expect(stopReveal).not.toHaveBeenCalled()
     unmount()
     expect(stopReveal).toHaveBeenCalled()
