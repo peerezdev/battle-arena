@@ -1025,9 +1025,13 @@ function RevealResult({
           border: '1px solid rgba(255,255,255,.1)', borderRadius: 22,
           boxShadow: '0 30px 80px -20px rgba(0,0,0,.8)',
         } : {
-          maxWidth: 440, width: '100%', maxHeight: '90vh', overflowY: 'auto',
-          background: COLORS.panel,
-          border: `2px solid ${rarityColor}`, borderRadius: 18,
+          // Caja de teléfono del diseño: altura fija para que la ficha ruede por dentro y el
+          // botón se quede anclado abajo. `overflow:hidden` porque quien hace scroll es el
+          // hueco de la ficha, no la caja entera.
+          width: '100%', maxWidth: 430, height: 'min(844px, 92vh)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          background: `radial-gradient(500px 380px at 50% -5%, ${rarityGlow(result.rarity) ?? 'transparent'}, transparent 70%), #08090d`,
+          border: '1px solid rgba(255,255,255,.08)', borderRadius: 24,
           boxShadow: `${SHADOW.panel}, ${SHADOW.glow(rarityColor)}`,
         }}
       >
@@ -1138,8 +1142,11 @@ function CardDetailsView({
 
   // ── Piezas compartidas por las dos disposiciones ────────────────────────────
 
+  // Escritorio: columna de miniaturas navegables. Móvil: no hay sitio para 64px de miniatura al
+  // lado de la carta, así que la selección se hace con barritas —la activa alargada— como un
+  // carrusel, que es lo que pide el diseño de móvil.
   const thumbs = images.length > 1 && (
-    <div style={{ display: 'flex', flexDirection: wide ? 'column' : 'row', gap: 10, flexShrink: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0 }}>
       {images.map((src, idx) => (
         <button key={idx} onClick={() => setActiveImg(idx)} aria-label={`View ${idx + 1}`}
           style={{
@@ -1155,45 +1162,65 @@ function CardDetailsView({
     </div>
   )
 
-  const hero = (
-    <div style={{
-      position: 'relative', borderRadius: 16, display: 'grid', placeItems: 'center', padding: wide ? 22 : 16,
-      background: `radial-gradient(70% 60% at 50% 45%, ${glow}, transparent 75%), rgba(0,0,0,.3)`,
-      border: '1px solid rgba(255,255,255,.07)',
-    }}>
-      {mainImgSrc ? (
-        <div style={{
-          width: '100%', maxWidth: wide ? 265 : 230, borderRadius: 12, overflow: 'hidden',
-          boxShadow: `0 0 60px -12px ${rarityColor}, 0 20px 40px -18px rgba(0,0,0,.8)`,
-          animation: reduced ? 'none' : 'ca-pop .7s cubic-bezier(.2,.9,.25,1) both, ca-float 5.5s ease-in-out .7s infinite',
-        }}>
-          <HoloCard src={mainImgSrc} alt={result.name ?? 'Card image'} rarity={result.rarity}
-            accent={rarityColor} radius={12} imgStyle={{ maxHeight: wide ? 390 : 300, objectFit: 'contain' }} />
-        </div>
-      ) : (
-        <span style={{ fontSize: 64, lineHeight: 1 }}>🃏</span>
-      )}
+  const dots = images.length > 1 && (
+    <div style={{ display: 'flex', gap: 7, marginTop: 12 }}>
+      {images.map((_, idx) => (
+        <button key={idx} onClick={() => setActiveImg(idx)} aria-label={`View ${idx + 1}`}
+          style={{
+            width: idx === activeImg ? 20 : 5, height: 5, padding: 0, border: 0, borderRadius: 3, cursor: 'pointer',
+            background: idx === activeImg ? rarityColor : 'rgba(255,255,255,.2)',
+            transition: reduced ? 'none' : 'width .25s ease, background .25s ease',
+          }} />
+      ))}
     </div>
   )
 
+  const cardArt = (w: number, maxH: number, radius: number) => (
+    mainImgSrc ? (
+      <div style={{
+        width: '100%', maxWidth: w, borderRadius: radius, overflow: 'hidden',
+        boxShadow: `0 0 ${radius === 11 ? '50px -10px' : '60px -12px'} ${rarityColor}, 0 18px 36px -16px rgba(0,0,0,.8)`,
+        animation: reduced ? 'none' : 'ca-pop .7s cubic-bezier(.2,.9,.25,1) both, ca-float 5.5s ease-in-out .7s infinite',
+      }}>
+        <HoloCard src={mainImgSrc} alt={result.name ?? 'Card image'} rarity={result.rarity}
+          accent={rarityColor} radius={radius} imgStyle={{ maxHeight: maxH, objectFit: 'contain' }} />
+      </div>
+    ) : (
+      <span style={{ fontSize: 64, lineHeight: 1 }}>🃏</span>
+    )
+  )
+
+  const hero = (
+    <div style={{
+      position: 'relative', borderRadius: 16, display: 'grid', placeItems: 'center', padding: 22,
+      background: `radial-gradient(70% 60% at 50% 45%, ${glow}, transparent 75%), rgba(0,0,0,.3)`,
+      border: '1px solid rgba(255,255,255,.07)',
+    }}>
+      {cardArt(265, 390, 12)}
+    </div>
+  )
+
+  // En móvil el sello se acorta a "Authentic": a 390px la frase entera empujaba la píldora de
+  // rareza a una segunda línea y la cabecera se comía la altura de la carta.
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: COLORS.green }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></svg>
-        Guaranteed authenticity
+    <div style={{ display: 'flex', alignItems: 'center', gap: wide ? 10 : 8, flexWrap: 'wrap' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6, fontSize: wide ? 13 : 12, fontWeight: 600, color: COLORS.green }}>
+        <svg width={wide ? 15 : 14} height={wide ? 15 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></svg>
+        {wide ? 'Guaranteed authenticity' : 'Authentic'}
       </span>
-      <span style={{ width: 1, height: 13, background: 'rgba(255,255,255,.15)' }} />
+      <span style={{ width: 1, height: wide ? 13 : 12, background: 'rgba(255,255,255,.15)' }} />
       <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#c9b3f0', textDecoration: 'none' }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="7" width="16" height="13" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>
+        style={{ display: 'inline-flex', alignItems: 'center', gap: wide ? 6 : 5, fontSize: wide ? 12 : 11, fontWeight: 600, color: '#c9b3f0', textDecoration: 'none' }}>
+        <svg width={wide ? 13 : 12} height={wide ? 13 : 12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="7" width="16" height="13" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>
         Vaulted by CollectorCrypt
       </a>
       <span style={{
-        marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 13px', borderRadius: 9,
+        marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6,
+        padding: wide ? '6px 13px' : '5px 11px', borderRadius: wide ? 9 : 8,
         background: `${rarityColor}1f`, border: `1px solid ${rarityColor}73`,
-        fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: '.18em', color: rarityColor,
+        fontFamily: FONTS.mono, fontSize: wide ? 10 : 9, fontWeight: 700, letterSpacing: '.18em', color: rarityColor,
       }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: rarityColor, boxShadow: `0 0 7px ${rarityColor}` }} />
+        <span style={{ width: wide ? 6 : 5, height: wide ? 6 : 5, borderRadius: '50%', background: rarityColor, boxShadow: `0 0 ${wide ? 7 : 6}px ${rarityColor}` }} />
         {result.rarity.toUpperCase()}
       </span>
     </div>
@@ -1201,34 +1228,39 @@ function CardDetailsView({
 
   const valueBlock = (result.insured_value != null || buybackOffer != null) && (
     <div style={{
-      marginTop: 16, borderRadius: 15, padding: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+      marginTop: wide ? 16 : 12, borderRadius: wide ? 15 : 14, padding: wide ? 16 : '13px 15px',
+      display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
       background: 'linear-gradient(135deg,rgba(139,92,246,.22),rgba(139,92,246,.08))',
       border: '1px solid rgba(139,92,246,.4)',
     }}>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: '#b9a5e8' }}>INSURED VALUE</span>
-        <span style={{ display: 'block', fontSize: 32, fontWeight: 700, color: '#ff4d9d', marginTop: 2 }}>
+        <span style={{ display: 'block', fontFamily: FONTS.mono, fontSize: wide ? 10 : 9, letterSpacing: '.2em', color: '#b9a5e8' }}>INSURED VALUE</span>
+        <span style={{ display: 'block', fontSize: wide ? 32 : 26, fontWeight: 700, color: '#ff4d9d', marginTop: 2 }}>
           {result.insured_value != null ? formatUsd(result.insured_value) : '—'}
         </span>
       </span>
       {canSell && (
         <button onClick={sell} disabled={selling}
           style={{
-            flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-            padding: '12px 18px', borderRadius: 12, border: 0, cursor: selling ? 'wait' : 'pointer',
+            flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: wide ? 2 : 1,
+            padding: wide ? '12px 18px' : '11px 15px', borderRadius: wide ? 12 : 11, border: 0, cursor: selling ? 'wait' : 'pointer',
             fontFamily: FONTS.body, color: '#06170f', background: 'linear-gradient(135deg,#3df0a0,#13c98a)',
-            boxShadow: '0 0 20px -6px rgba(47,226,138,.7)',
+            boxShadow: `0 0 ${wide ? 20 : 18}px -6px rgba(47,226,138,.7)`,
           }}>
-          <span style={{ fontSize: 14, fontWeight: 700 }}>{selling ? 'Selling…' : `Sell back · ${formatUsd(buybackOffer!)}`}</span>
-          <span style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.12em', opacity: .75 }}>INSTANT · {buybackPct}%</span>
+          <span style={{ fontSize: wide ? 14 : 13, fontWeight: 700 }}>
+            {selling ? 'Selling…' : `${wide ? 'Sell back' : 'Sell'} · ${formatUsd(buybackOffer!)}`}
+          </span>
+          <span style={{ fontFamily: FONTS.mono, fontSize: wide ? 9 : 8, letterSpacing: '.12em', opacity: .75 }}>INSTANT · {buybackPct}%</span>
         </button>
       )}
       {sold && (
         <span style={{
-          flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '12px 18px', borderRadius: 12,
-          background: 'rgba(47,226,138,.08)', border: '1px solid rgba(47,226,138,.4)', fontSize: 14, fontWeight: 700, color: COLORS.green,
+          flex: 'none', display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6,
+          padding: wide ? '12px 18px' : '11px 15px', borderRadius: wide ? 12 : 11,
+          background: 'rgba(47,226,138,.08)', border: '1px solid rgba(47,226,138,.4)',
+          fontSize: wide ? 14 : 13, fontWeight: 700, color: COLORS.green,
         }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
+          <svg width={wide ? 15 : 14} height={wide ? 15 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
           Sold · {formatUsd(buybackOffer ?? 0)}
         </span>
       )}
@@ -1238,24 +1270,25 @@ function CardDetailsView({
   const sectionBtn = (label: string, isOpen: boolean, onClick: () => void, first: boolean) => (
     <button onClick={onClick}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px',
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px',
         border: 0, borderTop: first ? undefined : '1px solid rgba(255,255,255,.08)',
         borderBottom: '1px solid rgba(255,255,255,.08)',
         background: 'transparent', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body,
       }}>
-      <span style={{ fontSize: 15, fontWeight: 700 }}>{label}</span>
-      <span style={{ color: '#7a8492', fontSize: 18, lineHeight: 1 }}>{isOpen ? '−' : '+'}</span>
+      <span style={{ fontSize: wide ? 15 : 14, fontWeight: 700 }}>{label}</span>
+      <span style={{ color: '#7a8492', fontSize: wide ? 18 : 17, lineHeight: 1 }}>{isOpen ? '−' : '+'}</span>
     </button>
   )
+  const rowFont = wide ? 13 : 12.5
   const detailRow = (k: string, v: React.ReactNode) => (
     <div key={k} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '7px 2px' }}>
-      <span style={{ fontSize: 13, color: '#7a8492' }}>{k}</span>
-      <span style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>{v}</span>
+      <span style={{ fontSize: rowFont, color: '#7a8492' }}>{k}</span>
+      <span style={{ fontSize: rowFont, fontWeight: 600, textAlign: 'right' }}>{v}</span>
     </div>
   )
 
   const sections = (
-    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ marginTop: wide ? 16 : 0, display: 'flex', flexDirection: 'column' }}>
       {gradingRows.length > 0 && (
         <>
           {sectionBtn('Grading', gradingOpen, () => setOpenSection(gradingOpen ? 'none' : 'grading'), true)}
@@ -1269,16 +1302,17 @@ function CardDetailsView({
         {detailRow('Blockchain', 'Solana')}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '7px 2px' }}>
           <span style={{ fontSize: 13, color: '#7a8492' }}>Token ID</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: FONTS.mono, fontSize: 12, fontWeight: 600 }}>{shortAddr}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: wide ? 8 : 7 }}>
+            <span style={{ fontFamily: FONTS.mono, fontSize: wide ? 12 : 11.5, fontWeight: 600 }}>{shortAddr}</span>
             <button onClick={handleCopy} title="Copy address"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 7,
+                display: 'inline-flex', alignItems: 'center', gap: wide ? 5 : 4,
+                padding: wide ? '4px 10px' : '4px 9px', borderRadius: 7,
                 border: `1px solid ${copied ? COLORS.green : 'rgba(255,255,255,.14)'}`,
                 background: 'rgba(255,255,255,.04)', color: copied ? COLORS.green : '#cdd4dd',
-                cursor: 'pointer', fontFamily: FONTS.body, fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', fontFamily: FONTS.body, fontSize: wide ? 11 : 10.5, fontWeight: 600,
               }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              <svg width={wide ? 11 : 10} height={wide ? 11 : 10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
               {copied ? 'Copied' : 'Copy'}
             </button>
           </span>
@@ -1287,32 +1321,73 @@ function CardDetailsView({
     </div>
   )
 
-  const ccLink = (
+  const ccLink = wide ? (
     <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
       style={{ marginTop: 10, fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.06em', color: '#c9b3f0', textDecoration: 'none' }}>
       View on CollectorCrypt ↗
     </a>
+  ) : (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 2px' }}>
+      <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
+        style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#c9b3f0', textDecoration: 'none', flex: 'none' }}>
+        CollectorCrypt ↗
+      </a>
+    </div>
   )
 
   // Quedarse la carta no dispara nada —ya está en el vault—, así que "Keep and Continue" cierra
   // directamente en vez de pedir una confirmación de más.
   const continueLabel = !single ? 'Next pack →' : sold ? 'Continue →' : 'Keep and Continue'
   const action = (
-    <div style={{ marginTop: wide ? 'auto' : 18, paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={wide
+      ? { marginTop: 'auto', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }
+      // Móvil: el botón queda fijo abajo mientras la ficha rueda por detrás, con el degradado
+      // del diseño para que el contenido no aparezca cortado a ras del borde.
+      : { flex: 'none', display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 18px 20px', background: 'linear-gradient(180deg,transparent,#08090d 35%)' }}>
       <button onClick={onNext}
         style={{
-          width: '100%', padding: '13px 0', borderRadius: 12, border: 0, cursor: 'pointer', fontFamily: FONTS.display,
-          fontSize: 14, fontWeight: 700, color: '#1a0a2e',
+          width: '100%', padding: wide ? '13px 0' : '15px 0', borderRadius: wide ? 12 : 13,
+          border: 0, cursor: 'pointer', fontFamily: FONTS.display,
+          fontSize: wide ? 14 : 15, fontWeight: 700, color: '#1a0a2e',
           background: 'linear-gradient(135deg,#ff5c98,#b84ef0)', boxShadow: '0 0 22px -6px rgba(184,78,240,.8)',
         }}>{continueLabel}</button>
       {sellErr && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, textAlign: 'center' }}>{sellErr}</div>}
     </div>
   )
 
+  if (!wide) {
+    // Columna de teléfono: cabecera, carta y valor fijos arriba; la ficha rueda en el hueco que
+    // sobra; el botón anclado abajo. Así "continuar" está siempre a un toque, sin buscarlo.
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ flex: 'none', padding: '18px 18px 0' }}>{header}</div>
+
+        <div style={{ flex: 'none', display: 'grid', placeItems: 'center', padding: '16px 0 4px' }}>
+          {cardArt(196, 288, 11)}
+          {dots}
+        </div>
+
+        <div style={{ flex: 'none', padding: '14px 18px 0' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-.01em', lineHeight: 1.2 }}>
+            {result.name ?? 'Unknown Card'}
+          </div>
+          {valueBlock}
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '6px 18px 12px' }}>
+          {sections}
+          {ccLink}
+        </div>
+
+        {action}
+      </div>
+    )
+  }
+
   const info = (
-    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: wide ? undefined : 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
       {header}
-      <div style={{ fontSize: wide ? 27 : 21, fontWeight: 700, letterSpacing: '-.01em', lineHeight: 1.15, marginTop: 12 }}>
+      <div style={{ fontSize: 27, fontWeight: 700, letterSpacing: '-.01em', lineHeight: 1.15, marginTop: 12 }}>
         {result.name ?? 'Unknown Card'}
       </div>
       {valueBlock}
@@ -1321,16 +1396,6 @@ function CardDetailsView({
       {action}
     </div>
   )
-
-  if (!wide) {
-    return (
-      <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {hero}
-        {thumbs && <div style={{ display: 'flex', justifyContent: 'center' }}>{thumbs}</div>}
-        {info}
-      </div>
-    )
-  }
 
   return (
     <div style={{
