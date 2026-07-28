@@ -170,7 +170,7 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
                   {/* Igual que en la rejilla compacta: si CC no compra la carta se dice y el
                       botón se apaga, en vez de dejar pulsar un Sell que devolvería 400. */}
                   {st !== 'sold' && noBb && (
-                    <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#6b7480' }} title="Collector Crypt no compra esta carta">no buyback</span>
+                    <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#6b7480' }} title="Collector Crypt does not buy this card back">no buyback</span>
                   )}
                   {st !== 'sold' && !noBb && (
                     <button onClick={() => toggle(nft)} disabled={busy} style={{
@@ -297,7 +297,7 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
                   {offer != null && <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }} title="Buyback value">↩ {formatUsd(offer)}</span>}
                   {/* Un hueco vacío se lee como "no ha cargado". Si CC ha dicho que no compra esa
                       carta, se dice; es la razón por la que abajo no se puede pulsar Sell. */}
-                  {noBb && <span style={{ fontFamily: FONTS.mono, fontSize: 9, color: '#6b7480' }} title="Collector Crypt no compra esta carta">no buyback</span>}
+                  {noBb && <span style={{ fontFamily: FONTS.mono, fontSize: 9, color: '#6b7480' }} title="Collector Crypt does not buy this card back">no buyback</span>}
                 </div>
               </div>
               {st !== 'sold' && (
@@ -308,7 +308,7 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
                     style={{ flex: 1, padding: '6px 0', border: 0, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
                       background: !picked ? 'rgba(0,255,196,.16)' : 'transparent', color: !picked ? COLORS.green : COLORS.muted }}>Keep</button>
                   <button onClick={() => setSell((s) => ({ ...s, [nft]: true }))} disabled={busy || noBb}
-                    title={noBb ? 'Collector Crypt no compra esta carta' : undefined}
+                    title={noBb ? 'Collector Crypt does not buy this card back' : undefined}
                     style={{ flex: 1, padding: '6px 0', border: 0, borderLeft: `1px solid ${COLORS.border}`,
                       cursor: busy || noBb ? 'default' : 'pointer', opacity: noBb ? 0.4 : 1, fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
                       background: picked ? 'rgba(255,46,151,.18)' : 'transparent', color: picked ? '#c4adff' : COLORS.muted }}>Sell</button>

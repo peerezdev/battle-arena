@@ -36,9 +36,9 @@ export function TieBreakRoulette({ tied, eliminated, nameOf, reducedMotion }: {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 60, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 24, background: 'rgba(6,8,11,.72)' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: '.28em', color: COLORS.muted, marginBottom: 8 }}>EMPATE EN EL ÚLTIMO PUESTO</div>
+        <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: '.28em', color: COLORS.muted, marginBottom: 8 }}>TIED FOR LAST PLACE</div>
         <div style={{ fontFamily: FONTS.display, fontSize: 'clamp(18px,2.4vw,24px)', fontWeight: 700, color: COLORS.text }}>
-          {landed ? 'Eliminado al azar' : 'Eligiendo un jugador al azar…'}
+          {landed ? 'Eliminated at random' : 'Picking a player at random…'}
         </div>
       </div>
 
@@ -59,7 +59,7 @@ export function TieBreakRoulette({ tied, eliminated, nameOf, reducedMotion }: {
       </div>
 
       <div style={{ fontFamily: FONTS.mono, fontSize: 12, letterSpacing: '.16em', color: landed ? '#ff8198' : COLORS.muted, minHeight: 16 }}>
-        {landed ? '✕ ELIMINADO' : `${tied.length} empatados`}
+        {landed ? '✕ ELIMINATED' : `${tied.length} tied`}
       </div>
     </div>
   )
