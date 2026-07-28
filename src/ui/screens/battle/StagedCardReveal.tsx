@@ -17,14 +17,13 @@ type Stage = 'year' | 'grade' | 'rarity' | 'card'
  *  previous one and STAYS, so the card is read as year + grade + rarity together before it flips.
  *  Off by default — Pack Battle's small cards have no room for three stacked rows. */
 export function StagedCardReveal({
-  year, grade, rarity, reduced, stepMs = 1700, dwellMs = 550, width = 180, height = 252,
+  year, grade, rarity, reduced, dwellMs = 550, width = 180, height = 252,
   stacked = false, preloadSrc, onCardShown, children,
 }: {
   year: string | null
   grade: number | string | null
   rarity: string | null
   reduced: boolean
-  stepMs?: number
   dwellMs?: number    // how long the revealed card stays before onCardShown advances (ms)
   width?: number
   height?: number
@@ -57,6 +56,9 @@ export function StagedCardReveal({
   const [i, setI] = useState(reduced ? stages.length - 1 : 0)
   const [shown, setShown] = useState(reduced ? rows.length : 0)   // stacked: how many rows are in
   const [flipped, setFlipped] = useState(reduced)                 // stacked: card turned over
+  // No apilado: hasta que no arranca el primer escalón no se pinta nada, para que el año no
+  // aparezca de golpe en el ms 0 y respete su turno como en el modo apilado.
+  const [preStarted, setPreStarted] = useState(reduced)
 
   // Franja de rareza: solo Rare y Epic. `band` = null oculta · 'in' entra · 'out' se desvanece.
   const bandKey = bandRarity(rarity)
@@ -75,36 +77,34 @@ export function StagedCardReveal({
     }
   }
 
+  /** Cuándo entra el escalón `k`. La rareza siempre va la última y se hace esperar un poco
+   *  más: es la que remata. Mismo reloj para los dos modos, para que Pack Battle y Battle
+   *  Royale suenen igual —antes el no apilado iba a `stepMs` fijo y llegaba muy tarde. */
+  const stepAt = (k: number, isRarity: boolean) =>
+    STACK_T.first + k * STACK_T.step + (isRarity ? STACK_T.rarityExtra : 0)
+
+  // Modo NO apilado (Pack Battle): un escalón a la vez, con el mismo reloj que el apilado.
   useEffect(() => {
     if (reduced || stacked) return
-    if (i >= stages.length - 1) return
-    // Con franja, el salto de la rareza a la carta lo manda el guion de la franja, no `stepMs`.
-    if (bandKey && stages[i] === 'rarity') return
-    const t = setTimeout(() => setI((n) => Math.min(n + 1, stages.length - 1)), stepMs)
-    return () => clearTimeout(t)
-  }, [i, stages, reduced, stacked, stepMs, bandKey])
-
-  // Modo NO apilado (Pack Battle): la franja cuelga del momento en que se muestra la rareza.
-  useEffect(() => {
-    if (reduced || stacked || !bandKey) return
-    if (stages[i] !== 'rarity') return
     const timers: ReturnType<typeof setTimeout>[] = []
     const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
-    bandSchedule(0, at, () => setI(stages.length - 1))
+    const pre = stages.slice(0, -1)               // year/grade/rarity que existan
+    at(STACK_T.first, () => setPreStarted(true))  // el primero también espera: nada antes
+    pre.forEach((s, k) => { if (k > 0) at(stepAt(k, s === 'rarity'), () => setI(k)) })
+    const rarityAt = stepAt(Math.max(0, pre.length - 1), pre[pre.length - 1] === 'rarity')
+    if (bandKey) bandSchedule(rarityAt, at, () => setI(stages.length - 1))
+    else at(rarityAt + STACK_T.hold, () => setI(stages.length - 1))
     return () => timers.forEach(clearTimeout)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i, stages, reduced, stacked, bandKey])
+  }, [stages, reduced, stacked, bandKey])
 
   // Stacked schedule: drop each row in turn, hold the full column, then flip.
   useEffect(() => {
     if (!stacked || reduced) return
     const timers: ReturnType<typeof setTimeout>[] = []
     const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
-    // La rareza siempre es la última fila y se hace esperar un poco más: es la que remata.
-    const rowAt = (k: number) =>
-      STACK_T.first + k * STACK_T.step + (rows[k]?.key === 'Rarity' ? STACK_T.rarityExtra : 0)
-    rows.forEach((_, k) => at(rowAt(k), () => setShown(k + 1)))
-    const rarityAt = rowAt(Math.max(0, rows.length - 1))
+    rows.forEach((_, k) => at(stepAt(k, rows[k]?.key === 'Rarity'), () => setShown(k + 1)))
+    const rarityAt = stepAt(Math.max(0, rows.length - 1), rows[rows.length - 1]?.key === 'Rarity')
     if (bandKey) bandSchedule(rarityAt, at, () => setFlipped(true))
     else at(rarityAt + STACK_T.hold, () => setFlipped(true))
     return () => timers.forEach(clearTimeout)
@@ -199,9 +199,14 @@ export function StagedCardReveal({
               ))}
             </div>
           )}
-          {!stacked && !onCard && (
+          {!stacked && !onCard && preStarted && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AnimatePresence mode="wait">
+              {/* Sin `mode="wait"`: esperar a que el escalón anterior TERMINE de salir retrasaba
+                  al siguiente ~540 ms, y el retraso se acumulaba —el grado llegaba a 1538 en vez
+                  de a 1000— hasta el punto de que la franja aparecía ANTES que la rareza. Ahora
+                  el que entra lo hace a su hora y el que sale se desvanece encima, para lo cual
+                  se posicionan en absoluto y no en flujo. */}
+              <AnimatePresence>
                 <motion.div
                   key={stage}
                   initial={{ scale: 0.7, opacity: 0 }}
@@ -209,7 +214,7 @@ export function StagedCardReveal({
                   exit={{ scale: 1.1, opacity: 0 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 24 }}
                   onAnimationStart={(def) => { if (stage === 'rarity' && (def as { opacity?: number })?.opacity === 1) setAccentOn(true) }}
-                  style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, userSelect: 'none' }}
+                  style={{ position: 'absolute', inset: 0, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, userSelect: 'none' }}
                 >
                   <div style={{ fontFamily: FONTS.mono, fontSize: Math.min(10, Math.max(7, Math.round(width / 18))), letterSpacing: '.14em', color: COLORS.muted, whiteSpace: 'nowrap' }}>{stage.toUpperCase()}</div>
                   <div style={{

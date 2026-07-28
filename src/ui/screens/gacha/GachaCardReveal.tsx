@@ -22,7 +22,9 @@ const RARITY_HEX: Record<Rarity, string> = {
 const ROW = 38   // alto de fila de la casilla; debe cuadrar con el alto del .reelItem de abajo
 
 /** Guion de la secuencia, en ms. Un solo sitio que tocar para recalibrar ritmos. */
-export const REVEAL_T = { year: 100, grade: 900, rarity: 1550, gap: 250, roll: 1600, hold: 1000, flip: 750 }
+// Las tres primeras van sincronizadas con el reveal de batallas (STACK_T): la ceremonia es
+// distinta —aquí hay ruleta y contador— pero el arranque tiene que sonar igual.
+export const REVEAL_T = { year: 500, grade: 1000, rarity: 1750, gap: 250, roll: 1600, hold: 1000, flip: 750 }
 
 /** Lo que tarda la casilla en parar, por rareza. Escala a propósito: una común para casi en
  *  seco y una épica coquetea con las bajas antes de deslizarse. Es lo que hace que una épica se

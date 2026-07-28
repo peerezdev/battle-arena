@@ -16,25 +16,34 @@ describe('StagedCardReveal', () => {
     expect(onCardShown).toHaveBeenCalled()
   })
 
-  it('non-reduced starts on the first pre-card stage (YEAR)', () => {
+  it('non-reduced starts on the first pre-card stage (YEAR), y no antes de su turno', () => {
+    vi.useFakeTimers()
     render(
       <StagedCardReveal year="2018" grade={10} rarity="Epic" reduced={false}>
         <div>THE CARD</div>
       </StagedCardReveal>,
     )
+    // El año ya no se pinta en el ms 0: espera su turno igual que en el modo apilado, que es
+    // lo que hace que las dos ceremonias suenen iguales.
+    expect(screen.queryByText('2018')).toBeNull()
+    act(() => { vi.advanceTimersByTime(STACK_T.first) })
     expect(screen.getByText('2018')).toBeTruthy()       // first stage = year
     expect(screen.queryByText('THE CARD')).toBeNull()   // card not yet
+    vi.useRealTimers()
   })
 
   it('sin stacked solo hay UN valor a la vez (lo que usa Pack Battle)', () => {
+    vi.useFakeTimers()
     render(
       <StagedCardReveal year="2018" grade={10} rarity="Epic" reduced={false}>
         <div>THE CARD</div>
       </StagedCardReveal>,
     )
+    act(() => { vi.advanceTimersByTime(STACK_T.first) })
     expect(screen.getByText('2018')).toBeTruthy()
     expect(screen.queryByText('10')).toBeNull()         // el grado aún no está montado
     expect(screen.queryByText('EPIC')).toBeNull()
+    vi.useRealTimers()
   })
 })
 
