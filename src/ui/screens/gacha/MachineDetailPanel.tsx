@@ -5,6 +5,7 @@ import { useReducedMotion } from '../../useReducedMotion'
 import { useIsWide } from '../../useIsWide'
 import type { GachaMachine } from '../../../onchain/gachaClient'
 import { yoloTotalCost, clampCount } from '../../../onchain/gachaClient'
+import { showToast } from '../../toast'
 
 interface Props {
   machine: GachaMachine
@@ -23,6 +24,8 @@ const RARITY_COLOR: Record<string, string> = {
   Uncommon: RARITY.uncommon, uncommon: RARITY.uncommon,
   Common: RARITY.common, common: RARITY.common,
 }
+
+const TURBO_ON_MSG = 'Turbo activated — Commons will be auto-sold'
 
 export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
   const reduced = useReducedMotion()
@@ -258,7 +261,13 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
             </div>
             {/* turbo toggle (only if supported) */}
             {machine.turboMode && (
-              <button onClick={() => setTurbo((t) => !t)} title="Turbo (auto-sell Commons)" aria-pressed={turbo}
+              // En móvil el botón es solo un ⚡ sin etiqueta —no cabe la del escritorio—, así que
+              // al encenderlo se dice en un toast lo que acaba de activar. Al apagarlo no hace
+              // falta: nadie necesita que le confirmen que ha vuelto a lo normal.
+              // Fuera del updater de setState a propósito: React puede invocarlo dos veces y
+              // saldrían dos toasts.
+              <button onClick={() => { const on = !turbo; setTurbo(on); if (on) showToast(TURBO_ON_MSG, 'success') }}
+                title="Turbo (auto-sell Commons)" aria-pressed={turbo}
                 style={{ flexShrink: 0, width: 44, height: 36, borderRadius: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
                   border: `1px solid ${turbo ? COLORS.green : COLORS.border}`, background: turbo ? 'rgba(0,255,196,.12)' : COLORS.panel2, color: turbo ? COLORS.green : COLORS.muted }}>⚡</button>
             )}
