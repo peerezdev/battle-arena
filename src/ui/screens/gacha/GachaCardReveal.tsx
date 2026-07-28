@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { COLORS, FONTS, RARITY } from '../../theme'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { COLORS, FONTS } from '../../theme'
+import { ROW, PHASE, RARITY_HEX, CARD_W, CARD_H, buildReelStrip, buildGachaTimeline, norm } from './gachaTiming'
 import type { YoloResult } from './pendingToResult'
-import { PACK_W, PACK_H } from './GachaPackTilt'
+// Compartidos con el reveal de batallas: la franja, su color y el sonido son los mismos, y
+// duplicarlos sería garantizar que un día dejen de parecerse.
+import { RarityBand } from '../battle/RarityBand'
+import { bandColorFor, EPIC_SPIN_DEG } from '../battle/revealTiming'
+import { playEpicSpin, playFlipThump, stopReveal } from '../../sfx'
 
 // Reveal del gacha: dorso con año, grado y rareza APILADOS, casilla de rareza tipo rodillo,
 // contador de valor y volteo final.
@@ -12,61 +17,6 @@ import { PACK_W, PACK_H } from './GachaPackTilt'
 // El orden es deliberado: las tres etiquetas se ACUMULAN en vez de sustituirse, así que cuando
 // entra el contador el jugador ya tiene el contexto completo delante y la cifra cae sobre algo
 // que ya entiende.
-
-const ORDER = ['common', 'uncommon', 'rare', 'epic'] as const
-type Rarity = typeof ORDER[number]
-
-const RARITY_HEX: Record<Rarity, string> = {
-  common: RARITY.common, uncommon: RARITY.uncommon, rare: RARITY.rare, epic: RARITY.epic,
-}
-
-const ROW = 38   // alto de fila de la casilla; debe cuadrar con el alto del .reelItem de abajo
-
-// La carta se monta EXACTAMENTE con las medidas del sobre: el sobre se abre y en su sitio
-// aparece una carta del mismo tamaño, sin salto. Vienen importadas y no copiadas para que no
-// puedan separarse. De paso encajan mejor: una losa PSA es ~0.60 de proporción y el sobre 0.583,
-// mucho más cerca que el 0.715 que tenía la caja antes.
-const CARD_W = PACK_W
-const CARD_H = PACK_H
-
-/** Guion de la secuencia, en ms. Un solo sitio que tocar para recalibrar ritmos. */
-// Las tres primeras van sincronizadas con el reveal de batallas (STACK_T): la ceremonia es
-// distinta —aquí hay ruleta y contador— pero el arranque tiene que sonar igual.
-export const REVEAL_T = { year: 500, grade: 1000, rarity: 1750, gap: 250, roll: 1600, hold: 1000, flip: 750 }
-
-/** Lo que tarda la casilla en parar, por rareza. Escala a propósito: una común para casi en
- *  seco y una épica coquetea con las bajas antes de deslizarse. Es lo que hace que una épica se
- *  SIENTA distinta sin añadir etapas nuevas. */
-export const SPIN_MS: Record<Rarity, number> = { common: 2500, uncommon: 3000, rare: 3000, epic: 3000 }
-
-function norm(rarity: string | null | undefined): Rarity | null {
-  const k = (rarity ?? '').toLowerCase()
-  return (ORDER as readonly string[]).includes(k) ? (k as Rarity) : null
-}
-
-/** Elige al azar evitando `prev`: dos nombres iguales seguidos rompen la ilusión de rodillo —
- *  parece que se ha atascado, no que está girando. */
-function pickNot(prev: Rarity | undefined, pool: readonly Rarity[] = ORDER): Rarity {
-  const opts = pool.filter((k) => k !== prev)
-  return opts[Math.floor(Math.random() * opts.length)]
-}
-
-/** Tira de nombres de la casilla. Termina SIEMPRE en la rareza real; lo anterior es relleno.
- *  En rareza alta las dos previas se fuerzan a common/uncommon: es el bait — parece que va a
- *  parar en una mala y luego se desliza a la buena. */
-export function buildReelStrip(target: Rarity, n = 14): Rarity[] {
-  const items: Rarity[] = []
-  for (let i = 0; i < n; i++) items.push(pickNot(items[i - 1]))
-  if (target === 'epic' || target === 'rare') {
-    const low: readonly Rarity[] = ['common', 'uncommon']
-    items[n - 2] = pickNot(items[n - 3], low)
-    items[n - 1] = pickNot(items[n - 2], low)
-  }
-  // El ganador tampoco puede repetir al anterior: sin bait, el relleno podría acabar en él.
-  if (items[n - 1] === target) items[n - 1] = pickNot(target, ORDER.filter((k) => k !== items[n - 2]))
-  items.push(target)
-  return items
-}
 
 export function GachaCardReveal({ result, reduced, skip, onDone }: {
   result: YoloResult
@@ -83,13 +33,16 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
   const [shown, setShown] = useState(0)       // 0 nada · 1 año · 2 grado · 3 rareza · 4 contador
   const [amount, setAmount] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [spinning, setSpinning] = useState(false)          // Epic: varias vueltas acelerando
+  const [band, setBand] = useState<null | 'in' | 'out'>(null)
   const stripRef = useRef<HTMLDivElement | null>(null)
   const doneRef = useRef(onDone)
   doneRef.current = onDone
 
   const hasYear = !!result.year
   const hasGrade = !!result.grade
-  const spin = rarity ? SPIN_MS[rarity] : SPIN_MS.common
+  const tl = useMemo(() => buildGachaTimeline({ hasYear, hasGrade, rarity }), [hasYear, hasGrade, rarity])
+  const bandKey = rarity === 'rare' || rarity === 'epic' ? rarity : null
 
   useEffect(() => {
     // Sin animación (reduced motion o skip) se entrega la carta y punto: quien pide menos
@@ -99,9 +52,10 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
     const timers: ReturnType<typeof setTimeout>[] = []
     const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
 
-    at(REVEAL_T.year, () => setShown(1))
-    at(REVEAL_T.grade, () => setShown(2))
-    at(REVEAL_T.rarity, () => {
+    if (tl.yearAt != null) at(tl.yearAt, () => setShown(1))
+    if (tl.gradeAt != null) at(tl.gradeAt, () => setShown(2))
+
+    at(tl.reelAt, () => {
       setShown(3)
       const el = stripRef.current
       if (el && strip.length) {
@@ -117,31 +71,41 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
              { transform: `translateY(${yWin}px)`, offset: 1 }]
           : [{ transform: 'translateY(0)', offset: 0, easing: 'cubic-bezier(.12,.7,.25,1)' },
              { transform: `translateY(${yWin}px)`, offset: 1 }]
-        el.animate(frames, { duration: spin, fill: 'forwards' })
+        el.animate(frames, { duration: tl.reelMs, fill: 'forwards' })
       }
     })
 
-    const tCount = REVEAL_T.rarity + spin + REVEAL_T.gap
-    at(tCount, () => setShown(4))
+    // La ruleta para: ahí se sabe la rareza. Es el instante del sonido, como en las batallas.
+    if (rarity === 'epic') at(tl.rarityAt, playEpicSpin)
+    if (tl.bandAt != null) at(tl.bandAt, () => setBand('in'))
 
-    // El contador sube con cúbica invertida: acelera y aterriza suave, no se corta en seco.
+    at(tl.turnAt, () => {
+      setBand((b) => (b ? 'out' : b))      // la franja se desvanece AL RITMO del giro
+      if (rarity === 'epic') setSpinning(true)
+      else setFlipped(true)
+    })
+    at(tl.faceUpAt, () => {
+      if (rarity === 'epic') setFlipped(true)
+      if (bandKey) playFlipThump()
+    })
+
+    // El contador entra con la carta YA de cara: el valor cae sobre la carta que lo justifica.
     let raf = 0
-    at(tCount, () => {
+    at(tl.countAt, () => {
+      setShown(4)
       const t0 = performance.now()
       const step = () => {
-        const p = Math.min(1, (performance.now() - t0) / REVEAL_T.roll)
+        const p = Math.min(1, (performance.now() - t0) / PHASE.count)
         setAmount(value * (1 - Math.pow(1 - p, 3)))
         if (p < 1) raf = requestAnimationFrame(step)
       }
       raf = requestAnimationFrame(step)
     })
 
-    const tFlip = tCount + REVEAL_T.roll + REVEAL_T.hold
-    at(tFlip, () => setFlipped(true))
-    at(tFlip + REVEAL_T.flip, () => doneRef.current())
+    at(tl.doneAt, () => doneRef.current())
 
-    return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf) }
-  }, [reduced, skip, spin, value, rarity, strip])
+    return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); stopReveal() }
+  }, [reduced, skip, tl, value, rarity, bandKey, strip])
 
   if (reduced || skip) return null
 
@@ -164,8 +128,10 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
       <div style={{ perspective: 1200, position: 'relative', width: CARD_W, height: CARD_H }}>
         <div style={{
           width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d',
-          transform: flipped ? 'rotateY(0)' : 'rotateY(180deg)',
-          transition: `transform ${REVEAL_T.flip}ms cubic-bezier(.4,0,.2,1)`,
+          // Epic gira varias vueltas COGIENDO VELOCIDAD; el resto es el volteo de media vuelta
+          // de siempre. -1800° ≡ 0° (mod 360), así que aterriza de cara sin salto.
+          transform: spinning ? `rotateY(-${EPIC_SPIN_DEG - 180}deg)` : flipped ? 'rotateY(0)' : 'rotateY(180deg)',
+          transition: `transform ${tl.turnMs}ms ${spinning ? 'cubic-bezier(.45,0,.95,.5)' : 'cubic-bezier(.4,0,.2,1)'}`,
         }}>
           <div style={{
             position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 10,
@@ -190,12 +156,24 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
           </div>
         </div>
 
+        {/* La franja también va fuera del elemento que rota: tiene que quedarse quieta mientras
+            la carta gira. La caja de arriba la recorta a su ancho. */}
+        {band && bandKey && (
+          // Caja propia para recortarla: la franja se pasa de largo a propósito y aquí quien
+          // manda es el ancho de la carta. No se recorta en el contenedor de la carta porque
+          // ahí se comería su sombra y su halo.
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', borderRadius: 10, pointerEvents: 'none', zIndex: 6 }}>
+            <RarityBand label={bandKey.toUpperCase()} color={bandColorFor(bandKey)}
+              w={CARD_W} h={CARD_H} phase={band} reduced={false} turnMs={tl.turnMs} />
+          </div>
+        )}
+
         {/* Las etiquetas van FUERA del elemento que rota: dentro heredarían su rotateY(180deg)
             y se verían en espejo. */}
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'space-evenly', padding: '22px 10px',
-          pointerEvents: 'none', opacity: flipped ? 0 : 1, transition: 'opacity .3s ease-out',
+          pointerEvents: 'none', opacity: flipped || spinning ? 0 : 1, transition: 'opacity .3s ease-out',
         }}>
           {hasYear && row('Year', big(String(result.year)), shown >= 1)}
           {hasGrade && row('Grade', big(String(result.grade)), shown >= 2)}
