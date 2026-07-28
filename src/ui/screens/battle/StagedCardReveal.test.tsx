@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, act } from '@testing-library/react'
 import { StagedCardReveal } from './StagedCardReveal'
+import { STACK_T, BAND_T } from './revealTiming'
 
 describe('StagedCardReveal', () => {
   it('reduced-motion jumps straight to the card and fires onCardShown', () => {
@@ -87,5 +88,51 @@ describe('StagedCardReveal · modo apilado (Battle Royale)', () => {
     expect(screen.getByText('THE CARD')).toBeTruthy()
     expect(screen.queryByText('2018')).toBeNull()
     expect(onCardShown).toHaveBeenCalled()
+  })
+})
+
+describe('StagedCardReveal · franja de rareza', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  const renderStacked = (rarity: string) => render(
+    <StagedCardReveal year="2010" grade="PSA 10" rarity={rarity} reduced={false} stacked>
+      <div>THE CARD</div>
+    </StagedCardReveal>,
+  )
+  // Con las tres filas, la rareza cae a los 1750 ms: 500 + 2×500 + 250 de propina.
+  const RARITY_AT = STACK_T.first + 2 * STACK_T.step + STACK_T.rarityExtra
+
+  it('la rareza aterriza a los 1750 ms, que es de donde cuelga todo lo demás', () => {
+    expect(RARITY_AT).toBe(1750)
+    expect(RARITY_AT + BAND_T.band).toBe(2100)        // franja
+    expect(RARITY_AT + BAND_T.epicSpin).toBe(2700)    // giro de Epic
+    expect(RARITY_AT + BAND_T.epicLand).toBe(4500)    // Epic de cara
+    expect(RARITY_AT + BAND_T.rareFlip).toBe(3500)    // Rare de cara
+  })
+
+  it('en Rare la franja sale a los 2100 y se va con el volteo', () => {
+    renderStacked('Rare')
+    // La fila de la carta YA escribe "RARE" en mayúsculas, así que la franja se cuenta, no se
+    // busca: una aparición es solo la fila; dos, la fila más la franja.
+    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.band - 1) })
+    expect(screen.getAllByText('RARE')).toHaveLength(1)
+
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(screen.getAllByText('RARE')).toHaveLength(2)   // franja dentro
+
+    act(() => { vi.advanceTimersByTime(BAND_T.rareFlip - BAND_T.band) })
+    expect(screen.getByText('THE CARD')).toBeTruthy() // volteo
+  })
+
+  it('Common y Uncommon no montan franja en ningún momento', () => {
+    renderStacked('Common')
+    // En el instante en que una Rare ya tendría franja, aquí sigue habiendo una sola aparición:
+    // la fila de la carta. Se mira ANTES del volteo, que desmonta el dorso y con él la fila.
+    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.band + 100) })
+    expect(screen.getAllByText('COMMON')).toHaveLength(1)
+
+    act(() => { vi.advanceTimersByTime(6000) })
+    expect(screen.getByText('THE CARD')).toBeTruthy()
   })
 })
