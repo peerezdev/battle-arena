@@ -972,6 +972,7 @@ function RevealResult({
   skipToCard,
   single = false,
   onNext,
+  onCardStage,
 }: {
   result: Extract<OpenPackResult, { pending: false }>
   reduced: boolean
@@ -980,6 +981,8 @@ function RevealResult({
   /** single open → inline Keep/Sell; multi → "Next pack". */
   single?: boolean
   onNext: () => void
+  /** Avisa al llegar al detalle de la carta: ya no queda secuencia que saltar. */
+  onCardStage?: () => void
 }) {
   const rarityColor = RARITY_COLOR[result.rarity] ?? COLORS.muted
   // El detalle de tres columnas pide ~980px; por debajo de eso las piezas se apilan.
@@ -989,6 +992,8 @@ function RevealResult({
   // GachaCardReveal. Aquí solo se espera a que termine para dar paso al detalle de la carta.
   const [revealed, setRevealed] = useState(reduced || !!skipToCard)
   useEffect(() => { if (skipToCard) setRevealed(true) }, [skipToCard])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (revealed) onCardStage?.() }, [revealed])
 
   if (!revealed) {
     return (
@@ -1028,7 +1033,9 @@ function RevealResult({
           // Caja de teléfono del diseño: altura fija para que la ficha ruede por dentro y el
           // botón se quede anclado abajo. `overflow:hidden` porque quien hace scroll es el
           // hueco de la ficha, no la caja entera.
-          width: '100%', maxWidth: 430, height: 'min(844px, 92vh)',
+          // Sin los Skip debajo, lo único entre la caja y el borde es el padding de 20 del
+          // overlay, así que se lo queda todo: más alto = más ficha visible sin desplazar.
+          width: '100%', maxWidth: 430, height: 'min(844px, calc(100vh - 40px))',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
           background: `radial-gradient(500px 380px at 50% -5%, ${rarityGlow(result.rarity) ?? 'transparent'}, transparent 70%), #08090d`,
           border: '1px solid rgba(255,255,255,.08)', borderRadius: 24,
@@ -1244,6 +1251,21 @@ function CardDetailsView({
     </div>
   )
 
+  const sellButton = (
+    <button onClick={sell} disabled={selling}
+      style={{
+        flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: wide ? 2 : 1,
+        padding: wide ? '12px 18px' : '0 16px', borderRadius: wide ? 12 : 13, border: 0, cursor: selling ? 'wait' : 'pointer',
+        fontFamily: FONTS.body, color: '#06170f', background: 'linear-gradient(135deg,#3df0a0,#13c98a)',
+        boxShadow: `0 0 ${wide ? 20 : 18}px -6px rgba(47,226,138,.7)`,
+      }}>
+      <span style={{ fontSize: wide ? 14 : 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+        {selling ? 'Selling…' : `${wide ? 'Sell back' : 'Sell'} · ${formatUsd(buybackOffer ?? 0)}`}
+      </span>
+      <span style={{ fontFamily: FONTS.mono, fontSize: wide ? 9 : 8, letterSpacing: '.12em', opacity: .75 }}>INSTANT · {buybackPct}%</span>
+    </button>
+  )
+
   const valueBlock = (result.insured_value != null || buybackOffer != null) && (
     <div style={{
       marginTop: wide ? 16 : 12, borderRadius: wide ? 15 : 14, padding: wide ? 16 : '13px 15px',
@@ -1257,20 +1279,9 @@ function CardDetailsView({
           {result.insured_value != null ? formatUsd(result.insured_value) : '—'}
         </span>
       </span>
-      {canSell && (
-        <button onClick={sell} disabled={selling}
-          style={{
-            flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: wide ? 2 : 1,
-            padding: wide ? '12px 18px' : '11px 15px', borderRadius: wide ? 12 : 11, border: 0, cursor: selling ? 'wait' : 'pointer',
-            fontFamily: FONTS.body, color: '#06170f', background: 'linear-gradient(135deg,#3df0a0,#13c98a)',
-            boxShadow: `0 0 ${wide ? 20 : 18}px -6px rgba(47,226,138,.7)`,
-          }}>
-          <span style={{ fontSize: wide ? 14 : 13, fontWeight: 700 }}>
-            {selling ? 'Selling…' : `${wide ? 'Sell back' : 'Sell'} · ${formatUsd(buybackOffer!)}`}
-          </span>
-          <span style={{ fontFamily: FONTS.mono, fontSize: wide ? 9 : 8, letterSpacing: '.12em', opacity: .75 }}>INSTANT · {buybackPct}%</span>
-        </button>
-      )}
+      {/* En móvil el botón de vender no vive aquí sino abajo, junto a "Keep and Continue": las
+          dos salidas de la pantalla están en el mismo sitio y al alcance del pulgar. */}
+      {canSell && wide && sellButton}
       {sold && (
         <span style={{
           flex: 'none', display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6,
@@ -1362,13 +1373,16 @@ function CardDetailsView({
       // Móvil: el botón queda fijo abajo mientras la ficha rueda por detrás, con el degradado
       // del diseño para que el contenido no aparezca cortado a ras del borde.
       : { flex: 'none', display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 18px 20px', background: 'linear-gradient(180deg,transparent,#08090d 35%)' }}>
-      <button onClick={onNext}
-        style={{
-          width: '100%', padding: wide ? '13px 0' : '15px 0', borderRadius: wide ? 12 : 13,
-          border: 0, cursor: 'pointer', fontFamily: FONTS.display,
-          fontSize: wide ? 14 : 15, fontWeight: 700, color: '#1a0a2e',
-          background: 'linear-gradient(135deg,#ff5c98,#b84ef0)', boxShadow: '0 0 22px -6px rgba(184,78,240,.8)',
-        }}>{continueLabel}</button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onNext}
+          style={{
+            flex: 1, minWidth: 0, padding: wide ? '13px 0' : '15px 0', borderRadius: wide ? 12 : 13,
+            border: 0, cursor: 'pointer', fontFamily: FONTS.display,
+            fontSize: wide ? 14 : 15, fontWeight: 700, color: '#1a0a2e',
+            background: 'linear-gradient(135deg,#ff5c98,#b84ef0)', boxShadow: '0 0 22px -6px rgba(184,78,240,.8)',
+          }}>{continueLabel}</button>
+        {canSell && !wide && sellButton}
+      </div>
       {sellErr && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, textAlign: 'center' }}>{sellErr}</div>}
     </div>
   )
@@ -1437,6 +1451,10 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
   onSkipAll: () => void
 }) {
   const [skippedAt, setSkippedAt] = useState<number | null>(null)
+  // Guardado por índice, no como booleano: RevealResult se remonta con cada sobre y su secuencia
+  // arranca de cero, así que los Skip tienen que volver mientras esa secuencia corre.
+  const [atCardFor, setAtCardFor] = useState<number | null>(null)
+  const atCard = atCardFor === index
   const result = results[index]
   return (
     <motion.div key="yolo-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1448,18 +1466,23 @@ function YoloRevealOverlay({ results, index, reduced, buybackPct, onAdvance, onS
           carta, React remonta y las etapas (año → grado → rareza) arrancan limpias. Con la
           posición sola reutilizaba la instancia y la nueva carta entraba a media secuencia, que
           es lo que se veía como "se relanza una sección". */}
-      <RevealResult key={`${index}-${result.nft_address ?? ''}`} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} single={results.length === 1 && !result.auto_sold} onNext={onAdvance} />
-      <div style={{ display: 'flex', gap: 10 }}>
-        {/* Los dos van en color de texto, no en `muted`: el gris apagado es el que la app usa
-            para lo deshabilitado, y "Skip all" se leía como un botón muerto que nadie intenta
-            pulsar. Se distinguen por el borde, no por parecer uno de ellos inactivo. */}
-        <button className="ba-ghostbtn" onClick={() => setSkippedAt(index)}
-          style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{results.length > 1 ? 'Skip pack ⏭' : 'Skip ⏭'}</button>
-        {results.length > 1 && (
-          <button className="ba-ghostbtn" onClick={onSkipAll}
-            style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.text}44`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
-        )}
-      </div>
+      <RevealResult key={`${index}-${result.nft_address ?? ''}`} result={result} reduced={reduced} buybackPct={buybackPct} skipToCard={skippedAt === index ? 1 : 0} single={results.length === 1 && !result.auto_sold} onNext={onAdvance} onCardStage={() => setAtCardFor(index)} />
+      {/* Los Skip solo mientras corre la secuencia (año → grado → rareza): en el detalle de la
+          carta no queda nada que saltar —de ahí se sale con Keep and Continue— y ocupaban el
+          hueco que la ficha necesita para llegar hasta abajo. */}
+      {!atCard && (
+        <div style={{ display: 'flex', gap: 10 }}>
+          {/* Los dos van en color de texto, no en `muted`: el gris apagado es el que la app usa
+              para lo deshabilitado, y "Skip all" se leía como un botón muerto que nadie intenta
+              pulsar. Se distinguen por el borde, no por parecer uno de ellos inactivo. */}
+          <button className="ba-ghostbtn" onClick={() => setSkippedAt(index)}
+            style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>{results.length > 1 ? 'Skip pack ⏭' : 'Skip ⏭'}</button>
+          {results.length > 1 && (
+            <button className="ba-ghostbtn" onClick={onSkipAll}
+              style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.text}44`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>Skip all ⏭⏭</button>
+          )}
+        </div>
+      )}
     </motion.div>
   )
 }
