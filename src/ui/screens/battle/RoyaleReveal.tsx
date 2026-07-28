@@ -1,4 +1,5 @@
 import { useState, type CSSProperties } from 'react'
+import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { startRematch } from '../../battle/startRematch'
@@ -80,8 +81,8 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
                 revealRound={rv.revealRound} rounds={totalRounds(vm)} settled={vm.status === 'settled'} />
               <Stage activePlayer={activePlayer} activeName={activeName} isOpening={isOpening}
                 stagingCard={rv.stagingCard} revealKey={rv.stagingKey} reducedMotion={reducedMotion}
-                onCardShown={rv.onCardShown} />
-              <Standings vm={proj} name={name} activeWallet={activeWallet} />
+                onCardShown={rv.onCardShown} onFaceUp={rv.onCardFaceUp} />
+              <Standings vm={proj} name={name} activeWallet={activeWallet} reducedMotion={reducedMotion} />
             </div>
             {/* 1a · fila de chips de jugador (uno por jugador, ancla de emotes) */}
             <ChipsRow players={proj.players} name={name} activeWallet={activeWallet} justEliminated={rv.justEliminated} reducedMotion={reducedMotion} />
@@ -198,9 +199,10 @@ function BattleBar({ proj, totalPlayers, alive, entry, revealRound, rounds, sett
 // ─────────────────────────── STAGE ───────────────────────────
 // Centre stage: the opener sits above the single card, which plays its full staged ceremony
 // (year → grade → rarity → card).
-function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, reducedMotion, onCardShown }: {
+function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, reducedMotion, onCardShown, onFaceUp }: {
   activePlayer: RevealPlayerVM | null; activeName: string | null; isOpening: boolean
-  stagingCard: RevealCardVM | null; revealKey: string | null; reducedMotion: boolean; onCardShown: () => void
+  stagingCard: RevealCardVM | null; revealKey: string | null; reducedMotion: boolean
+  onCardShown: () => void; onFaceUp: () => void
 }) {
   const W = 200, H = 330
   return (
@@ -228,7 +230,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
         ? <StagedCardReveal key={revealKey ?? stagingCard.nftAddress} year={stagingCard.year} grade={stagingCard.grade}
             rarity={stagingCard.rarity} reduced={reducedMotion} width={W} height={H} stacked
             preloadSrc={stagingCard.nftAddress ? ccCardImageUrl(stagingCard.nftAddress) : undefined}
-            onCardShown={onCardShown}>
+            onCardShown={onCardShown} onFaceUp={onFaceUp}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={W} h={H} valueColor={COLORS.text} />
           </StagedCardReveal>
         : <CardBack width={W} height={H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}
@@ -238,8 +240,8 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
 
 // ─────────────────────────── STANDINGS ───────────────────────────
 // Live ranking by revealed value — one row per player (replaces the old grid+leaderboard pair).
-function Standings({ vm, name, activeWallet }: {
-  vm: RevealVM; name: (p: RevealPlayerVM) => string; activeWallet: string | null
+function Standings({ vm, name, activeWallet, reducedMotion }: {
+  vm: RevealVM; name: (p: RevealPlayerVM) => string; activeWallet: string | null; reducedMotion: boolean
 }) {
   // Alive on top by value; eliminated sink to the bottom (most-recent first) so a living
   // player never ranks below an out one. #1 = leader; the last alive is at risk this round.
@@ -257,7 +259,10 @@ function Standings({ vm, name, activeWallet }: {
           const atRisk = p.wallet === atRiskWallet
           const leader = i === 0
           return (
-            <div key={p.wallet} style={{
+            // `layout`: al reordenarse la tabla, la fila SE DESLIZA a su puesto nuevo en vez de
+            // aparecer ya colocada. Es lo que deja ver al jugador subir cuando su carta cuenta.
+            <motion.div key={p.wallet} layout={!reducedMotion}
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }} style={{
               display: 'flex', alignItems: 'center', gap: 9, padding: '6px 9px', borderRadius: 8,
               border: `1px solid ${leader ? 'rgba(245,197,66,.4)' : atRisk ? 'rgba(255,94,122,.45)' : 'transparent'}`,
               background: atRisk ? 'rgba(255,94,122,.07)' : leader ? 'rgba(245,197,66,.09)' : cur ? 'rgba(0,255,196,.07)' : 'transparent',
@@ -268,7 +273,7 @@ function Standings({ vm, name, activeWallet }: {
               <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: cur ? COLORS.green : elim ? '#5d6674' : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: elim ? 'line-through' : 'none' }}>{name(p)}</span>
               {p.isMe && <span style={{ flex: 'none', padding: '1px 5px', borderRadius: 5, background: 'rgba(0,255,196,.14)', border: '1px solid rgba(0,255,196,.4)', fontFamily: FONTS.mono, fontSize: 8.5, fontWeight: 700, letterSpacing: '.06em', color: COLORS.green }}>YOU</span>}
               <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: p.total > 0 ? COLORS.text : '#7a8492' }}>{formatUsd(p.total)}</span>
-            </div>
+            </motion.div>
           )
         })}
       </div>

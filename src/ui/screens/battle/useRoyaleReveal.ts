@@ -21,6 +21,7 @@ export interface RoyaleRevealState {
   stagingKey: string | null      // unique per reveal step (round+cursor) — keys the staged card so it
                                  // remounts every step even if two pulls share an nft address
   onCardShown: () => void        // the staged ceremony calls this when it lands → advance to the next card
+  onCardFaceUp: () => void       // la carta quedó de cara: cuenta ya en la tabla, sin avanzar
   justEliminated: string | null  // player eliminated in the just-finished round (beat + break)
   tiedWallets: string[]          // players tied for last this round → spin the roulette (empty if no tie)
   eliminatedReveal: string | null // wallet que anuncia el cartel (ruleta o eliminación directa)
@@ -52,7 +53,12 @@ export function tiedLosers(vm: RevealVM, round: number): string[] {
 }
 
 // Project the full VM down to what has been revealed at cursor (round, card).
-export function project(vm: RevealVM, round: number, card: number): RevealVM {
+/**
+ * `completeRound=false` proyecta las cartas de la ronda en curso pero NO aplica su eliminación.
+ * Hace falta para que la última carta sume en la tabla al quedar de cara sin destripar quién cae:
+ * eso lo anuncia el cartel, unos segundos después.
+ */
+export function project(vm: RevealVM, round: number, card: number, completeRound = true): RevealVM {
   const revealedByWallet = new Map<string, RevealCardVM[]>()
   let lastFullRound = 0
   for (const r of vm.rounds) {
@@ -60,7 +66,7 @@ export function project(vm: RevealVM, round: number, card: number): RevealVM {
     const nRevealed = r.roundNumber < round ? order.length
       : r.roundNumber === round ? Math.min(card, order.length)
       : 0
-    if (order.length > 0 && nRevealed >= order.length) {
+    if (order.length > 0 && nRevealed >= order.length && (r.roundNumber < round || completeRound)) {
       lastFullRound = Math.max(lastFullRound, r.roundNumber)
     }
     for (let i = 0; i < nRevealed; i++) {
@@ -90,6 +96,8 @@ export function useRoyaleReveal(
   const [card, setCard] = useState(0)
   const [phase, setPhase] = useState<RevealPhase>('revealing')
   const [countdown, setCountdown] = useState(COUNTDOWN_FROM)
+  // La carta en el escenario ya está de cara: cuenta en la tabla aunque el cursor siga en ella.
+  const [landed, setLanded] = useState(false)
   const firedRef = useRef(false)
 
   // Derived signals — the current target card and whether its pull has resolved on-chain.
@@ -125,7 +133,9 @@ export function useRoyaleReveal(
   // Advance the reveal cursor by one card. Driven by the staged ceremony's onCardShown, so each
   // card plays its full year→grade→rarity→card reveal before the next begins (instead of a fixed
   // dwell timer racing the animation). Stable identity → a poll never disturbs it.
-  const onCardShown = useCallback(() => setCard((c) => c + 1), [])
+  const onCardShown = useCallback(() => { setLanded(false); setCard((c) => c + 1) }, [])
+  /** La ceremonia avisa de que la carta quedó de cara: su valor entra YA en la tabla. */
+  const onCardFaceUp = useCallback(() => setLanded(true), [])
 
   // Scheduler: only ROUND-level transitions are timed here. Per-card advance is driven by
   // onCardShown (the animation), so a 1.5s poll can never restart an in-flight reveal.
@@ -136,6 +146,7 @@ export function useRoyaleReveal(
       if (countdown <= 0) {
         setRound((r) => r + 1)
         setCard(0)
+        setLanded(false)
         setPhase('revealing')
         return
       }
@@ -179,11 +190,14 @@ export function useRoyaleReveal(
     return {
       phase, projection: vm, revealRound: round, countdown,
       upcomingRound: round + 1, openingWallet: null, stagingWallet: null, stagingCard: null,
-      stagingKey: null, onCardShown, justEliminated: null, tiedWallets: [], eliminatedReveal: null,
+      stagingKey: null, onCardShown, onCardFaceUp, justEliminated: null, tiedWallets: [], eliminatedReveal: null,
     }
   }
 
-  const projection = project(vm, round, card)
+  // Con la carta ya de cara se proyecta una más —así el jugador ve su total subir en la tabla
+  // mientras la carta sigue en el escenario— pero sin cerrar la ronda, que destriparía la
+  // eliminación antes de su cartel.
+  const projection = project(vm, round, card + (landed ? 1 : 0), !landed)
   const openingWallet = targetWallet && !targetResolved ? targetWallet : null
   const stagingWallet = targetWallet && targetResolved ? targetWallet : null
   const stagingCard = stagingWallet ? targetCard : null
@@ -199,6 +213,6 @@ export function useRoyaleReveal(
     ? (roundData?.eliminatedWallet ?? null) : null
   return {
     phase, projection, revealRound: round, countdown, upcomingRound: round + 1,
-    openingWallet, stagingWallet, stagingCard, stagingKey, onCardShown, justEliminated, tiedWallets, eliminatedReveal,
+    openingWallet, stagingWallet, stagingCard, stagingKey, onCardShown, onCardFaceUp, justEliminated, tiedWallets, eliminatedReveal,
   }
 }

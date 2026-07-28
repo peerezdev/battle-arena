@@ -120,27 +120,30 @@ describe('StagedCardReveal · franja de rareza', () => {
   )
   const TL = (r: string) => buildTimeline(['Year', 'Grade', 'Rarity'], r)
 
-  it('las duraciones se encadenan en los instantes esperados', () => {
-    // Duraciones (PHASE) → instantes. Si tocas una fase, esto dice a dónde se mueve todo.
+  it('las duraciones se encadenan: cada fase empieza donde acaba la anterior', () => {
+    // A propósito NO se fijan números: PHASE está para tocarlo. Lo que no puede cambiar es el
+    // encadenado, que es lo que hace que mover una fase desplace sola a las de después.
     const e = TL('Epic'), r = TL('Rare'), c = TL('Common')
-    expect(e.rowAt).toEqual([0, 500, 1000])     // year 0 · grade 500 · rarity 1000
-    expect(e.bandAt).toBe(1750)                 // + rarity 750
-    expect(e.turnAt).toBe(2700)                 // + band 350 + epicWait 600
-    expect(e.faceUpAt).toBe(4500)               // + epicTurn 1800
 
-    expect(r.bandAt).toBe(1750)
-    expect(r.turnAt).toBe(2100)                 // + band 350, sin espera
-    expect(r.faceUpAt).toBe(2900)               // + rareTurn 800
+    expect(e.rowAt).toEqual([0, PHASE.year, PHASE.year + PHASE.grade])
+    const finFilas = PHASE.year + PHASE.grade + PHASE.rarity
+    expect(e.bandAt).toBe(finFilas)
+    expect(e.turnAt).toBe(finFilas + PHASE.band + PHASE.epicWait)
+    expect(e.faceUpAt).toBe(e.turnAt + PHASE.epicTurn)
 
-    expect(c.bandAt).toBeNull()                 // Common no lleva franja
-    expect(c.turnAt).toBe(1750)
-    expect(c.faceUpAt).toBe(2750)               // + plainTurn 1000
+    expect(r.bandAt).toBe(finFilas)
+    expect(r.turnAt).toBe(finFilas + PHASE.band)      // Rare no espera: voltea tras la franja
+    expect(r.faceUpAt).toBe(r.turnAt + PHASE.rareTurn)
+
+    expect(c.bandAt).toBeNull()                       // Common no lleva franja
+    expect(c.turnAt).toBe(finFilas)
+    expect(c.faceUpAt).toBe(finFilas + PHASE.plainTurn)
   })
 
   it('una carta sin año sube todo en bloque, sin hueco muerto', () => {
     const sinAnio = buildTimeline(['Grade', 'Rarity'], 'Epic')
-    expect(sinAnio.rowAt).toEqual([0, 500])
-    expect(sinAnio.bandAt).toBe(1250)           // 500 de grado + 750 de rareza
+    expect(sinAnio.rowAt).toEqual([0, PHASE.grade])
+    expect(sinAnio.bandAt).toBe(PHASE.grade + PHASE.rarity)
   })
 
   it('en Rare la franja sale a los 2100 y se va con el volteo', () => {

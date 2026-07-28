@@ -61,7 +61,7 @@ export function RoyaleRevealMobile({ vm, proj, rv, name, reducedMotion }: {
           alive={alive} total={vm.players.length} pot={proj.potValue} />
         <Stage activePlayer={activePlayer} activeName={activePlayer ? name(activePlayer) : null}
           isOpening={isOpening} stagingCard={rv.stagingCard} revealKey={rv.stagingKey}
-          reducedMotion={reducedMotion} onCardShown={rv.onCardShown}
+          reducedMotion={reducedMotion} onCardShown={rv.onCardShown} onFaceUp={rv.onCardFaceUp}
           upNextName={upNextWallet ? nameOfWallet(upNextWallet) : null} />
         <ChipStrip players={proj.players} name={name} activeWallet={activeWallet}
           justEliminated={rv.justEliminated} reducedMotion={reducedMotion} anchored={onBattle} />
@@ -129,10 +129,10 @@ function StatHeader({ round, rounds, alive, total, pot }: {
 }
 
 // ─────────────────────────── BATTLE: stage ───────────────────────────
-function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, reducedMotion, onCardShown, upNextName }: {
+function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, reducedMotion, onCardShown, onFaceUp, upNextName }: {
   activePlayer: RevealPlayerVM | null; activeName: string | null; isOpening: boolean
   stagingCard: RevealVM['rounds'][number]['cards'][number] | null
-  revealKey: string | null; reducedMotion: boolean; onCardShown: () => void; upNextName: string | null
+  revealKey: string | null; reducedMotion: boolean; onCardShown: () => void; onFaceUp: () => void; upNextName: string | null
 }) {
   return (
     <div style={{
@@ -158,7 +158,7 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
             rarity={stagingCard.rarity} reduced={reducedMotion} width={CARD_W} height={CARD_H}
             stacked
             preloadSrc={stagingCard.nftAddress ? ccCardImageUrl(stagingCard.nftAddress) : undefined}
-            onCardShown={onCardShown}>
+            onCardShown={onCardShown} onFaceUp={onFaceUp}>
             <RevealCard reducedMotion={reducedMotion} card={stagingCard} w={CARD_W} h={CARD_H} valueColor={COLORS.text} />
           </StagedCardReveal>
         : <CardBack width={CARD_W} height={CARD_H} accent={COLORS.muted} label={activeName ? 'opening…' : ''} />}

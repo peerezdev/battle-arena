@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { COLORS, FONTS, SHADOW } from '../../theme'
 import { rarityColor } from './RevealCard'
@@ -19,7 +19,7 @@ type Stage = 'year' | 'grade' | 'rarity' | 'card'
  *  Off by default — Pack Battle's small cards have no room for three stacked rows. */
 export function StagedCardReveal({
   year, grade, rarity, reduced, dwellMs = PHASE.hold, width = 180, height = 252,
-  stacked = false, preloadSrc, onCardShown, children,
+  stacked = false, preloadSrc, onCardShown, onFaceUp, children,
 }: {
   year: string | null
   grade: number | string | null
@@ -32,6 +32,9 @@ export function StagedCardReveal({
   /** Imagen de la carta, para precargarla mientras corre la ceremonia (ver abajo). */
   preloadSrc?: string
   onCardShown?: () => void
+  /** La carta acaba de quedar de cara. Va ANTES del `hold`, para que lo que dependa de su
+   *  valor —la tabla de posiciones— se mueva mientras la carta sigue en el escenario. */
+  onFaceUp?: () => void
   children: ReactNode
 }) {
   const rc = rarityColor(rarity)
@@ -68,6 +71,12 @@ export function StagedCardReveal({
 
   // Un solo guion para los dos modos: las fases salen de sus DURACIONES (revealTiming.PHASE),
   // encadenadas sobre las filas que trae esta carta.
+  // Por ref: el guion no debe reprogramarse porque el padre pase otra función.
+  const onFaceUpRef = useRef(onFaceUp)
+  const onCardShownRef = useRef(onCardShown)
+  // En un efecto y no en el render: tocar una ref mientras se renderiza es un efecto colateral.
+  useEffect(() => { onFaceUpRef.current = onFaceUp; onCardShownRef.current = onCardShown })
+
   const rowKeys = useMemo(() => rows.map((r) => r.key), [rows])
   const tl = useMemo(() => buildTimeline(rowKeys, rarity), [rowKeys, rarity])
 
@@ -95,12 +104,16 @@ export function StagedCardReveal({
     at(tl.faceUpAt, () => {
       if (bandKey === 'epic') { if (stacked) setFlipped(true); else setI(stages.length - 1) }
       if (bandKey) playFlipThump()
+      onFaceUpRef.current?.()
     })
+    // `hold` es lo que la carta se queda DE CARA, así que cuenta desde faceUpAt. Antes colgaba
+    // del inicio del volteo, y en Common/Rare eso se comía 800-1000 ms del hold.
+    at(tl.faceUpAt + dwellMs, () => onCardShownRef.current?.())
 
     // Al desmontar —o sea, al pasar a la carta siguiente— se corta lo que esté sonando.
     return () => { timers.forEach(clearTimeout); stopReveal() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tl, reduced, stacked, bandKey])
+  }, [tl, reduced, stacked, bandKey, dwellMs])
 
   // La imagen se descargaba al montar la carta, o sea AL VOLTEAR: se veía el hueco vacío hasta
   // que llegaba. Aquí se pide durante el año/grado/rareza, que dura segundos, así que al voltear
@@ -126,15 +139,10 @@ export function StagedCardReveal({
   const backAccent = lit && !isCommon ? rc : COLORS.muted
 
   useEffect(() => {
-    if (!onCard) return
-    // Fire AFTER the flip lands so totals/leaders update once the card is actually shown
-    // (not while it's still flipping). Reduced motion fires synchronously.
-    if (reduced) { onCardShown?.(); return }
-    const t = setTimeout(() => onCardShown?.(), dwellMs)
-    return () => clearTimeout(t)
-    // Fire once when the card stage is reached; onCardShown identity intentionally ignored.
+    // Sin animación se entrega el resultado y punto; con ella lo programa la línea de tiempos.
+    if (reduced && onCard) onCardShownRef.current?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onCard])
+  }, [onCard, reduced])
 
   const stageValue = stage === 'year' ? year : stage === 'grade' ? grade : rarity
 

@@ -268,3 +268,40 @@ describe('useRoyaleReveal', () => {
     expect(result.current.tiedWallets).toEqual([])
   })
 })
+
+describe('la tabla se mueve al quedar la carta de cara, no al pasar a la siguiente', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  const totals = (r: { current: { projection: RevealVM } }) =>
+    Object.fromEntries(r.current.projection.players.map((p) => [p.wallet, p.total]))
+
+  it('onCardFaceUp suma esa carta SIN mover el cursor', () => {
+    const { result } = renderHook(() => useRoyaleReveal(vm3, { reducedMotion: false, onComplete: vi.fn() }))
+    expect(totals(result)).toEqual({ A: 0, B: 0, C: 0 })
+    expect(result.current.stagingWallet).toBe('A')
+
+    act(() => { result.current.onCardFaceUp() })
+    expect(totals(result)).toEqual({ A: 100, B: 0, C: 0 })   // A ya cuenta…
+    expect(result.current.stagingWallet).toBe('A')           // …y su carta sigue en el escenario
+
+    act(() => { result.current.onCardShown() })
+    expect(result.current.stagingWallet).toBe('B')           // ahora sí pasa a la siguiente
+    expect(totals(result)).toEqual({ A: 100, B: 0, C: 0 })   // sin contar dos veces
+  })
+
+  it('la última carta de la ronda suma pero NO destripa la eliminación', () => {
+    const { result } = renderHook(() => useRoyaleReveal(vm3, { reducedMotion: false, onComplete: vi.fn() }))
+    act(() => { result.current.onCardShown() })   // A
+    act(() => { result.current.onCardShown() })   // B
+    act(() => { result.current.onCardFaceUp() })  // C queda de cara: es la última de la ronda
+
+    expect(totals(result)).toEqual({ A: 100, B: 90, C: 40 })   // C ya suma en la tabla
+    const c = result.current.projection.players.find((p) => p.wallet === 'C')!
+    expect(c.eliminatedRound).toBeNull()   // pero todavía no está marcado como eliminado
+
+    act(() => { result.current.onCardShown() })
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
+    expect(result.current.phase).toBe('elimination')   // eso lo anuncia el cartel
+  })
+})
