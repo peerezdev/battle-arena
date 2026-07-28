@@ -114,3 +114,36 @@ describe('buildPackDemo', () => {
     expect(seats.size).toBeGreaterThan(2)
   })
 })
+
+describe('demo con rarezas forzadas', () => {
+  // Dos cartas de cada rareza, con la capitalización que devuelve CC de verdad.
+  const POOL = ['Epic', 'Rare', 'Uncommon', 'Common'].flatMap((r, k) =>
+    [card(`${r}1`, r, 10 + k), card(`${r}2`, r, 20 + k)])
+  const FORCED = ['epic', 'rare', 'uncommon', 'common'] as const
+
+  it('el pack reparte las rarezas en el orden pedido, una por asiento', () => {
+    const b = buildPackDemo(POOL, ODDS, 'pokemon_50', 50, seeded(5), FORCED)
+    const seq = (b.pulls ?? []).map((p) => (p.rarity ?? '').toLowerCase())
+    // 5 asientos y 4 rarezas: la lista se recorre en bucle.
+    expect(seq).toEqual(['epic', 'rare', 'uncommon', 'common', 'epic'])
+  })
+
+  it('forzado no auto-vende nada: cada carta tiene que pasar por la ceremonia', () => {
+    const b = buildPackDemo(POOL, ODDS, 'pokemon_50', 50, seeded(5), FORCED)
+    expect((b.pulls ?? []).every((p) => !p.auto_sold)).toBe(true)
+  })
+
+  it('el royale sigue el bucle tirada a tirada, sin reiniciarlo entre rondas', () => {
+    const b = buildRoyaleDemo(POOL, ODDS, 'pokemon_50', 50, 4, seeded(9), FORCED)
+    const seq = (b.pulls ?? []).map((p) => (p.rarity ?? '').toLowerCase())
+    expect(seq).toEqual(seq.map((_, i) => FORCED[i % FORCED.length]))
+    expect(seq.length).toBe(4 + 3 + 2)   // rondas de 4, 3 y 2 supervivientes
+  })
+
+  it('una rareza ausente del pool cae al sorteo en vez de romper', () => {
+    const onlyCommons = [card('c1', 'Common', 10), card('c2', 'Common', 20)]
+    const b = buildPackDemo(onlyCommons, ODDS, 'pokemon_50', 50, seeded(2), FORCED)
+    expect((b.pulls ?? [])).toHaveLength(5)
+    expect((b.pulls ?? []).every((p) => (p.rarity ?? '').toLowerCase() === 'common')).toBe(true)
+  })
+})

@@ -57,6 +57,24 @@ function pickCard(byRarity: Map<string, MachineCard[]>, odds: Record<string, num
   return cards[Math.floor(rng() * cards.length)]
 }
 
+/**
+ * Elige cartas. Sin `forced` es el sorteo ponderado de siempre; con `forced` recorre esa lista de
+ * rarezas en bucle, una por tirada, para poder ver los efectos de cada rareza sin depender de la
+ * suerte. Si el pool no trae alguna rareza, esa tirada cae al sorteo normal en vez de repetir.
+ */
+function makePicker(
+  byRarity: Map<string, MachineCard[]>, odds: Record<string, number>, rng: () => number, forced?: readonly string[],
+) {
+  if (!forced?.length) return () => pickCard(byRarity, odds, rng)
+  let n = 0
+  return () => {
+    const want = forced[n++ % forced.length]
+    const cards = byRarity.get(want.toLowerCase())
+    if (!cards?.length) return pickCard(byRarity, odds, rng)
+    return cards[Math.floor(rng() * cards.length)]
+  }
+}
+
 function toPull(card: MachineCard, round: number, wallet: string): BattlePullInfo {
   return {
     round_number: round, player_wallet: wallet, nft_address: card.nft_address,
@@ -68,15 +86,18 @@ function toPull(card: MachineCard, round: number, wallet: string): BattlePullInf
 const val = (c: MachineCard) => c.insured_value ?? 0
 
 /** Pack Battle demo: you vs one bot, one card each; higher insured value wins the pot. */
-export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, rng: () => number = Math.random): Battle {
+export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, rng: () => number = Math.random, forced?: readonly string[]): Battle {
   const byRarity = groupByRarity(pool)
+  const pick = makePicker(byRarity, odds, rng, forced)
   const TEMP_N = 5
   const wallets = [DEMO_ME, ...Array.from({ length: TEMP_N - 1 }, () => fakeWallet(rng))]
-  const cards = wallets.map(() => pickCard(byRarity, odds, rng))
+  const cards = wallets.map(() => pick())
   const pulls: BattlePullInfo[] = wallets.map((w, i) => toPull(cards[i], 1, w))
   // El ⚡ de auto-vendida se sortea por carta. Antes se marcaban las dos últimas de la lista
   // ordenada, o sea siempre los mismos asientos: se leía como un guion, no como suerte.
-  pulls.forEach((p) => { p.auto_sold = rng() < 0.4 })
+  // Con rarezas forzadas no se auto-vende nada: la gracia es ver cada carta, y una
+  // auto-vendida se salta la ceremonia que se está ajustando.
+  if (!forced?.length) pulls.forEach((p) => { p.auto_sold = rng() < 0.4 })
   const totals = cards.map(val)
   const players: BattlePlayerState[] = wallets.map((w, i) => ({ wallet: w, eliminated_round: null, accumulated_value: totals[i] }))
   // Gana el valor más alto, como en el backend real (determine_winner suma por jugador y compara).
@@ -98,8 +119,9 @@ export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>,
 
 /** Battle Royale demo: you + (n-1) bots. Each round the survivors pull one card and the player
  *  with the lowest ACCUMULATED total is eliminated, until one remains. Mirrors the real backend. */
-export function buildRoyaleDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, numPlayers = 10, rng: () => number = Math.random): Battle {
+export function buildRoyaleDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, numPlayers = 10, rng: () => number = Math.random, forced?: readonly string[]): Battle {
   const byRarity = groupByRarity(pool)
+  const pick = makePicker(byRarity, odds, rng, forced)
   const wallets = [DEMO_ME, ...Array.from({ length: numPlayers - 1 }, () => fakeWallet(rng))]
   const acc: Record<string, number> = {}; wallets.forEach((w) => (acc[w] = 0))
   const elimRound: Record<string, number | null> = {}; wallets.forEach((w) => (elimRound[w] = null))
@@ -109,7 +131,7 @@ export function buildRoyaleDemo(pool: MachineCard[], odds: Record<string, number
   let alive = [...wallets]
   let round = 1
   while (alive.length > 1) {
-    for (const w of alive) { const c = pickCard(byRarity, odds, rng); pulls.push(toPull(c, round, w)); acc[w] += val(c) }
+    for (const w of alive) { const c = pick(); pulls.push(toPull(c, round, w)); acc[w] += val(c) }
     // Eliminate the lowest ACCUMULATED total (matches the real backend), NOT the lowest single
     // pull this round — a strong overall lead must not be knocked out by one bad pull.
     let worst = alive[0]

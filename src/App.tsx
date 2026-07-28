@@ -6,6 +6,7 @@ import { Hub } from './ui/screens/Hub/Hub'
 import { ModeHub } from './ui/screens/Hub/ModeHub'
 import { AppShell } from './ui/layouts/AppShell'
 import { BattleFlow } from './ui/flows/BattleFlow'
+import { DemoPage } from './ui/screens/Demo/DemoPage'
 import { DemoFlow } from './ui/flows/DemoFlow'
 import { ProfilePage } from './ui/screens/Profile/ProfilePage'
 import { LeaderboardPage } from './ui/screens/Leaderboard/LeaderboardPage'
@@ -24,6 +25,8 @@ export default function App() {
           <Route path="/play/royale" element={<ModeHub mode="royale" />} />
           <Route path="/play/battle/:battleId" element={<BattleFlow />} />
           <Route path="/play/demo/:mode" element={<DemoFlow />} />
+          {/* Banco de pruebas de los reveals. Fuera de la navegación a propósito. */}
+          <Route path="/demo" element={<DemoPage />} />
           <Route
             path="/play/gacha"
             element={

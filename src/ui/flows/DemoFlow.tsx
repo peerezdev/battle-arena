@@ -1,19 +1,16 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { COLORS, FONTS } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
-import { fetchMachines, fetchMachineCards, type MachineCard, type GachaMachine } from '../../onchain/gachaClient'
 import type { Battle } from '../../onchain/packBattleClient'
 import { buildPackDemo, buildRoyaleDemo, DEMO_ME } from '../../demo/demoBattle'
+import { fetchDemoPool, FORCED_ORDER } from '../../demo/demoPool'
 import { battleToReveal } from '../screens/battle/battleReveal'
 import { PackReveal } from '../screens/battle/PackReveal'
 import { BattleResult } from '../screens/battle/BattleResult'
 import { RoyaleReveal, RoyaleResult } from '../screens/battle/RoyaleReveal'
 
-const DEMO_MACHINE = 'pokemon_25'
 const ROYALE_PLAYERS = 10
-// Cartas por página al muestrear el pool de la demo.
-const SAMPLE_PAGE_SIZE = 24
 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
@@ -39,6 +36,10 @@ export function DemoFlow() {
   const navigate = useNavigate()
   const reduced = useReducedMotion()
   const isRoyale = mode === 'royale'
+  // ?forced=1 → las rarezas salen en orden epic → rare → uncommon → common, para poder
+  // ajustar tiempos y sonidos de cada una sin depender de la suerte.
+  const [params] = useSearchParams()
+  const forced = params.get('forced') === '1' ? FORCED_ORDER : undefined
   const exit = () => navigate('/home')
 
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -54,43 +55,17 @@ export function DemoFlow() {
     setBattle(null); setError(null); setRevealDone(false); setDone(false)
     ;(async () => {
       try {
-        const machines: GachaMachine[] = await fetchMachines()
-        const m = machines.find((x) => x.code === DEMO_MACHINE) ?? machines[0]
-        if (!m) throw new Error('No machines available')
-        // Fetch per-rarity so the pool spans every tier (the unfiltered endpoint groups by rarity),
-        // then the weighted pick reproduces the machine's real odds (mostly commons, rare epics).
-        //
-        // Y de cada rareza se piden DOS páginas, una fija y otra al azar, porque CC devuelve las
-        // cartas ORDENADAS POR VALOR: pedir solo la primera página daba las N más caras, que en
-        // mainnet son idénticas (las 24 primeras commons de pokemon_25 valen todas $29). Así la
-        // demo enseñaba siempre el mismo importe y parecía un número cableado.
-        const rarities = Object.keys(m.odds)
-        // El stock por rareza dice cuántas páginas hay DE VERDAD, así que se muestrea todo el
-        // rango en vez de adivinar un tope: en mainnet una rareza puede tener 4.000+ cartas (169
-        // páginas) y los valores bajos viven al final. Con un tope corto la demo solo enseñaba las
-        // más caras. Pools pequeños (una página) se piden enteros.
-        const pages = rarities.flatMap((r) => {
-          const maxPage = Math.max(1, Math.ceil((m.stock?.[r] ?? 0) / SAMPLE_PAGE_SIZE))
-          const randomPage = () => 1 + Math.floor(Math.random() * maxPage)
-          return maxPage === 1
-            ? [{ rarity: r, page: 1 }]
-            : [{ rarity: r, page: randomPage() }, { rarity: r, page: randomPage() }]
-        })
-        const byRarity = await Promise.all(pages.map(({ rarity, page }) =>
-          fetchMachineCards(m.code, { rarity, page, limit: SAMPLE_PAGE_SIZE }).catch(() => [] as MachineCard[])))
-        let cards: MachineCard[] = byRarity.flat()
-        if (!cards.length) cards = await fetchMachineCards(m.code, { limit: 80 }).catch(() => [])
-        if (!cards.length) throw new Error('No cards in the pool')
+        const { machine: m, cards } = await fetchDemoPool()
         const b = isRoyale
-          ? buildRoyaleDemo(cards, m.odds, m.code, m.price, ROYALE_PLAYERS)
-          : buildPackDemo(cards, m.odds, m.code, m.price)
+          ? buildRoyaleDemo(cards, m.odds, m.code, m.price, ROYALE_PLAYERS, Math.random, forced)
+          : buildPackDemo(cards, m.odds, m.code, m.price, Math.random, forced)
         if (!cancelled) setBattle(b)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Could not start the demo')
       }
     })()
     return () => { cancelled = true }
-  }, [isRoyale])
+  }, [isRoyale, forced])
 
   // Los rivales de la demo NO lanzan emotes. Un emote es una acción de una persona; ponerlo en
   // boca de un bot finge que hay alguien al otro lado. En una batalla real un bot tampoco puede:
