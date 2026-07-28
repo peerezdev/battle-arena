@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RevealVM, RevealCardVM, RevealPlayerVM } from './battleReveal'
+import { spinDurationMs } from './royaleShared'
 
 export const ELIM_BEAT_MS = 800
-export const ROULETTE_MS = 3200
+/** Cuánto se queda en pantalla el cartel del eliminado cuando NO hubo empate. */
+export const ELIM_SHOW_MS = 2000
 export const COUNTDOWN_FROM = 5
 
-export type RevealPhase = 'revealing' | 'tieBreak' | 'roundBreak' | 'done'
+export type RevealPhase = 'revealing' | 'tieBreak' | 'elimination' | 'roundBreak' | 'done'
 
 export interface RoyaleRevealState {
   phase: RevealPhase
@@ -21,7 +23,7 @@ export interface RoyaleRevealState {
   onCardShown: () => void        // the staged ceremony calls this when it lands → advance to the next card
   justEliminated: string | null  // player eliminated in the just-finished round (beat + break)
   tiedWallets: string[]          // players tied for last this round → spin the roulette (empty if no tie)
-  tieEliminated: string | null   // the wallet the roulette must land on (already decided upstream)
+  eliminatedReveal: string | null // wallet que anuncia el cartel (ruleta o eliminación directa)
 }
 
 // Players still alive at the START of `roundNumber`, in seating (vm.players) order.
@@ -101,6 +103,10 @@ export function useRoyaleReveal(
   const settled = vm.status === 'settled'
   const tied = tiedLosers(vm, round)   // >1 → this round's elimination was a random pick
   const isTie = tied.length > 1
+  // Un número, no el array: `tied` se reconstruye en cada render y como dependencia del scheduler
+  // reiniciaría el temporizador con cada poll. El milisegundo es el mismo mientras los datos lo
+  // sean, así que el efecto no se reprograma sin motivo.
+  const tieSpinMs = isTie ? spinDurationMs(tied, roundData?.eliminatedWallet ?? null) : 0
 
   // Fire onComplete exactly once when we reach 'done'.
   useEffect(() => {
@@ -138,8 +144,18 @@ export function useRoyaleReveal(
     }
 
     if (phase === 'tieBreak') {
-      // Spin the roulette, then reveal who dropped and roll into the round break.
-      const t = setTimeout(() => { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }, ROULETTE_MS)
+      // La fase dura lo que dure el giro MÁS el rato de aterrizaje: con un tiempo fijo, a partir
+      // de 5 empatados la ruleta seguía girando cuando la fase ya había acabado y el eliminado
+      // no se llegaba a ver. Ahora el cartel siempre se sostiene ELIM_SHOW_MS sobre el caído.
+      const t = setTimeout(() => { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }, tieSpinMs + ELIM_SHOW_MS)
+      return () => clearTimeout(t)
+    }
+
+    if (phase === 'elimination') {
+      // Sin empate no hay nada que sortear, pero el eliminado se anuncia igual antes de la cuenta
+      // atrás: quién cae es el resultado de la ronda, y pasar directo al "Round N starts in" lo
+      // dejaba enterrado en un cambio de chip que se pierde de vista.
+      const t = setTimeout(() => { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }, ELIM_SHOW_MS)
       return () => clearTimeout(t)
     }
 
@@ -152,20 +168,18 @@ export function useRoyaleReveal(
       if (settled) setPhase('done')
       return   // else hold on the fully-revealed final round until the battle settles
     }
-    // A tie for last → run the random-pick roulette (tieBreak) before revealing the loser.
-    const next: RevealPhase = isTie ? 'tieBreak' : 'roundBreak'
-    const t = setTimeout(() => {
-      setPhase(next)
-      if (next === 'roundBreak') setCountdown(COUNTDOWN_FROM)
-    }, ELIM_BEAT_MS)
+    // A tie for last → run the random-pick roulette; otherwise announce the eliminated player
+    // straight away. Las dos ramas acaban enseñando al caído antes de la cuenta atrás.
+    const next: RevealPhase = isTie ? 'tieBreak' : 'elimination'
+    const t = setTimeout(() => setPhase(next), ELIM_BEAT_MS)
     return () => clearTimeout(t)
-  }, [reducedMotion, phase, countdown, round, card, roundComplete, isLastRound, isTie, settled])
+  }, [reducedMotion, phase, countdown, round, card, roundComplete, isLastRound, isTie, tieSpinMs, settled])
 
   if (reducedMotion) {
     return {
       phase, projection: vm, revealRound: round, countdown,
       upcomingRound: round + 1, openingWallet: null, stagingWallet: null, stagingCard: null,
-      stagingKey: null, onCardShown, justEliminated: null, tiedWallets: [], tieEliminated: null,
+      stagingKey: null, onCardShown, justEliminated: null, tiedWallets: [], eliminatedReveal: null,
     }
   }
 
@@ -176,12 +190,15 @@ export function useRoyaleReveal(
   const stagingKey = stagingWallet ? `${round}:${card}` : null
   // Hold the elimination reveal while the tie-break roulette spins; show it from the round break on
   // (and immediately for the non-tie case, so the eliminated player's beat still plays).
-  const justEliminated = (phase === 'roundBreak' || (roundComplete && !isTie))
+  const justEliminated = (phase === 'roundBreak' || phase === 'elimination' || (roundComplete && !isTie))
     ? (roundData?.eliminatedWallet ?? null) : null
+  // Solo la ruleta tiene candidatos que sortear; en la eliminación normal el cartel sale ya
+  // resuelto, sin girar, porque no hubo azar que enseñar.
   const tiedWallets = phase === 'tieBreak' ? tied : []
-  const tieEliminated = phase === 'tieBreak' ? (roundData?.eliminatedWallet ?? null) : null
+  const eliminatedReveal = (phase === 'tieBreak' || phase === 'elimination')
+    ? (roundData?.eliminatedWallet ?? null) : null
   return {
     phase, projection, revealRound: round, countdown, upcomingRound: round + 1,
-    openingWallet, stagingWallet, stagingCard, stagingKey, onCardShown, justEliminated, tiedWallets, tieEliminated,
+    openingWallet, stagingWallet, stagingCard, stagingKey, onCardShown, justEliminated, tiedWallets, eliminatedReveal,
   }
 }

@@ -41,3 +41,33 @@ export function pullTitle(
   const isJustTheValue = !!name && Number(name) === (card.insuredValue ?? 0)
   return name && !isJustTheValue ? name : (card.rarity ?? 'card')
 }
+
+/** Recorrido de la ruleta: 4 pasadas por los empatados y deceleración hasta el que cae. */
+export function spinSequence(tied: string[], eliminated: string | null): string[] {
+  const base = tied.length ? tied : (eliminated ? [eliminated] : [])
+  if (base.length === 0) return []
+  const endAt = Math.max(0, base.indexOf(eliminated ?? base[base.length - 1]))
+  const s: string[] = []
+  const CYCLES = 4
+  for (let c = 0; c < CYCLES; c++) for (const w of base) s.push(w)
+  for (let i = 0; i <= endAt; i++) s.push(base[i])   // decelerate onto the loser
+  return s
+}
+
+/** Retardo del paso `i` de una secuencia de `n`: 55ms → ~355ms, ease-out. */
+export function spinStepMs(i: number, n: number): number {
+  const progress = i / Math.max(1, n - 1)
+  return Math.round(55 + progress * progress * 300)
+}
+
+/**
+ * Cuánto tarda la ruleta en aterrizar. La usa el hook para dimensionar la fase: con un tiempo
+ * fijo, a partir de 5 empatados el giro (3,6s y subiendo) se cortaba antes de llegar al final y
+ * el eliminado no se llegaba a ver nunca.
+ */
+export function spinDurationMs(tied: string[], eliminated: string | null): number {
+  const n = spinSequence(tied, eliminated).length
+  let total = 0
+  for (let i = 0; i < Math.max(0, n - 1); i++) total += spinStepMs(i, n)
+  return total
+}

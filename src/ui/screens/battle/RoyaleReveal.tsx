@@ -17,7 +17,7 @@ import { useIsWide } from '../../useIsWide'
 import { useRoyaleReveal, totalRounds } from './useRoyaleReveal'
 import { RoyaleRevealMobile } from './RoyaleRevealMobile'
 import { RoundBreakOverlay } from './RoundBreakOverlay'
-import { TieBreakRoulette } from './TieBreakRoulette'
+import { EliminationOverlay } from './EliminationOverlay'
 import type { RevealVM, RevealPlayerVM, RevealCardVM } from './battleReveal'
 
 const TITLE = (
@@ -92,7 +92,11 @@ export function RoyaleReveal({ vm, reducedMotion = false, battleId, onComplete }
         )}
       </div>
       {rv.phase === 'roundBreak' && !reducedMotion && <RoundBreakOverlay vm={proj} name={name} upcomingRound={rv.upcomingRound} countdown={rv.countdown} />}
-      {rv.phase === 'tieBreak' && !reducedMotion && <TieBreakRoulette tied={rv.tiedWallets} eliminated={rv.tieEliminated} nameOf={nameByWallet} reducedMotion={reducedMotion} />}
+      {/* Las dos ramas —sorteo por empate y eliminación directa— cierran la ronda con el mismo
+          cartel; solo cambia si gira o sale ya resuelto. */}
+      {(rv.phase === 'tieBreak' || rv.phase === 'elimination') && !reducedMotion && (
+        <EliminationOverlay tied={rv.tiedWallets} eliminated={rv.eliminatedReveal} nameOf={nameByWallet} reducedMotion={reducedMotion} />
+      )}
       {vm.meWallet && <EmoteDock meWallet={vm.meWallet} battleId={battleId} />}
     </div>
   )

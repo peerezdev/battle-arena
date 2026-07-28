@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useRoyaleReveal, project, revealOrderWallets, totalRounds, tiedLosers, ELIM_BEAT_MS, ROULETTE_MS } from './useRoyaleReveal'
+import { useRoyaleReveal, project, revealOrderWallets, totalRounds, tiedLosers, ELIM_BEAT_MS, ELIM_SHOW_MS } from './useRoyaleReveal'
+import { spinDurationMs } from './royaleShared'
 import type { RevealVM, RevealCardVM } from './battleReveal'
 
 const card = (wallet: string, isMe: boolean, val: number | null, addr: string | null): RevealCardVM => ({
@@ -113,7 +114,8 @@ describe('useRoyaleReveal', () => {
     act(() => { result.current.onCardShown() })   // reveal A
     act(() => { result.current.onCardShown() })   // reveal B
     act(() => { result.current.onCardShown() })   // reveal C -> round 1 complete
-    act(() => { vi.advanceTimersByTime(800) })    // elimination beat -> round break
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })    // beat -> cartel del eliminado
+    act(() => { vi.advanceTimersByTime(ELIM_SHOW_MS) })    // cartel -> round break
     expect(result.current.phase).toBe('roundBreak')
     expect(result.current.countdown).toBe(5)
     expect(result.current.upcomingRound).toBe(2)
@@ -132,7 +134,10 @@ describe('useRoyaleReveal', () => {
     act(() => { result.current.onCardShown() })   // A
     act(() => { result.current.onCardShown() })   // B
     act(() => { result.current.onCardShown() })   // C -> round complete
-    act(() => { vi.advanceTimersByTime(800) })    // beat -> roundBreak
+    // Dos `act` y no uno: el temporizador del cartel no existe hasta que corre el efecto de esa
+    // fase, así que un único avance de 2800ms no llegaría a programarlo.
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })   // beat -> cartel del eliminado
+    act(() => { vi.advanceTimersByTime(ELIM_SHOW_MS) })   // cartel -> roundBreak
     expect(result.current.phase).toBe('roundBreak')
     // Part of the way through the 1000ms tick, a poll arrives (fresh vm object, same data).
     act(() => { vi.advanceTimersByTime(600) })
@@ -182,6 +187,68 @@ describe('useRoyaleReveal', () => {
     }
   })
 
+  it('sin empate también anuncia al eliminado antes de la cuenta atrás', () => {
+    // Antes se pasaba de la última carta directo al "Round N starts in" y quién caía solo se veía
+    // en el chip. Ahora la ronda cierra con el mismo cartel que la ruleta, pero sin sorteo.
+    const { result } = renderHook(() => useRoyaleReveal(vm3, { reducedMotion: false, onComplete: vi.fn() }))
+    act(() => { result.current.onCardShown() })   // A
+    act(() => { result.current.onCardShown() })   // B
+    act(() => { result.current.onCardShown() })   // C → ronda 1 completa, sin empate (C cae solo)
+
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
+    expect(result.current.phase).toBe('elimination')
+    expect(result.current.eliminatedReveal).toBe('C')   // el cartel sabe a quién anunciar
+    expect(result.current.tiedWallets).toEqual([])      // y no hay nada que sortear
+
+    // El cartel dura lo suyo: la cuenta atrás NO ha arrancado todavía.
+    act(() => { vi.advanceTimersByTime(ELIM_SHOW_MS - 1) })
+    expect(result.current.phase).toBe('elimination')
+
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(result.current.phase).toBe('roundBreak')
+    expect(result.current.eliminatedReveal).toBeNull()  // el cartel se va con la fase
+  })
+
+  it('con muchos empatados la fase dura lo que el giro: el eliminado SIEMPRE se llega a ver', () => {
+    // El fallo: la ruleta tenía una ventana fija de 3200ms, pero el giro crece con los empatados
+    // (5 → 3,6s; 8 → 5,9s). A partir de 5 la fase acababa girando todavía y nadie veía quién caía.
+    const n = 6
+    const wallets = ['A', 'B', 'C', 'D', 'E', 'F', 'G']          // A gana, B..G empatan a 0
+    const vmBigTie: RevealVM = {
+      mode: 'royale', status: 'settled', winner: 'A', meWallet: 'A',
+      players: wallets.map((w, i) => ({
+        wallet: w, isMe: w === 'A', accumulatedValue: w === 'A' ? 100 : 0,
+        eliminatedRound: w === 'A' ? null : (w === 'G' ? 1 : i), cards: [], total: 0,
+      })),
+      rounds: [{
+        roundNumber: 1, eliminatedWallet: 'G',
+        cards: wallets.map((w) => card(w, w === 'A', w === 'A' ? 100 : 0, `n${w}`)),
+      }],
+      potValue: 100, machines: ['m'], buybackTotal: 0, entry: 0,
+    }
+    const tied = tiedLosers(vmBigTie, 1)
+    expect(tied.length).toBe(n)                                   // los seis empatados a 0
+    const spin = spinDurationMs(tied, 'G')
+    expect(spin).toBeGreaterThan(3200)                            // el giro NO cabía en la ventana vieja
+
+    const { result } = renderHook(() => useRoyaleReveal(vmBigTie, { reducedMotion: false, onComplete: vi.fn() }))
+    wallets.forEach(() => act(() => { result.current.onCardShown() }))
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
+    expect(result.current.phase).toBe('tieBreak')
+
+    // Con la ventana vieja aquí ya se habría pasado de fase con la ruleta a medio girar.
+    act(() => { vi.advanceTimersByTime(3200) })
+    expect(result.current.phase).toBe('tieBreak')
+
+    // Aterriza, y todavía se sostiene sobre el eliminado antes de soltar la cuenta atrás.
+    act(() => { vi.advanceTimersByTime(spin - 3200 + ELIM_SHOW_MS - 1) })
+    expect(result.current.phase).toBe('tieBreak')
+    expect(result.current.eliminatedReveal).toBe('G')
+
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(result.current.phase).toBe('roundBreak')
+  })
+
   it('runs the tie-break roulette before the round break, holding the elimination until it lands', () => {
     const { result } = renderHook(() => useRoyaleReveal(vmTie, { reducedMotion: false, onComplete: vi.fn() }))
     act(() => { result.current.onCardShown() })   // reveal A
@@ -192,10 +259,10 @@ describe('useRoyaleReveal', () => {
     act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })        // → tieBreak
     expect(result.current.phase).toBe('tieBreak')
     expect([...result.current.tiedWallets].sort()).toEqual(['B', 'C'])
-    expect(result.current.tieEliminated).toBe('C')
+    expect(result.current.eliminatedReveal).toBe('C')
     expect(result.current.justEliminated).toBeNull()          // still hidden while the roulette spins
 
-    act(() => { vi.advanceTimersByTime(ROULETTE_MS) })         // roulette lands → round break
+    act(() => { vi.advanceTimersByTime(spinDurationMs(['B', 'C'], 'C') + ELIM_SHOW_MS) })   // gira, aterriza y se sostiene → round break
     expect(result.current.phase).toBe('roundBreak')
     expect(result.current.justEliminated).toBe('C')           // now revealed
     expect(result.current.tiedWallets).toEqual([])
