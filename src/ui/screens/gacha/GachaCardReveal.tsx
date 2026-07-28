@@ -170,8 +170,14 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
             boxShadow: `0 18px 34px #000a, 0 0 26px -6px ${color}`,
             display: 'grid', placeItems: 'center',
           }}>
+            {/* En absoluto y no en el flujo: el padre es un grid con `place-items:center`, así que
+                su fila se dimensiona por CONTENIDO y el `height:100%` de la imagen no limitaba
+                nada. Una losa de 2425×4055 se pintaba 194×324 dentro de una caja de 274 de alto
+                y el overflow se comía 50px de carta. Contra `inset:0` los porcentajes sí
+                resuelven, y `contain` ya la encaja entera. */}
             {result.image
-              ? <img src={result.image} alt={result.name ?? ''} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              ? <img src={result.image} alt={result.name ?? ''}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }} />
               : <span style={{ fontSize: 46 }}>🃏</span>}
           </div>
         </div>
