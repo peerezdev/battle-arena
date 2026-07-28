@@ -5,7 +5,7 @@ import { rarityColor } from './RevealCard'
 import { CardBack } from './CardBack'
 import { RarityBand } from './RarityBand'
 import { STACK_T, BAND_T, EPIC_SPIN_DEG, FLIP_MS, bandRarity, bandColorFor } from './revealTiming'
-import { playEpicSpin } from '../../sfx'
+import { playEpicSpin, playFlipThump, stopReveal } from '../../sfx'
 
 type Stage = 'year' | 'grade' | 'rarity' | 'card'
 
@@ -72,12 +72,15 @@ export function StagedCardReveal({
     // de la imagen y la franja cae dentro del sonido. Solo Epic.
     if (bandKey === 'epic') at(rarityAt, playEpicSpin)
     at(rarityAt + BAND_T.band, () => setBand('in'))
+    // El golpe grave cierra la ceremonia: suena cuando la carta queda de cara, no al empezar
+    // a girar. Es el segundo ♪ del diseño.
+    const landed = () => { land(); playFlipThump() }
     if (bandKey === 'epic') {
       // La franja se va AL RITMO del giro: las dos cosas arrancan en el mismo instante.
       at(rarityAt + BAND_T.epicSpin, () => { setSpinning(true); setBand('out') })
-      at(rarityAt + BAND_T.epicLand, land)
+      at(rarityAt + BAND_T.epicLand, landed)
     } else {
-      at(rarityAt + BAND_T.rareFlip, () => { setBand('out'); land() })
+      at(rarityAt + BAND_T.rareFlip, () => { setBand('out'); landed() })
     }
   }
 
@@ -98,7 +101,7 @@ export function StagedCardReveal({
     const rarityAt = stepAt(Math.max(0, pre.length - 1), pre[pre.length - 1] === 'rarity')
     if (bandKey) bandSchedule(rarityAt, at, () => setI(stages.length - 1))
     else at(rarityAt + STACK_T.hold, () => setI(stages.length - 1))
-    return () => timers.forEach(clearTimeout)
+    return () => { timers.forEach(clearTimeout); stopReveal() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stages, reduced, stacked, bandKey])
 
@@ -111,7 +114,8 @@ export function StagedCardReveal({
     const rarityAt = stepAt(Math.max(0, rows.length - 1), rows[rows.length - 1]?.key === 'Rarity')
     if (bandKey) bandSchedule(rarityAt, at, () => setFlipped(true))
     else at(rarityAt + STACK_T.hold, () => setFlipped(true))
-    return () => timers.forEach(clearTimeout)
+    // Al desmontar —o sea, al pasar a la carta siguiente— se corta lo que esté sonando.
+    return () => { timers.forEach(clearTimeout); stopReveal() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stacked, reduced, rows, bandKey])
 

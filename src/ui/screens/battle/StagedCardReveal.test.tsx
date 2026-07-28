@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 const playEpicSpin = vi.fn()
-vi.mock('../../sfx', () => ({ playEpicSpin: () => playEpicSpin() }))
+const playFlipThump = vi.fn()
+const stopReveal = vi.fn()
+vi.mock('../../sfx', () => ({
+  playEpicSpin: () => playEpicSpin(),
+  playFlipThump: () => playFlipThump(),
+  stopReveal: () => stopReveal(),
+}))
 import { StagedCardReveal } from './StagedCardReveal'
 import { STACK_T, BAND_T } from './revealTiming'
 
@@ -149,7 +155,7 @@ describe('StagedCardReveal · franja de rareza', () => {
 })
 
 describe('StagedCardReveal · sonido de Epic', () => {
-  beforeEach(() => { vi.useFakeTimers(); playEpicSpin.mockClear() })
+  beforeEach(() => { vi.useFakeTimers(); playEpicSpin.mockClear(); playFlipThump.mockClear(); stopReveal.mockClear() })
   afterEach(() => vi.useRealTimers())
 
   const play = (rarity: string) => render(
@@ -185,5 +191,50 @@ describe('StagedCardReveal · sonido de Epic', () => {
     )
     act(() => { vi.advanceTimersByTime(8000) })
     expect(playEpicSpin).not.toHaveBeenCalled()
+  })
+})
+
+describe('StagedCardReveal · golpe del volteo y corte al cambiar de carta', () => {
+  beforeEach(() => { vi.useFakeTimers(); playFlipThump.mockClear(); stopReveal.mockClear() })
+  afterEach(() => vi.useRealTimers())
+
+  const mount = (rarity: string) => render(
+    <StagedCardReveal year="2010" grade="PSA 10" rarity={rarity} reduced={false} stacked>
+      <div>THE CARD</div>
+    </StagedCardReveal>,
+  )
+  const RARITY_AT = STACK_T.first + 2 * STACK_T.step + STACK_T.rarityExtra
+
+  it('el golpe suena cuando la carta queda DE CARA, no al empezar a girar', () => {
+    mount('Epic')
+    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.epicSpin + 50) })
+    expect(playFlipThump).not.toHaveBeenCalled()   // ya está girando, pero aún no de cara
+
+    act(() => { vi.advanceTimersByTime(BAND_T.epicLand - BAND_T.epicSpin) })
+    expect(playFlipThump).toHaveBeenCalledTimes(1)
+  })
+
+  it('en Rare suena con su volteo', () => {
+    mount('Rare')
+    act(() => { vi.advanceTimersByTime(RARITY_AT + BAND_T.rareFlip) })
+    expect(playFlipThump).toHaveBeenCalledTimes(1)
+  })
+
+  it('Common y Uncommon voltean en silencio', () => {
+    for (const r of ['Common', 'Uncommon']) {
+      playFlipThump.mockClear()
+      mount(r)
+      act(() => { vi.advanceTimersByTime(8000) })
+      expect(playFlipThump, r).not.toHaveBeenCalled()
+    }
+  })
+
+  it('al cambiar de carta se corta lo que esté sonando', () => {
+    // Era el problema: el sonido de una épica seguía sonando encima de la tirada siguiente.
+    const { unmount } = mount('Epic')
+    act(() => { vi.advanceTimersByTime(RARITY_AT + 100) })
+    expect(stopReveal).not.toHaveBeenCalled()
+    unmount()
+    expect(stopReveal).toHaveBeenCalled()
   })
 })
