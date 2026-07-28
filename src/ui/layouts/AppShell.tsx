@@ -11,6 +11,10 @@ import { AuthButtons } from '../components/AuthButtons'
 import { RadioPlayer } from '../components/RadioPlayer'
 import { MobileRadioBar } from '../components/MobileRadioBar'
 import { useRadio } from '../radio/useRadio'
+
+// 🔇 Radio en pausa. El componente, el store y sus tests siguen en su sitio: esto solo deja de
+// montarlo, así que no suena nada ni aparece el botón. Para recuperarla, `true` y ya.
+const RADIO_ENABLED = false
 import { DepositModal } from '../components/DepositModal'
 import { LeftRail, NAV_ICONS } from '../screens/Hub/LeftRail'
 import { ChatDock } from '../screens/Hub/ChatDock'
@@ -173,8 +177,8 @@ export function AppShell() {
   // navegador. tryAutoplay ya contempla que el navegador BLOQUEE el autoplay sin gesto previo:
   // en ese caso deja armado un disparo al primer click o tecla, así que suena igualmente en
   // cuanto el usuario toca algo. Y comprueba la preferencia por dentro.
-  useEffect(() => { tryAutoplay() }, [tryAutoplay])
-  const mobileRadio = !wideRail && radioTracks.length > 0
+  useEffect(() => { if (RADIO_ENABLED) tryAutoplay() }, [tryAutoplay])
+  const mobileRadio = RADIO_ENABLED && !wideRail && radioTracks.length > 0
   // When the mini-player is collapsed only the floating re-open button shows, so
   // the content only needs to clear the nav (not the full radio bar).
   const mobileRadioBar = mobileRadio && !radioCollapsed
@@ -249,7 +253,7 @@ export function AppShell() {
       ) : (
         // Mobile bottom stack: radio mini-player floating above the tab bar.
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50 }}>
-          <MobileRadioBar />
+          {RADIO_ENABLED && <MobileRadioBar />}
           <BottomNav
             active={active}
             onNavigate={() => setChatOpen(false)}
@@ -303,7 +307,7 @@ export function AppShell() {
           {/* Radio — global player in the header on desktop; on mobile it lives in the
               bottom stack (MobileRadioBar). The store is a singleton, so audio survives
               navigation and breakpoint changes either way. */}
-          {wideRail && <RadioPlayer />}
+          {RADIO_ENABLED && wideRail && <RadioPlayer />}
 
           {/* Balance + Gimmighouls — labelled groups on desktop; one divided box on mobile */}
           {authenticated && (wideRail ? (
