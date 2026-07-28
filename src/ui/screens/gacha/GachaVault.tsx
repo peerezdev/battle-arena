@@ -982,6 +982,8 @@ function RevealResult({
   onNext: () => void
 }) {
   const rarityColor = RARITY_COLOR[result.rarity] ?? COLORS.muted
+  // El detalle de tres columnas pide ~980px; por debajo de eso las piezas se apilan.
+  const wide = useIsWide('(min-width: 1040px)')
 
   // La secuencia previa a la carta (año, grado, casilla de rareza, contador y volteo) vive en
   // GachaCardReveal. Aquí solo se espera a que termine para dar paso al detalle de la carta.
@@ -1013,14 +1015,19 @@ function RevealResult({
         initial={reduced ? undefined : { scale: 0.82, opacity: 0 }}
         animate={reduced ? undefined : { scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-        style={{
-          maxWidth: 440,
-          width: '100%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
+        style={wide ? {
+          // Caja fija del diseño: la ficha de la derecha ancla el botón de continuar abajo con
+          // `margin-top:auto`, y eso necesita una altura, no un alto que siga al contenido.
+          // overflowY por si la ventana es ancha pero baja: 90vh puede quedarse por debajo de
+          // los 660 y sin esto la ficha se cortaría sin poder llegar al botón.
+          width: 980, maxWidth: '100%', height: 660, maxHeight: '90vh', overflowY: 'auto',
+          background: 'linear-gradient(180deg,#12161e,#0c0f15)',
+          border: '1px solid rgba(255,255,255,.1)', borderRadius: 22,
+          boxShadow: '0 30px 80px -20px rgba(0,0,0,.8)',
+        } : {
+          maxWidth: 440, width: '100%', maxHeight: '90vh', overflowY: 'auto',
           background: COLORS.panel,
-          border: `2px solid ${rarityColor}`,
-          borderRadius: 18,
+          border: `2px solid ${rarityColor}`, borderRadius: 18,
           boxShadow: `${SHADOW.panel}, ${SHADOW.glow(rarityColor)}`,
         }}
       >
@@ -1030,6 +1037,7 @@ function RevealResult({
           buybackPct={buybackPct}
           single={single}
           reduced={reduced}
+          wide={wide}
           onNext={onNext}
         />
       </motion.div>
@@ -1038,29 +1046,37 @@ function RevealResult({
 }
 
 // ── Rich card details panel (inner — owns activeImg state) ────────────────────
+//
+// Layout de tres columnas (miniaturas · carta · ficha) en escritorio; en pantallas estrechas
+// las mismas piezas se apilan en una sola columna con scroll. Solo lo usa el gacha.
 function CardDetailsView({
   result,
   rarityColor,
   buybackPct,
   single,
   reduced,
+  wide,
   onNext,
 }: {
   result: Extract<OpenPackResult, { pending: false }>
   rarityColor: string
   buybackPct: number | null
-  /** single open → inline Keep/Sell; multi → just "Next pack". */
+  /** single open → se puede vender aquí mismo; multi → solo "Next pack". */
   single: boolean
   reduced: boolean
+  wide: boolean
   onNext: () => void
 }) {
   const { identityToken } = useIdentityToken()
   const { signTransactionBase64 } = useWallet()
   const [activeImg, setActiveImg] = useState(0)
   const [copied, setCopied] = useState(false)
-  const [decision, setDecision] = useState<'kept' | 'sold' | null>(null)
+  const [sold, setSold] = useState(false)
   const [selling, setSelling] = useState(false)
   const [sellErr, setSellErr] = useState<string | null>(null)
+  // Un solo desplegable abierto a la vez, como en el diseño: las dos fichas juntas no caben en
+  // la columna sin empujar el botón de continuar fuera de la caja.
+  const [openSection, setOpenSection] = useState<'grading' | 'contract' | 'none'>('grading')
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current) }, [])
@@ -1072,7 +1088,7 @@ function CardDetailsView({
       const res = await requestBuyback(identityToken, result.nft_address)
       const signed = await signTransactionBase64(res.serialized_transaction)
       await submitTx(identityToken, signed)
-      setDecision('sold')
+      setSold(true)
     } catch (e) {
       setSellErr(e instanceof Error ? e.message : 'Buyback failed')
     } finally {
@@ -1088,7 +1104,7 @@ function CardDetailsView({
       : []
 
   const mainImgSrc = images[activeImg] ?? null
-  const glow = rarityGlow(result.rarity)   // Recent-Drops-style beam (common = none)
+  const glow = rarityGlow(result.rarity) ?? rarityColor   // Recent-Drops-style beam
 
   function handleCopy() {
     if (!navigator.clipboard) return
@@ -1106,337 +1122,224 @@ function CardDetailsView({
     result.insured_value != null && buybackPct != null
       ? result.insured_value * buybackPct / 100
       : null
+  const canSell = single && !sold && buybackOffer != null
 
-  // Grading rows — only show present fields
+  // Solo las filas que el backend trae de verdad: una tabla con huecos vacíos se lee como que
+  // la carta no está bien catalogada.
   const gradingRows: Array<{ label: string; value: string }> = []
-  if (result.grading_company) gradingRows.push({ label: 'Grading Company', value: result.grading_company })
+  if (result.grading_company) gradingRows.push({ label: 'Grading company', value: result.grading_company })
   if (result.grading_id) gradingRows.push({ label: 'Grading ID', value: result.grading_id })
   if (result.grade) gradingRows.push({ label: 'Grade', value: result.grade })
   if (result.year) gradingRows.push({ label: 'Year', value: result.year })
   if (result.authenticated != null) gradingRows.push({ label: 'Authenticated', value: result.authenticated ? 'Yes' : 'No' })
 
-  return (
-    <div style={{ padding: '24px 22px 22px' }}>
-      {/* ── Top row: authenticity + rarity badge ─────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 600, color: rarityColor }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 12l2 2 4-4" /></svg>
-          Guaranteed authenticity
-        </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 12px', borderRadius: 8, fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: rarityColor, background: `${rarityColor}1f`, border: `1px solid ${rarityColor}6b` }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: rarityColor, boxShadow: `0 0 7px ${rarityColor}` }} />{result.rarity}
-        </span>
-      </div>
+  const gradingOpen = openSection === 'grading' && gradingRows.length > 0
+  const contractOpen = openSection === 'contract'
 
-      {/* ── Title ────────────────────────────────────────────────────────────── */}
-      <h1 style={{ margin: '0 0 18px', fontFamily: FONTS.display, fontWeight: 700, fontSize: 'clamp(20px,2.6vw,24px)', letterSpacing: '-.02em', lineHeight: 1.14, color: COLORS.text }}>
-        {result.name ?? 'Unknown Card'}
-      </h1>
+  // ── Piezas compartidas por las dos disposiciones ────────────────────────────
 
-      {/* ── Image area — card hero with rarity halo + gentle float ───────────── */}
+  const thumbs = images.length > 1 && (
+    <div style={{ display: 'flex', flexDirection: wide ? 'column' : 'row', gap: 10, flexShrink: 0 }}>
+      {images.map((src, idx) => (
+        <button key={idx} onClick={() => setActiveImg(idx)} aria-label={`View ${idx + 1}`}
+          style={{
+            width: 64, height: 88, flexShrink: 0, padding: 3, borderRadius: 10, cursor: 'pointer',
+            border: `2px solid ${idx === activeImg ? rarityColor : 'transparent'}`,
+            background: 'rgba(255,255,255,.03)', overflow: 'hidden',
+            boxShadow: idx === activeImg ? SHADOW.glow(rarityColor) : 'none',
+            transition: 'border-color .15s, box-shadow .15s',
+          }}>
+          <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, display: 'block' }} />
+        </button>
+      ))}
+    </div>
+  )
+
+  const hero = (
+    <div style={{
+      position: 'relative', borderRadius: 16, display: 'grid', placeItems: 'center', padding: wide ? 22 : 16,
+      background: `radial-gradient(70% 60% at 50% 45%, ${glow}, transparent 75%), rgba(0,0,0,.3)`,
+      border: '1px solid rgba(255,255,255,.07)',
+    }}>
       {mainImgSrc ? (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-            <div aria-hidden style={{ position: 'absolute', inset: '2% 16%', zIndex: 0, borderRadius: '50%', background: `radial-gradient(circle, ${glow ?? rarityColor}, transparent 66%)`, filter: 'blur(26px)', animation: reduced ? 'none' : 'ca-haloPulse 3.4s ease-in-out infinite' }} />
-            <div style={{ position: 'relative', zIndex: 1, width: '100%', animation: reduced ? 'none' : 'ca-pop .7s cubic-bezier(.2,.9,.25,1) both, ca-float 5.5s ease-in-out .7s infinite' }}>
-              <HoloCard
-                src={mainImgSrc}
-                alt={result.name ?? 'Card image'}
-                rarity={result.rarity}
-                accent={rarityColor}
-                radius={10}
-                imgStyle={{ maxHeight: 280, objectFit: 'contain' }}
-              />
-            </div>
-          </div>
-          {/* Thumbnails — only when multiple images */}
-          {images.length > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                justifyContent: 'center',
-                marginTop: 10,
-              }}
-            >
-              {images.map((src, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImg(idx)}
-                  style={{
-                    padding: 0,
-                    border: `2px solid ${idx === activeImg ? rarityColor : COLORS.border}`,
-                    borderRadius: 6,
-                    background: 'none',
-                    cursor: 'pointer',
-                    boxShadow: idx === activeImg ? SHADOW.glow(rarityColor) : 'none',
-                    transition: 'border-color 0.15s, box-shadow 0.15s',
-                    flexShrink: 0,
-                  }}
-                >
-                  <img
-                    src={src}
-                    alt={`View ${idx + 1}`}
-                    style={{
-                      width: 48,
-                      height: 48,
-                      objectFit: 'cover',
-                      borderRadius: 4,
-                      display: 'block',
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
-          )}
+        <div style={{
+          width: '100%', maxWidth: wide ? 265 : 230, borderRadius: 12, overflow: 'hidden',
+          boxShadow: `0 0 60px -12px ${rarityColor}, 0 20px 40px -18px rgba(0,0,0,.8)`,
+          animation: reduced ? 'none' : 'ca-pop .7s cubic-bezier(.2,.9,.25,1) both, ca-float 5.5s ease-in-out .7s infinite',
+        }}>
+          <HoloCard src={mainImgSrc} alt={result.name ?? 'Card image'} rarity={result.rarity}
+            accent={rarityColor} radius={12} imgStyle={{ maxHeight: wide ? 390 : 300, objectFit: 'contain' }} />
         </div>
       ) : (
-        <div
-          style={{
-            fontSize: 64,
-            textAlign: 'center',
-            marginBottom: 16,
-            lineHeight: 1,
-          }}
-        >
-          &#127183;
-        </div>
+        <span style={{ fontSize: 64, lineHeight: 1 }}>🃏</span>
       )}
+    </div>
+  )
 
-      {/* ── Value box ───────────────────────────────────────────────────────── */}
-      {(result.insured_value != null || buybackOffer != null) && (
-        <div
+  const header = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: COLORS.green }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></svg>
+        Guaranteed authenticity
+      </span>
+      <span style={{ width: 1, height: 13, background: 'rgba(255,255,255,.15)' }} />
+      <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#c9b3f0', textDecoration: 'none' }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="7" width="16" height="13" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>
+        Vaulted by CollectorCrypt
+      </a>
+      <span style={{
+        marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 13px', borderRadius: 9,
+        background: `${rarityColor}1f`, border: `1px solid ${rarityColor}73`,
+        fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: '.18em', color: rarityColor,
+      }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: rarityColor, boxShadow: `0 0 7px ${rarityColor}` }} />
+        {result.rarity.toUpperCase()}
+      </span>
+    </div>
+  )
+
+  const valueBlock = (result.insured_value != null || buybackOffer != null) && (
+    <div style={{
+      marginTop: 16, borderRadius: 15, padding: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+      background: 'linear-gradient(135deg,rgba(139,92,246,.22),rgba(139,92,246,.08))',
+      border: '1px solid rgba(139,92,246,.4)',
+    }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: '#b9a5e8' }}>INSURED VALUE</span>
+        <span style={{ display: 'block', fontSize: 32, fontWeight: 700, color: '#ff4d9d', marginTop: 2 }}>
+          {result.insured_value != null ? formatUsd(result.insured_value) : '—'}
+        </span>
+      </span>
+      {canSell && (
+        <button onClick={sell} disabled={selling}
           style={{
-            background: `linear-gradient(135deg, #1a1430 0%, #0f1a28 100%)`,
-            border: `1px solid ${COLORS.violet}44`,
-            borderRadius: 12,
-            padding: '16px 18px',
-            marginBottom: 16,
-            boxShadow: SHADOW.glow(COLORS.violet),
-          }}
-        >
-          {result.insured_value != null && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: buybackOffer != null ? 8 : 0,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: 11,
-                  color: COLORS.muted,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.06em',
-                }}
-              >
-                Insured Value
-              </span>
-              <span
-                style={{
-                  fontFamily: FONTS.display,
-                  fontWeight: 800,
-                  fontSize: 18,
-                  color: COLORS.violet,
-                }}
-              >
-                {formatUsd(result.insured_value)}
-              </span>
-            </div>
-          )}
-          {buybackOffer != null && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: 11,
-                  color: COLORS.muted,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.06em',
-                }}
-              >
-                Buyback Offer ({buybackPct}%)
-              </span>
-              <span
-                style={{
-                  fontFamily: FONTS.display,
-                  fontWeight: 700,
-                  fontSize: 15,
-                  color: COLORS.green,
-                }}
-              >
-                {formatUsd(buybackOffer)}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Token ID + explorer link ─────────────────────────────────────────── */}
-      <div
-        style={{
-          background: COLORS.panel2,
-          border: `1px solid ${COLORS.border}`,
-          borderRadius: 10,
-          padding: '12px 14px',
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 10,
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontFamily: FONTS.mono,
-              fontSize: 10,
-              color: COLORS.muted,
-              textTransform: 'uppercase',
-              letterSpacing: '.07em',
-              marginBottom: 4,
-            }}
-          >
-            Token ID
-          </div>
-          <div
-            style={{
-              fontFamily: FONTS.mono,
-              fontSize: 13,
-              color: COLORS.text,
-            }}
-          >
-            {shortAddr}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-          <button
-            onClick={handleCopy}
-            title="Copy address"
-            style={{
-              background: copied ? COLORS.green + '22' : COLORS.panel,
-              border: `1px solid ${copied ? COLORS.green : COLORS.border}`,
-              borderRadius: 6,
-              padding: '5px 10px',
-              cursor: 'pointer',
-              color: copied ? COLORS.green : COLORS.muted,
-              fontFamily: FONTS.mono,
-              fontSize: 11,
-              transition: 'all 0.15s',
-            }}
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-          <a
-            href={explorerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontFamily: FONTS.mono,
-              fontSize: 11,
-              color: COLORS.violet,
-              textDecoration: 'none',
-              border: `1px solid ${COLORS.violet}44`,
-              borderRadius: 6,
-              padding: '5px 10px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            View on CollectorCrypt &#8599;
-          </a>
-        </div>
-      </div>
-
-      {/* ── Grading section ─────────────────────────────────────────────────── */}
-      {gradingRows.length > 0 && (
-        <div
-          style={{
-            background: COLORS.panel2,
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 10,
-            padding: '12px 14px',
-            marginBottom: 20,
-          }}
-        >
-          {gradingRows.map(({ label, value }) => (
-            <div
-              key={label}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                padding: '4px 0',
-                borderBottom: `1px solid ${COLORS.border}`,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: 10,
-                  color: COLORS.muted,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.06em',
-                }}
-              >
-                {label}
-              </span>
-              <span
-                style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: 12,
-                  color: COLORS.text,
-                }}
-              >
-                {value}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── Actions ──────────────────────────────────────────────────────────── */}
-      {single && decision === null ? (
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={() => setDecision('kept')} disabled={selling}
-            style={{ position: 'relative', overflow: 'hidden', flex: 1.4, padding: 15, borderRadius: 14, border: 0, cursor: selling ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(0,255,196,.6)' }}>
-            <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '38%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent)', animation: reduced ? 'none' : 'ba-sweep 3.6s infinite' }} />
-            <span style={{ position: 'relative' }}>Keep in Vault ✓</span>
-          </button>
-          <button onClick={sell} disabled={selling}
-            style={{ flex: 1, padding: 15, borderRadius: 14, border: `1px solid ${COLORS.green}66`, background: 'rgba(0,255,196,.07)', color: COLORS.green, cursor: selling ? 'wait' : 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 800 }}>
-            {selling ? 'Selling…' : `Sell · ${formatUsd(buybackOffer ?? 0)}`}
-          </button>
-        </div>
-      ) : single ? (
-        <div style={{ animation: 'ca-fade .3s ease-out both' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '14px 16px', borderRadius: 14, marginBottom: 12,
-            background: decision === 'kept' ? 'rgba(0,255,196,.10)' : 'rgba(124,77,255,.12)', border: `1px solid ${decision === 'kept' ? 'rgba(0,255,196,.34)' : 'rgba(124,77,255,.34)'}` }}>
-            <span style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: decision === 'kept' ? 'rgba(0,255,196,.16)' : 'rgba(124,77,255,.18)', color: decision === 'kept' ? COLORS.green : '#c4adff', fontSize: 17 }}>{decision === 'kept' ? '◆' : '↩'}</span>
-            <div>
-              <div style={{ fontSize: 14.5, fontWeight: 700, color: COLORS.text }}>{decision === 'kept' ? 'Kept in your vault' : `Sold · +${formatUsd(buybackOffer ?? 0)} USDC`}</div>
-              <div style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 1 }}>{decision === 'kept' ? 'The card stays in your insured inventory.' : 'Balance credited instantly.'}</div>
-            </div>
-          </div>
-          <button onClick={onNext}
-            style={{ width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(0,255,196,.6)' }}>Continue →</button>
-        </div>
-      ) : (
-        <button onClick={onNext}
-          style={{ position: 'relative', overflow: 'hidden', width: '100%', padding: 15, borderRadius: 14, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15.5, fontWeight: 800, color: '#06170f', background: GRADIENT, boxShadow: '0 14px 40px -14px rgba(0,255,196,.6)' }}>
-          <span style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: '38%', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.42),transparent)', animation: reduced ? 'none' : 'ba-sweep 3.6s infinite' }} />
-          <span style={{ position: 'relative' }}>Next pack →</span>
+            flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            padding: '12px 18px', borderRadius: 12, border: 0, cursor: selling ? 'wait' : 'pointer',
+            fontFamily: FONTS.body, color: '#06170f', background: 'linear-gradient(135deg,#3df0a0,#13c98a)',
+            boxShadow: '0 0 20px -6px rgba(47,226,138,.7)',
+          }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{selling ? 'Selling…' : `Sell back · ${formatUsd(buybackOffer!)}`}</span>
+          <span style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.12em', opacity: .75 }}>INSTANT · {buybackPct}%</span>
         </button>
       )}
-      {sellErr && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, marginTop: 10, textAlign: 'center' }}>{sellErr}</div>}
+      {sold && (
+        <span style={{
+          flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '12px 18px', borderRadius: 12,
+          background: 'rgba(47,226,138,.08)', border: '1px solid rgba(47,226,138,.4)', fontSize: 14, fontWeight: 700, color: COLORS.green,
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
+          Sold · {formatUsd(buybackOffer ?? 0)}
+        </span>
+      )}
+    </div>
+  )
+
+  const sectionBtn = (label: string, isOpen: boolean, onClick: () => void, first: boolean) => (
+    <button onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px',
+        border: 0, borderTop: first ? undefined : '1px solid rgba(255,255,255,.08)',
+        borderBottom: '1px solid rgba(255,255,255,.08)',
+        background: 'transparent', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body,
+      }}>
+      <span style={{ fontSize: 15, fontWeight: 700 }}>{label}</span>
+      <span style={{ color: '#7a8492', fontSize: 18, lineHeight: 1 }}>{isOpen ? '−' : '+'}</span>
+    </button>
+  )
+  const detailRow = (k: string, v: React.ReactNode) => (
+    <div key={k} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '7px 2px' }}>
+      <span style={{ fontSize: 13, color: '#7a8492' }}>{k}</span>
+      <span style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>{v}</span>
+    </div>
+  )
+
+  const sections = (
+    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column' }}>
+      {gradingRows.length > 0 && (
+        <>
+          {sectionBtn('Grading', gradingOpen, () => setOpenSection(gradingOpen ? 'none' : 'grading'), true)}
+          <div style={{ overflow: 'hidden', maxHeight: gradingOpen ? 260 : 0, opacity: gradingOpen ? 1 : 0, transition: reduced ? 'none' : 'max-height .35s ease, opacity .3s ease' }}>
+            {gradingRows.map((g) => detailRow(g.label, g.value))}
+          </div>
+        </>
+      )}
+      {sectionBtn('Contract', contractOpen, () => setOpenSection(contractOpen ? 'none' : 'contract'), gradingRows.length === 0)}
+      <div style={{ overflow: 'hidden', maxHeight: contractOpen ? 120 : 0, opacity: contractOpen ? 1 : 0, transition: reduced ? 'none' : 'max-height .35s ease, opacity .3s ease' }}>
+        {detailRow('Blockchain', 'Solana')}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '7px 2px' }}>
+          <span style={{ fontSize: 13, color: '#7a8492' }}>Token ID</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: FONTS.mono, fontSize: 12, fontWeight: 600 }}>{shortAddr}</span>
+            <button onClick={handleCopy} title="Copy address"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 7,
+                border: `1px solid ${copied ? COLORS.green : 'rgba(255,255,255,.14)'}`,
+                background: 'rgba(255,255,255,.04)', color: copied ? COLORS.green : '#cdd4dd',
+                cursor: 'pointer', fontFamily: FONTS.body, fontSize: 11, fontWeight: 600,
+              }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+
+  const ccLink = (
+    <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
+      style={{ marginTop: 10, fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.06em', color: '#c9b3f0', textDecoration: 'none' }}>
+      View on CollectorCrypt ↗
+    </a>
+  )
+
+  // Quedarse la carta no dispara nada —ya está en el vault—, así que "Keep and Continue" cierra
+  // directamente en vez de pedir una confirmación de más.
+  const continueLabel = !single ? 'Next pack →' : sold ? 'Continue →' : 'Keep and Continue'
+  const action = (
+    <div style={{ marginTop: wide ? 'auto' : 18, paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <button onClick={onNext}
+        style={{
+          width: '100%', padding: '13px 0', borderRadius: 12, border: 0, cursor: 'pointer', fontFamily: FONTS.display,
+          fontSize: 14, fontWeight: 700, color: '#1a0a2e',
+          background: 'linear-gradient(135deg,#ff5c98,#b84ef0)', boxShadow: '0 0 22px -6px rgba(184,78,240,.8)',
+        }}>{continueLabel}</button>
+      {sellErr && <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.red, textAlign: 'center' }}>{sellErr}</div>}
+    </div>
+  )
+
+  const info = (
+    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: wide ? undefined : 1 }}>
+      {header}
+      <div style={{ fontSize: wide ? 27 : 21, fontWeight: 700, letterSpacing: '-.01em', lineHeight: 1.15, marginTop: 12 }}>
+        {result.name ?? 'Unknown Card'}
+      </div>
+      {valueBlock}
+      {sections}
+      {ccLink}
+      {action}
+    </div>
+  )
+
+  if (!wide) {
+    return (
+      <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {hero}
+        {thumbs && <div style={{ display: 'flex', justifyContent: 'center' }}>{thumbs}</div>}
+        {info}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      height: '100%', padding: 26, display: 'grid', gap: 20,
+      gridTemplateColumns: `${images.length > 1 ? '64px ' : ''}340px 1fr`,
+    }}>
+      {thumbs}
+      {hero}
+      {info}
     </div>
   )
 }
