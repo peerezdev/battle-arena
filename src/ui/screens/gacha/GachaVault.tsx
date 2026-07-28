@@ -1202,18 +1202,36 @@ function CardDetailsView({
 
   // En móvil el sello se acorta a "Authentic": a 390px la frase entera empujaba la píldora de
   // rareza a una segunda línea y la cabecera se comía la altura de la carta.
+  const authBadge = (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6, fontSize: wide ? 13 : 12, fontWeight: 600, color: COLORS.green }}>
+      <svg width={wide ? 15 : 14} height={wide ? 15 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></svg>
+      {wide ? 'Guaranteed authenticity' : 'Authentic'}
+    </span>
+  )
+  const vaultedLink = (
+    <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: wide ? 6 : 5, fontSize: wide ? 12 : 11, fontWeight: 600, color: '#c9b3f0', textDecoration: 'none' }}>
+      <svg width={wide ? 13 : 12} height={wide ? 13 : 12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="7" width="16" height="13" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>
+      Vaulted by CollectorCrypt
+    </a>
+  )
+
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: wide ? 10 : 8, flexWrap: 'wrap' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6, fontSize: wide ? 13 : 12, fontWeight: 600, color: COLORS.green }}>
-        <svg width={wide ? 15 : 14} height={wide ? 15 : 14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></svg>
-        {wide ? 'Guaranteed authenticity' : 'Authentic'}
-      </span>
-      <span style={{ width: 1, height: wide ? 13 : 12, background: 'rgba(255,255,255,.15)' }} />
-      <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: wide ? 6 : 5, fontSize: wide ? 12 : 11, fontWeight: 600, color: '#c9b3f0', textDecoration: 'none' }}>
-        <svg width={wide ? 13 : 12} height={wide ? 13 : 12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="7" width="16" height="13" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>
-        Vaulted by CollectorCrypt
-      </a>
+      {wide ? (
+        <>
+          {authBadge}
+          <span style={{ width: 1, height: 13, background: 'rgba(255,255,255,.15)' }} />
+          {vaultedLink}
+        </>
+      ) : (
+        // En móvil los dos sellos se apilan: en una línea, "Vaulted by CollectorCrypt" apretaba
+        // la píldora de rareza contra el borde y no quedaba aire entre las tres cosas.
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5 }}>
+          {authBadge}
+          {vaultedLink}
+        </span>
+      )}
       <span style={{
         marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: wide ? 7 : 6,
         padding: wide ? '6px 13px' : '5px 11px', borderRadius: wide ? 9 : 8,
