@@ -207,6 +207,9 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+      // La franja de rareza se pasa de largo a propósito para llegar a los dos bordes; es esta
+      // caja la que la recorta, y por eso va de lado a lado del escenario y no más allá.
+      position: 'relative', overflow: 'hidden',
       borderRadius: 16, minHeight: H + 88, padding: 'clamp(16px,2vw,24px)',
       background: 'radial-gradient(60% 90% at 50% 40%,rgba(0,255,196,.08),transparent 70%)', border: `1px solid ${COLORS.border}`,
     }}>

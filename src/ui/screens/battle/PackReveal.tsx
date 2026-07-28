@@ -268,7 +268,7 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
       </div>
 
       {/* card stage */}
-      <div style={{ width: cardW, height: cardH }}>
+      <div style={{ width: cardW, height: cardH, position: 'relative', overflow: 'hidden' }}>
         {roundReady && currentCard ? (
           <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
             reduced={reducedMotion} width={cardW} height={cardH}
@@ -339,7 +339,7 @@ function MiniPanel({ player, name, round, roundReady, shownRounds, isHot, isWinn
 
       {/* card stage */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: cardW, height: cardH }}>
+        <div style={{ width: cardW, height: cardH, position: 'relative', overflow: 'hidden' }}>
           {roundReady && currentCard ? (
             <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
               reduced={reducedMotion} width={cardW} height={cardH}

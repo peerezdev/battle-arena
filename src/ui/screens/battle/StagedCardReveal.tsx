@@ -5,6 +5,7 @@ import { rarityColor } from './RevealCard'
 import { CardBack } from './CardBack'
 import { RarityBand } from './RarityBand'
 import { STACK_T, BAND_T, EPIC_SPIN_DEG, FLIP_MS, bandRarity, bandColorFor } from './revealTiming'
+import { playEpicSpin } from '../../sfx'
 
 type Stage = 'year' | 'grade' | 'rarity' | 'card'
 
@@ -67,6 +68,9 @@ export function StagedCardReveal({
 
   /** Guion de la franja, común a los dos modos. `rarityAt` es cuándo se lee la rareza. */
   const bandSchedule = (rarityAt: number, at: (ms: number, fn: () => void) => void, land: () => void) => {
+    // El sonido arranca CON la rareza, antes de que entre la franja: así el audio va por delante
+    // de la imagen y la franja cae dentro del sonido. Solo Epic.
+    if (bandKey === 'epic') at(rarityAt, playEpicSpin)
     at(rarityAt + BAND_T.band, () => setBand('in'))
     if (bandKey === 'epic') {
       // La franja se va AL RITMO del giro: las dos cosas arrancan en el mismo instante.

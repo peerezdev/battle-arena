@@ -138,6 +138,8 @@ function Stage({ activePlayer, activeName, isOpening, stagingCard, revealKey, re
   return (
     <div style={{
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      // Recorta la franja de rareza, que se pasa de largo para llegar a los dos bordes.
+      position: 'relative', overflow: 'hidden',
       gap: 14, padding: '14px 10px', borderRadius: 16, border: `1px solid ${COLORS.border}`,
       background: 'radial-gradient(80% 60% at 50% 40%,rgba(0,255,196,.08),transparent 70%)',
     }}>

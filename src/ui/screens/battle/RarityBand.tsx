@@ -43,13 +43,14 @@ export function RarityBand({ label, color, w, h, phase, turnMs, reduced }: {
         animation: reduced ? 'none' : 'ba-bandRing .8s .14s cubic-bezier(.1,.7,.3,1) forwards',
       }} />
 
+      {/* 200vw: la franja tiene que llegar a los dos bordes de CUALQUIER escenario, así que se
+          pasa de largo a propósito y es el escenario el que la recorta (overflow:hidden). */}
       <span style={{
-        position: 'absolute', left: '-80%', width: '260%', height: bandH,
+        position: 'absolute', left: '50%', width: '200vw', transform: 'translateX(-50%)', height: bandH,
         background: 'linear-gradient(180deg,#0a0d13,#141b2b 48%,#080b11)',
         borderTop: `2px solid ${color}`, borderBottom: `2px solid ${color}`,
         boxShadow: `0 0 44px -6px ${color}, inset 0 0 40px -14px ${color}`,
         display: 'grid', placeItems: 'center',
-        transform: reduced ? 'none' : 'scaleY(.06)',
         animation: reduced ? 'none' : 'ba-bandOpen .5s cubic-bezier(.15,.9,.2,1) forwards',
       }}>
         <span style={{

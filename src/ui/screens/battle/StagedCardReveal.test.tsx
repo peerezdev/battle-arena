@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
+const playEpicSpin = vi.fn()
+vi.mock('../../sfx', () => ({ playEpicSpin: () => playEpicSpin() }))
 import { StagedCardReveal } from './StagedCardReveal'
 import { STACK_T, BAND_T } from './revealTiming'
 
@@ -143,5 +145,45 @@ describe('StagedCardReveal · franja de rareza', () => {
 
     act(() => { vi.advanceTimersByTime(6000) })
     expect(screen.getByText('THE CARD')).toBeTruthy()
+  })
+})
+
+describe('StagedCardReveal · sonido de Epic', () => {
+  beforeEach(() => { vi.useFakeTimers(); playEpicSpin.mockClear() })
+  afterEach(() => vi.useRealTimers())
+
+  const play = (rarity: string) => render(
+    <StagedCardReveal year="2010" grade="PSA 10" rarity={rarity} reduced={false} stacked>
+      <div>THE CARD</div>
+    </StagedCardReveal>,
+  )
+  const RARITY_AT = STACK_T.first + 2 * STACK_T.step + STACK_T.rarityExtra
+
+  it('suena CON la rareza, no con la franja', () => {
+    play('Epic')
+    act(() => { vi.advanceTimersByTime(RARITY_AT - 1) })
+    expect(playEpicSpin).not.toHaveBeenCalled()
+
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(playEpicSpin).toHaveBeenCalledTimes(1)   // en la rareza (1750), antes de la franja (2100)
+  })
+
+  it('solo Epic: ninguna otra rareza lo dispara', () => {
+    for (const r of ['Rare', 'Uncommon', 'Common']) {
+      playEpicSpin.mockClear()
+      play(r)
+      act(() => { vi.advanceTimersByTime(8000) })
+      expect(playEpicSpin, r).not.toHaveBeenCalled()
+    }
+  })
+
+  it('con reduced motion no suena: quien pide menos movimiento no quiere la ceremonia', () => {
+    render(
+      <StagedCardReveal year="2010" grade="PSA 10" rarity="Epic" reduced stacked>
+        <div>THE CARD</div>
+      </StagedCardReveal>,
+    )
+    act(() => { vi.advanceTimersByTime(8000) })
+    expect(playEpicSpin).not.toHaveBeenCalled()
   })
 })
