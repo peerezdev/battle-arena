@@ -162,7 +162,14 @@ export function CardPoolGrid({
           animate="show"
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(auto-fill, minmax(${wideCols ? 190 : 150}px, 1fr))`,
+            // Escritorio: el mínimo se mide contra el CONTENEDOR, no contra el viewport. Con el chat
+            // desplegado la columna del pool se queda en ~560px y un mínimo fijo de 190px sólo dejaba
+            // sitio para 2 cartas; el clamp baja el mínimo justo hasta lo que hace que entren 4
+            // (100% menos los 3 huecos, entre 4), sin pasar de 190px cuando sobra ancho —ahí sigue
+            // metiendo 5 o 6 como hasta ahora— ni bajar de 120px en contenedores muy estrechos.
+            gridTemplateColumns: wideCols
+              ? 'repeat(auto-fill, minmax(clamp(120px, (100% - 48px) / 4, 190px), 1fr))'
+              : 'repeat(auto-fill, minmax(150px, 1fr))',
             gap: wideCols ? 16 : 12,
           }}
         >
