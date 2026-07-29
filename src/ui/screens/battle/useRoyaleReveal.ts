@@ -52,6 +52,27 @@ export function tiedLosers(vm: RevealVM, round: number): string[] {
   return totals.filter((x) => x.t === min).map((x) => x.w)
 }
 
+/**
+ * Por dónde va la partida AHORA MISMO, en (ronda, carta). Sirve para engancharse al directo en
+ * vez de repetir desde el principio: una royale de 10 son ~6 minutos de ceremonia y el servidor
+ * la genera en mucho menos, así que entrar en la ronda 6 y arrancar en la 1 no es ver el directo
+ * con retraso — es ver una repetición que nunca alcanza el presente.
+ *
+ * `card` es cuántas cartas de esa ronda YA están registradas, o sea la siguiente que animar.
+ */
+export function liveEdge(vm: RevealVM): { round: number; card: number } {
+  let edge = { round: 1, card: 0 }
+  for (const r of vm.rounds) {
+    const order = revealOrderWallets(vm, r.roundNumber)
+    // El PREFIJO, no el total: las cartas se enseñan en orden de asiento, así que si la del
+    // primero aún no ha resuelto el borde sigue en él aunque el de detrás ya tenga la suya.
+    let n = 0
+    while (n < order.length && r.cards.find((c) => c.wallet === order[n])?.nftAddress) n++
+    if (n > 0) edge = { round: r.roundNumber, card: n }
+  }
+  return edge
+}
+
 // Project the full VM down to what has been revealed at cursor (round, card).
 /**
  * `completeRound=false` proyecta las cartas de la ronda en curso pero NO aplica su eliminación.
@@ -92,8 +113,12 @@ export function useRoyaleReveal(
   vm: RevealVM,
   { reducedMotion, onComplete }: { reducedMotion: boolean; onComplete?: () => void },
 ): RoyaleRevealState {
-  const [round, setRound] = useState(1)
-  const [card, setCard] = useState(0)
+  // Al ENTRAR en una partida ya empezada se arranca en su borde en vivo. Solo con 'running':
+  // una terminada que te perdiste tiene que reproducirse entera desde el principio, que es para
+  // lo que está el modal de "te las perdiste". El inicializador es perezoso a propósito — corre
+  // una vez, así que los polls posteriores no vuelven a mover el cursor.
+  const [round, setRound] = useState(() => (vm.status === 'running' ? liveEdge(vm).round : 1))
+  const [card, setCard] = useState(() => (vm.status === 'running' ? liveEdge(vm).card : 0))
   const [phase, setPhase] = useState<RevealPhase>('revealing')
   const [countdown, setCountdown] = useState(COUNTDOWN_FROM)
   // La carta en el escenario ya está de cara: cuenta en la tabla aunque el cursor siga en ella.

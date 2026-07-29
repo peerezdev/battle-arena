@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useRoyaleReveal, project, revealOrderWallets, totalRounds, tiedLosers, ELIM_BEAT_MS, ELIM_SHOW_MS } from './useRoyaleReveal'
+import { useRoyaleReveal, project, revealOrderWallets, totalRounds, tiedLosers, liveEdge, ELIM_BEAT_MS, ELIM_SHOW_MS } from './useRoyaleReveal'
 import { spinDurationMs } from './royaleShared'
 import type { RevealVM, RevealCardVM } from './battleReveal'
 
@@ -303,5 +303,53 @@ describe('la tabla se mueve al quedar la carta de cara, no al pasar a la siguien
     act(() => { result.current.onCardShown() })
     act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
     expect(result.current.phase).toBe('elimination')   // eso lo anuncia el cartel
+  })
+})
+
+describe('engancharse al directo', () => {
+  // vm3 en curso: ronda 1 entera registrada y la 2 a medias (solo A ha tirado).
+  const enCurso: RevealVM = {
+    ...vm3, status: 'running',
+    players: vm3.players.map((p) => ({ ...p, eliminatedRound: p.wallet === 'C' ? 1 : null })),
+    rounds: [
+      vm3.rounds[0],
+      { roundNumber: 2, eliminatedWallet: 'B', cards: [card('A', true, 200, 'nA2'), card('B', false, 60, null)] },
+    ],
+  }
+
+  it('liveEdge respeta el orden: no salta una tirada que aún no ha resuelto', () => {
+    // Ronda 2 con A resuelta y B no: el borde es (2, 1) —la siguiente que animar es la de B—.
+    // Si contara resueltas sueltas en vez del prefijo, una tirada lenta del primero haría
+    // saltársela y el jugador vería la de detrás antes que la suya.
+    // La ronda 2 existe pero solo A tiene carta: el borde es (2, 1), o sea "la siguiente que
+    // animar es la de B". Con (2, 2) se saltaría una tirada que aún no ha ocurrido.
+    expect(liveEdge(enCurso)).toEqual({ round: 2, card: 1 })
+  })
+
+  it('una partida en curso ARRANCA en ese borde en vez de repetir desde el principio', () => {
+    const { result } = renderHook(() => useRoyaleReveal(enCurso, { reducedMotion: false, onComplete: vi.fn() }))
+    expect(result.current.revealRound).toBe(2)
+    // B es la que toca ahora, no la ronda 1. Su tirada aún no ha resuelto → sale como "opening".
+    expect(result.current.openingWallet).toBe('B')
+  })
+
+  it('una partida TERMINADA sigue reproduciéndose entera: es la que te perdiste', () => {
+    const { result } = renderHook(() => useRoyaleReveal(vm3, { reducedMotion: false, onComplete: vi.fn() }))
+    expect(result.current.revealRound).toBe(1)
+    expect(result.current.stagingWallet).toBe('A')
+  })
+
+  it('un poll posterior no vuelve a mover el cursor', () => {
+    // El inicializador es perezoso: si se recalculara en cada render, cada poll daría un salto
+    // hacia delante y el reveal iría a trompicones.
+    const { result, rerender } = renderHook(
+      ({ vm }) => useRoyaleReveal(vm, { reducedMotion: false, onComplete: vi.fn() }),
+      { initialProps: { vm: enCurso } },
+    )
+    expect(result.current.revealRound).toBe(2)
+    act(() => { result.current.onCardShown() })   // avanza a mano
+    const avanzado = { ...enCurso, rounds: [...enCurso.rounds] }
+    rerender({ vm: avanzado })
+    expect(result.current.revealRound).toBe(2)   // el poll no lo ha reseteado
   })
 })
