@@ -34,7 +34,7 @@ export function PotGain({ pot }: { pot: number }) {
       key={gain.id}   // remonta en cada subida: dos cartas seguidas reinician la animación
       aria-live="polite"
       style={{
-        fontFamily: FONTS.mono, fontSize: 12, fontWeight: 700, color: COLORS.green,
+        fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700, color: COLORS.green,
         whiteSpace: 'nowrap', pointerEvents: 'none',
         animation: `ba-potgain ${POT_GAIN_MS}ms ease-out forwards`,
       }}
