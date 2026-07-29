@@ -7,6 +7,7 @@ import type { YoloResult } from './pendingToResult'
 import { RarityBand } from '../battle/RarityBand'
 import { bandColorFor, EPIC_SPIN_DEG } from '../battle/revealTiming'
 import { playEpicSpin, playFlipThump, stopReveal } from '../../sfx'
+import { CardBack } from '../battle/CardBack'
 
 // Reveal del gacha: dorso con año, grado y rareza APILADOS, casilla de rareza tipo rodillo,
 // contador de valor y volteo final.
@@ -133,11 +134,18 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
           transform: spinning ? `rotateY(-${EPIC_SPIN_DEG - 180}deg)` : flipped ? 'rotateY(0)' : 'rotateY(180deg)',
           transition: `transform ${tl.turnMs}ms ${spinning ? 'cubic-bezier(.45,0,.95,.5)' : 'cubic-bezier(.4,0,.2,1)'}`,
         }}>
-          <div style={{
-            position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 10,
-            transform: 'rotateY(180deg)', border: '1px solid #ffffff1a',
-            background: 'repeating-linear-gradient(45deg,#141a26 0 8px,#101620 8px 16px)',
-          }} />
+          {/* Dorso: la misma tapa que las batallas —negro con el logo en gris—, para que las
+              tres pantallas enseñen la misma carta mientras no se sabe qué hay debajo. */}
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+            <CardBack width={CARD_W} height={CARD_H} accent={color} quietMark />
+          </div>
+          {/* Mientras GIRA lleva la tapa y no la carta: en un giro de varias vueltas esta cara
+              pasa por delante cada media vuelta, y con la carta de verdad sería un spoiler. */}
+          {spinning && !flipped && (
+            <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', zIndex: 2 }}>
+              <CardBack width={CARD_W} height={CARD_H} accent={color} strong />
+            </div>
+          )}
           <div style={{
             position: 'absolute', inset: 0, backfaceVisibility: 'hidden', borderRadius: 10,
             overflow: 'hidden', background: COLORS.panel2, border: `1px solid ${color}66`,

@@ -237,7 +237,11 @@ export function StagedCardReveal({
             veces, y si no está montada se ven huecos en lugar de la carta. */}
         {(onCard || spinning) && (
           <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', display: 'flex', justifyContent: 'center' }}>
-            {children}
+            {/* Mientras GIRA, esta cara lleva la tapa y no la carta: en un giro de varias vueltas
+                la cara delantera pasa por delante del jugador cada media vuelta, y con la carta
+                de verdad el giro destriparía lo que va a salir. Se cambia al aterrizar, que es
+                cuando la carta está quieta y de cara. */}
+            {onCard ? children : <CardBack width={width} height={height} accent={backAccent} strong={lit && !isCommon} />}
           </div>
         )}
       </motion.div>
