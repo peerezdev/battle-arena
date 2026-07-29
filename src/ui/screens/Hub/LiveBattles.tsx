@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { useIsWide } from '../../useIsWide'
 import { useMachineList } from '../../useMachines'
@@ -57,6 +57,10 @@ const MODE_LABEL: Record<BattleMode, string> = {
 }
 
 const FILTERS = ['All', 'Ready to join', 'Mine', 'Recent']
+// 'Recent' es el único que enseña partidas TERMINADAS; los tres de antes miran a las que siguen
+// en juego. Una rayita delante lo agrupa: el filtro que cambia de tiempo verbal no debería
+// parecer uno más de la fila.
+const FINISHED_FILTER = FILTERS.indexOf('Recent')
 
 // Which battles each filter shows. Status is absent on legacy/open-only rows → treated as an
 // open lobby. All = live or not-yet-started; Ready = joinable & not already in; Mine = created
@@ -191,8 +195,14 @@ export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel
         }}
       >
         {FILTERS.map((f, i) => (
+          <Fragment key={f}>
+            {i === FINISHED_FILTER && (
+              <span aria-hidden style={{
+                alignSelf: 'stretch', width: 1, margin: '4px 5px',
+                background: COLORS.border, flex: 'none',
+              }} />
+            )}
           <span
-            key={f}
             onClick={() => setActiveFilter(i)}
             style={{
               fontSize: 12,
@@ -208,6 +218,7 @@ export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel
           >
             {f}
           </span>
+          </Fragment>
         ))}
       </div>
 
