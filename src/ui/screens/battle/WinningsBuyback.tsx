@@ -258,7 +258,9 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
             cursor: pending.length && !busy ? 'pointer' : 'not-allowed', opacity: pending.length && !busy ? 1 : 0.5,
             background: GRADIENT, color: '#06080b', fontFamily: FONTS.display, fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap',
           }}>
-            {busy ? 'Selling…' : pending.length ? `Sell ${pending.length}` : 'Select to sell'}
+            {/* El importe y no el número de cartas: lo que se decide aquí es cuánto USDC entra,
+                y "Sell 3" obligaba a sumar de cabeza las tres cifras de las cartas marcadas. */}
+            {busy ? 'Selling…' : pending.length ? `Sell · ~${formatUsd(pendingUsd)}` : 'Select to sell'}
           </button>
         </div>
       )}

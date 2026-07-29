@@ -43,7 +43,7 @@ describe('WinningsBuyback', () => {
     render(<WinningsBuyback cards={[card('a'), card('b')]} winnerWallet="W" lootTotal={120} />)
     await waitFor(() => expect(fetchBuybackAvailable).toHaveBeenCalled())
     fireEvent.click(screen.getByText('Sell all'))
-    fireEvent.click(await screen.findByText(/Sell 2/))
+    fireEvent.click(await screen.findByText(/Sell · ~\$100/))   // dos cartas a $50
     await waitFor(() => expect(requestBuyback).toHaveBeenCalledTimes(2))
     expect(submitTx).toHaveBeenCalledTimes(2)
     await waitFor(() => expect(screen.getAllByText(/SOLD/).length).toBe(2))
@@ -58,7 +58,8 @@ describe('WinningsBuyback', () => {
     expect(screen.getAllByText('Keep')).toHaveLength(2)
     expect(screen.getAllByText('Sell')).toHaveLength(2)
     fireEvent.click(screen.getAllByText('Sell')[0]!)
-    expect(await screen.findByText(/Sell 1/)).toBeTruthy()   // solo la pulsada
+    // El botón dice el DINERO, no el número: una sola carta marcada → sus $50.
+    expect(await screen.findByText(/Sell · ~\$50/)).toBeTruthy()
   })
 
   it('una carta que CC no compra lo dice y no se puede meter en el lote', async () => {
@@ -75,7 +76,7 @@ describe('WinningsBuyback', () => {
 
     // "Sell all" tampoco la arrastra: el lote queda en 1, no en 2.
     fireEvent.click(screen.getByText('Sell all'))
-    expect(await screen.findByText(/Sell 1/)).toBeTruthy()
+    expect(await screen.findByText(/Sell · ~\$50/)).toBeTruthy()
   })
 
   it('renders nothing when there are no cards', () => {
