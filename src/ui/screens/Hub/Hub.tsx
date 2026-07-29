@@ -23,10 +23,10 @@ export function Hub() {
       <div style={{ padding: '24px clamp(16px,3vw,32px) 0', display: 'flex', flexDirection: 'column', gap: 26 }}>
         <Banner
           kicker="01 · BATTLE ROYALE"
-          titlePlain="10 players in."
-          titleAccent="1 walks out with everything."
-          body="9 rounds of graded-card warfare. The pot grows every round — 54 cards by the end — and the last one standing takes it ALL. One game per day. Don't miss your spot."
-          cta="Enter the Royale →"
+          titlePlain="The first-ever NFT Battle Royale"
+          titleAccent=" powered by real graded cards is here..."
+          body="If you've only been into TCGs for two days, this isn't for you."
+          cta="See how it works →"
           to={NAV_ROUTES.royale}
           badge="● LIVE ROYALE"
           accent="#ff2e7e"
