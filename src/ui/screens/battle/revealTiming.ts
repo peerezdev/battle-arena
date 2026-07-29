@@ -12,15 +12,15 @@ import { COLORS } from '../../theme'
 //                                      └─ resto: [voltea] ──plainTurn──▶ de cara
 //                                                                        └─ ──hold──▶ siguiente
 export const PHASE = {
-  year: 500,        // la fila del año, sola en pantalla
-  grade: 500,       // luego el grado
-  rarity: 750,      // luego la rareza: dura más porque es la que remata
-  band: 350,        // la franja entra y se sostiene antes de que la carta se mueva
+  year: 800,        // la fila del año, sola en pantalla
+  grade: 800,       // luego el grado
+  rarity: 800,      // luego la rareza: dura más porque es la que remata
+  band: 600,        // la franja entra y se sostiene antes de que la carta se mueva
   epicWait: 600,    // Epic: lo que espera con la franja puesta antes de arrancar a girar
   epicTurn: 1800,   // Epic: lo que tarda el giro en dejarla de cara
   rareTurn: 800,    // Rare: lo que dura su volteo
   plainTurn: 1000,  // Common y Uncommon: lo que dura su volteo (no llevan franja)
-  hold: 1000,       // lo que se queda la carta de cara antes de pasar a la siguiente
+  hold: 1800,       // lo que se queda la carta de cara antes de pasar a la siguiente
 }
 
 /** Vueltas del giro de Epic. 1980° ≡ 180°, así que aterriza de cara sin salto. */
