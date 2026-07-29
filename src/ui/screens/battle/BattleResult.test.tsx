@@ -87,7 +87,7 @@ describe('BattleResult', () => {
     expect(box.style.background).not.toContain(GREEN)
   })
 
-  it('desktop: shows the ×N return, the standings margin, and suggests the fullest open lobby', () => {
+  it('desktop: shows the ×N return and suggests the fullest open lobby', () => {
     mocks.wide = true
     mocks.open = [
       // roomier lobby — should lose to the one closest to starting
@@ -97,7 +97,7 @@ describe('BattleResult', () => {
     render(<MemoryRouter><BattleResult vm={{ ...baseVm, entry: 50 }} battleId="b1" onExit={() => {}} /></MemoryRouter>)
     expect(screen.getByText('FINAL STANDINGS')).toBeTruthy()
     expect(screen.getByText(/×4\.0 return/)).toBeTruthy()        // loot 200 / entry 50
-    expect(screen.getByText(/\+\$120 over #2/)).toBeTruthy()     // 160 − 40
+    // La fila de MARGIN ("+$120 over #2") se quitó del panel: ya no se afirma.
     expect(screen.getByText('3/4')).toBeTruthy()                 // fewest free seats wins
     expect(screen.getByText('ENTRY')).toBeTruthy()               // money pills
     expect(screen.getByText('EST. POT')).toBeTruthy()

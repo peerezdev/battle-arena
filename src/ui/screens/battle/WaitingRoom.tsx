@@ -37,8 +37,10 @@ function machineImg(m: GachaMachine | undefined): string | null {
 interface PoolState { cards: MachineCard[]; page: number; loading: boolean; error: boolean; done: boolean }
 
 export function WaitingRoom({
-  battle, meWallet, onJoinSelf, onJoinBot, onJoinAllBots, onCancel, onExit, onBack,
-  joiningSelf, joiningBot, joiningAll, botError, cancelError,
+  // onJoinBot / joiningBot siguen en el tipo —los callers los pasan— pero no se leen:
+  // el botón de "+ Bot" está aparcado (ver más abajo). Se recuperan descomentándolo.
+  battle, meWallet, onJoinSelf, onJoinAllBots, onCancel, onExit, onBack,
+  joiningSelf, joiningAll, botError, cancelError,
 }: {
   battle: Battle
   meWallet: string | null
@@ -135,9 +137,9 @@ export function WaitingRoom({
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: accent, boxShadow: `0 0 8px ${accent}`, animation: 'wr-pulse 1.6s infinite' }} />
             {(isPB ? 'PACK BATTLE' : 'BATTLE ROYALE')} · {formatUsd(entry)}
           </span>
-          <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.12em', color: '#7a8492' }}>
+          {/* <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.12em', color: '#7a8492' }}>
             TABLE #{battle.id.slice(0, 4)}…{battle.id.slice(-4)} · WAITING FOR PLAYERS···
-          </span>
+          </span> */}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: wide ? `minmax(0,1fr) ${battle.max_players > 5 ? 448 : 330}px` : '1fr' }}>

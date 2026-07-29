@@ -42,7 +42,9 @@ describe('BattleFlow', () => {
   it('shows the waiting room in lobby', () => {
     mockUseBattle.mockReturnValue({ battle: { ...royaleRunning, status: 'lobby', pulls: [] }, loading: false, error: null })
     render(<BattleFlow />)
-    expect(screen.getByText(/waiting/i)).toBeTruthy()
+    // El rótulo con "WAITING FOR PLAYERS" se aparcó. La cabecera de la sala —modo + entrada—
+    // la identifica igual y no depende de si este jugador ya está sentado o no.
+    expect(screen.getByText(/BATTLE ROYALE ·/)).toBeTruthy()
   })
 
   it('Back in the lobby waiting room returns to the previous page (history back)', () => {

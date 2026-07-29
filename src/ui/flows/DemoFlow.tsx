@@ -21,7 +21,9 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 // Small persistent ribbon so it's unmistakable this is a simulation, not a real (funded) battle.
-function DemoBadge({ onExit }: { onExit: () => void }) {
+// Aparcado: su uso está comentado más abajo. Se exporta para conservarlo sin que el
+// build falle por "declarado y no usado".
+export function DemoBadge({ onExit }: { onExit: () => void }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px clamp(14px,2.4vw,28px)', borderBottom: `1px solid ${COLORS.border}`, background: 'rgba(255,46,151,.06)' }}>
       <span style={{ fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: '.16em', color: COLORS.violet, padding: '3px 9px', borderRadius: 7, background: 'rgba(255,46,151,.14)', border: `1px solid ${COLORS.violet}55` }}>DEMO</span>

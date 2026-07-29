@@ -40,7 +40,6 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
   // ── Desktop (≥1024px): hero + standings + next battle across the top, winnings below. ──
   if (wide) {
     const ret = vm.entry > 0 ? lootTotal / vm.entry : null
-    const margin = ranked.length > 1 ? ranked[0].total - ranked[1].total : null
     return (
       <div style={{ padding: 36, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1440, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr .9fr .7fr', gap: 20, alignItems: 'stretch' }}>
@@ -99,12 +98,6 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
                 </div>
               )
             })}
-            {margin != null && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: FONTS.mono, fontSize: 10, color: '#7d8794', paddingTop: 4 }}>
-                <span>MARGIN</span>
-                <span style={{ color: COLORS.green, fontWeight: 700 }}>+{formatUsd(margin)} over #2</span>
-              </div>
-            )}
           </div>
 
           {/* next battle */}
