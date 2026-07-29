@@ -42,8 +42,11 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   const liveBattles = battles
     .map((b) => openBattleToLive(b, meWallet))
     .filter((b) => b.mode === mode)
-  // The royale wide cards are join lobbies only — drop live/finished rows the /list feed now carries.
-  const royaleOpen = liveBattles.filter((b) => !b.battleStatus || b.battleStatus === 'lobby')
+  // Lobbies Y partidas en curso: una royale arrancada desaparecía de la sección entera —también
+  // para quien la estaba jugando—, y solo se volvía a ver en el modal de "te las perdiste". Las
+  // terminadas sí se quedan fuera: para esas está la tarjeta de recap. La card ya distingue el
+  // caso (`action: join | watch` y el estado "Live" en rojo).
+  const royaleOpen = liveBattles.filter((b) => !b.battleStatus || b.battleStatus === 'lobby' || b.battleStatus === 'running')
   // Recap card beside Quick Match. Royale page only, and only once a royale has actually finished.
   const lastRoyale = mode === 'royale' ? lastSettledRoyale(liveBattles) : null
 

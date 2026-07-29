@@ -1062,6 +1062,31 @@ def test_join_all_bots_fills_lobby_and_schedules_run(monkeypatch):
     assert run_called, "run_pack_battle_live was not scheduled after bots filled the lobby"
 
 
+def test_join_all_bots_announces_the_start(monkeypatch):
+    """Llenar el lobby con bots tiene que anunciar 'battle_start' como lo hace una entrada humana.
+
+    Regresión: /join-bot y /join-all-bots arrancaban la partida sin difundir nada, así que a los
+    humanos ya sentados no les llegaba el aviso — ni toast, ni forma de enterarse de que su
+    partida había empezado.
+    """
+    sent: list = []
+
+    async def _spy(self, msg):
+        sent.append(msg)
+
+    monkeypatch.setattr("app.chat.ConnectionManager.broadcast", _spy)
+    c, priv = _build_client(dev_endpoints_enabled=True)
+    _mock_battle_env(monkeypatch, bots=_BOTS_3, run_called=[])
+
+    battle_id = _create_pack(c, priv, max_players=4)
+    r = c.post(f"/pack-battles/{battle_id}/join-all-bots")
+    assert r.status_code == 200, r.text
+
+    starts = [m for m in sent if m.get("type") == "battle_start" and m.get("battle_id") == battle_id]
+    assert len(starts) == 1, f"esperaba un battle_start, llegaron: {[m.get('type') for m in sent]}"
+    assert len(starts[0]["players"]) == 4
+
+
 def test_join_all_bots_409_when_no_eligible_bots(monkeypatch):
     c, priv = _build_client(dev_endpoints_enabled=True)
     _mock_battle_env(monkeypatch, bots=[], run_called=[])  # no bots configured

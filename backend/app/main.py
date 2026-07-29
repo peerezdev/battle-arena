@@ -1193,6 +1193,10 @@ def create_app(session_factory, chain: ChainSource,
             reserve(s, bw, b.id, b.price)
             if filled:
                 _spawn(_run_bg(b.id))
+        # El aviso se difunde AQUÍ y no en cada endpoint: /join-bot y /join-all-bots se lo
+        # dejaban los dos, así que llenar un lobby con bots arrancaba la partida sin que a los
+        # humanos les llegara el 'battle_start' — ni toast ni forma de enterarse.
+        await _broadcast_join_event(s, b, bw, filled)
         return filled
 
     @app.post("/pack-battles/{battle_id}/join-bot")
