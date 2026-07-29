@@ -42,7 +42,7 @@ describe('RoyaleReveal', () => {
     expect(screen.getAllByText('You')).toHaveLength(2)                       // standings row + player chip
     expect(screen.getByText('STANDINGS')).toBeTruthy()                       // 1a standings sidebar rendered
     expect(document.querySelectorAll('[data-player-anchor]')).toHaveLength(2) // one chip per player (emote anchor)
-    expect(screen.getByText(/OUT · R1/)).toBeTruthy()                        // B marked out in its chip
+    expect(screen.getByText('OUT R1')).toBeTruthy()                          // sello rojo sobre la carta de B
   })
 
   it('champion loot shows uncommon+ cards and packs the commons (loser view)', () => {

@@ -322,7 +322,9 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
         return (
           <div key={p.wallet} data-player-anchor={p.wallet} style={{
             flex: '1 0 96px', minWidth: 0, padding: '9px 8px', borderRadius: 12, textAlign: 'center', lineHeight: 1.3,
-            opacity: out ? 0.55 : 1, transition: 'box-shadow .3s, border-color .3s',
+            // Un eliminado se apaga MUCHO: la fila de abajo es para seguir a quien sigue vivo, y
+            // con 0.55 los caídos competían igual por la mirada.
+            opacity: out ? 0.34 : 1, transition: 'box-shadow .3s, border-color .3s, opacity .4s',
             background: cur ? 'rgba(0,255,196,.08)' : 'rgba(255,255,255,.025)',
             border: `1px solid ${beat ? 'rgba(255,94,122,.6)' : cur ? 'rgba(0,255,196,.45)' : out ? 'rgba(255,46,126,.25)' : COLORS.border}`,
             boxShadow: beat ? '0 0 30px -12px rgba(255,94,122,.8)' : cur ? '0 0 24px -12px rgba(0,255,196,.7)' : 'none',
@@ -331,12 +333,30 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
               <span style={{ flex: 'none', width: 16, height: 16, borderRadius: '50%', background: tintFor(p.wallet) }} />
               <span style={{ fontSize: 10.5, fontWeight: 600, color: p.isMe ? COLORS.green : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
             </div>
-            <ChipCardBox latest={latest} cur={cur} hasPull={hasPull} />
+            <div style={{ position: 'relative' }}>
+              {/* La carta del caído se difumina y pierde el color: sigue ahí, pero deja de
+                  pedir atención. El sello va ENCIMA para que se lea de un vistazo cuál de
+                  los diez ha caído, sin tener que buscar una línea de texto debajo. */}
+              <div style={{
+                filter: out ? 'blur(2.5px) grayscale(.85)' : 'none',
+                transition: 'filter .4s ease-out',
+              }}>
+                <ChipCardBox latest={latest} cur={cur} hasPull={hasPull} />
+              </div>
+              {out && (
+                <span style={{
+                  position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%) rotate(-8deg)',
+                  fontFamily: FONTS.mono, fontSize: 11, fontWeight: 800, letterSpacing: '.08em',
+                  color: '#ff5e7a', whiteSpace: 'nowrap', padding: '3px 7px', borderRadius: 6,
+                  background: 'rgba(10,6,9,.82)', border: '1px solid rgba(255,94,122,.75)',
+                  textShadow: '0 0 12px rgba(255,94,122,.9)', pointerEvents: 'none',
+                }}>
+                  OUT R{p.eliminatedRound}
+                </span>
+              )}
+            </div>
             <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 700, color: cur ? COLORS.green : hasPull ? COLORS.green : '#4a525e' }}>
               {cur ? '···' : hasPull ? formatUsd(latest!.insuredValue ?? 0) : '—'}
-            </div>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700, color: '#ff6ba4', minHeight: 12 }}>
-              {out ? `OUT · R${p.eliminatedRound}` : ''}
             </div>
           </div>
         )
