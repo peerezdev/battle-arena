@@ -1,0 +1,47 @@
+[Unit]
+Description=BattleArena backend (FastAPI, mainnet)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=battlearena
+Group=battlearena
+
+# WorkingDirectory OBLIGATORIO: backend/app/config.py lee .env con ruta relativa, y
+# DATABASE_URL=sqlite:///battlearena.mainnet.db también es relativo al cwd.
+WorkingDirectory=/srv/battlearena/backend
+
+# APP_NETWORK=mainnet hace que get_settings() cargue .env + .env.mainnet (en ese orden).
+Environment=APP_NETWORK=mainnet
+Environment=PRICING_SOURCE=collectorcrypt
+Environment=PYTHONUNBUFFERED=1
+
+# UN SOLO worker, siempre. El backend guarda estado en memoria por proceso (rate-limits,
+# el asyncio.Lock que serializa los buy-ins, el set de WebSockets del chat) y tareas de
+# fondo con asyncio.create_task. Con dos workers habría doble settle de USDC real.
+#
+# --proxy-headers + --forwarded-allow-ips: sin esto, detrás de Caddy toda petición parece
+# venir de 127.0.0.1 y los logs (y cualquier límite por IP) serían inútiles.
+ExecStart=/srv/battlearena/backend/.venv/bin/uvicorn app.main:app \
+	--host 127.0.0.1 --port 9190 \
+	--proxy-headers --forwarded-allow-ips 127.0.0.1
+
+Restart=always
+RestartSec=3
+# Al arrancar, _resume_orphaned_battles termina o anula+reembolsa las batallas que
+# quedaron a medias. Dale margen para cerrar conexiones antes de matarlo.
+TimeoutStopSec=30
+
+# Hardening. ReadWritePaths cubre la SQLite (+ sus -wal/-journal), que vive en el cwd.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/battlearena/backend
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

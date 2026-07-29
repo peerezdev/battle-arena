@@ -1,0 +1,67 @@
+# BattleArena — mainnet. Un solo origen para SPA + backend + oráculo.
+#
+# Reproduce el proxy de vite.config.ts en producción: las rutas del backend van a :9190,
+# el resto sirve el SPA. Sustituye battlearena.tld por tu dominio y pon tu email en el
+# bloque global (Let's Encrypt te avisa si un certificado va a caducar sin renovarse).
+
+{
+	email tu-email@ejemplo.com
+}
+
+battlearena.tld {
+	root * /srv/battlearena/dist
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# --- Backend (:9190) ------------------------------------------------------
+	# Espejo de `backendProxy` en vite.config.ts. El matcher `not header Accept *text/html*`
+	# es el equivalente al `htmlBypass`: /leaderboard es a la vez ruta del SPA y del backend,
+	# así que una NAVEGACIÓN (Accept: text/html, p.ej. recargar la URL) sirve la app y una
+	# llamada fetch/XHR pasa al backend. Si añades rutas al backend, añádelas aquí también.
+	@api {
+		path /gacha /gacha/* /pack-battles /pack-battles/* /emotes /emotes/* \
+			/wallet /wallet/* /auth /auth/* /users /users/* /matches /matches/* \
+			/elo /elo/* /leaderboard /leaderboard/* /health
+		not header Accept *text/html*
+	}
+	handle @api {
+		reverse_proxy 127.0.0.1:9190
+	}
+
+	# WebSocket: chat de lobby y eventos en vivo. Caddy negocia el upgrade solo.
+	handle /ws* {
+		reverse_proxy 127.0.0.1:9190
+	}
+
+	# --- Oráculo (:8787) ------------------------------------------------------
+	# Lo llama el NAVEGADOR (src/onchain/oracleClient.ts), no solo el backend: /attest y
+	# /pubkey tienen que ser públicos. Al ir por el mismo origen no hace falta CORS ni
+	# exponer el puerto 8787. /health NO se enruta aquí (es del backend); para vigilar el
+	# oráculo usa curl a 127.0.0.1:8787/health desde la propia máquina.
+	handle /attest* {
+		reverse_proxy 127.0.0.1:8787
+	}
+	handle /pubkey* {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	# --- SPA ------------------------------------------------------------------
+	# Los assets de Vite llevan hash en el nombre → cacheables para siempre.
+	# index.html nunca se cachea, o un deploy no llegaría a los navegadores abiertos.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	@html path / /index.html
+	header @html Cache-Control "no-cache"
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

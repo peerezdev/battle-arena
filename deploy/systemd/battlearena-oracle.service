@@ -1,0 +1,38 @@
+[Unit]
+Description=BattleArena oracle (atestaciones ed25519 de valor de carta)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=battlearena
+Group=battlearena
+WorkingDirectory=/srv/battlearena/oracle
+
+Environment=PRICING_SOURCE=collectorcrypt
+Environment=PYTHONUNBUFFERED=1
+# La clave vive FUERA del repo. En /var/lib (no /etc) a propósito: keys.py hace chmod 600
+# en cada carga, y ProtectSystem=strict monta /etc en solo lectura → el chmod fallaría.
+Environment=ORACLE_KEY_PATH=/var/lib/battlearena/oracle_key.json
+# Rate limit por IP de /attest. Súbelo si ves 429 con varias cartas por batalla; requiere
+# --proxy-headers (abajo) para que la IP sea la real del jugador y no la de Caddy.
+Environment=RATE_LIMIT_PER_MIN=120
+
+ExecStart=/srv/battlearena/oracle/.venv/bin/uvicorn app.main:app \
+	--host 127.0.0.1 --port 8787 \
+	--proxy-headers --forwarded-allow-ips 127.0.0.1
+
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/battlearena
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
