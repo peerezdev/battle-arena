@@ -8,8 +8,9 @@ import { COLORS, FONTS } from '../../theme'
  *
  *  `accent` tiñe el borde y el halo (la rareza ya se ha anunciado con la franja, así que el color
  *  no destripa nada), `label` pone un estado abajo ("opening…") y `strong` sube el halo.
- *  `quietMark` esconde el logo: el reveal apilado escribe tres líneas por el centro de la carta
- *  y el logo chocaba con la de en medio. */
+ *  `quietMark` NO lo esconde: lo baja a marca de agua. El reveal escribe año, grado y rareza por
+ *  el centro de la carta, así que ahí el logo va más grande, muy tenue y por DEBAJO del texto —la
+ *  carta se sigue reconociendo como la misma por las dos caras sin pelearse con lo que se lee. */
 export function CardBack({ width, height, accent, label, strong = false, quietMark = false }: {
   width: number; height: number; accent: string; label?: string; strong?: boolean; quietMark?: boolean
 }) {
@@ -27,18 +28,20 @@ export function CardBack({ width, height, accent, label, strong = false, quietMa
       transition: 'border-color .35s ease, box-shadow .35s ease',
     }}>
       <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(135deg,#ffffff08 0 2px,transparent 2px 11px)' }} />
-      {!quietMark && (
-        <img
-          src="/logo-rail.png" alt="" aria-hidden
-          style={{
-            // En escala de grises y a media opacidad: es una marca de agua, no un adorno con
-            // color propio que compita con el acento de la rareza.
-            width: Math.round(Math.min(width, height) * 0.44), height: 'auto',
-            filter: 'grayscale(1) brightness(1.5) contrast(.85)',
-            opacity: 0.55, zIndex: 1, userSelect: 'none', pointerEvents: 'none',
-          }}
-        />
-      )}
+      <img
+        src="/logo-rail.png" alt="" aria-hidden
+        style={{
+          // En escala de grises: es una marca, no un adorno con color propio que compita con el
+          // acento de la rareza.
+          filter: 'grayscale(1) brightness(1.5) contrast(.85)',
+          userSelect: 'none', pointerEvents: 'none', height: 'auto',
+          ...(quietMark
+            // Detrás del texto del reveal: más grande y casi transparente, como una filigrana.
+            ? { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                width: Math.round(Math.min(width, height) * 0.62), opacity: 0.14, zIndex: 0 }
+            : { width: Math.round(Math.min(width, height) * 0.44), opacity: 0.55, zIndex: 1 }),
+        }}
+      />
       {label && (
         <div style={{ position: 'absolute', bottom: 12, fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted, zIndex: 1 }}>{label}</div>
       )}
