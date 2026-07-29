@@ -580,3 +580,44 @@ async def test_run_royale_no_fee_deps_no_fee_call(session, monkeypatch):
 
     assert out == "settled"
     assert calls == []
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# La partida se cierra ANTES de la custodia
+#
+# Regresión de una partida real que se quedó 2h+ en 'running': el reveal había
+# terminado (9/9 rondas) pero las cartas no confirmaban en el escrow, y como el
+# status se escribía DESPUÉS de moverlas, el jugador veía la partida congelada
+# mientras por dentro se reintentaba ~3,7 min por carta.
+# ════════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+async def test_settled_before_moving_the_cards(session):
+    """Al entrar en el traspaso, la batalla ya tiene que estar cerrada y con ganador."""
+    values = {("A", 1): 10, ("B", 1): 20}
+    _mk(session, "r-order", ["A", "B"])
+    fakes = _std_fakes()
+
+    visto = {}
+
+    async def confirm_lento(esc, mint):
+        # Se mira el estado JUSTO cuando empieza la parte lenta (mover cartas).
+        b = session.get(PackBattle, "r-order")
+        visto.setdefault("status", b.status)
+        visto.setdefault("winner", b.winner)
+        return await fakes["confirm_in_escrow"](esc, mint)
+
+    out = await run_royale(
+        session, session.get(PackBattle, "r-order"),
+        gacha=_Gacha(values), signer=_Signer(),
+        resolve_wallet_id=lambda w: f"{w}-id",
+        distribute=fakes["distribute"], confirm_usdc=fakes["confirm_usdc"],
+        confirm_in_escrow=confirm_lento,
+        build_transfer_tx=fakes["build_transfer_tx"], submit_tx=fakes["submit_tx"],
+        prepare_escrow=fakes["prepare_escrow"], price_base=50_000_000,
+        now_fn=lambda: __import__("datetime").datetime(2026, 6, 21), sleep_fn=_noop,
+    )
+
+    assert out == "settled"
+    assert visto["status"] == "settled", "la custodia empezó con la batalla aún en 'running'"
+    assert visto["winner"] == "B", "la custodia empezó sin ganador escrito"

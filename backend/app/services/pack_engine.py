@@ -48,6 +48,26 @@ async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_
     raise RuntimeError(f"nft {nft_address} not confirmed in escrow")
 
 
+async def _sweep_escrow_usdc(escrow_address, winner, *, build_usdc_sweep_tx, signer,
+                             escrow_wallet_id, submit_tx, sleep_fn, wait_delay, max_attempts,
+                             battle_id, operator_wallet_id) -> None:
+    """Manda el USDC del escrow al ganador. Acotado y sin levantar: es una sola transacción."""
+    if build_usdc_sweep_tx is None:
+        return
+    for _ in range(max_attempts):
+        try:
+            sweep = await build_usdc_sweep_tx(escrow_address, winner)
+            if sweep:
+                signed = await signer.sign_solana(escrow_wallet_id, sweep)
+                if operator_wallet_id:
+                    signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
+                await submit_tx(signed)
+            return
+        except Exception as exc:
+            logger.warning("settle usdc sweep retry in battle %s: %s", battle_id, exc)
+            await sleep_fn(wait_delay)
+
+
 async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_address, winner,
                                  build_transfer_tx, submit_tx, signer, confirm_in_escrow,
                                  build_usdc_sweep_tx, sleep_fn, wait_max_attempts, wait_delay,
@@ -58,6 +78,15 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
     transferred=False and continue), then sweep the escrow USDC to the winner with max_attempts total
     attempts. Never raises."""
     from app.models import BattlePull
+
+    # El BOTE primero y las cartas después. Es una sola transacción acotada, mientras que las
+    # cartas pueden encadenar minutos de sondeo: dejar el dinero detrás de ellas hacía que el
+    # ganador esperase por la parte lenta para cobrar la rápida.
+    await _sweep_escrow_usdc(escrow_address, winner, build_usdc_sweep_tx=build_usdc_sweep_tx,
+                             signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
+                             sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
+                             battle_id=battle.id, operator_wallet_id=operator_wallet_id)
+
     pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
     for p in pulls:
         if p.auto_sold or not p.nft_address or p.transferred:
@@ -83,19 +112,6 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
             session.commit()
         except Exception as exc:
             logger.warning("settle commit failed in battle %s: %s", battle.id, exc)
-    if build_usdc_sweep_tx is not None:
-        for _ in range(max_attempts):
-            try:
-                sweep = await build_usdc_sweep_tx(escrow_address, winner)
-                if sweep:
-                    signed = await signer.sign_solana(escrow_wallet_id, sweep)
-                    if operator_wallet_id:
-                        signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
-                    await submit_tx(signed)
-                break
-            except Exception as exc:
-                logger.warning("settle usdc sweep retry in battle %s: %s", battle.id, exc)
-                await sleep_fn(wait_delay)
 
 
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,

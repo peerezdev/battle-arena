@@ -94,7 +94,27 @@ async def _settle_and_finish(session, battle, *, winner, players, esc, gacha, si
                              resolve_wallet_id, build_transfer_tx, submit_tx, confirm_in_escrow,
                              build_usdc_sweep_tx, usdc_balance, build_usdc_transfer_tx,
                              operator_wallet_id, now_fn, sleep_fn, max_attempts, delay) -> str:
-    # Settle: transfer all non-auto-sold escrow NFTs + the escrow USDC to the winner (resilient).
+    # 1) CERRAR LA PARTIDA PRIMERO. El resultado ya está decidido: lo dijo la última ronda.
+    #
+    # Antes esto iba al final, después de mover las cartas, y ahí está el problema: cada carta que
+    # no confirma en el escrow cuesta ~3,7 min (20 sondeos × 3 s, por 3 intentos), así que con 14
+    # cartas fallidas la batalla se quedaba en 'running' casi una hora. Una partida real tardó 48
+    # minutos en aparecer como terminada y otra pasó de las dos horas. Para el jugador eso es una
+    # partida congelada, aunque por dentro estuviera reintentando.
+    #
+    # Mover las cartas es CUSTODIA, no resultado. Se hace después, y si tarda o falla, la batalla
+    # ya está cerrada y el jugador tiene su resultado.
+    battle.winner = winner
+    battle.status = "settled"
+    battle.settled_at = now_fn()
+    # Loyalty points: per-player buy-in for a royale is royale_buyin(max_players, price).
+    from app.services.referrals import award_battle_loyalty
+    from app.services.royale_funding import royale_buyin
+    award_battle_loyalty(session, battle, players,
+                         float(royale_buyin(battle.max_players, battle.price)))
+    session.commit()
+
+    # 2) Custodia: el bote y las cartas al ganador. Puede tardar; ya no bloquea a nadie.
     await settle_cards_to_winner(
         session, battle, escrow_wallet_id=esc["id"], escrow_address=esc["address"], winner=winner,
         build_transfer_tx=build_transfer_tx, submit_tx=submit_tx, signer=signer,
@@ -110,15 +130,6 @@ async def _settle_and_finish(session, battle, *, winner, players, esc, gacha, si
             usdc_balance=usdc_balance, build_usdc_transfer_tx=build_usdc_transfer_tx,
             operator_wallet_id=operator_wallet_id, sleep_fn=sleep_fn,
         )
-
-    battle.winner = winner
-    battle.status = "settled"
-    battle.settled_at = now_fn()
-    # Loyalty points: per-player buy-in for a royale is royale_buyin(max_players, price).
-    from app.services.referrals import award_battle_loyalty
-    from app.services.royale_funding import royale_buyin
-    award_battle_loyalty(session, battle, players,
-                         float(royale_buyin(battle.max_players, battle.price)))
     session.commit()
     return "settled"
 
