@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { COLORS, FONTS, formatUsd } from '../theme'
 import type { PendingPack } from '../../onchain/gachaClient'
@@ -36,6 +37,10 @@ export function UnseenModal({
   onResultBattle: (b: UnseenBattle) => void     // ir directo al resultado
   onSeeAllBattles: () => void                   // darlas todas por vistas sin entrar en ninguna
 }) {
+  // Batalla cuya "See result" está pendiente de confirmar. Ir al resultado se salta el reveal
+  // entero y no hay vuelta atrás —la batalla queda vista—, así que se pregunta antes.
+  const [confirm, setConfirm] = useState<UnseenBattle | null>(null)
+
   const np = packs.length
   const nb = battles.length
   // Sin ninguna jugada (todo anuladas/canceladas) no hay resultado que asumir: la salida es un
@@ -50,9 +55,11 @@ export function UnseenModal({
   const packsHeading = byMachine.size === 1
     ? `${np} × ${machineTitle(packs[0].pack_type)}`
     : `${np} packs`
+  // Con varias máquinas el desglose va una por línea: "2 × PKM 250" debajo de "1 × PKM 50".
+  // Apelotonarlas en una sola línea separada por puntos se lee como un único lote.
   const packsMix = byMachine.size > 1
-    ? [...byMachine.entries()].map(([c, n]) => `${n} × ${machineTitle(c)}`).join(' · ')
-    : null
+    ? [...byMachine.entries()].map(([c, n]) => ({ code: c, label: `${n} × ${machineTitle(c)}` }))
+    : []
 
   const sub = [
     nb > 0 ? `${nb} battle${nb === 1 ? '' : 's'} to see` : null,
@@ -128,22 +135,24 @@ export function UnseenModal({
                   ? ghostBtn('View', () => onResultBattle(b), { grow: true })
                   : (<>
                       {primaryBtn(<><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>Replay battle</>, () => onWatchBattle(b))}
-                      {ghostBtn('See result', () => onResultBattle(b), { grow: true })}
+                      {ghostBtn('See result', () => setConfirm(b), { grow: true })}
                     </>)}
               </div>
             </div>
           )
         })}
 
-        {/* Salida en bloque. Entrar en cada batalla es opcional, no un peaje: esto las da todas
-            por vistas. Si todo son reembolsos no hay resultado que asumir → "Continue". */}
-        {nb > 0 && (
+        {/* Sin salida en bloque cuando hay algo jugado: "Resolve" daba por vistos de un toque
+            resultados que el jugador no había visto, y eso no se deshace. Cada batalla se cierra
+            desde su propia tarjeta. Solo queda el "Continue" de las reembolsadas, donde no hay
+            reveal que saltarse. */}
+        {allRefunded && (
           <button className="ba-ghostbtn" onClick={onSeeAllBattles} disabled={busy}
             style={{ width: '100%', borderRadius: 12, padding: '11px 18px', fontSize: 13, fontWeight: 700,
               fontFamily: FONTS.body, cursor: busy ? 'default' : 'pointer', marginTop: -6,
               border: `1px solid ${COLORS.border}`, background: 'transparent',
               color: busy ? COLORS.muted : COLORS.text }}>
-            {allRefunded ? 'Continue' : nb > 1 ? `Resolve all ${nb}` : 'Resolve'}
+            Continue
           </button>
         )}
 
@@ -167,7 +176,9 @@ export function UnseenModal({
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: COLORS.text }}>{packsHeading}</span>
-                {packsMix && <span style={{ display: 'block', fontSize: 11.5, color: '#9a86b8', marginTop: 2 }}>{packsMix}</span>}
+                {packsMix.map(({ code, label }) => (
+                  <span key={code} style={{ display: 'block', fontSize: 11.5, color: '#9a86b8', marginTop: 2 }}>{label}</span>
+                ))}
                 {packsValue > 0 && (
                   <span style={{ display: 'block', fontSize: 12, color: '#9a86b8', marginTop: 2 }}>
                     {formatUsd(packsValue)} in packs to reveal
@@ -182,6 +193,43 @@ export function UnseenModal({
           </div>
         )}
       </div>
+
+      {/* ── ¿Seguro? ── Ir al resultado se salta la batalla entera y la deja vista: no hay forma
+          de recuperarla después, así que se pregunta antes de hacerlo. */}
+      {confirm && (
+        <div
+          role="dialog" aria-modal="true" aria-label="Skip the battle?"
+          style={{ position: 'fixed', inset: 0, zIndex: 220, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', padding: 20, background: 'rgba(3,4,6,.78)' }}>
+          <div style={{ width: 360, maxWidth: '100%', borderRadius: 18, padding: 22,
+            background: 'linear-gradient(180deg,#161b25,#0d1118)', border: '1px solid rgba(255,255,255,.12)',
+            boxShadow: '0 30px 80px -20px rgba(0,0,0,.85)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <div style={{ fontFamily: FONTS.display, fontSize: 18, fontWeight: 700, color: COLORS.text }}>
+                Skip the battle?
+              </div>
+              <div style={{ fontSize: 13.5, color: '#9aa5b3', marginTop: 6, lineHeight: 1.5 }}>
+                You'll jump straight to the result and miss the whole reveal. This can't be undone.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="ba-ghostbtn" onClick={() => setConfirm(null)} disabled={busy}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 11, fontFamily: FONTS.body,
+                  fontSize: 13.5, fontWeight: 700, cursor: busy ? 'default' : 'pointer',
+                  color: '#cdd4dd', background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.12)' }}>
+                No
+              </button>
+              <button onClick={() => { const b = confirm; setConfirm(null); onResultBattle(b) }} disabled={busy}
+                style={{ flex: 1, padding: '11px 0', borderRadius: 11, border: 0, fontFamily: FONTS.body,
+                  fontSize: 13.5, fontWeight: 700, cursor: busy ? 'default' : 'pointer', color: '#06170f',
+                  background: busy ? COLORS.panel2 : GREEN_GRAD,
+                  boxShadow: busy ? 'none' : '0 0 18px -6px rgba(47,226,138,.7)' }}>
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }
