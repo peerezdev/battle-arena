@@ -29,22 +29,26 @@ describe('LeaderboardPage', () => {
     })
   })
 
-  it('renders ranked rows in order with gimmighouls', async () => {
+  // The board is parked (RANKING_LIVE = false): no rows, no fetch, just the notice.
+  it('shows the tracking notice instead of the board', async () => {
     render(<MemoryRouter><LeaderboardPage /></MemoryRouter>)
-    await screen.findByText('Alice')
-    expect(screen.getByText('500')).toBeTruthy()
-    // top row is rank #1
-    expect(screen.getByText('#1')).toBeTruthy()
-    expect(screen.getByText('#2')).toBeTruthy()
-    // my row falls back to short wallet
-    expect(screen.getByText('me-w…1234')).toBeTruthy()
+    await screen.findByText('Your stats are being tracked')
+    expect(fetchLeaderboard).not.toHaveBeenCalled()
+    expect(screen.queryByText('Alice')).toBeNull()
+    expect(screen.queryByText('#1')).toBeNull()
+    expect(screen.queryByText('FULL RANKING')).toBeNull()
+  })
+
+  it('keeps the creator code box', async () => {
+    render(<MemoryRouter><LeaderboardPage /></MemoryRouter>)
+    await screen.findByText('Have a creator code?')
+    expect(screen.getByLabelText('Referral code')).toBeTruthy()
   })
 
   it('applies a referral code on success', async () => {
     mockFn(applyReferralCode).mockResolvedValue({ code: 'PROMO', boost_pct: 0.1 })
     render(<MemoryRouter><LeaderboardPage /></MemoryRouter>)
-    await screen.findByText('Alice')
-    const input = screen.getByLabelText('Referral code') as HTMLInputElement
+    const input = await screen.findByLabelText('Referral code') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'PROMO' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
     await waitFor(() => expect(applyReferralCode).toHaveBeenCalledWith('tok', 'me-wallet-1234', 'PROMO'))
@@ -54,8 +58,7 @@ describe('LeaderboardPage', () => {
   it('shows the error message on a failed apply', async () => {
     mockFn(applyReferralCode).mockRejectedValue(new Error('invalid_code'))
     render(<MemoryRouter><LeaderboardPage /></MemoryRouter>)
-    await screen.findByText('Alice')
-    fireEvent.change(screen.getByLabelText('Referral code'), { target: { value: 'NOPE' } })
+    fireEvent.change(await screen.findByLabelText('Referral code'), { target: { value: 'NOPE' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }))
     await screen.findByText('invalid_code')
   })

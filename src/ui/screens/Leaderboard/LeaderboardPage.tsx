@@ -40,6 +40,10 @@ function Coin({ size = 14 }: { size?: number }) {
 
 const RANGES = [['all', 'Global'], ['month', 'Month'], ['week', 'Week']] as const
 
+// The public board is parked until we publish it: stats keep being tracked in the
+// backend, but nothing is shown yet. Flip to true to bring the whole ranking back.
+const RANKING_LIVE: boolean = false
+
 export function LeaderboardPage() {
   const navigate = useNavigate()
   const myWallet = useEmbeddedSolanaAddress()
@@ -48,7 +52,7 @@ export function LeaderboardPage() {
   const fmtN = (n: number) => (wide ? fmt(n) : fmtCompact(n))
 
   const [rows, setRows] = useState<LeaderboardRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(RANKING_LIVE) // nothing to load while the board is parked
   const [myGimmighouls, setMyGimmighouls] = useState<number | null>(null)
   const [myCode, setMyCode] = useState<string | null>(null)
   const [range, setRange] = useState<string>('all') // all-time only for now (no time-series backend)
@@ -58,6 +62,7 @@ export function LeaderboardPage() {
   const [applyMsg, setApplyMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
+    if (!RANKING_LIVE) return
     let cancelled = false
     fetchLeaderboard()
       .then((r) => { if (!cancelled) setRows(r) })
@@ -110,19 +115,51 @@ export function LeaderboardPage() {
         </span>
         <h1 style={{ margin: 0, fontFamily: FONTS.display, fontSize: 'clamp(26px,3.2vw,34px)', fontWeight: 700, letterSpacing: '-.02em' }}>Ranking</h1>
         <span style={{ fontSize: 14, color: COLORS.muted }}>· by accumulated Gimmighouls</span>
-        <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, background: '#ffffff08', border: `1px solid ${COLORS.border}` }}>
-          {RANGES.map(([k, label]) => (
-            <button key={k} onClick={() => setRange(k)} style={{
-              position: 'relative', padding: '8px 16px', borderRadius: 9, border: 0, cursor: 'pointer',
-              fontFamily: FONTS.body, fontSize: 13.5, fontWeight: 500,
-              color: range === k ? COLORS.text : COLORS.muted,
-              background: range === k ? 'linear-gradient(180deg,rgba(0,255,196,.16),rgba(255,46,151,.10))' : 'transparent',
-              boxShadow: range === k ? 'inset 0 0 0 1px rgba(0,255,196,.32)' : 'none',
-            }}>{label}</button>
-          ))}
-        </div>
+        {RANKING_LIVE && (
+          <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, background: '#ffffff08', border: `1px solid ${COLORS.border}` }}>
+            {RANGES.map(([k, label]) => (
+              <button key={k} onClick={() => setRange(k)} style={{
+                position: 'relative', padding: '8px 16px', borderRadius: 9, border: 0, cursor: 'pointer',
+                fontFamily: FONTS.body, fontSize: 13.5, fontWeight: 500,
+                color: range === k ? COLORS.text : COLORS.muted,
+                background: range === k ? 'linear-gradient(180deg,rgba(0,255,196,.16),rgba(255,46,151,.10))' : 'transparent',
+                boxShadow: range === k ? 'inset 0 0 0 1px rgba(0,255,196,.32)' : 'none',
+              }}>{label}</button>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* Board parked: only the "we're tracking you" notice + the creator code box. */}
+      {!RANKING_LIVE && (
+        <section style={{
+          position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(22px,2.6vw,34px)',
+          background: 'linear-gradient(135deg,rgba(0,255,196,.12),rgba(13,17,22,.55) 48%,rgba(255,46,151,.12))',
+          border: `1px solid ${COLORS.border}`,
+          display: 'flex', gap: 30, flexWrap: 'wrap', alignItems: 'center',
+        }}>
+          <div style={{ flex: '1 1 340px', minWidth: 0 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderRadius: 20, background: 'rgba(0,255,196,.12)', border: '1px solid rgba(0,255,196,.35)', fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.2em', color: COLORS.green }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: COLORS.green, boxShadow: `0 0 10px ${COLORS.green}` }} />
+              TRACKING
+            </span>
+            <h2 style={{ margin: '14px 0 0', fontFamily: FONTS.display, fontSize: 'clamp(22px,2.8vw,30px)', fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.15 }}>
+              Your stats are being tracked
+            </h2>
+            <p style={{ margin: '10px 0 0', maxWidth: 520, fontFamily: FONTS.body, fontSize: 14.5, lineHeight: 1.6, color: COLORS.muted }}>
+              Every battle, win and Gimmighoul you earn is already counting. We'll publish the ranking soon — keep playing so you land high when it goes live.
+            </p>
+          </div>
+
+          <CreatorCodeCard
+            myWallet={myWallet} identityToken={identityToken} myCode={myCode}
+            codeInput={codeInput} setCodeInput={setCodeInput}
+            applying={applying} applyMsg={applyMsg} onApply={onApply}
+          />
+        </section>
+      )}
+
+      {RANKING_LIVE && <>
       {/* your standing + creator code */}
       <section style={{
         position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(20px,2.4vw,30px)',
@@ -148,36 +185,11 @@ export function LeaderboardPage() {
             </div>
           </div>
 
-          {/* creator code */}
-          <div style={{ flex: '1 1 300px', minWidth: 260, padding: 20, borderRadius: 18, background: 'rgba(8,10,14,.45)', border: `1px solid ${COLORS.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
-              <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,46,151,.14)', border: '1px solid rgba(255,46,151,.4)', color: '#ff6bb5' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
-              </span>
-              <span style={{ fontFamily: FONTS.display, fontSize: 15, fontWeight: 700 }}>Have a creator code?</span>
-            </div>
-            {myCode ? (
-              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: COLORS.text }}>
-                Applied: <strong style={{ color: COLORS.green }}>{myCode}</strong> — boosting your Gimmighouls.
-              </p>
-            ) : (
-              <>
-                <p style={{ margin: '0 0 14px', fontSize: 13, lineHeight: 1.5, color: COLORS.muted }}>Apply it to boost your Gimmighouls and climb faster.</p>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <input
-                    aria-label="Referral code" placeholder="Referral code" value={codeInput}
-                    onChange={(e) => setCodeInput(e.target.value)} disabled={!myWallet || applying}
-                    style={{ flex: 1, minWidth: 0, padding: '12px 15px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, fontFamily: FONTS.mono, fontSize: 13.5, letterSpacing: '.04em', outline: 'none' }}
-                  />
-                  <button type="button" onClick={onApply} disabled={!myWallet || applying || !codeInput.trim()}
-                    style={{ flex: 'none', padding: '12px 22px', borderRadius: 12, border: 0, cursor: !myWallet || applying || !codeInput.trim() ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, color: '#06170f', background: GRADIENT, opacity: !myWallet || applying || !codeInput.trim() ? 0.5 : 1, boxShadow: '0 0 20px -6px rgba(0,255,196,.7)' }}>
-                    {applying ? 'Applying…' : 'Apply'}
-                  </button>
-                </div>
-              </>
-            )}
-            {applyMsg && <div style={{ marginTop: 10, fontFamily: FONTS.body, fontSize: 13, color: applyMsg.ok ? COLORS.green : COLORS.red }}>{applyMsg.text}</div>}
-          </div>
+          <CreatorCodeCard
+            myWallet={myWallet} identityToken={identityToken} myCode={myCode}
+            codeInput={codeInput} setCodeInput={setCodeInput}
+            applying={applying} applyMsg={applyMsg} onApply={onApply}
+          />
         </div>
       </section>
 
@@ -247,6 +259,51 @@ export function LeaderboardPage() {
           </div>
         )}
       </div>
+      </>}
+    </div>
+  )
+}
+
+function CreatorCodeCard({ myWallet, identityToken, myCode, codeInput, setCodeInput, applying, applyMsg, onApply }: {
+  myWallet: string | null | undefined
+  identityToken: string | null | undefined
+  myCode: string | null
+  codeInput: string
+  setCodeInput: (v: string) => void
+  applying: boolean
+  applyMsg: { ok: boolean; text: string } | null
+  onApply: () => void
+}) {
+  const disabled = !myWallet || !identityToken || applying || !codeInput.trim()
+  return (
+    <div style={{ flex: '1 1 300px', minWidth: 260, padding: 20, borderRadius: 18, background: 'rgba(8,10,14,.45)', border: `1px solid ${COLORS.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,46,151,.14)', border: '1px solid rgba(255,46,151,.4)', color: '#ff6bb5' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
+        </span>
+        <span style={{ fontFamily: FONTS.display, fontSize: 15, fontWeight: 700 }}>Have a creator code?</span>
+      </div>
+      {myCode ? (
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: COLORS.text }}>
+          Applied: <strong style={{ color: COLORS.green }}>{myCode}</strong> — boosting your Gimmighouls.
+        </p>
+      ) : (
+        <>
+          <p style={{ margin: '0 0 14px', fontSize: 13, lineHeight: 1.5, color: COLORS.muted }}>Apply it to boost your Gimmighouls and climb faster.</p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input
+              aria-label="Referral code" placeholder="Referral code" value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)} disabled={!myWallet || applying}
+              style={{ flex: 1, minWidth: 0, padding: '12px 15px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, fontFamily: FONTS.mono, fontSize: 13.5, letterSpacing: '.04em', outline: 'none' }}
+            />
+            <button type="button" onClick={onApply} disabled={disabled}
+              style={{ flex: 'none', padding: '12px 22px', borderRadius: 12, border: 0, cursor: disabled ? 'default' : 'pointer', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, color: '#06170f', background: GRADIENT, opacity: disabled ? 0.5 : 1, boxShadow: '0 0 20px -6px rgba(0,255,196,.7)' }}>
+              {applying ? 'Applying…' : 'Apply'}
+            </button>
+          </div>
+        </>
+      )}
+      {applyMsg && <div style={{ marginTop: 10, fontFamily: FONTS.body, fontSize: 13, color: applyMsg.ok ? COLORS.green : COLORS.red }}>{applyMsg.text}</div>}
     </div>
   )
 }
