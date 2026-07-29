@@ -322,14 +322,14 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
         return (
           <div key={p.wallet} data-player-anchor={p.wallet} style={{
             flex: '1 0 96px', minWidth: 0, padding: '9px 8px', borderRadius: 12, textAlign: 'center', lineHeight: 1.3,
-            // Un eliminado se apaga MUCHO: la fila de abajo es para seguir a quien sigue vivo, y
-            // con 0.55 los caídos competían igual por la mirada.
-            opacity: out ? 0.34 : 1, transition: 'box-shadow .3s, border-color .3s, opacity .4s',
+            // La opacidad NO va aquí: apagaría también el sello, que es justo lo que tiene que
+            // resaltar. Se aplica pieza a pieza más abajo.
+            transition: 'box-shadow .3s, border-color .3s',
             background: cur ? 'rgba(0,255,196,.08)' : 'rgba(255,255,255,.025)',
             border: `1px solid ${beat ? 'rgba(255,94,122,.6)' : cur ? 'rgba(0,255,196,.45)' : out ? 'rgba(255,46,126,.25)' : COLORS.border}`,
             boxShadow: beat ? '0 0 30px -12px rgba(255,94,122,.8)' : cur ? '0 0 24px -12px rgba(0,255,196,.7)' : 'none',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 6, opacity: out ? 0.34 : 1, transition: 'opacity .4s' }}>
               <span style={{ flex: 'none', width: 16, height: 16, borderRadius: '50%', background: tintFor(p.wallet) }} />
               <span style={{ fontSize: 10.5, fontWeight: 600, color: p.isMe ? COLORS.green : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
             </div>
@@ -339,7 +339,8 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
                   los diez ha caído, sin tener que buscar una línea de texto debajo. */}
               <div style={{
                 filter: out ? 'blur(2.5px) grayscale(.85)' : 'none',
-                transition: 'filter .4s ease-out',
+                opacity: out ? 0.34 : 1,
+                transition: 'filter .4s ease-out, opacity .4s',
               }}>
                 <ChipCardBox latest={latest} cur={cur} hasPull={hasPull} />
               </div>
@@ -355,7 +356,7 @@ function ChipsRow({ players, name, activeWallet, justEliminated, reducedMotion }
                 </span>
               )}
             </div>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 700, color: cur ? COLORS.green : hasPull ? COLORS.green : '#4a525e' }}>
+            <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, fontWeight: 700, opacity: out ? 0.34 : 1, transition: 'opacity .4s', color: cur ? COLORS.green : hasPull ? COLORS.green : '#4a525e' }}>
               {cur ? '···' : hasPull ? formatUsd(latest!.insuredValue ?? 0) : '—'}
             </div>
           </div>

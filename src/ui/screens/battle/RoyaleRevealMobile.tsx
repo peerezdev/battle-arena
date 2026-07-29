@@ -188,13 +188,14 @@ function ChipStrip({ players, name, activeWallet, justEliminated, reducedMotion,
         return (
           <div key={p.wallet} {...(anchored ? { 'data-player-anchor': p.wallet } : {})} style={{
             flex: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', borderRadius: 9,
-            opacity: out ? 0.34 : 1, transition: 'box-shadow .3s, border-color .3s, opacity .4s',
+            // Sin opacidad aquí: apagaría el sello. Se apagan solo el punto y el nombre.
+            transition: 'box-shadow .3s, border-color .3s',
             background: cur ? 'rgba(0,255,196,.08)' : 'rgba(255,255,255,.025)',
             border: `1px solid ${beat ? 'rgba(255,94,122,.6)' : cur ? 'rgba(0,255,196,.45)' : out ? 'rgba(255,46,126,.25)' : COLORS.border}`,
             boxShadow: beat ? '0 0 30px -12px rgba(255,94,122,.8)' : 'none',
           }}>
-            <span style={{ flex: 'none', width: 14, height: 14, borderRadius: '50%', background: tintFor(p.wallet) }} />
-            <span style={{ fontSize: 10, fontWeight: 600, color: p.isMe ? COLORS.green : '#cdd4dd', whiteSpace: 'nowrap' }}>{name(p)}</span>
+            <span style={{ flex: 'none', width: 14, height: 14, borderRadius: '50%', background: tintFor(p.wallet), opacity: out ? 0.34 : 1, transition: 'opacity .4s' }} />
+            <span style={{ fontSize: 10, fontWeight: 600, opacity: out ? 0.34 : 1, transition: 'opacity .4s', color: p.isMe ? COLORS.green : '#cdd4dd', whiteSpace: 'nowrap' }}>{name(p)}</span>
             {/* Aquí la pastilla no lleva carta, así que el sello ocupa el sitio del importe:
                 de un caído lo que importa es que cayó y en qué ronda. */}
             {out ? (
