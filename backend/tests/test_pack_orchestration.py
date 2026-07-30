@@ -133,9 +133,11 @@ def _make_rpc_handler(
     blockhash: str = BLOCKHASH,
     balances=None,          # dict[str, int] | None — {ata_address: amount}
     missing_atas=None,      # set[str] | None — ATAs whose response has error/null value
+    sol_inicial: int = 0,   # lamports del escrow ANTES de sembrar (0 = wallet recién creada)
 ):
     """Returns an httpx side_effect callable for respx that handles both
     getLatestBlockhash and getTokenAccountBalance in a single mock route."""
+    _sol_state = {"n": 0}
     _balances = balances or {}
     _missing = missing_atas or set()
 
@@ -150,10 +152,16 @@ def _make_rpc_handler(
             })
 
         if method == "getBalance":
-            # Escrow SOL already landed → seed_and_confirm_sol confirms on the first poll.
+            # Con estado, porque el saldo del escrow cambia y de eso depende si se siembra: la
+            # PRIMERA consulta es la guarda (¿hace falta gas?) y las siguientes son el confirm-poll
+            # de seed_and_confirm_sol. Un mock que devuelva siempre 10M no distingue una wallet
+            # recién creada de una reutilizada, que es justo lo que hay que probar.
+            visto = _sol_state["n"]
+            _sol_state["n"] += 1
+            valor = sol_inicial if visto == 0 else 10_000_000
             return httpx.Response(200, json={
                 "jsonrpc": "2.0", "id": body.get("id", 1),
-                "result": {"value": 10_000_000},
+                "result": {"value": valor},
             })
 
         if method == "getTokenAccountBalance":
@@ -345,6 +353,59 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
 
     # seed_escrow was called with the escrow address
     assert calls["seed"] == [ESCROW_ADDRESS]
+
+
+@pytest.mark.asyncio
+async def test_un_escrow_reutilizado_no_se_vuelve_a_sembrar(session, monkeypatch):
+    """Con el pool, un escrow vuelve a usarse con el gas que le sobró. Sembrarle otros 10M en cada
+    uso vaciaría al operador poco a poco y en silencio: 0,01 SOL por partida que nadie reclama."""
+    import app.services.pack_orchestration as po
+    calls = {"seed": []}
+
+    async def fake_build(rpc, esc, dest, mint, bh, *, fee_payer=None):
+        return f"tx-{mint}"
+
+    async def fake_submit(rpc, signed):
+        return "sig"
+
+    async def fake_nft_in_owner(rpc, owner, mint):
+        return True
+
+    async def fake_seed_escrow(rpc_url, signer, operator_wallet_id, operator_address,
+                               escrow_address, lamports, blockhash):
+        calls["seed"].append(escrow_address)
+        return "seed-sig"
+
+    monkeypatch.setattr(po, "build_transfer", fake_build)
+    monkeypatch.setattr(po, "submit_signed_tx", fake_submit)
+    monkeypatch.setattr(po, "nft_in_owner", fake_nft_in_owner)
+    monkeypatch.setattr(po, "seed_escrow", fake_seed_escrow)
+
+    b = PackBattle(id="b-reuse", mode="pack", machine_code="pokemon_50",
+                   price=50, max_players=2, status="running")
+    session.add(b)
+    session.add_all([
+        BattlePlayer(battle_id="b-reuse", player_wallet=WALLET_A, wallet_id=WALLET_ID_A),
+        BattlePlayer(battle_id="b-reuse", player_wallet=WALLET_B, wallet_id=WALLET_ID_B),
+    ])
+    session.commit()
+    gacha = _Gacha({
+        WALLET_A: {"nft_address": NFT_A, "insured_value": 100.0, "grade": 9},
+        WALLET_B: {"nft_address": NFT_B, "insured_value": 300.0, "grade": 8},
+    })
+    # El escrow ya trae gas de su partida anterior.
+    handler = _make_rpc_handler(blockhash=BLOCKHASH,
+                                balances={ATA_A: 10_000_000, ATA_B: 10_000_000},
+                                sol_inicial=8_000_000)
+    with respx.mock:
+        respx.post(RPC_URL).mock(side_effect=handler)
+        await run_pack_battle_live(
+            session, b, gacha=gacha, signer=_Signer(), rpc_url=RPC_URL, usdc_mint=USDC_MINT,
+            min_usdc_base_units=1_000_000, token_program=TOKEN_PROGRAM, sponsor=False,
+            operator_wallet_id=OPERATOR_WALLET_ID, operator_address=OPERATOR_ADDRESS,
+            seed_lamports=SEED_LAMPORTS,
+        )
+    assert calls["seed"] == [], "con gas dentro no se siembra otra vez"
 
 
 # ---------------------------------------------------------------------------

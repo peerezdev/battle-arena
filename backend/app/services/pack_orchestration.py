@@ -270,9 +270,15 @@ async def run_pack_battle_live(
         # Seed gas SOL and confirm it landed (poll balance > 0) BEFORE using the
         # escrow — otherwise the ATA pre-create / USDC transfers can hit
         # "AccountNotFound" / "no record of a prior credit".
-        await seed_and_confirm_sol(
-            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports
-        )
+        # La siembra, solo si está a cero. Con el pool, un escrow reutilizado llega con el gas que
+        # le sobró de su partida anterior; sembrarle otros 10M en cada uso vaciaría al operador
+        # poco a poco sin que nadie lo notase. El camino de `resume` ya lo miraba así.
+        # Ojo: esto condiciona SOLO la siembra. Lo que viene después (pre-crear la ATA de USDC)
+        # tiene que correr igual, y es idempotente.
+        if await sol_balance(rpc_url, esc_addr) <= 0:
+            await seed_and_confirm_sol(
+                rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports
+            )
         # Pre-create the escrow's USDC ATA (operator pays) so CC's turbo auto-buyback payout
         # does not revert (CreateIdempotent would otherwise exhaust the payout tx's CU budget).
         bh2 = await fetch_latest_blockhash(rpc_url)
@@ -446,9 +452,15 @@ async def run_royale_live(
     async def prepare_escrow(esc_addr):
         # Seed gas SOL and confirm it landed (poll balance > 0) before the escrow
         # is used for distribute/sweep — same confirm-poll as the pack-battle path.
-        return await seed_and_confirm_sol(
-            rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports
-        )
+        # La siembra, solo si está a cero. Con el pool, un escrow reutilizado llega con el gas que
+        # le sobró de su partida anterior; sembrarle otros 10M en cada uso vaciaría al operador
+        # poco a poco sin que nadie lo notase. El camino de `resume` ya lo miraba así.
+        # Ojo: esto condiciona SOLO la siembra. Lo que viene después (pre-crear la ATA de USDC)
+        # tiene que correr igual, y es idempotente.
+        if await sol_balance(rpc_url, esc_addr) <= 0:
+            await seed_and_confirm_sol(   # el llamante descarta el retorno
+                rpc_url, signer, operator_wallet_id, operator_address, esc_addr, seed_lamports
+            )
 
     async def build_usdc_sweep_tx(esc_addr, winner_addr):
         bal = await usdc_balance_base_units(rpc_url, esc_addr, usdc_mint)
