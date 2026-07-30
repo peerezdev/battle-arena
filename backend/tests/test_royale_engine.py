@@ -483,7 +483,10 @@ async def test_run_royale_turbo_persists_rarity_and_resilient_settle(session):
     assert out == "settled" and b.winner == "B"
     assert gacha.turbo is True
     assert transfers == [("B", "nftB")]      # only the kept epic
-    assert sweeps == ["B"]
+    # Dos pasadas del bote a propósito: una al principio y otra tras el bucle de cartas, que
+    # es la ventana en la que CC ingresa el USDC de las auto-ventas. Con una sola, todo lo que
+    # llegase después se quedaba en el escrow para siempre.
+    assert sweeps == ["B", "B"]
     a_pull = session.query(BattlePull).filter_by(battle_id="r1", player_wallet="A").first()
     assert a_pull.rarity == "Common" and a_pull.auto_sold is True
     assert a_pull.buyback_amount == 42_500_000

@@ -472,7 +472,10 @@ async def test_run_battle_turbo_autosold_common_not_transferred(session):
     assert out == "settled" and b.winner == "B"
     assert gacha.turbo is True                          # battles pull in turbo
     assert transfers == [("B", "nftB")]                 # only the kept epic transferred
-    assert sweeps == ["B"]                              # USDC swept to winner
+    # Dos pasadas del bote a propósito: una al principio y otra tras el bucle de cartas, que
+    # es la ventana en la que CC ingresa el USDC de las auto-ventas. Con una sola, todo lo que
+    # llegase después se quedaba en el escrow para siempre.
+    assert sweeps == ["B", "B"]                          # USDC al ganador, en dos pasadas
     a_pull = session.query(BattlePull).filter_by(battle_id="bt", player_wallet="A").first()
     assert a_pull.auto_sold is True and a_pull.transferred is False
     assert a_pull.buyback_amount == 42_500_000
@@ -699,7 +702,10 @@ async def test_run_battle_todo_autosold_settlea_sin_transferir_cartas(session):
                            now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
                            sleep_fn=_noslp, build_usdc_sweep_tx=sweep)
     assert out == "settled" and b.winner == "B"
-    assert built == [] and sweeps == ["B"]
+    # Dos pasadas del bote a propósito: una al principio y otra tras el bucle de cartas, que
+    # es la ventana en la que CC ingresa el USDC de las auto-ventas. Con una sola, todo lo que
+    # llegase después se quedaba en el escrow para siempre.
+    assert built == [] and sweeps == ["B", "B"]
 
 
 @pytest.mark.asyncio

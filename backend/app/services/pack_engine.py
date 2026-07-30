@@ -55,14 +55,26 @@ async def _sweep_escrow_usdc(escrow_address, winner, *, build_usdc_sweep_tx, sig
     """Manda el USDC del escrow al ganador. Acotado y sin levantar: es una sola transacción."""
     if build_usdc_sweep_tx is None:
         return
-    for _ in range(max_attempts):
+    for intento in range(max_attempts):
         try:
             sweep = await build_usdc_sweep_tx(escrow_address, winner)
-            if sweep:
-                signed = await signer.sign_solana(escrow_wallet_id, sweep)
-                if operator_wallet_id:
-                    signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
-                await submit_tx(signed)
+            if sweep is None:
+                # Saldo cero AHORA MISMO, que no es lo mismo que "no va a haber". El USDC de las
+                # auto-ventas lo ingresa CC de forma asíncrona y puede aterrizar segundos después;
+                # y el lector de saldo devuelve 0 cuando la petición falla, así que un 429 también
+                # llega aquí. Antes esto hacía `return` y el dinero se quedaba dentro para siempre:
+                # medido en devnet, 24 escrows retenían USDC sin entregar. Reintentar es la
+                # diferencia entre "todavía no" y "nunca".
+                if intento + 1 < max_attempts:
+                    await sleep_fn(wait_delay)
+                    continue
+                logger.warning("settle usdc sweep: sin saldo tras %d intentos en %s",
+                               max_attempts, battle_id)
+                return
+            signed = await signer.sign_solana(escrow_wallet_id, sweep)
+            if operator_wallet_id:
+                signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
+            await submit_tx(signed)
             return
         except Exception as exc:
             logger.warning("settle usdc sweep retry in battle %s: %s", battle_id, exc)
@@ -119,6 +131,15 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
             session.commit()
         except Exception as exc:
             logger.warning("settle commit failed in battle %s: %s", battle.id, exc)
+
+    # Segunda pasada del bote. El bucle de cartas de arriba tarda de segundos a minutos, y ese rato
+    # es exactamente la ventana que CC necesita para ingresar el USDC de las auto-ventas. Barrer solo
+    # al principio dejaba dentro todo lo que llegara después, y nadie volvía a mirar. Si no quedó
+    # nada, el builder devuelve None y esto no cuesta más que una consulta de saldo.
+    await _sweep_escrow_usdc(escrow_address, winner, build_usdc_sweep_tx=build_usdc_sweep_tx,
+                             signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
+                             sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=1,
+                             battle_id=battle.id, operator_wallet_id=operator_wallet_id)
 
 
 async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
