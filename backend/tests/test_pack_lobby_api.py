@@ -679,6 +679,55 @@ def test_royale_cancel_refunds_buyins(monkeypatch):
     assert refunds[0][0] == WALLET_A
 
 
+def test_cancelar_un_lobby_devuelve_su_escrow_al_pool(monkeypatch):
+    """Las royale crean el escrow al ABRIR el lobby, así que un lobby cancelado tenía una wallet
+    reservada para siempre. Eran 26 de las 79 wallets históricas: el mayor derroche, y el pool no lo
+    tocaba porque nadie liberaba en este camino."""
+    from app.models import EscrowWallet
+    sf, c, priv = _build_client_with_sf(signer=_FakeSigner())
+
+    async def _high(*args, **kwargs):
+        return 1_000_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    async def _collect(*args, **kwargs):
+        return "collect-sig"
+
+    async def _bh(*args, **kwargs):
+        return "11111111111111111111111111111111"
+
+    async def _refund(*args, **kwargs):
+        return "refund-sig"
+
+    async def _vacio(rpc_url, address, usdc_mint):
+        return None            # el escrow queda limpio tras devolver los buy-ins
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.collect_buyin", _collect)
+    monkeypatch.setattr("app.main.refund_buyin", _refund)
+    monkeypatch.setattr("app.services.escrow_pool.motivo_retencion", _vacio)
+
+    hdrs_a = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    res = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 5,
+                                        "mode": "royale"}, headers=hdrs_a)
+    bid = res.json()["id"]
+    esc = res.json()["escrow_address"]
+
+    with sf() as s:
+        assert s.get(EscrowWallet, esc).status == "in_use"
+
+    assert c.post(f"/pack-battles/{bid}/cancel", headers=hdrs_a).status_code == 200
+
+    with sf() as s:
+        fila = s.get(EscrowWallet, esc)
+        assert fila.status == "free", "el escrow de un lobby cancelado tiene que volver al pool"
+        assert fila.battle_id is None
+
+
 def test_cancel_refundea_al_jugador_que_entro_durante_el_cancel(monkeypatch):
     """Simula el interleaving: un jugador se une DESPUÉS del (viejo) snapshot pero ANTES del flip.
     Con el fix, el snapshot es post-flip y ese jugador queda incluido en los refunds."""

@@ -1316,6 +1316,12 @@ def create_app(session_factory, chain: ChainSource,
                     logger.error("royale cancel refund FAILED after retries for %s in %s", pw, battle_id)
         else:
             release_reservations(s, battle_id)
+        # Devolver el escrow al pool. Sin esto, cancelar un lobby dejaba su wallet marcada `in_use`
+        # para siempre: las royale crean el escrow al abrir el lobby, y los lobbies que nadie juega
+        # eran 26 de las 79 wallets históricas — o sea, el mayor derroche, intacto.
+        # Si los reembolsos de arriba acaban de enviarse y aún no han aterrizado, la comprobación
+        # verá saldo y la marcará `retained`; el barrido de escrow_pool_sync la reevalúa después.
+        await escrow_pool.liberar_al_terminar(s, solana_rpc_url, b, cc_usdc_mint)
         return get_battle(s, battle_id)
 
     @app.get("/pack-battles/open")
