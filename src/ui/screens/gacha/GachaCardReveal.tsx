@@ -36,6 +36,10 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
   const [flipped, setFlipped] = useState(false)
   const [spinning, setSpinning] = useState(false)          // Epic: varias vueltas acelerando
   const [band, setBand] = useState<null | 'in' | 'out'>(null)
+  // El borde y el halo del dorso NO pueden llevar el color de la rareza antes de que la ruleta
+  // pare: un marco morado destripa la épica mientras las casillas siguen girando. Se enciende
+  // cuando para, que es cuando ya se sabe. (Batallas hace lo mismo con su `lit`.)
+  const [lit, setLit] = useState(false)
   const stripRef = useRef<HTMLDivElement | null>(null)
   const doneRef = useRef(onDone)
   doneRef.current = onDone
@@ -77,6 +81,7 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
     })
 
     // La ruleta para: ahí se sabe la rareza. Es el instante del sonido, como en las batallas.
+    at(tl.rarityAt, () => setLit(true))
     if (rarity === 'epic') at(tl.rarityAt, playEpicSpin)
     if (tl.bandAt != null) at(tl.bandAt, () => setBand('in'))
 
@@ -137,7 +142,7 @@ export function GachaCardReveal({ result, reduced, skip, onDone }: {
           {/* Dorso: la misma tapa que las batallas —negro con el logo en gris—, para que las
               tres pantallas enseñen la misma carta mientras no se sabe qué hay debajo. */}
           <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-            <CardBack width={CARD_W} height={CARD_H} accent={color} quietMark />
+            <CardBack width={CARD_W} height={CARD_H} accent={lit ? color : COLORS.muted} strong={lit} quietMark />
           </div>
           {/* Mientras GIRA lleva la tapa y no la carta: en un giro de varias vueltas esta cara
               pasa por delante cada media vuelta, y con la carta de verdad sería un spoiler. */}
