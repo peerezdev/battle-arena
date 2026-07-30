@@ -2,9 +2,23 @@
 Soporta pNFT (Metaplex Transfer), SPL, MPL Core y cNFT comprimidos (Bubblegum transfer_v2)."""
 from __future__ import annotations
 import base64
+import re
 import struct
 import httpx
 from typing import Optional
+
+_SECRETO = re.compile(r"(api[-_]?key=)[^&\s\'\"]+", re.I)
+
+
+def sin_secretos(texto) -> str:
+    """Tapa la api-key de la URL del RPC en cualquier texto.
+
+    Los errores de httpx incluyen la URL completa, y la del RPC lleva la clave de Helius. Ese texto
+    acaba en logs y, peor, persistido en la base (`escrow_wallets.unavailable_reason`): sin esto un
+    429 escribe la clave en disco. Comprobado en una ejecución real antes de añadirlo.
+    """
+    return _SECRETO.sub(r"\1[redactada]", str(texto))
+
 from solders.pubkey import Pubkey
 from solders.hash import Hash
 from solders.instruction import Instruction, AccountMeta
@@ -311,7 +325,8 @@ async def _das(rpc_url: str, method: str, mint: str) -> Optional[dict]:
                                             "params": {"id": mint}}, timeout=20)
             r.raise_for_status()          # un RPC sin DAS responde 404; Helius limita con 429
         except Exception as exc:
-            raise DasUnavailable(f"{method}: {exc}") from exc
+            # La URL del RPC lleva la api-key y httpx la mete en su mensaje de error.
+            raise DasUnavailable(f"{method}: {sin_secretos(exc)}") from exc
     d = r.json()
     if isinstance(d.get("result"), dict):
         return d["result"]

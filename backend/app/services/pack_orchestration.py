@@ -21,6 +21,7 @@ from app.services.reconcile import reconcile_unresolved_pulls, has_pending_refun
 from app.services.royale_funding import distribute_usdc, confirm_usdc
 from app.services.solana_tx import TOKEN_PROGRAM, build_token_transfer, build_create_ata
 from app.services.nft_transfer import build_transfer, submit_signed_tx, nft_in_owner
+from app.services.escrow_pool import liberar_al_terminar
 from solders.hash import Hash
 from solders.message import Message
 from solders.system_program import transfer, TransferParams
@@ -314,6 +315,9 @@ async def run_pack_battle_live(
             build_usdc_transfer_tx=build_usdc_transfer_tx, confirm_in_escrow=confirm_in_escrow,
             operator_wallet_id=operator_wallet_id,
         )
+    # La partida ha terminado: si el escrow quedó vacío de verdad vuelve al pool, y si
+    # no, se queda retenido con el motivo escrito (USDC dentro = barrido incompleto).
+    await liberar_al_terminar(session, rpc_url, battle, usdc_mint)
     return result
 
 
@@ -370,6 +374,9 @@ async def resume_pack_battle_live(session, battle, *, gacha, signer, rpc_url: st
             build_usdc_transfer_tx=build_usdc_transfer_tx, confirm_in_escrow=confirm_in_escrow,
             operator_wallet_id=operator_wallet_id,
         )
+    # La partida ha terminado: si el escrow quedó vacío de verdad vuelve al pool, y si
+    # no, se queda retenido con el motivo escrito (USDC dentro = barrido incompleto).
+    await liberar_al_terminar(session, rpc_url, battle, usdc_mint)
     return result
 
 
@@ -487,6 +494,9 @@ async def run_royale_live(
             escrow_usdc_balance=escrow_usdc_balance, confirm_in_escrow=confirm_in_escrow,
             operator_wallet_id=operator_wallet_id,
         )
+    # La partida ha terminado: si el escrow quedó vacío de verdad vuelve al pool, y si
+    # no, se queda retenido con el motivo escrito (USDC dentro = barrido incompleto).
+    await liberar_al_terminar(session, rpc_url, battle, usdc_mint)
     return result
 
 
@@ -576,6 +586,9 @@ async def resume_royale_live(session, battle, *, gacha, signer, rpc_url: str, us
             buyback_to_escrow=buyback_to_escrow, escrow_usdc_balance=escrow_usdc_balance,
             confirm_in_escrow=confirm_in_escrow, operator_wallet_id=operator_wallet_id,
         )
+    # La partida ha terminado: si el escrow quedó vacío de verdad vuelve al pool, y si
+    # no, se queda retenido con el motivo escrito (USDC dentro = barrido incompleto).
+    await liberar_al_terminar(session, rpc_url, battle, usdc_mint)
     return result
 
 

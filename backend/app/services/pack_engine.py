@@ -141,8 +141,10 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     if not all(can_play(w) for w in players):
         battle.status = "voided"; session.commit(); return "voided"
 
-    # Escrow
-    esc = await signer.create_solana_wallet()
+    # Escrow: del pool si hay alguna vacía, y solo si no, una nueva en Privy. Cada wallet nueva
+    # cuenta como usuario activo en Privy, y antes se creaba una por partida sin reciclarla jamás.
+    from app.services.escrow_pool import adquirir as adquirir_escrow
+    esc = await adquirir_escrow(session, signer, battle.id)
     battle.escrow_wallet_id = esc["id"]; battle.escrow_address = esc["address"]
     battle.status = "running"; session.commit()
 

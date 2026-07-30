@@ -160,7 +160,8 @@ async def run_royale(
     if battle.escrow_wallet_id and battle.escrow_address:
         esc = {"id": battle.escrow_wallet_id, "address": battle.escrow_address}
     else:
-        esc = await signer.create_solana_wallet()
+        from app.services.escrow_pool import adquirir as adquirir_escrow
+        esc = await adquirir_escrow(session, signer, battle.id)   # reutiliza si el pool tiene
         battle.escrow_wallet_id = esc["id"]
         battle.escrow_address = esc["address"]
         session.commit()

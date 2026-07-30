@@ -201,3 +201,27 @@ class ChatMessage(Base):
     amount_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # value styled in gold (hit pull / winner take)
     machine: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # gacha machine a hit came from (display name)
     mult: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # hit multiple (value ÷ pull cost), e.g. 10.0 → "(x10)"
+
+
+class EscrowWallet(Base):
+    """Pool de wallets de escrow reutilizables.
+
+    Antes se creaba una wallet de Privy por partida y no se reciclaba nunca: 79 partidas → 79
+    wallets, y un tercio de ellas para lobbies que nadie llegó a jugar. Cada wallet cuenta como
+    usuario activo en Privy, así que el coste crecía con las partidas para siempre.
+
+    Una wallet solo vuelve al pool cuando se ha comprobado ON-CHAIN que está vacía: ni cartas (de
+    cualquier estándar) ni USDC. `unavailable_reason` guarda por qué no se pudo liberar, para que un
+    barrido que deja dinero detrás se vea como lo que es en vez de disfrazarse de pool poco eficiente.
+    """
+    __tablename__ = "escrow_wallets"
+    address: Mapped[str] = mapped_column(String, primary_key=True)
+    wallet_id: Mapped[str] = mapped_column(String)          # id de la wallet en Privy (para firmar)
+    # free  → se puede reclamar. in_use → la tiene una partida. retained → tiene algo dentro.
+    status: Mapped[str] = mapped_column(String, default="free", index=True)
+    battle_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    unavailable_reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    times_used: Mapped[int] = mapped_column(Integer, default=0)

@@ -27,6 +27,7 @@ from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
+from .services import escrow_pool
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
                    recent_chat_messages, big_hit_multiple)
@@ -974,7 +975,9 @@ def create_app(session_factory, chain: ChainSource,
             # Pre-create the escrow wallet at lobby-creation time so buy-ins can be
             # collected immediately when players join (before the battle starts).
             # Pack battles create the escrow lazily inside run_battle; royale diverges here.
-            esc = await privy_signer.create_solana_wallet()
+            # Del pool si hay: este era el peor derrochador de wallets, porque crea el escrow al
+            # abrir el lobby y 26 de las 79 wallets existentes son de lobbies que nadie jugó.
+            esc = await escrow_pool.adquirir(s, privy_signer, b.id)
             b.escrow_wallet_id = esc["id"]
             b.escrow_address = esc["address"]
             s.commit()
