@@ -9,6 +9,7 @@ from app.models import BattlePlayer, BattlePull, BattleRound
 from app.services.provably_fair import client_seed_round, pick_index
 from app.services.pack_engine import _wait_in_escrow, settle_cards_to_winner
 from app.services.battle_fees import collect_battle_fee
+from app.services.onchain_policy import CONFIRM_POLLS, CONFIRM_DELAY
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ async def run_royale(
     distribute, confirm_usdc, confirm_in_escrow,
     build_transfer_tx, submit_tx, prepare_escrow,
     price_base, now_fn,
-    sleep_fn=None, max_attempts=20, delay=3.0, build_usdc_sweep_tx=None,
+    sleep_fn=None, max_attempts=CONFIRM_POLLS, delay=CONFIRM_DELAY, build_usdc_sweep_tx=None,
     escrow_usdc_balance=None, operator_wallet_id="",
     usdc_balance=None, build_usdc_transfer_tx=None,
 ) -> str:
@@ -224,7 +225,7 @@ async def run_royale(
 async def resume_royale(session, battle, *, gacha, signer, resolve_wallet_id,
                         distribute, confirm_usdc, confirm_in_escrow,
                         build_transfer_tx, submit_tx, price_base, now_fn,
-                        sleep_fn=None, max_attempts=20, delay=3.0,
+                        sleep_fn=None, max_attempts=CONFIRM_POLLS, delay=CONFIRM_DELAY,
                         build_usdc_sweep_tx=None, operator_wallet_id="",
                         usdc_balance=None, build_usdc_transfer_tx=None,
                         reconcile_max_attempts=5) -> str:

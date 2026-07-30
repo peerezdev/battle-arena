@@ -9,6 +9,7 @@ from typing import Optional
 from app.services.provably_fair import pick_index, client_seed_from_nfts
 from app.services.nft_transfer import UnsupportedNftStandard
 from app.services.battle_fees import collect_battle_fee
+from app.services.onchain_policy import CONFIRM_POLLS, CONFIRM_DELAY
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                      submit_tx, prepare_escrow, confirm_in_escrow, can_play, now_fn,
                      sponsor: bool = False,
                      open_max_attempts: int = 20, open_delay: float = 3.0,
-                     escrow_max_attempts: int = 20, escrow_delay: float = 3.0,
+                     escrow_max_attempts: int = CONFIRM_POLLS, escrow_delay: float = CONFIRM_DELAY,
                      sleep_fn=None, build_usdc_sweep_tx=None, operator_wallet_id="",
                      usdc_balance=None, build_usdc_transfer_tx=None) -> str:
     # sponsor=False → user-pays (the fee-payer wallet needs SOL). sponsor=True requires
@@ -258,7 +259,7 @@ async def _finalize_pack_battle(session, battle, outcomes, players, *, escrow_wa
 
 async def resume_pack_battle(session, battle, *, gacha, signer, resolve_wallet_id, build_transfer_tx,
                              submit_tx, confirm_in_escrow, now_fn,
-                             escrow_max_attempts=20, escrow_delay=3.0, sleep_fn=None,
+                             escrow_max_attempts=CONFIRM_POLLS, escrow_delay=CONFIRM_DELAY, sleep_fn=None,
                              build_usdc_sweep_tx=None, operator_wallet_id="",
                              usdc_balance=None, build_usdc_transfer_tx=None) -> str:
     """Resume a pack battle orphaned in 'running' (a backend restart killed the runner mid-flight).

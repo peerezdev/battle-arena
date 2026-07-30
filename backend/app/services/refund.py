@@ -6,6 +6,7 @@ import logging
 
 from app.services.pack_engine import _wait_in_escrow
 from app.services.nft_transfer import UnsupportedNftStandard
+from app.services.onchain_policy import CONFIRM_POLLS, CONFIRM_DELAY
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,8 @@ async def _sign_submit_retry(build_tx, *, signer, escrow_wallet_id, submit_tx,
 
 async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
                            build_transfer_tx, submit_tx, signer, build_usdc_transfer_tx,
-                           confirm_in_escrow, sleep_fn=None, wait_max_attempts=20,
-                           wait_delay=3.0, max_attempts=3, operator_wallet_id=None) -> None:
+                           confirm_in_escrow, sleep_fn=None, wait_max_attempts=CONFIRM_POLLS,
+                           wait_delay=CONFIRM_DELAY, max_attempts=3, operator_wallet_id=None) -> None:
     """Pack Battle void refund: return each puller their own pull — the non-common card, or the
     auto-sold common's buyback_amount USDC. No-op if there is no escrow (pre-flight void). Never raises."""
     sleep_fn = sleep_fn or asyncio.sleep
@@ -84,7 +85,7 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
 async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_address,
                              build_transfer_tx, submit_tx, signer, build_usdc_transfer_tx,
                              buyback_to_escrow, escrow_usdc_balance, confirm_in_escrow,
-                             sleep_fn=None, wait_max_attempts=20, wait_delay=3.0, max_attempts=3,
+                             sleep_fn=None, wait_max_attempts=CONFIRM_POLLS, wait_delay=CONFIRM_DELAY, max_attempts=3,
                              operator_wallet_id=None) -> None:
     """Battle Royale void refund: alive players (eliminated_round IS NULL) get their own pulls (non-common
     cards + auto-sold commons' USDC); each eliminated player's non-common cards are bought back; the leftover
