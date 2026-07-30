@@ -847,6 +847,31 @@ def create_app(session_factory, chain: ChainSource,
                                 escrow_address, cc_usdc_mint, amount, blockhash)
             await asyncio.sleep(1)  # let the tx land before the next serialized collect
 
+    def _anotar_buyin(s: Session, battle_id: str, wallet: str, amount: int) -> None:
+        """Deja constancia de que ESTE jugador pagó su buy-in.
+
+        Es el libro de caja que permite reconciliar un reembolso a medias: si la partida se anula y
+        una transferencia falla, `buyin_paid > 0` con `refunded_at` nulo señala exactamente a quién
+        le falta el dinero. Sin esto, lo único que quedaba era un saldo raro en el escrow y ninguna
+        forma de saber de quién era.
+
+        Se llama DESPUÉS del join porque el cobro va antes de que exista la fila del jugador.
+        """
+        fila = (s.query(BattlePlayer)
+                .filter_by(battle_id=battle_id, player_wallet=wallet).first())
+        if fila is not None:
+            fila.buyin_paid = amount
+            s.commit()
+
+    def _anotar_reembolso(s: Session, battle_id: str, wallet: str, amount: int) -> None:
+        """Cierra la anotación: a este jugador ya se le devolvió. Solo tras confirmar el envío."""
+        fila = (s.query(BattlePlayer)
+                .filter_by(battle_id=battle_id, player_wallet=wallet).first())
+        if fila is not None:
+            fila.refund_amount = amount
+            fila.refunded_at = datetime.now(timezone.utc)
+            s.commit()
+
     # Per-wallet withdraw throttle. The operator pays gas + the destination-ATA rent on every
     # withdraw, so without a rate-limit + minimum a user could spam tiny withdrawals to fresh
     # addresses and drain the operator's SOL (each new ATA ~0.002 SOL of rent the operator funds).
@@ -986,6 +1011,7 @@ def create_app(session_factory, chain: ChainSource,
                 await collect_buyin_confirmed(wallet_id, wallet, b.escrow_address, buyin)
             except Exception as exc:
                 raise HTTPException(502, f"No se pudo cobrar tu buy-in: {exc}")
+            _anotar_buyin(s, b.id, wallet, buyin)
             resp = get_battle(s, b.id)
             resp["buyin"] = buyin
             resp["escrow_address"] = b.escrow_address
@@ -1039,6 +1065,7 @@ def create_app(session_factory, chain: ChainSource,
                 raise HTTPException(502, f"No se pudo cobrar el buy-in: {exc}")
             try:
                 b, filled = join_battle(s, battle_id, wallet, wallet_id)
+                _anotar_buyin(s, battle_id, wallet, buyin)
             except LobbyError as e:
                 # Joined too late — refund the buy-in we just collected so it isn't stuck.
                 try:
@@ -1175,6 +1202,7 @@ def create_app(session_factory, chain: ChainSource,
                 raise HTTPException(502, f"No se pudo cobrar el buy-in del bot: {exc}")
             try:
                 _b2, filled = join_battle(s, b.id, bw, bid)
+                _anotar_buyin(s, b.id, bw, buyin)
             except LobbyError as e:
                 # Joined too late — refund the buy-in we just collected so it isn't stuck.
                 try:
@@ -1277,10 +1305,14 @@ def create_app(session_factory, chain: ChainSource,
                         await refund_buyin(solana_rpc_url, privy_signer, escrow_wallet_id, escrow_address,
                                            privy_operator_wallet_id, privy_operator_address,
                                            pw, cc_usdc_mint, buyin, bh)
+                        _anotar_reembolso(s, battle_id, pw, buyin)
                         break
                     except Exception as exc:
                         logger.warning("royale cancel refund retry for %s in %s: %s", pw, battle_id, exc)
                 else:
+                    # Sin anotar `refunded_at`: la fila queda con buyin_paid > 0 y sin reembolso, que
+                    # es justo lo que hace falta para saber a quién se le debe. Antes esto solo
+                    # dejaba una línea de log y el dinero quieto en el escrow sin dueño conocido.
                     logger.error("royale cancel refund FAILED after retries for %s in %s", pw, battle_id)
         else:
             release_reservations(s, battle_id)

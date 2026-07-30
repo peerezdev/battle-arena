@@ -265,3 +265,74 @@ async def test_refund_royale_void_marca_refunded_y_es_reentrante(session):
     # Re-ejecución completa (barrido): nada se repite.
     await refund_royale_void(session, b, **kw)
     assert built == [("A", "nftA")] and usdc == [("B", 10_000_000)] and buybacks == ["nftE"]
+
+
+# ── libro de caja del buy-in ──────────────────────────────────────────────────
+# El reparto del sobrante llamaba a _sign_submit_retry y TIRABA su resultado. Un envío fallido no
+# dejaba rastro: su parte se quedaba en el escrow sin dueño conocido. Medido en devnet, una royale
+# anulada de 4 jugadores retenía exactamente una parte, y sin registro por jugador no había forma de
+# saber cuál de los cuatro se quedó sin cobrar — solo forense on-chain.
+
+def _royale_anulada(session, wallets, buyin=100_000_000):
+    b = PackBattle(id="rv", mode="royale", machine_code="m", price=50,
+                   max_players=len(wallets), status="voided")
+    session.add(b)
+    for w in wallets:
+        session.add(BattlePlayer(battle_id="rv", player_wallet=w, buyin_paid=buyin))
+    session.commit()
+    return b
+
+
+async def _sin_pulls(session, b, *, falla_para=(), saldo=400_000_000):
+    enviados = []
+
+    async def usdctx(src, dest, amt):
+        if dest in falla_para:
+            raise RuntimeError("la red dijo que no")
+        enviados.append((dest, amt))
+        return f"u-{dest}"
+
+    async def sub(signed):
+        return "sig"
+
+    async def saldo_escrow(esc):
+        return saldo
+
+    async def buyback(nft):
+        return None
+
+    async def btx(esc, dest, nft):
+        return "x"
+
+    await refund_royale_void(session, b, escrow_wallet_id="eid", escrow_address="ESC",
+                             build_transfer_tx=btx, submit_tx=sub, signer=_Signer(),
+                             build_usdc_transfer_tx=usdctx, buyback_to_escrow=buyback,
+                             escrow_usdc_balance=saldo_escrow, confirm_in_escrow=_ce,
+                             sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0, max_attempts=2)
+    return enviados
+
+
+@pytest.mark.asyncio
+async def test_el_reembolso_del_sobrante_queda_anotado(session):
+    b = _royale_anulada(session, ["A", "B", "C", "D"])
+    enviados = await _sin_pulls(session, b)
+    assert len(enviados) == 4
+    for p in session.query(BattlePlayer).filter_by(battle_id="rv").all():
+        assert p.refunded_at is not None, f"{p.player_wallet} cobró pero no consta"
+        assert p.refund_amount == 100_000_000
+
+
+@pytest.mark.asyncio
+async def test_a_quien_no_cobra_se_le_ve_la_deuda(session):
+    """Lo que hacía irreconciliable el lío: ahora el que falla queda señalado."""
+    b = _royale_anulada(session, ["A", "B", "C", "D"])
+    await _sin_pulls(session, b, falla_para={"C"})
+    filas = {p.player_wallet: p for p in session.query(BattlePlayer).filter_by(battle_id="rv").all()}
+    assert filas["C"].refunded_at is None, "C no cobró: no puede constar como reembolsado"
+    assert filas["C"].buyin_paid == 100_000_000, "y sigue constando lo que pagó"
+    for w in ("A", "B", "D"):
+        assert filas[w].refunded_at is not None
+    # Esta consulta es la que antes no se podía hacer: ¿a quién se le debe dinero?
+    deudores = [p.player_wallet for p in session.query(BattlePlayer)
+                .filter_by(battle_id="rv", refunded_at=None).all() if p.buyin_paid > 0]
+    assert deudores == ["C"]

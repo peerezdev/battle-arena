@@ -136,6 +136,14 @@ class BattlePlayer(Base):
     # la lata con batallas que el jugador acaba de ver en directo. Es la misma distinción que en
     # el gacha entre opened_at (CC lo resolvió) y revealed_at (el jugador lo vio).
     seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Libro de caja del buy-in, por jugador. Sin esto, si una partida se anula y un reembolso falla,
+    # no queda constancia de a quién le falta: el dinero se queda en el escrow y reconstruirlo exige
+    # forense on-chain. Pasó de verdad — una royale anulada de 4 jugadores retenía exactamente una
+    # parte, y no había forma de saber cuál de los cuatro no cobró.
+    # buyin_paid > 0 y refunded_at NULL en una partida anulada = a este jugador se le debe dinero.
+    buyin_paid: Mapped[int] = mapped_column(Integer, default=0)              # USDC base units
+    refund_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    refunded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class BattlePull(Base):

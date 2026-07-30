@@ -3,6 +3,7 @@ Called by the wiring when a run returns 'voided'. Logs no secrets."""
 from __future__ import annotations
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 from app.services.pack_engine import _wait_in_escrow
 from app.services.nft_transfer import UnsupportedNftStandard
@@ -155,9 +156,21 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
     share = leftover // len(alive)
     if share <= 0:
         return
+    por_wallet = {p.player_wallet: p for p in players}
     for w in alive:
-        await _sign_submit_retry(
+        ok = await _sign_submit_retry(
             lambda w=w, share=share: build_usdc_transfer_tx(escrow_address, w, share),
             signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
             sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts, operator_wallet_id=operator_wallet_id,
             ctx=f"royale void leftover {w} in {battle.id}")
+        # El resultado se MIRA. Antes se descartaba: un envío fallido no dejaba rastro y su parte se
+        # quedaba en el escrow sin dueño conocido — medido, una royale anulada de 4 jugadores retenía
+        # exactamente una parte y no había forma de saber cuál de los cuatro se quedó sin cobrar.
+        fila = por_wallet.get(w)
+        if ok and fila is not None:
+            fila.refund_amount = (fila.refund_amount or 0) + share
+            fila.refunded_at = datetime.now(timezone.utc)
+            session.commit()
+        elif not ok:
+            logger.error("royale void: NO se pudo devolver su parte a %s en %s (queda en el escrow)",
+                         w, battle.id)
