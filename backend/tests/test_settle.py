@@ -76,3 +76,42 @@ async def test_settle_retries_transient_then_flags(session):
         build_usdc_sweep_tx=sweep, sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0, max_attempts=3)
     assert calls["n"] == 3   # retried 3×
     assert session.query(BattlePull).filter_by(player_wallet="A").first().transferred is False
+
+
+# ── quién paga el traspaso de la carta ────────────────────────────────────────
+# Mover una carta obliga a crear la token account del ganador: 2.039.280 lamports de rent. Al
+# escrow se le siembran 10M fijos, o sea que cubre exactamente 4 cartas y de la quinta en adelante
+# fallaba con "insufficient lamports" dejándolas dentro sin avisar. Ahora paga el operador, y por
+# eso tiene que firmar. Lo que estos tests protegen es que las dos decisiones no se separen: quien
+# construye pone al operador como fee-payer y quien firma añade su firma. Una sin la otra produce
+# una transacción que la red rechaza.
+
+@pytest.mark.asyncio
+async def test_el_operador_cofirma_el_traspaso_de_cada_carta(session):
+    b = _battle_with_pulls(session, [("A", "nftA", False), ("B", "nftB", False)])
+    async def btx(esc, dest, nft): return f"tx-{nft}"
+    async def sub(signed): return "sig"
+    async def sweep(esc, winner): return None
+    signer = _Signer()
+    await settle_cards_to_winner(session, b, escrow_wallet_id="eid", escrow_address="ESC", winner="A",
+        build_transfer_tx=btx, submit_tx=sub, signer=signer, confirm_in_escrow=_ce,
+        build_usdc_sweep_tx=sweep, sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0,
+        operator_wallet_id="op-id")
+    for nft in ("nftA", "nftB"):
+        firmas = [wid for wid, tx in signer.signed if tx.endswith(f"tx-{nft}")]
+        assert firmas == ["eid", "op-id"], f"{nft}: firma el dueño y luego el que paga"
+
+
+@pytest.mark.asyncio
+async def test_sin_operador_configurado_firma_solo_el_escrow(session):
+    """En un entorno sin operador, build_transfer deja al escrow como fee-payer. Añadir aquí una
+    firma del operador metería una firma de una cuenta que no es firmante: transacción inválida."""
+    b = _battle_with_pulls(session, [("A", "nftA", False)])
+    async def btx(esc, dest, nft): return f"tx-{nft}"
+    async def sub(signed): return "sig"
+    async def sweep(esc, winner): return None
+    signer = _Signer()
+    await settle_cards_to_winner(session, b, escrow_wallet_id="eid", escrow_address="ESC", winner="A",
+        build_transfer_tx=btx, submit_tx=sub, signer=signer, confirm_in_escrow=_ce,
+        build_usdc_sweep_tx=sweep, sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0)
+    assert [wid for wid, _ in signer.signed] == ["eid"]

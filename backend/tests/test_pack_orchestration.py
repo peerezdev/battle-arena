@@ -244,8 +244,8 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
     # Stub build_transfer and submit_signed_tx in the pack_orchestration module
     calls = {"build": [], "submit": [], "seed": []}
 
-    async def fake_build(rpc, esc, dest, mint, bh):
-        calls["build"].append((esc, dest, mint))
+    async def fake_build(rpc, esc, dest, mint, bh, *, fee_payer=None):
+        calls["build"].append((esc, dest, mint, fee_payer))
         return f"tx-{mint}"
 
     async def fake_submit(rpc, signed):
@@ -323,11 +323,24 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
     assert NFT_A in build_mints
     assert NFT_B in build_mints
 
+    # El traspaso lo paga el OPERADOR, no el escrow. Crear la token account del ganador cuesta
+    # 2.039.280 lamports de rent y la semilla fija del escrow (10M) solo da para 4 cartas: pagando
+    # el escrow, de la quinta en adelante se quedaban dentro en silencio.
+    assert {t[3] for t in calls["build"]} == {OPERATOR_ADDRESS}
+
+    # Y si paga el operador, el operador tiene que firmar: escrow como dueño de la carta, operador
+    # como fee-payer. Sin las dos firmas la red rechaza la transacción.
+    firmas_por_carta = [
+        [wid for wid, tx in signer.signed if tx.endswith(f"tx-{mint}")]
+        for mint in (NFT_A, NFT_B)
+    ]
+    assert firmas_por_carta == [[ESCROW_WALLET_ID, OPERATOR_WALLET_ID]] * 2
+
     # submit_signed_tx was called once for the escrow USDC ATA pre-create
     # (operator-signed) and once per NFT settle transfer — 3 total.
     assert len(calls["submit"]) == 3
-    # The two NFT-settle submits receive "signed-tx-<mint>"
-    nft_submits = [s for s in calls["submit"] if s.startswith("signed-tx-")]
+    # Las dos de carta llegan con la doble firma encima (el fake anida "signed-").
+    nft_submits = [s for s in calls["submit"] if s.startswith("signed-signed-tx-")]
     assert len(nft_submits) == 2
 
     # seed_escrow was called with the escrow address

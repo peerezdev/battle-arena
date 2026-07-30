@@ -74,7 +74,8 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
             ok = await _sign_submit_retry(
                 _build, signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
-                ctx=f"pack void card {p.nft_address} in {battle.id}")
+                ctx=f"pack void card {p.nft_address} in {battle.id}",
+                operator_wallet_id=operator_wallet_id)
         else:
             continue   # memo sin resolver: lo cubre la reconciliación, no hay nada que devolver aún
         if ok:
@@ -121,7 +122,8 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
             ok = await _sign_submit_retry(
                 _build, signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
-                ctx=f"royale void card {p.nft_address} in {battle.id}")
+                ctx=f"royale void card {p.nft_address} in {battle.id}",
+                operator_wallet_id=operator_wallet_id)
         else:
             continue   # memo sin resolver: lo cubre la reconciliación, no hay nada que devolver aún
         if ok:

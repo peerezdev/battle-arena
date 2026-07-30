@@ -255,7 +255,12 @@ async def run_pack_battle_live(
 
     async def build_transfer_tx(esc, dest, nft):
         bh = await fetch_latest_blockhash(rpc_url)
-        return await build_transfer(rpc_url, esc, dest, nft, bh)
+        # Paga el OPERADOR, no el escrow: crear la token account del ganador cuesta 2.039.280
+        # lamports de rent y la semilla fija de 10M del escrow solo da para 4 cartas — la quinta
+        # fallaba con "insufficient lamports" y la carta se quedaba dentro sin avisar. El escrow
+        # firma solo como dueño; la co-firma del operador la pone el engine (settle) y refund.py.
+        return await build_transfer(rpc_url, esc, dest, nft, bh,
+                                    fee_payer=operator_address or None)
 
     submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
@@ -327,7 +332,9 @@ async def resume_pack_battle_live(session, battle, *, gacha, signer, rpc_url: st
 
     async def build_transfer_tx(esc, dest, nft):
         bh = await fetch_latest_blockhash(rpc_url)
-        return await build_transfer(rpc_url, esc, dest, nft, bh)
+        # Paga el operador, no el escrow (ver el comentario en run_pack_battle_live).
+        return await build_transfer(rpc_url, esc, dest, nft, bh,
+                                    fee_payer=operator_address or None)
 
     submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
@@ -422,7 +429,9 @@ async def run_royale_live(
     # Each fetches a fresh blockhash to avoid stale-blockhash failures.
     async def build_transfer_tx(esc, dest, mint):
         bh = await fetch_latest_blockhash(rpc_url)
-        return await build_transfer(rpc_url, esc, dest, mint, bh)
+        # Paga el operador, no el escrow (ver el comentario en run_pack_battle_live).
+        return await build_transfer(rpc_url, esc, dest, mint, bh,
+                                    fee_payer=operator_address or None)
 
     submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
@@ -507,7 +516,9 @@ async def resume_royale_live(session, battle, *, gacha, signer, rpc_url: str, us
 
     async def build_transfer_tx(esc, dest, mint):
         bh = await fetch_latest_blockhash(rpc_url)
-        return await build_transfer(rpc_url, esc, dest, mint, bh)
+        # Paga el operador, no el escrow (ver el comentario en run_pack_battle_live).
+        return await build_transfer(rpc_url, esc, dest, mint, bh,
+                                    fee_payer=operator_address or None)
 
     submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
     confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731
@@ -589,7 +600,9 @@ async def reconcile_voided_battle_live(session, battle, *, gacha, signer, rpc_ur
 
         async def build_transfer_tx(esc, dest, nft):
             bh = await fetch_latest_blockhash(rpc_url)
-            return await build_transfer(rpc_url, esc, dest, nft, bh)
+            # Paga el operador, no el escrow (ver el comentario en run_pack_battle_live).
+            return await build_transfer(rpc_url, esc, dest, nft, bh,
+                                        fee_payer=operator_address or None)
 
         submit_tx = lambda signed: submit_signed_tx(rpc_url, signed)  # noqa: E731
         confirm_in_escrow = lambda esc, mint: nft_in_owner(rpc_url, esc, mint)  # noqa: E731

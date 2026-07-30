@@ -97,7 +97,13 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
                 await _wait_in_escrow(confirm_in_escrow, escrow_address, p.nft_address,
                                       sleep_fn, wait_max_attempts, wait_delay)
                 tx = await build_transfer_tx(escrow_address, winner, p.nft_address)
-                signed = await signer.sign_solana(escrow_wallet_id, tx)
+                signed = await signer.sign_solana(escrow_wallet_id, tx)      # dueño de la carta
+                if operator_wallet_id:
+                    # El operador es el fee-payer del traspaso (lo pone build_transfer_tx) y tiene
+                    # que firmarlo. Sin esto el escrow pagaría el rent de la token account del
+                    # ganador — 2.039.280 lamports — y su semilla de 10M solo da para 4 cartas: de
+                    # la quinta en adelante se quedaban dentro del escrow en silencio.
+                    signed = await signer.sign_solana(operator_wallet_id, signed)
                 await submit_tx(signed)
                 p.transferred = True
                 break
