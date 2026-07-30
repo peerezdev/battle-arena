@@ -4,6 +4,7 @@ import { useMachines } from '../../useMachines'
 import { useAliases } from '../../useAliases'
 import { shortWallet } from '../battle/RoyaleReveal'
 import { DelegationPanel } from './DelegationPanel'
+import { ReferrerPanel } from './ReferrerPanel'
 import { ccCardImageUrl } from '../../../onchain/gachaClient'
 import type { UserStats } from '../../../hooks/useUserStats'
 
@@ -112,6 +113,7 @@ export function OverviewTab({ wallet, stats }: { wallet?: string; stats: UserSta
         </section>
       </div>
 
+      {isSelf && <ReferrerPanel />}
       {isSelf && <DelegationPanel />}
     </div>
   )

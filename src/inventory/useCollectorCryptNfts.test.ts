@@ -5,7 +5,7 @@ const CC = 'CCryptWBYktukHDQ2vHGtVcmtjXxYzvw8XNVY64YN2Yf' // config.ccCollection
 const EMBEDDED = 'EMBEDDEDwallet1111111111111111111111111111'
 
 // El hook resuelve la wallet por Privy; aquí se sustituye para poder decidir qué hay vinculado.
-const embeddedAddress = vi.fn<[], string | null>(() => EMBEDDED)
+const embeddedAddress = vi.fn<() => string | null>(() => EMBEDDED)
 vi.mock('../wallet/embedded', () => ({
   useEmbeddedSolanaAddress: () => embeddedAddress(),
 }))
