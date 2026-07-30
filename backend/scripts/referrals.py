@@ -27,11 +27,12 @@ def cmd_add(args) -> int:
         if get_referral_code(s, args.code) is not None:
             print(f"error: code '{args.code}' already exists", file=sys.stderr)
             return 1
-        create_referral_code(s, args.code, args.name, boost_pct=args.boost,
-                             referrer_pct=args.referrer, owner_wallet=args.owner)
+        rc = create_referral_code(s, args.code, args.name, boost_pct=args.boost,
+                                  referrer_pct=args.referrer, owner_wallet=args.owner)
+        rc.rake_share_pct = args.rake_share   # create_referral_code no acepta el campo aún
         s.commit()
         print(f"added {args.code} (name={args.name!r} boost={args.boost} "
-              f"referrer={args.referrer} owner={args.owner})")
+              f"rake_share={args.rake_share} owner={args.owner})")
         return 0
     finally:
         s.close()
@@ -44,9 +45,16 @@ def cmd_list(args) -> int:
         rows = s.query(ReferralCode).order_by(ReferralCode.created_at).all()
         if not rows:
             print("(no referral codes)")
+        from app.services.referral_earnings import referrer_summary
         for r in rows:
-            print(f"{r.code}\tname={r.name!r}\tboost={r.boost_pct}\treferrer={r.referrer_pct}\t"
-                  f"owner={r.owner_wallet}\tearned={r.earned}")
+            line = (f"{r.code}\tname={r.name!r}\tboost={r.boost_pct}\t"
+                    f"rake_share={r.rake_share_pct}\towner={r.owner_wallet}")
+            if r.owner_wallet:
+                sm = referrer_summary(s, r.owner_wallet)
+                line += (f"\treferidos={sum(c['referred_count'] for c in sm['codes'])}"
+                         f"\tunclaimed=${sm['unclaimed_base_units'] / 1e6:.2f}"
+                         f"\tlifetime=${sm['lifetime_base_units'] / 1e6:.2f}")
+            print(line)
         return 0
     finally:
         s.close()
@@ -61,6 +69,8 @@ def main(argv=None) -> int:
     pa.add_argument("--name", required=True)
     pa.add_argument("--boost", type=float, default=0.0, help="boost pct for the referred user (e.g. 0.10)")
     pa.add_argument("--referrer", type=float, default=0.0, help="cut pct for the code owner (e.g. 0.10)")
+    pa.add_argument("--rake-share", type=float, default=0.25,
+                    help="fracción del rake de sus referidos que cobra el dueño (0.25 = 25%%)")
     pa.add_argument("--owner", default=None, help="owner wallet to credit the referrer cut to")
     pa.set_defaults(func=cmd_add)
 
