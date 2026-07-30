@@ -12,11 +12,13 @@ es justo lo contrario de lo que se quiere premiar.
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional, Tuple
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..models import BattlePlayer, ReferralCode, ReferralEarning, User
+from ..models import (BattlePlayer, ReferralCode, ReferralEarning, ReferralPayout,
+                      User)
 
 logger = logging.getLogger(__name__)
 
@@ -64,3 +66,57 @@ def accrue_rake_earnings(session: Session, battle_id: str,
     except Exception:
         logger.exception("rev-share: devengo falló en la batalla %s — se omite", battle_id)
         return []
+
+
+def referrer_summary(session: Session, wallet: str) -> dict:
+    """Resumen para el panel del referidor. Devuelve ceros (no error) si no posee códigos."""
+    codes = session.query(ReferralCode).filter_by(owner_wallet=wallet).all()
+    code_rows = []
+    for c in codes:
+        referred = session.query(User).filter_by(referred_by=c.code).count()
+        code_rows.append({"code": c.code, "rake_share_pct": c.rake_share_pct,
+                          "referred_count": referred})
+
+    def _sum(*conditions) -> int:
+        return int(session.scalar(
+            select(func.coalesce(func.sum(ReferralEarning.amount_base_units), 0))
+            .where(ReferralEarning.referrer_wallet == wallet, *conditions)) or 0)
+
+    return {
+        "codes": code_rows,
+        "unclaimed_base_units": _sum(ReferralEarning.payout_id.is_(None)),
+        "lifetime_base_units": _sum(),
+    }
+
+
+def claim_earnings(session: Session, wallet: str) -> Tuple[Optional[ReferralPayout], List[int]]:
+    """Abre un claim: crea el payout 'pending' con el total pendiente y devuelve sus earning ids.
+
+    NO marca las earnings todavía. Se marcan sólo cuando la transferencia confirma
+    (mark_payout_sent), para que un pago fallido deje el dinero reclamable.
+    """
+    pending = session.query(ReferralEarning).filter(
+        ReferralEarning.referrer_wallet == wallet,
+        ReferralEarning.payout_id.is_(None)).all()
+    if not pending:
+        return None, []
+    total = sum(e.amount_base_units for e in pending)
+    payout = ReferralPayout(wallet=wallet, amount_base_units=total, status="pending")
+    session.add(payout)
+    session.flush()          # necesitamos payout.id
+    return payout, [e.id for e in pending]
+
+
+def mark_payout_sent(session: Session, payout: ReferralPayout, earning_ids: List[int],
+                     signature: str) -> None:
+    session.query(ReferralEarning).filter(ReferralEarning.id.in_(earning_ids)).update(
+        {ReferralEarning.payout_id: payout.id}, synchronize_session=False)
+    payout.status = "sent"
+    payout.signature = signature
+    session.commit()
+
+
+def mark_payout_failed(session: Session, payout: ReferralPayout) -> None:
+    """El pago no salió: las earnings siguen sin payout_id, así que se pueden volver a reclamar."""
+    payout.status = "failed"
+    session.commit()

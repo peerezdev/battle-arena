@@ -2,7 +2,10 @@
 from app.models import (BattlePlayer, PackBattle, ReferralCode, ReferralEarning,
                         ReferralPayout, User)
 from app.services.battle_fees import collect_battle_fee
-from app.services.referral_earnings import accrue_rake_earnings
+from app.config import Settings
+from app.services.referral_earnings import (accrue_rake_earnings, claim_earnings,
+                                            mark_payout_failed, mark_payout_sent,
+                                            referrer_summary)
 
 
 def test_referral_code_rake_share_default(Session):
@@ -213,3 +216,81 @@ async def test_sin_saldo_no_devenga(Session):
     await collect_battle_fee(s, b, "A", 2, **_fee_deps(balance=0))
 
     assert s.query(ReferralEarning).filter_by(battle_id="bf3").count() == 0
+
+
+def test_claim_min_default():
+    assert Settings().referral_claim_min_base_units == 5_000_000   # $5
+
+
+def test_summary_sin_codigos_devuelve_ceros(Session):
+    s = Session()
+    out = referrer_summary(s, "NADIE")
+    assert out["codes"] == []
+    assert out["unclaimed_base_units"] == 0 and out["lifetime_base_units"] == 0
+
+
+def test_summary_cuenta_referidos_unclaimed_y_lifetime(Session):
+    s = Session()
+    s.add(ReferralCode(code="C", name="c", owner_wallet="W_OWNER", rake_share_pct=0.25))
+    s.add_all([User(wallet="A", referred_by="C"), User(wallet="B", referred_by="C"),
+               User(wallet="X", referred_by=None)])
+    s.add(ReferralEarning(code="C", referrer_wallet="W_OWNER", referred_wallet="A",
+                          battle_id="b1", amount_base_units=500_000))
+    s.add(ReferralEarning(code="C", referrer_wallet="W_OWNER", referred_wallet="B",
+                          battle_id="b1", amount_base_units=300_000, payout_id=7))
+    s.commit()
+    out = referrer_summary(s, "W_OWNER")
+    assert out["codes"] == [{"code": "C", "rake_share_pct": 0.25, "referred_count": 2}]
+    assert out["unclaimed_base_units"] == 500_000    # la de payout_id=7 ya se cobró
+    assert out["lifetime_base_units"] == 800_000
+
+
+def test_claim_agrega_lo_pendiente_y_deja_el_payout_en_pending(Session):
+    s = Session()
+    s.add_all([
+        ReferralEarning(code="C", referrer_wallet="W", referred_wallet="A",
+                        battle_id="b1", amount_base_units=500_000),
+        ReferralEarning(code="C", referrer_wallet="W", referred_wallet="B",
+                        battle_id="b2", amount_base_units=250_000),
+        ReferralEarning(code="C", referrer_wallet="OTRO", referred_wallet="Z",
+                        battle_id="b3", amount_base_units=999_000),
+    ])
+    s.commit()
+    payout, ids = claim_earnings(s, "W")
+    assert payout.amount_base_units == 750_000 and payout.status == "pending"
+    assert len(ids) == 2                       # no arrastra las de OTRO
+    # Hasta que no se marque como pagado, las earnings siguen sin payout_id. El commit es
+    # necesario para que la comprobación sea real: la sesión va con autoflush=False, así que sin
+    # él la consulta lee la base sin los cambios pendientes y pasaría aunque claim_earnings las
+    # hubiera marcado ya — que es justo el fallo que este test existe para impedir.
+    s.commit()
+    assert s.query(ReferralEarning).filter_by(payout_id=None).count() == 3
+
+
+def test_claim_sin_pendientes_devuelve_none(Session):
+    s = Session()
+    assert claim_earnings(s, "W") == (None, [])
+
+
+def test_mark_sent_marca_earnings_y_firma(Session):
+    s = Session()
+    s.add(ReferralEarning(code="C", referrer_wallet="W", referred_wallet="A",
+                          battle_id="b1", amount_base_units=500_000))
+    s.commit()
+    payout, ids = claim_earnings(s, "W")
+    mark_payout_sent(s, payout, ids, "SIG123")
+    assert payout.status == "sent" and payout.signature == "SIG123"
+    assert s.query(ReferralEarning).one().payout_id == payout.id
+    assert referrer_summary(s, "W")["unclaimed_base_units"] == 0
+
+
+def test_mark_failed_deja_las_earnings_reclamables(Session):
+    s = Session()
+    s.add(ReferralEarning(code="C", referrer_wallet="W", referred_wallet="A",
+                          battle_id="b1", amount_base_units=500_000))
+    s.commit()
+    payout, ids = claim_earnings(s, "W")
+    mark_payout_failed(s, payout)
+    assert payout.status == "failed"
+    # El dinero no se pierde: se puede volver a reclamar
+    assert referrer_summary(s, "W")["unclaimed_base_units"] == 500_000

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # / FEE_WALLET_ADDRESS
     battle_fee_pct_per_player: float = 0.005
     battle_fee_pct_cap: float = 0.03
+    # Mínimo para que un referidor pueda reclamar su rev-share. Agrega el polvo de muchas
+    # batallas en un solo pago: sin mínimo, cada claim costaría más en fees de red que el importe.
+    referral_claim_min_base_units: int = 5_000_000  # $5; env: REFERRAL_CLAIM_MIN_BASE_UNITS
     # Chat announcements: a gacha hit >= this multiple of the pull cost, and a battle winner whose
     # haul >= this multiple of the entry, get a highlight in the lobby chat. env: HIT/WINNER_ANNOUNCE_MULT
     hit_announce_mult: float = 3.0
