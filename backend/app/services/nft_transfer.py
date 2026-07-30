@@ -173,6 +173,25 @@ async def _get_account(rpc_url: str, pubkey: str) -> Optional[dict]:
         return (r.json().get("result") or {}).get("value")
 
 
+async def das_get_asset(rpc_url: str, mint: str) -> Optional[dict]:
+    """El asset según DAS, o None si este RPC no habla DAS o no lo conoce.
+
+    Un cNFT comprimido no tiene cuenta propia: vive como una hoja de un árbol de Merkle, así que
+    `getAccountInfo` responde null y por RPC normal es indistinguible de un mint que no existe.
+    DAS (`getAsset`) es lo único que lo ve. Devuelve None en vez de propagar el error porque no
+    todos los RPC lo implementan: quien llame debe poder seguir sin DAS.
+    """
+    async with httpx.AsyncClient() as c:
+        try:
+            r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getAsset",
+                                            "params": {"id": mint}}, timeout=20)
+            r.raise_for_status()
+        except Exception:
+            return None
+    d = r.json()
+    return d.get("result") if isinstance(d.get("result"), dict) else None
+
+
 def _token_standard(data: bytes) -> Optional[int]:
     """Walk Borsh-encoded Token Metadata account bytes to the token_standard Option<u8>."""
     o = 1 + 32 + 32  # key + update_authority + mint
@@ -236,11 +255,22 @@ async def nft_in_owner(rpc_url: str, owner: str, mint: str) -> bool:
     su dueño dentro. Preguntando solo por token accounts (como hacía esto antes) un Core es
     invisible por mucho que se sondee, así que el settle esperaba en balde y daba la carta por no
     entregable — dejándola atrapada en el escrow aunque estuviera justo ahí.
+
+    Un cNFT comprimido tiene el mismo problema pero peor: no tiene NI cuenta propia, así que ni
+    `getAccountInfo` ni las token accounts lo ven. Se pregunta por DAS. Medido en devnet: 28 cartas
+    daban "no está en el escrow" cuando su dueño ERA el escrow.
     """
     info = await _get_account(rpc_url, mint)
     if info is not None and info.get("owner") == MPL_CORE_PROGRAM:
         holder = read_core_owner(base64.b64decode(info["data"][0]))
         return holder is not None and str(holder) == owner
+
+    if info is None:
+        # Sin cuenta: o es un cNFT, o el mint no existe. DAS lo distingue; si no hay DAS se cae al
+        # camino de abajo, que dirá False — el mismo comportamiento que antes, no peor.
+        asset = await das_get_asset(rpc_url, mint)
+        if asset is not None:
+            return (asset.get("ownership") or {}).get("owner") == owner
 
     # SPL / Token-2022: el saldo vive en una token account del dueño.
     async with httpx.AsyncClient() as c:

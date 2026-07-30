@@ -1,4 +1,5 @@
 import base64
+from typing import Optional
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction
 from app.services.nft_transfer import (
@@ -121,5 +122,51 @@ async def test_spl_sigue_usando_token_accounts():
 @respx.mock
 @pytest.mark.anyio
 async def test_cuenta_inexistente_no_esta_en_el_escrow():
-    respx.post(RPC).mock(return_value=Response(200, json={"result": {"value": None}}))
+    """Sin cuenta y sin que DAS lo conozca: el mint no existe y punto."""
+    def handler(request):
+        m = _json.loads(request.content)["method"]
+        if m == "getAsset":
+            return Response(200, json={"error": {"code": -32601, "message": "not supported"}})
+        return Response(200, json={"result": {"value": None}})
+    respx.post(RPC).mock(side_effect=handler)
+    assert await nft_in_owner(RPC, ESCROW, ASSET) is False
+
+
+# ── nft_in_owner con cNFT comprimidos ─────────────────────────────────────────
+# Un cNFT es peor que un Core: no tiene NI cuenta propia, es una hoja de un árbol de Merkle. Ni
+# getAccountInfo ni las token accounts lo ven, así que sin DAS es indistinguible de un mint que no
+# existe. Medido en devnet: 28 cartas se reportaban "fuera del escrow" siendo el escrow su dueño.
+
+def _sin_cuenta_pero_das(owner: Optional[str]):
+    """Handler RPC: la cuenta no existe; DAS conoce el asset y dice quién es su dueño."""
+    def handler(request):
+        m = _json.loads(request.content)["method"]
+        if m == "getAsset":
+            if owner is None:
+                return Response(200, json={"error": {"code": -32601, "message": "not supported"}})
+            return Response(200, json={"result": {"compression": {"compressed": True},
+                                                  "ownership": {"owner": owner}}})
+        return Response(200, json={"result": {"value": None}})
+    return handler
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_cnft_en_el_escrow_se_detecta_por_das():
+    respx.post(RPC).mock(side_effect=_sin_cuenta_pero_das(ESCROW))
+    assert await nft_in_owner(RPC, ESCROW, ASSET) is True
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_cnft_de_otro_dueno_no_se_confunde():
+    respx.post(RPC).mock(side_effect=_sin_cuenta_pero_das(WINNER))
+    assert await nft_in_owner(RPC, ESCROW, ASSET) is False
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_sin_das_el_comportamiento_es_el_de_antes():
+    """Un RPC que no habla DAS no debe romper nada: responde False, como hacía siempre."""
+    respx.post(RPC).mock(side_effect=_sin_cuenta_pero_das(None))
     assert await nft_in_owner(RPC, ESCROW, ASSET) is False
