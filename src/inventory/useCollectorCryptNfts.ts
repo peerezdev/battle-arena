@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLinkedSolanaWallets } from '../wallet/embedded'
+import { useEmbeddedSolanaAddress } from '../wallet/embedded'
 import { config } from '../onchain/config'
 import { getAssetsByOwner, filterCollectorCryptAssets, dasAssetToCard, type InventoryCard } from './dasClient'
 
@@ -7,32 +7,40 @@ export interface OwnedCard extends InventoryCard {
   source: 'embedded' | 'connected'
 }
 
+/**
+ * Cartas de Collector Crypt en la embedded wallet del usuario — y solo en esa.
+ *
+ * Antes se leían TODAS las wallets Solana vinculadas, incluida una externa tipo Phantom, y se
+ * mezclaban en la misma cuadrícula. Eso enseñaba cartas sobre las que el inventario no puede hacer
+ * nada: el buyback y el withdraw solo funcionan desde la embedded, así que las de una wallet
+ * conectada aparecían y luego se negaban a venderse. El inventario muestra ahora la wallet del
+ * juego, que es la que puede operar.
+ *
+ * `source` se mantiene porque la pestaña reutiliza `OwnedCard` para el inventario público de otro
+ * jugador, donde marca las cartas como 'connected' para desactivar las acciones.
+ */
 export function useCollectorCryptNfts(): { cards: OwnedCard[]; loading: boolean; refresh: () => void } {
-  const wallets = useLinkedSolanaWallets()
+  const address = useEmbeddedSolanaAddress()
   const [cards, setCards] = useState<OwnedCard[]>([])
   const [loading, setLoading] = useState(false)
   const [nonce, setNonce] = useState(0)
-  // Stable dependency key so the effect doesn't loop on array identity.
-  const key = wallets.map((w) => `${w.source}:${w.address}`).join(',')
 
   useEffect(() => {
-    if (wallets.length === 0) {
+    if (!address) {
       setCards([])
       return
     }
     let cancelled = false
     setLoading(true)
-    Promise.all(
-      wallets.map(async (w) => {
-        const assets = await getAssetsByOwner(config.dasRpcUrl, w.address)
-        return filterCollectorCryptAssets(assets, config.ccCollectionMints).map((a) => ({
-          ...dasAssetToCard(a),
-          source: w.source,
-        }))
-      }),
-    )
-      .then((groups) => {
-        if (!cancelled) setCards(groups.flat())
+    getAssetsByOwner(config.dasRpcUrl, address)
+      .then((assets) => {
+        if (cancelled) return
+        setCards(
+          filterCollectorCryptAssets(assets, config.ccCollectionMints).map((a) => ({
+            ...dasAssetToCard(a),
+            source: 'embedded' as const,
+          })),
+        )
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -40,8 +48,7 @@ export function useCollectorCryptNfts(): { cards: OwnedCard[]; loading: boolean;
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `wallets` y `key` van siempre en sync (key deriva de wallets); depender de `key` evita el bucle por identidad del array
-  }, [key, nonce])
+  }, [address, nonce])
 
   return { cards, loading, refresh: () => setNonce((n) => n + 1) }
 }
