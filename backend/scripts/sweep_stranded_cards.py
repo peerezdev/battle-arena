@@ -10,7 +10,6 @@ comprueba on-chain dónde está cada carta y actúa según lo que encuentre:
 
   · en su escrow          → la transfiere a su ganador y marca transferred=1
   · ya en el ganador      → solo marca transferred=1 (llegó, pero no se registró)
-  · cNFT                  → la deja: son invisibles a `nft_in_owner` y `build_transfer` los rechaza
   · en cualquier otro     → no la toca y lo dice: eso necesita mirarse a mano
 
 El gas lo pone el OPERADOR (`fee_payer` + co-firma), no el escrow: al escrow le queda ~1,8M
@@ -32,8 +31,8 @@ import sys
 from app.config import get_settings
 from app.db import make_engine, make_session_factory
 from app.models import BattlePull, PackBattle
-from app.services.nft_transfer import (UnsupportedNftStandard, build_transfer, detect_standard,
-                                       nft_in_owner, submit_signed_tx)
+from app.services.nft_transfer import (UnsupportedNftStandard, build_transfer, nft_in_owner,
+                                       submit_signed_tx)
 from app.services.pack_orchestration import fetch_latest_blockhash, sol_balance
 from app.services.privy_signer import PrivySigner
 
@@ -74,7 +73,7 @@ def _pendientes(s, only: str | None):
 
 
 async def _entregar(s, st, signer, pull, battle) -> str:
-    """Devuelve qué se hizo con esta carta: 'entregada' | 'ya-estaba' | 'cnft' | 'fuera' | 'error'."""
+    """Devuelve qué se hizo con esta carta: 'entregada' | 'ya-estaba' | 'fuera' | 'error'."""
     mint, esc, winner = pull.nft_address, battle.escrow_address, battle.winner
 
     if await nft_in_owner(st.solana_rpc_url, winner, mint):
@@ -85,12 +84,6 @@ async def _entregar(s, st, signer, pull, battle) -> str:
         return "ya-estaba"
 
     if not await nft_in_owner(st.solana_rpc_url, esc, mint):
-        # Un cNFT no tiene cuenta propia: vive dentro de un árbol de Merkle, así que `nft_in_owner`
-        # no lo ve ni estando en el escrow. No es que la carta se haya ido — es que no la sabemos
-        # ni mirar ni mover (`build_transfer` los rechaza). Se distingue para no dar un diagnóstico
-        # falso: "no está" y "no sé moverla" piden arreglos muy distintos.
-        if await detect_standard(st.solana_rpc_url, mint) == "cnft":
-            return "cnft"
         return "fuera"
 
     if not GO:
@@ -137,7 +130,7 @@ async def main() -> None:
         batallas[battle.id] = battle
 
     _log(f"\n{len(filas)} cartas pendientes en {len(por_batalla)} batallas\n")
-    total = {"entregada": 0, "ya-estaba": 0, "cnft": 0, "fuera": 0, "error": 0}
+    total = {"entregada": 0, "ya-estaba": 0, "fuera": 0, "error": 0}
 
     # El gas sale del operador, así que se mira su saldo UNA vez: si no llega para todas, mejor
     # saberlo antes de dejar la mitad entregada.
@@ -157,7 +150,6 @@ async def main() -> None:
             r = await _entregar(s, st, signer, pull, b)
             total[r] += 1
             marca = {"entregada": "→ ganador", "ya-estaba": "ya la tenía",
-                     "cnft": "cNFT: en el escrow, pero no sabemos moverlo",
                      "fuera": "NO está en el escrow", "error": "error"}[r]
             _log(f"    {pull.nft_address[:12]}…  {marca}")
         _log()
@@ -166,7 +158,6 @@ async def main() -> None:
     verbo = "entregadas" if GO else "entregables"
     _log(f"  {verbo:<22} {total['entregada']:>4}")
     _log(f"  {'ya las tenía el ganador':<22} {total['ya-estaba']:>4}")
-    _log(f"  {'cNFT sin soporte':<22} {total['cnft']:>4}   ← hace falta Bubblegum para moverlas")
     _log(f"  {'fuera del escrow':<22} {total['fuera']:>4}   ← requieren mirarse a mano")
     _log(f"  {'errores':<22} {total['error']:>4}")
     if not GO:

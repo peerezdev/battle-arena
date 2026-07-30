@@ -1,5 +1,5 @@
 """Multi-standard NFT transfer (escrow→winner). Pure builders + async resolvers.
-v1: pNFT (Metaplex Transfer) + Standard (SPL). cNFT/MPL Core raise UnsupportedNftStandard."""
+Soporta pNFT (Metaplex Transfer), SPL, MPL Core y cNFT comprimidos (Bubblegum transfer_v2)."""
 from __future__ import annotations
 import base64
 import struct
@@ -161,6 +161,129 @@ class UnsupportedNftStandard(Exception):
     pass
 
 
+# ── cNFT comprimidos: Bubblegum transfer_v2 ───────────────────────────────────
+# Un cNFT no es una cuenta: es una hoja de un árbol de Merkle. Moverlo no es "transferir un token",
+# es probarle al programa dónde está la hoja (root + proof) y reescribirla.
+#
+# El layout de esta instrucción NO está adivinado. Se sacó decodificando una transacción real de
+# Collector Crypt (su buyback mueve estos mismos cNFT): de ahí salen el discriminador, las 11
+# cuentas base y el orden de los campos, y cada campo se verificó contra lo que responde DAS. Los
+# dos únicos cambios respecto a la de CC son quién paga y quién recibe.
+BUBBLEGUM_PROGRAM = Pubkey.from_string("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY")
+MPL_NOOP = Pubkey.from_string("mnoopTCrg4p8ry25e4bcWA9XZjbNjMTfgYVGGEdRsf3")
+MPL_ACCOUNT_COMPRESSION = Pubkey.from_string("mcmt6YrQEMKw8Mw43FmpRLmf7BqRnFMKmAcbxE3xkAW")
+_TRANSFER_V2_DISC = bytes.fromhex("772806ebeaddf831")   # sha256("global:transfer_v2")[:8]
+
+# Límite de tamaño de una transacción de Solana. Importa aquí porque el proof son cuentas: 20 nodos
+# ocupan 640 bytes solo en claves y la transacción no cabe.
+MAX_TX_BYTES = 1232
+
+
+def tree_config_pda(tree: Pubkey) -> Pubkey:
+    return Pubkey.find_program_address([bytes(tree)], BUBBLEGUM_PROGRAM)[0]
+
+
+def _opt(value: Optional[bytes]) -> bytes:
+    """Option<T> de Borsh: 1 byte de etiqueta y, si es Some, el contenido."""
+    return b"\x00" if value is None else b"\x01" + value
+
+
+def build_cnft_transfer(escrow: str, winner: str, recent_blockhash: str, *, tree: str,
+                        collection: str, root: bytes, data_hash: bytes, creator_hash: bytes,
+                        asset_data_hash: Optional[bytes], flags: Optional[int], leaf_id: int,
+                        proof: list, fee_payer: Optional[str] = None) -> str:
+    """transfer_v2 de Bubblegum. Constructor puro: el llamante trae los datos de DAS.
+
+    `proof` son los nodos del camino de Merkle, de la hoja hacia la raíz. Se pasan como cuentas y no
+    caben todos: el árbol guarda sus niveles superiores en un *canopy* y el programa completa desde
+    ahí lo que no se le mande. Así que se envían los que quepan empezando por la hoja — pasar de más
+    nunca estorba, pasar de menos solo funciona si el canopy cubre el resto (en el árbol de CC cubre
+    14 de 20 niveles, y con 6 sobra sitio).
+    """
+    esc = Pubkey.from_string(escrow); win = Pubkey.from_string(winner)
+    tre = Pubkey.from_string(tree); col = Pubkey.from_string(collection)
+    payer = Pubkey.from_string(fee_payer) if fee_payer else esc
+
+    data = (_TRANSFER_V2_DISC + root + data_hash + creator_hash
+            + _opt(asset_data_hash)
+            + _opt(None if flags is None else bytes([flags]))
+            + leaf_id.to_bytes(8, "little")      # nonce
+            + leaf_id.to_bytes(4, "little"))     # index (misma hoja)
+
+    base = [
+        AccountMeta(tree_config_pda(tre), is_signer=False, is_writable=True),   # 0 tree_config
+        AccountMeta(payer, is_signer=True,  is_writable=True),                 # 1 payer
+        AccountMeta(esc,   is_signer=True,  is_writable=False),                 # 2 leaf_owner
+        AccountMeta(esc,   is_signer=True,  is_writable=False),                 # 3 ·
+        AccountMeta(esc,   is_signer=True,  is_writable=False),                 # 4 ·
+        AccountMeta(win,   is_signer=False, is_writable=False),                 # 5 new_leaf_owner
+        AccountMeta(tre,   is_signer=False, is_writable=True),                  # 6 merkle_tree
+        AccountMeta(col,   is_signer=False, is_writable=False),                 # 7 core_collection
+        AccountMeta(MPL_NOOP, is_signer=False, is_writable=False),              # 8 log_wrapper
+        AccountMeta(MPL_ACCOUNT_COMPRESSION, is_signer=False, is_writable=False),  # 9 compression
+        AccountMeta(SYS_PROGRAM, is_signer=False, is_writable=False),           # 10 system
+    ]
+    # La verificación del proof consume mucho más que un traspaso normal.
+    cu_ix = Instruction(COMPUTE_BUDGET, bytes([2]) + (250000).to_bytes(4, "little"), [])
+    firmas = 2 if (fee_payer and fee_payer != escrow) else 1
+
+    for n in range(len(proof), -1, -1):
+        metas = base + [AccountMeta(Pubkey.from_string(p), is_signer=False, is_writable=False)
+                        for p in proof[:n]]
+        ix = Instruction(BUBBLEGUM_PROGRAM, data, metas)
+        msg = Message.new_with_blockhash([cu_ix, ix], payer, Hash.from_string(recent_blockhash))
+        raw = bytes(Transaction.new_unsigned(msg))
+        if len(raw) + firmas * 64 <= MAX_TX_BYTES:
+            return base64.b64encode(raw).decode()
+    raise UnsupportedNftStandard("cnft: la transacción no cabe ni sin proof")
+
+
+async def das_get_asset_proof(rpc_url: str, mint: str) -> Optional[dict]:
+    """El camino de Merkle del asset según DAS, o None si el RPC no habla DAS."""
+    async with httpx.AsyncClient() as c:
+        try:
+            r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getAssetProof",
+                                            "params": {"id": mint}}, timeout=20)
+            r.raise_for_status()
+        except Exception:
+            return None
+    d = r.json()
+    return d.get("result") if isinstance(d.get("result"), dict) else None
+
+
+def _b58(s: str) -> bytes:
+    return bytes(Pubkey.from_string(s))     # los hashes de DAS vienen en base58, como las claves
+
+
+async def resolve_cnft_transfer(rpc_url: str, escrow: str, winner: str, mint: str, blockhash: str,
+                                *, fee_payer: Optional[str] = None) -> str:
+    """Reúne de DAS lo que hace falta y construye el transfer_v2."""
+    asset = await das_get_asset(rpc_url, mint)
+    prf = await das_get_asset_proof(rpc_url, mint)
+    if asset is None or prf is None:
+        raise UnsupportedNftStandard("cnft: hace falta un RPC con DAS para leer el proof")
+
+    comp = asset.get("compression") or {}
+    coll = next((g.get("group_value") for g in (asset.get("grouping") or [])
+                 if g.get("group_key") == "collection"), None)
+    if not coll:
+        # Sin colección no se sabe qué mandar en esa cuenta, y adivinarlo puede firmar cualquier
+        # cosa. Mejor fallar y que se vea.
+        raise UnsupportedNftStandard("cnft sin colección: no soportado")
+    if (asset.get("ownership") or {}).get("delegate"):
+        raise UnsupportedNftStandard("cnft con delegado: no soportado")
+
+    adh = comp.get("asset_data_hash")
+    return build_cnft_transfer(
+        escrow, winner, blockhash,
+        tree=comp["tree"], collection=coll,
+        root=_b58(prf["root"]), data_hash=_b58(comp["data_hash"]),
+        creator_hash=_b58(comp["creator_hash"]),
+        asset_data_hash=_b58(adh) if adh else None,
+        flags=comp.get("flags"), leaf_id=comp["leaf_id"],
+        proof=prf["proof"], fee_payer=fee_payer)
+
+
 async def _get_account(rpc_url: str, pubkey: str) -> Optional[dict]:
     async with httpx.AsyncClient() as c:
         r = await c.post(
@@ -245,6 +368,9 @@ async def build_transfer(rpc_url: str, escrow: str, winner: str, mint: str, bloc
         coll = read_core_collection(base64.b64decode(info["data"][0])) if info else None
         return build_core_transfer(escrow, winner, mint, blockhash,
                                    collection=str(coll) if coll else None, fee_payer=fee_payer)
+    if std == "cnft":
+        return await resolve_cnft_transfer(rpc_url, escrow, winner, mint, blockhash,
+                                           fee_payer=fee_payer)
     raise UnsupportedNftStandard(f"standard={std!r} is not supported")
 
 
