@@ -44,8 +44,17 @@ def accrue_rake_earnings(session: Session, battle_id: str,
         if per_player <= 0:
             return []
 
+        # Lo ya devengado de esta batalla. El guard `fee_charged` del cobro ya impide llegar aquí
+        # dos veces, pero esa protección es PRESTADA: si alguien mueve esta llamada de sitio o
+        # cambia el guard, el referidor acumularía el doble y nadie se enteraría. Esto lo hace
+        # imposible en vez de improbable, y el índice único de la tabla es la última red.
+        ya = {e.referred_wallet for e in
+              session.query(ReferralEarning).filter_by(battle_id=battle_id).all()}
+
         rows: List[ReferralEarning] = []
         for wallet in wallets:
+            if wallet in ya:
+                continue
             user = session.get(User, wallet)
             if user is None or not user.referred_by:
                 continue

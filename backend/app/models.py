@@ -56,6 +56,12 @@ class ReferralEarning(Base):
     salió cada céntimo. `payout_id` nulo = pendiente de cobrar.
     """
     __tablename__ = "referral_earnings"
+    # Un referidor no puede cobrar dos veces por el mismo jugador en la misma batalla. Va como
+    # índice y no como UniqueConstraint porque aquí no hay framework de migraciones: un índice se
+    # puede crear sobre una tabla que ya existe (ver _ENSURE_INDEXES en db.py), y una constraint de
+    # tabla exigiría reconstruirla.
+    __table_args__ = (Index("uq_earning_battle_referred", "battle_id", "referred_wallet",
+                            unique=True),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String)
     referrer_wallet: Mapped[str] = mapped_column(String, index=True)

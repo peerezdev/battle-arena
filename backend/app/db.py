@@ -51,6 +51,26 @@ _ENSURE_COLUMNS = [
 ]
 
 
+# Índices que hay que poder crear sobre tablas que YA existen. create_all solo crea tablas
+# ausentes: si la tabla estaba, sus índices nuevos no aparecen nunca. `CREATE ... IF NOT EXISTS`
+# lo hace idempotente, igual que _ENSURE_COLUMNS con las columnas.
+_ENSURE_INDEXES = [
+    # Un referidor no puede cobrar dos veces por el mismo jugador en la misma batalla.
+    ("referral_earnings", "uq_earning_battle_referred",
+     "CREATE UNIQUE INDEX IF NOT EXISTS uq_earning_battle_referred "
+     "ON referral_earnings (battle_id, referred_wallet)"),
+]
+
+
+def _ensure_indexes(engine):
+    insp = inspect(engine)
+    existing = set(insp.get_table_names())
+    with engine.begin() as conn:
+        for table, _name, ddl in _ENSURE_INDEXES:
+            if table in existing:
+                conn.execute(text(ddl))
+
+
 def _ensure_columns(engine):
     insp = inspect(engine)
     existing_tables = set(insp.get_table_names())
@@ -117,6 +137,7 @@ def init_db(engine):
                 and "seen_at" in {c["name"] for c in insp.get_columns("battle_players")})
     Base.metadata.create_all(engine)
     _ensure_columns(engine)
+    _ensure_indexes(engine)
     if not had_refunded:
         _backfill_refunded(engine)
     if not had_seen:

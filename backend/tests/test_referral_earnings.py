@@ -294,3 +294,52 @@ def test_mark_failed_deja_las_earnings_reclamables(Session):
     assert payout.status == "failed"
     # El dinero no se pierde: se puede volver a reclamar
     assert referrer_summary(s, "W")["unclaimed_base_units"] == 500_000
+
+
+# ── que no se pueda pagar dos veces por lo mismo ──────────────────────────────
+# El devengo no duplica porque vive dentro del guard `fee_charged` del cobro. Esa protección es
+# PRESTADA: si alguien mueve el devengo de sitio o cambia cómo funciona el guard, el referidor
+# empezaría a acumular el doble y nadie se enteraría, porque no habría nada que lo comprobase.
+# Estas dos defensas lo convierten en imposible en vez de en improbable.
+
+def test_no_se_devenga_dos_veces_por_el_mismo_referido(Session):
+    """Defensa 1, en el código: si ya hay devengo de esta batalla para este jugador, se salta."""
+    s = Session()
+    s.add(ReferralCode(code="C", name="c", owner_wallet="W_OWNER", rake_share_pct=0.25))
+    s.commit()
+    _battle_with(s, "bd", [("A", "C"), ("B", None)])
+
+    primera = accrue_rake_earnings(s, "bd", 8_000_000)
+    s.commit()
+    segunda = accrue_rake_earnings(s, "bd", 8_000_000)   # el guard de arriba se rompió
+    s.commit()
+
+    assert len(primera) == 1
+    assert segunda == [], "una segunda pasada no puede volver a devengar"
+    assert s.query(ReferralEarning).filter_by(battle_id="bd").count() == 1
+
+
+def test_la_base_rechaza_el_duplicado_aunque_se_inserte_a_mano(Session):
+    """Defensa 2, en la base: la última línea, por si alguien inserta saltándose la función."""
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+    s = Session()
+    s.add(ReferralEarning(code="C", referrer_wallet="W", referred_wallet="A",
+                          battle_id="bx", amount_base_units=500_000))
+    s.commit()
+    s.add(ReferralEarning(code="C", referrer_wallet="W", referred_wallet="A",
+                          battle_id="bx", amount_base_units=500_000))
+    with pytest.raises(IntegrityError):
+        s.commit()
+    s.rollback()
+
+
+def test_el_mismo_jugador_en_otra_batalla_si_devenga(Session):
+    """La restricción es por (batalla, referido): jugar más partidas tiene que seguir pagando."""
+    s = Session()
+    s.add(ReferralEarning(code="C", referrer_wallet="W", referred_wallet="A",
+                          battle_id="b_uno", amount_base_units=500_000))
+    s.add(ReferralEarning(code="C", referrer_wallet="W", referred_wallet="A",
+                          battle_id="b_dos", amount_base_units=500_000))
+    s.commit()
+    assert s.query(ReferralEarning).filter_by(referred_wallet="A").count() == 2
