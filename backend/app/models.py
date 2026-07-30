@@ -40,8 +40,40 @@ class ReferralCode(Base):
     name: Mapped[str] = mapped_column(String)  # creator name
     boost_pct: Mapped[float] = mapped_column(Float, default=0.0)      # boost on the referred user's earnings
     referrer_pct: Mapped[float] = mapped_column(Float, default=0.0)   # cut credited to the code owner
+    # Rev-share del rake de batallas que generan los referidos de este código. Es dinero real
+    # (USDC), a diferencia de referrer_pct, que es puntos. Sale del rake existente: el jugador
+    # paga lo mismo.
+    rake_share_pct: Mapped[float] = mapped_column(Float, default=0.25)
     owner_wallet: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # User to credit the cut to
     earned: Mapped[int] = mapped_column(Integer, default=0)  # fallback tally when no owner_wallet
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ReferralEarning(Base):
+    """Un devengo: lo que un referidor ganó por UN participante referido en UNA batalla.
+
+    Una fila por (batalla, referido) hace la auditoría trivial: se puede reconstruir de dónde
+    salió cada céntimo. `payout_id` nulo = pendiente de cobrar.
+    """
+    __tablename__ = "referral_earnings"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String)
+    referrer_wallet: Mapped[str] = mapped_column(String, index=True)
+    referred_wallet: Mapped[str] = mapped_column(String)
+    battle_id: Mapped[str] = mapped_column(String, index=True)
+    amount_base_units: Mapped[int] = mapped_column(Integer)
+    payout_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ReferralPayout(Base):
+    """Un claim: el pago agregado de todas las earnings pendientes de un referidor."""
+    __tablename__ = "referral_payouts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    wallet: Mapped[str] = mapped_column(String, index=True)
+    amount_base_units: Mapped[int] = mapped_column(Integer)
+    signature: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="pending")  # pending | sent | failed
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

@@ -39,6 +39,7 @@ _ENSURE_COLUMNS = [
     ("gacha_packs", "rarity", "VARCHAR"),
     ("gacha_packs", "auto_sold", "BOOLEAN NOT NULL DEFAULT 0"),
     ("gacha_packs", "buyback_amount", "INTEGER"),
+    ("referral_codes", "rake_share_pct", "FLOAT NOT NULL DEFAULT 0.25"),
     ("chat_messages", "kind", "VARCHAR NOT NULL DEFAULT 'user'"),
     ("chat_messages", "action", "VARCHAR"),
     ("chat_messages", "event", "VARCHAR"),
