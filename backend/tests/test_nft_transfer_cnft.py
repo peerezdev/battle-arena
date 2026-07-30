@@ -10,13 +10,17 @@ exactamente los de esa instrucción que funciona. Si alguien cambia el orden de 
 tamaño de un entero, ese test lo caza — un test que solo comprobase "no revienta" no lo haría.
 """
 import base64
+import json
 import pytest
+import respx
+from httpx import Response
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction
 
 from app.services.nft_transfer import (BUBBLEGUM_PROGRAM, MAX_TX_BYTES, MPL_ACCOUNT_COMPRESSION,
-                                       MPL_NOOP, SYS_PROGRAM, UnsupportedNftStandard,
-                                       build_cnft_transfer, tree_config_pda)
+                                       MPL_NOOP, SYS_PROGRAM, DasUnavailable,
+                                       UnsupportedNftStandard, build_cnft_transfer,
+                                       das_get_asset, resolve_cnft_transfer, tree_config_pda)
 
 # Valores del asset real 7rkmuy1Kn6D7… tal y como los devuelve DAS.
 TREE = "CCTREEA8hbsXNCf77tUEgbHaBFV9CmgfuQWfeNXHQ34h"
@@ -138,3 +142,76 @@ def test_un_hash_de_tamano_raro_no_se_cuela(campo):
     """Los hashes son de 32 bytes exactos: uno corto desplazaría todos los campos siguientes."""
     _, tx = _construir(**{campo: b"\x01\x02"})
     assert len(bytes(_ix_bubblegum(tx).data)) != 151
+
+
+# ── "no lo conozco" vs "no pude preguntar" ────────────────────────────────────
+# Sin cuenta on-chain, un mint puede ser un cNFT vivo o un mint que no existe. Solo DAS lo
+# distingue, y confundir su silencio con un "no existe" es exactamente el error que nos tuvo
+# semanas persiguiendo cartas fantasma. Las dos respuestas piden reacciones opuestas: una carta
+# que no existe no aparecerá nunca (no reintentar), un DAS caído es transitorio (reintentar).
+
+RPC = "https://rpc.test"
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_das_devuelve_none_cuando_no_conoce_el_asset():
+    respx.post(RPC).mock(return_value=Response(200, json={
+        "error": {"code": -32000, "message": "Database Error: RecordNotFound Error: Asset Not Found"}}))
+    assert await das_get_asset(RPC, "loquesea") is None
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_un_rpc_sin_das_no_se_confunde_con_un_mint_inexistente():
+    """Un RPC sin DAS responde 404. Eso no dice nada sobre la carta."""
+    respx.post(RPC).mock(return_value=Response(404, json={"error": {"message": "Method not found"}}))
+    with pytest.raises(DasUnavailable):
+        await das_get_asset(RPC, "loquesea")
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_un_error_transitorio_de_das_tampoco():
+    """Un límite de peticiones o un fallo interno no es "esta carta no existe"."""
+    respx.post(RPC).mock(return_value=Response(200, json={
+        "error": {"code": -32429, "message": "Too many requests"}}))
+    with pytest.raises(DasUnavailable):
+        await das_get_asset(RPC, "loquesea")
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_mint_inexistente_se_reporta_como_tal_y_no_se_reintenta():
+    """UnsupportedNftStandard es la señal de "no insistas" para el settle."""
+    respx.post(RPC).mock(return_value=Response(200, json={
+        "error": {"code": -32000, "message": "Asset Not Found"}}))
+    with pytest.raises(UnsupportedNftStandard, match="no existe"):
+        await resolve_cnft_transfer(RPC, ESCROW, WINNER, "MINT", ROOT)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_das_caido_sube_como_transitorio_para_que_se_reintente():
+    """Si esto se convirtiese en UnsupportedNftStandard, el settle se rendiría con la carta ahí."""
+    respx.post(RPC).mock(return_value=Response(503, text="upstream down"))
+    with pytest.raises(DasUnavailable):
+        await resolve_cnft_transfer(RPC, ESCROW, WINNER, "MINT", ROOT)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_un_cnft_con_delegado_no_se_toca():
+    """Con delegado la hoja lleva otra clave y firmaríamos algo que no cuadra: mejor no entregarla."""
+    def handler(request):
+        m = json.loads(request.content)["method"]
+        if m == "getAssetProof":
+            return Response(200, json={"result": {"root": ROOT, "proof": []}})
+        return Response(200, json={"result": {
+            "compression": {"tree": TREE, "data_hash": DATA_HASH, "creator_hash": CREATOR_HASH,
+                            "asset_data_hash": CREATOR_HASH, "flags": 0, "leaf_id": LEAF_ID},
+            "grouping": [{"group_key": "collection", "group_value": COLLECTION}],
+            "ownership": {"owner": ESCROW, "delegate": "OTRO"}}})
+    respx.post(RPC).mock(side_effect=handler)
+    with pytest.raises(UnsupportedNftStandard, match="delegado"):
+        await resolve_cnft_transfer(RPC, ESCROW, WINNER, "MINT", ROOT)

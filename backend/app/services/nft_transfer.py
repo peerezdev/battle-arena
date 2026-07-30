@@ -239,16 +239,8 @@ def build_cnft_transfer(escrow: str, winner: str, recent_blockhash: str, *, tree
 
 
 async def das_get_asset_proof(rpc_url: str, mint: str) -> Optional[dict]:
-    """El camino de Merkle del asset según DAS, o None si el RPC no habla DAS."""
-    async with httpx.AsyncClient() as c:
-        try:
-            r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getAssetProof",
-                                            "params": {"id": mint}}, timeout=20)
-            r.raise_for_status()
-        except Exception:
-            return None
-    d = r.json()
-    return d.get("result") if isinstance(d.get("result"), dict) else None
+    """El camino de Merkle del asset según DAS, o None si DAS no lo conoce."""
+    return await _das(rpc_url, "getAssetProof", mint)
 
 
 def _b58(s: str) -> bytes:
@@ -258,10 +250,13 @@ def _b58(s: str) -> bytes:
 async def resolve_cnft_transfer(rpc_url: str, escrow: str, winner: str, mint: str, blockhash: str,
                                 *, fee_payer: Optional[str] = None) -> str:
     """Reúne de DAS lo que hace falta y construye el transfer_v2."""
+    # Un DasUnavailable NO se convierte en UnsupportedNftStandard: sube tal cual para que el
+    # reintento del settle lo vuelva a intentar. UnsupportedNftStandard significa "no insistas".
     asset = await das_get_asset(rpc_url, mint)
     prf = await das_get_asset_proof(rpc_url, mint)
     if asset is None or prf is None:
-        raise UnsupportedNftStandard("cnft: hace falta un RPC con DAS para leer el proof")
+        # DAS contestó y no lo conoce: no hay ninguna carta detrás de este mint.
+        raise UnsupportedNftStandard(f"el mint {mint} no existe on-chain (DAS no lo conoce)")
 
     comp = asset.get("compression") or {}
     coll = next((g.get("group_value") for g in (asset.get("grouping") or [])
@@ -296,23 +291,44 @@ async def _get_account(rpc_url: str, pubkey: str) -> Optional[dict]:
         return (r.json().get("result") or {}).get("value")
 
 
-async def das_get_asset(rpc_url: str, mint: str) -> Optional[dict]:
-    """El asset según DAS, o None si este RPC no habla DAS o no lo conoce.
+class DasUnavailable(Exception):
+    """No se pudo preguntar a DAS. NO significa que la carta no exista, solo que no lo sabemos.
 
-    Un cNFT comprimido no tiene cuenta propia: vive como una hoja de un árbol de Merkle, así que
-    `getAccountInfo` responde null y por RPC normal es indistinguible de un mint que no existe.
-    DAS (`getAsset`) es lo único que lo ve. Devuelve None en vez de propagar el error porque no
-    todos los RPC lo implementan: quien llame debe poder seguir sin DAS.
+    La diferencia con "DAS dice que no lo conoce" es de comportamiento, no de redacción: esto es
+    transitorio y hay que reintentar, mientras que una carta que no existe no va a aparecer nunca.
+    Confundirlos es lo que nos tuvo semanas persiguiendo "mints inexistentes" que resultaron ser
+    cNFT perfectamente vivos.
+    """
+
+
+async def _das(rpc_url: str, method: str, mint: str) -> Optional[dict]:
+    """Llama a un método DAS. Devuelve None si DAS contesta que no conoce el asset.
+    Levanta DasUnavailable si no se pudo preguntar (RPC sin DAS, 429, timeout…).
     """
     async with httpx.AsyncClient() as c:
         try:
-            r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getAsset",
+            r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": method,
                                             "params": {"id": mint}}, timeout=20)
-            r.raise_for_status()
-        except Exception:
-            return None
+            r.raise_for_status()          # un RPC sin DAS responde 404; Helius limita con 429
+        except Exception as exc:
+            raise DasUnavailable(f"{method}: {exc}") from exc
     d = r.json()
-    return d.get("result") if isinstance(d.get("result"), dict) else None
+    if isinstance(d.get("result"), dict):
+        return d["result"]
+    err = d.get("error") or {}
+    if "not found" in str(err.get("message", "")).lower():
+        return None                       # DAS contestó y no lo conoce: el mint no existe
+    raise DasUnavailable(f"{method}: {err or 'respuesta sin result'}")
+
+
+async def das_get_asset(rpc_url: str, mint: str) -> Optional[dict]:
+    """El asset según DAS, o None si DAS no lo conoce.
+
+    Un cNFT comprimido no tiene cuenta propia: vive como una hoja de un árbol de Merkle, así que
+    `getAccountInfo` responde null y por RPC normal es indistinguible de un mint que no existe.
+    DAS (`getAsset`) es lo único que lo ve.
+    """
+    return await _das(rpc_url, "getAsset", mint)
 
 
 def _token_standard(data: bytes) -> Optional[int]:
@@ -392,9 +408,14 @@ async def nft_in_owner(rpc_url: str, owner: str, mint: str) -> bool:
         return holder is not None and str(holder) == owner
 
     if info is None:
-        # Sin cuenta: o es un cNFT, o el mint no existe. DAS lo distingue; si no hay DAS se cae al
-        # camino de abajo, que dirá False — el mismo comportamiento que antes, no peor.
-        asset = await das_get_asset(rpc_url, mint)
+        # Sin cuenta: o es un cNFT, o el mint no existe. DAS lo distingue. Si no se puede preguntar
+        # se cae al camino de abajo, que dirá False — el comportamiento de antes, no peor. Aquí sí
+        # se traga el DasUnavailable a propósito: esto es un "¿la tiene?" y la respuesta honesta
+        # cuando no se sabe es "no me consta", que es lo que el sondeo del settle espera.
+        try:
+            asset = await das_get_asset(rpc_url, mint)
+        except DasUnavailable:
+            asset = None
         if asset is not None:
             return (asset.get("ownership") or {}).get("owner") == owner
 
