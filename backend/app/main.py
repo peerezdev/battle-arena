@@ -206,7 +206,10 @@ def create_app(session_factory, chain: ChainSource,
                fee_wallet_address: str = "",
                hit_announce_mult: float = 3.0,
                winner_announce_mult: float = 4.0,
-               royale_creator_allowlist: set[str] | None = None) -> FastAPI:
+               royale_creator_allowlist: set[str] | None = None,
+               referral_payout_wallet_id: str = "",
+               referral_payout_address: str = "",
+               referral_claim_min_base_units: int = 5_000_000) -> FastAPI:
     app = FastAPI(title="Battle Arena — Backend")
 
     # Wallets allowed to CREATE Battle Royale (empty = open to all). Captured by the
@@ -370,6 +373,62 @@ def create_app(session_factory, chain: ChainSource,
             s.rollback()
             raise HTTPException(409, str(e))
         return out
+
+    # ── Panel del referidor: rev-share del rake ─────────────────────────────
+    # Un claim en vuelo por wallet: dos pulsaciones seguidas no pueden pagar dos veces.
+    _claim_locks: set = set()
+
+    @app.get("/users/me/referrer")
+    async def me_referrer(wallet: str = Depends(current_user), s: Session = Depends(db)):
+        """Panel del referidor. Sin códigos en propiedad devuelve ceros, no 404: el frontend
+        decide con esto si enseña el panel."""
+        from .services.referral_earnings import referrer_summary
+        out = referrer_summary(s, wallet)
+        out["claim_min_base_units"] = referral_claim_min_base_units
+        return out
+
+    @app.post("/users/me/referrer/claim")
+    async def me_referrer_claim(wallet: str = Depends(current_user), s: Session = Depends(db)):
+        """Paga el rev-share pendiente desde la wallet de payouts.
+
+        Esa wallet es la misma a la que aterriza el rake y está POR DECIDIR: mientras no se
+        configure, esto responde 503 en vez de tirar del operador. El operador ya paga el rent de
+        cada carta y la siembra de escrows; hacerlo además la caja de los referidos lo convertiría
+        en punto único de fallo de tres cosas a la vez.
+        """
+        from .services.referral_earnings import (claim_earnings, mark_payout_failed,
+                                                 mark_payout_sent, referrer_summary)
+        pending = referrer_summary(s, wallet)["unclaimed_base_units"]
+        if pending < referral_claim_min_base_units:
+            raise HTTPException(409, "below_minimum")
+        if not (referral_payout_wallet_id and referral_payout_address):
+            raise HTTPException(503, "payouts_unavailable")
+        if wallet in _claim_locks:
+            raise HTTPException(409, "claim_in_progress")
+        _claim_locks.add(wallet)
+        try:
+            payout, earning_ids = claim_earnings(s, wallet)
+            if payout is None:
+                raise HTTPException(409, "nothing_to_claim")
+            s.commit()
+            try:
+                bh = await fetch_latest_blockhash(solana_rpc_url)
+                # withdraw_usdc crea el ATA destino de forma idempotente (el pagador cubre la
+                # renta): un referidor puede no tener cuenta USDC todavía. La wallet de payouts va
+                # como origen Y como fee-payer; al ser el mismo firmante, la segunda firma es un no-op.
+                sig = await withdraw_usdc(
+                    solana_rpc_url, privy_signer,
+                    referral_payout_wallet_id, referral_payout_address,   # origen del dinero
+                    referral_payout_wallet_id, referral_payout_address,   # fee-payer
+                    wallet, cc_usdc_mint, payout.amount_base_units, bh)
+            except Exception as exc:
+                mark_payout_failed(s, payout)
+                logger.error("rev-share: claim de %s falló: %s", wallet, exc)
+                raise HTTPException(502, "payout_failed")
+            mark_payout_sent(s, payout, earning_ids, sig)
+            return {"signature": sig, "amount_base_units": payout.amount_base_units}
+        finally:
+            _claim_locks.discard(wallet)
 
     @app.get("/leaderboard")
     async def get_leaderboard(limit: int = Query(default=50, ge=1, le=200), s: Session = Depends(db)):
@@ -1595,6 +1654,9 @@ def build_default_app() -> FastAPI:
                       min_withdraw_usdc=s.min_withdraw_usdc,
                       withdraw_rate_limit=s.withdraw_rate_limit,
                       withdraw_rate_window_s=s.withdraw_rate_window_s,
+                      referral_payout_wallet_id=s.referral_payout_wallet_id,
+                      referral_payout_address=s.referral_payout_address,
+                      referral_claim_min_base_units=s.referral_claim_min_base_units,
                       withdraw_fee_pct=s.withdraw_fee_pct,
                       fee_wallet_address=s.fee_wallet_address,
                       hit_announce_mult=s.hit_announce_mult,

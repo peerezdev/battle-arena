@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # Mínimo para que un referidor pueda reclamar su rev-share. Agrega el polvo de muchas
     # batallas en un solo pago: sin mínimo, cada claim costaría más en fees de red que el importe.
     referral_claim_min_base_units: int = 5_000_000  # $5; env: REFERRAL_CLAIM_MIN_BASE_UNITS
+    # Wallet desde la que se pagan los claims de rev-share. Es la MISMA a la que aterriza el rake,
+    # así que tiene que ser una wallet de Privy firmable (no basta una dirección suelta como
+    # fee_wallet_address). Está sin decidir: mientras esté vacía, el claim responde 503 en vez de
+    # tirar del operador — el operador ya paga el rent de las cartas y la siembra de escrows, y
+    # convertirlo además en la caja de los referidos lo haría punto único de fallo de tres cosas.
+    referral_payout_wallet_id: str = ""    # env: REFERRAL_PAYOUT_WALLET_ID
+    referral_payout_address: str = ""      # env: REFERRAL_PAYOUT_ADDRESS
     # Chat announcements: a gacha hit >= this multiple of the pull cost, and a battle winner whose
     # haul >= this multiple of the entry, get a highlight in the lobby chat. env: HIT/WINNER_ANNOUNCE_MULT
     hit_announce_mult: float = 3.0
