@@ -1,6 +1,7 @@
 """Rev-share del rake: esquema del ledger, devengo y consultas de claim."""
 from app.models import (BattlePlayer, PackBattle, ReferralCode, ReferralEarning,
                         ReferralPayout, User)
+from app.services.battle_fees import collect_battle_fee
 from app.services.referral_earnings import accrue_rake_earnings
 
 
@@ -129,3 +130,86 @@ def test_rake_share_por_codigo_se_respeta(Session):
     _battle_with(s, "b8", [("A", "VIP"), ("B", None)])
     rows = accrue_rake_earnings(s, "b8", 8_000_000)
     assert rows[0].amount_base_units == 1_600_000   # (8M // 2) * 0.40
+
+
+class _Gacha:
+    async def machines(self):
+        return [{"code": "m50", "instantBuyback": 1.0}]
+
+
+async def _noop(*a, **k):
+    return None
+
+
+def _fee_deps(balance=100_000_000):
+    """Dependencias inyectadas de collect_battle_fee: todo falso, nada toca la red."""
+    async def usdc_balance(_w):
+        return balance
+    async def build_tx(_a, _b, _amt):
+        return "TX"
+    async def submit(_signed):
+        return "SIG"
+    class _Signer:
+        async def sign_solana(self, _wid, tx):
+            return tx
+    return dict(gacha=_Gacha(), signer=_Signer(), resolve_wallet_id=lambda w: f"wid-{w}",
+                submit_tx=submit, usdc_balance=usdc_balance, build_usdc_transfer_tx=build_tx,
+                sleep_fn=_noop)
+
+
+async def test_cobrar_el_fee_devenga_rev_share(Session):
+    from app.models import BattlePull
+    s = Session()
+    s.add(ReferralCode(code="C", name="c", owner_wallet="W_OWNER", rake_share_pct=0.25))
+    s.commit()
+    _battle_with(s, "bf", [("A", "C"), ("B", None)])
+    b = s.get(PackBattle, "bf")
+    # Base del fee: una carta auto-vendida por $400 → fee 1% (0.5% × 2) = $4
+    s.add(BattlePull(battle_id="bf", player_wallet="A", memo="m", round_number=1,
+                     nft_address="n1", insured_value=400.0, auto_sold=True,
+                     buyback_amount=400_000_000))
+    s.commit()
+
+    charged = await collect_battle_fee(s, b, "A", 2, **_fee_deps())
+
+    assert charged == 4_000_000 and b.fee_charged is True
+    rows = s.query(ReferralEarning).filter_by(battle_id="bf").all()
+    assert len(rows) == 1
+    assert rows[0].amount_base_units == 500_000    # (4M // 2) * 0.25
+
+
+async def test_settle_repetido_no_duplica_devengos(Session):
+    """El guard fee_charged ya protege el cobro; el devengo hereda esa protección."""
+    from app.models import BattlePull
+    s = Session()
+    s.add(ReferralCode(code="C", name="c", owner_wallet="W_OWNER", rake_share_pct=0.25))
+    s.commit()
+    _battle_with(s, "bf2", [("A", "C"), ("B", None)])
+    b = s.get(PackBattle, "bf2")
+    s.add(BattlePull(battle_id="bf2", player_wallet="A", memo="m", round_number=1,
+                     nft_address="n1", insured_value=400.0, auto_sold=True,
+                     buyback_amount=400_000_000))
+    s.commit()
+
+    await collect_battle_fee(s, b, "A", 2, **_fee_deps())
+    await collect_battle_fee(s, b, "A", 2, **_fee_deps())   # segunda pasada
+
+    assert s.query(ReferralEarning).filter_by(battle_id="bf2").count() == 1
+
+
+async def test_sin_saldo_no_devenga(Session):
+    """Fee no cobrado (ganador a cero) → no hay dinero que repartir."""
+    from app.models import BattlePull
+    s = Session()
+    s.add(ReferralCode(code="C", name="c", owner_wallet="W_OWNER", rake_share_pct=0.25))
+    s.commit()
+    _battle_with(s, "bf3", [("A", "C"), ("B", None)])
+    b = s.get(PackBattle, "bf3")
+    s.add(BattlePull(battle_id="bf3", player_wallet="A", memo="m", round_number=1,
+                     nft_address="n1", insured_value=400.0, auto_sold=True,
+                     buyback_amount=400_000_000))
+    s.commit()
+
+    await collect_battle_fee(s, b, "A", 2, **_fee_deps(balance=0))
+
+    assert s.query(ReferralEarning).filter_by(battle_id="bf3").count() == 0

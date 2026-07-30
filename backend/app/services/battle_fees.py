@@ -110,6 +110,10 @@ async def collect_battle_fee(session, battle, winner, n_players, *, gacha, signe
                 battle.fee_charged = True
                 battle.fee_base_units = charged
                 battle.fee_pct = pct
+                # Rev-share de referidos DENTRO de este commit: así hereda el guard
+                # fee_charged y un settle repetido no puede duplicar devengos. Nunca lanza.
+                from app.services.referral_earnings import accrue_rake_earnings
+                accrue_rake_earnings(session, battle.id, charged)
                 session.commit()
             except Exception as exc:
                 logger.error("fee: charged %s in battle %s but persistence FAILED: %s — "
