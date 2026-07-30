@@ -28,12 +28,16 @@ class _Signer:
     async def sign_solana(self, *a): return "signed"
 
 
-def test_el_techo_no_sube_sin_querer():
-    # 7 × 3 s = 21 s. Solana confirma en 1-2 s; subirlo multiplica el gasto de un fallo sin
-    # mejorar el camino bueno, que sale del bucle en cuanto confirma.
-    assert CONFIRM_POLLS == 7
-    assert CONFIRM_DELAY == 3.0
-    assert CONFIRM_POLLS * CONFIRM_DELAY <= 25, "más de 25s esperando algo que ya no va a confirmar"
+def test_pocas_llamadas_pero_sin_perder_paciencia():
+    """Los dos números son independientes y confundirlos sale caro.
+
+    Se midió que cartas dadas por "no confirmadas en el escrow" SÍ estaban ahí al mirarlas
+    después: llegaban más tarde que la ventana. Así que la ventana no se recorta — se preguntan
+    menos veces, más espaciado.
+    """
+    assert CONFIRM_POLLS <= 8, "cada sondeo es una llamada al RPC que se paga"
+    ventana = CONFIRM_POLLS * CONFIRM_DELAY
+    assert ventana >= 50, f"solo {ventana:.0f}s de paciencia: dejaría cartas atrapadas en el escrow"
 
 
 @pytest.mark.asyncio
