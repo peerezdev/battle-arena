@@ -40,6 +40,20 @@ assertSecureUrl('VITE_BACKEND_URL', backendUrl)
 assertSecureUrl('VITE_DAS_RPC', dasRpcUrl)
 
 export const config = {
+  /**
+   * ¿Estamos en devnet? Habilita lo que solo tiene sentido probando: rellenar una sala con bots,
+   * por ejemplo.
+   *
+   * Se deduce del MODE de Vite y no de una variable nueva a propósito: `--mode mainnet` es ya el
+   * interruptor que decide qué .env se carga (lo usa el dev server y también deploy.sh al construir),
+   * así que esto no puede desincronizarse de la red real. Mirar la URL del RPC sería frágil — un RPC
+   * propio no tiene por qué llevar "devnet" en el nombre.
+   *
+   * La polaridad importa: solo la build EXPLÍCITA de mainnet cuenta como mainnet. Si alguien
+   * construye olvidándose del flag, tampoco carga .env.mainnet, así que ambas cosas fallan juntas
+   * en vez de dar una app de mainnet con botones de prueba.
+   */
+  isDevnet: import.meta.env.MODE !== 'mainnet',
   rpcUrl: import.meta.env.VITE_SOLANA_RPC ?? 'https://api.devnet.solana.com',
   programId: import.meta.env.VITE_PROGRAM_ID ?? '89qGDjXGcV9zi3968DtRLNzBn5KXhYmSGJkjKntksCdk',
   oracleUrl,

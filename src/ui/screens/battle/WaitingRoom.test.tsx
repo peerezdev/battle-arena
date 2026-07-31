@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { MachineCard } from '../../../onchain/gachaClient'
 import type { Battle } from '../../../onchain/packBattleClient'
 
+const red = vi.hoisted(() => ({ isDevnet: true }))
+vi.mock('../../../onchain/config', () => ({ config: red }))
 vi.mock('../../useIsWide', () => ({ useIsWide: () => true }))
 vi.mock('../../useMachines', () => ({
   useMachineList: () => ({ machines: [{ code: 'pokemon_50', name: 'Elite Pokémon', price: 50, odds: {} }], loading: false }),
@@ -96,5 +98,33 @@ describe('WaitingRoom · pool de cartas', () => {
     fireEvent.click(await screen.findByRole('button', { name: /load more/i }))
     await waitFor(() => expect(screen.getByText(/Couldn't load more cards/)).toBeTruthy())
     expect(screen.getByText(/100\+ CARDS/)).toBeTruthy()   // no se pierde lo anterior
+  })
+})
+
+
+// ── el botón de bots es solo de devnet ────────────────────────────────────────
+// Rellenar una sala con bots es una herramienta de pruebas. En mainnet completaría una partida de
+// dinero real con rivales que no existen, así que no puede ni verse.
+
+describe('WaitingRoom · rellenar con bots', () => {
+  const boton = () => screen.queryByRole('button', { name: /fill with bots/i })
+
+  it('en devnet se ofrece', () => {
+    red.isDevnet = true
+    renderRoom()
+    expect(boton()).toBeTruthy()
+  })
+
+  it('en mainnet no aparece', () => {
+    red.isDevnet = false
+    renderRoom()
+    expect(boton()).toBeNull()
+  })
+
+  it('en mainnet siguen estando los demás botones de la sala', () => {
+    // La condición es del botón de bots, no de la columna entera.
+    red.isDevnet = false
+    renderRoom()
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeTruthy()
   })
 })

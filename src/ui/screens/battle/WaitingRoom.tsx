@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { config } from '../../../onchain/config'
 import { COLORS, FONTS, GRADIENT, RARITY, formatUsd } from '../../theme'
 import { useIsWide } from '../../useIsWide'
 import { useMachineList } from '../../useMachines'
@@ -288,7 +289,9 @@ export function WaitingRoom({
             {!isParticipant && spaceAvailable && (
               <button onClick={onJoinSelf} disabled={joiningSelf} style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: 0, cursor: joiningSelf ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 14.5, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 12px 30px -10px rgba(0,255,196,.5)', marginBottom: 8, opacity: joiningSelf ? 0.7 : 1 }}>{joiningSelf ? 'Joining…' : 'Join battle'}</button>
             )}
-            {spaceAvailable && (
+            {/* Rellenar con bots es una herramienta de pruebas: en mainnet llenaría una partida de
+                dinero real con rivales que no existen. Solo devnet. */}
+            {config.isDevnet && spaceAvailable && (
               <button onClick={onJoinAllBots} disabled={joiningAll} style={{ position: 'relative', overflow: 'hidden', width: '100%', padding: '13px 0', borderRadius: 14, border: `1px solid ${COLORS.violet}59`, cursor: joiningAll ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 14, fontWeight: 700, color: COLORS.violet, background: `${COLORS.violet}14`, marginBottom: 8 }}>{joiningAll ? 'Adding bots…' : 'Fill with bots & start'}</button>
             )}
             {isCreator && (

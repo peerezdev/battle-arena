@@ -56,3 +56,30 @@ describe('config.backendUrl', () => {
     expect(config.backendUrl).toBe('http://localhost:5173')
   })
 })
+
+// ── red ───────────────────────────────────────────────────────────────────────
+
+describe('config.isDevnet', () => {
+  beforeEach(() => { vi.resetModules() })
+  afterEach(() => { vi.resetModules(); vi.unstubAllEnvs() })
+
+  it('en la build de mainnet es false', async () => {
+    vi.stubEnv('MODE', 'mainnet')
+    const { config } = await import('./config')
+    expect(config.isDevnet).toBe(false)
+  })
+
+  it('en desarrollo es true', async () => {
+    vi.stubEnv('MODE', 'development')
+    const { config } = await import('./config')
+    expect(config.isDevnet).toBe(true)
+  })
+
+  it('una build normal SIN --mode mainnet cuenta como devnet', async () => {
+    // Deliberado: si falta el flag tampoco se carga .env.mainnet, así que la app entera es de
+    // devnet. Lo contrario daría una app de mainnet con botones de prueba dentro.
+    vi.stubEnv('MODE', 'production')
+    const { config } = await import('./config')
+    expect(config.isDevnet).toBe(true)
+  })
+})
