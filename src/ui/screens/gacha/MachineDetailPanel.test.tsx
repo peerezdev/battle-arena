@@ -59,3 +59,40 @@ describe('MachineDetailPanel · aviso del turbo en móvil', () => {
     expect(screen.queryByTitle('Turbo (auto-sell Commons)')).toBeNull()
   })
 })
+
+// ── el vídeo tiene que cambiar al cambiar de máquina ──────────────────────────
+// Un <video> no recarga porque cambie el `src` de su <source>: hay que remontarlo o llamar a
+// load(). Sin eso React reutiliza el mismo nodo y sigue reproduciendo el primer vídeo que cargó —
+// que es el de la máquina seleccionada por defecto. Síntoma: TODAS las máquinas enseñaban la
+// imagen del gacha de 50, que es el primero de la lista que devuelve Collector Crypt.
+
+function conVideo(code: string): GachaMachine {
+  return { ...machine, code, name: code, videoSrc: `https://cc.test/${code}.webm`,
+           thumbnailUrl: `https://cc.test/${code}.png` } as unknown as GachaMachine
+}
+
+describe('MachineDetailPanel · vídeo de la máquina', () => {
+  beforeEach(() => viewport(true))
+
+  it('remonta el vídeo al cambiar de máquina', () => {
+    const { container, rerender } = render(
+      <MachineDetailPanel machine={conVideo('pokemon_50')} authed usdc={500} onYolo={vi.fn()} />,
+    )
+    const antes = container.querySelector('video')
+    expect(antes?.querySelector('source')?.getAttribute('src')).toContain('pokemon_50')
+
+    rerender(<MachineDetailPanel machine={conVideo('onepiece_250')} authed usdc={500} onYolo={vi.fn()} />)
+    const despues = container.querySelector('video')
+
+    expect(despues?.querySelector('source')?.getAttribute('src')).toContain('onepiece_250')
+    expect(despues).not.toBe(antes)   // nodo NUEVO: si se reutiliza, el navegador no recarga
+  })
+
+  it('el poster también acompaña a la máquina', () => {
+    const { container, rerender } = render(
+      <MachineDetailPanel machine={conVideo('pokemon_50')} authed usdc={500} onYolo={vi.fn()} />,
+    )
+    rerender(<MachineDetailPanel machine={conVideo('comic_25')} authed usdc={500} onYolo={vi.fn()} />)
+    expect(container.querySelector('video')?.getAttribute('poster')).toContain('comic_25')
+  })
+})

@@ -27,6 +27,10 @@ export function AlphaVideo({ webm, mov, loop = true, muted = true, style, classN
 
   return (
     <video
+      // Mismo motivo que en MachineDetailPanel: cambiar el `src` de un <source> NO hace que el
+      // navegador recargue el vídeo. Sin esta key, la barra de emotes se quedaba reproduciendo el
+      // primer emote que cargó por mucho que se eligiera otro.
+      key={webm}
       ref={ref}
       autoPlay
       loop={loop}

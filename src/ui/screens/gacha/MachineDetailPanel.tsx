@@ -102,6 +102,12 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
       >
         {machine.videoSrc ? (
           <video
+            // La key fuerza a React a crear un <video> NUEVO al cambiar de máquina. Sin ella
+            // reutiliza el nodo y solo reescribe el `src` del <source> — cosa que el navegador
+            // ignora: un vídeo no recarga por eso, hay que remontarlo o llamar a load(). El
+            // resultado era que todas las máquinas enseñaban el vídeo de la primera que se cargó,
+            // la seleccionada por defecto (pokemon_50 en mainnet, el primero que devuelve CC).
+            key={machine.videoSrc}
             poster={machine.thumbnailUrl ?? machine.image ?? undefined}
             autoPlay
             loop
