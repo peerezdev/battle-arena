@@ -71,3 +71,24 @@ export const FONTS = {
   mono: "'JetBrains Mono', 'Courier New', monospace",
   body: "'Space Grotesk', system-ui, sans-serif",
 } as const
+
+/**
+ * Escala de capas. Los z-index estaban puestos a ojo fichero a fichero y eso dejó modales POR
+ * DEBAJO del chrome: `DelegationGate` y `VerifyPanel` (ambos `aria-modal`) iban a 50 con la barra
+ * superior a 60, así que la cabecera —y el logo, que en móvil vive ahí— se pintaba encima de un
+ * diálogo. `MuteButton` iba fijo arriba a la derecha, exactamente donde está la barra, o sea
+ * tapado del todo en móvil.
+ *
+ * Regla: nada que deba verse por encima del contenido puede ir por debajo de `chrome`.
+ */
+export const Z = {
+  backdrop: 0,     // fondos decorativos (ArenaBackdrop)
+  content: 1,      // contenido normal de la página
+  bottomBar: 50,   // navegación inferior en móvil
+  chrome: 60,      // barra superior y rail: por encima del contenido, sus menús se despliegan
+  floating: 70,    // controles flotantes sobre el chrome (mute)
+  modal: 100,      // diálogos y sus fondos
+  drawer: 120,     // chat lateral y pantallas a pantalla completa
+  overlay: 200,    // reveals y overlays que se comen la pantalla entera
+  toast: 9999,     // avisos: siempre lo último
+} as const

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { usePrivy, useIdentityToken } from '@privy-io/react-auth'
-import { COLORS, GRADIENT, FONTS, formatUsd } from '../theme'
+import { COLORS, GRADIENT, FONTS, formatUsd, Z } from '../theme'
 import { useUsdcBalance } from '../../wallet/useUsdcBalance'
 import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalance'
 import { useProfile } from '../../hooks/useProfile'
@@ -273,7 +273,7 @@ export function AppShell() {
             // Grid siblings paint in DOM order, and <main> comes after — without this the menu
             // renders under the content. Kept below the chat drawer / modals (z ≥ 100).
             position: 'relative',
-            zIndex: 60,
+            zIndex: Z.chrome,
             display: 'flex',
             alignItems: 'center',
             flexWrap: 'wrap',

@@ -1,4 +1,4 @@
-import { COLORS, FONTS } from '../theme'
+import { COLORS, FONTS, Z } from '../theme'
 import type { useDelegationGate } from './useDelegationGate'
 
 export function DelegationGate({ gate }: { gate: ReturnType<typeof useDelegationGate> }) {
@@ -9,7 +9,7 @@ export function DelegationGate({ gate }: { gate: ReturnType<typeof useDelegation
       aria-modal="true"
       onClick={gate.cancel}
       style={{
-        position: 'fixed', inset: 0, background: '#000000aa', zIndex: 50,
+        position: 'fixed', inset: 0, background: '#000000aa', zIndex: Z.modal,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
       }}
     >

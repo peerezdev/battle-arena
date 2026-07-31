@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { COLORS, FONTS } from '../../theme'
+import { COLORS, FONTS, Z } from '../../theme'
 import { verifyBattle, type Verification } from '../../../onchain/packBattleClient'
 import { verifyCommit } from '../../../onchain/pfVerify'
 import { shortWallet } from './RoyaleReveal'
@@ -101,7 +101,7 @@ export function VerifyPanel({ battleId, onClose }: { battleId: string; onClose: 
 }
 
 const overlay: CSSProperties = {
-  position: 'fixed', inset: 0, background: '#000000aa', zIndex: 50,
+  position: 'fixed', inset: 0, background: '#000000aa', zIndex: Z.modal,
   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
 }
 const panel: CSSProperties = {

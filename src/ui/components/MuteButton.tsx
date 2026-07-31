@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { isMuted, toggleMuted, playSfx } from '../sound'
-import { COLORS } from '../theme'
+import { COLORS, Z } from '../theme'
 
 /** Persistent corner mute toggle wired to sound.ts (state persisted to localStorage). */
 export function MuteButton() {
@@ -23,7 +23,7 @@ export function MuteButton() {
         position: 'fixed',
         top: 'max(10px, env(safe-area-inset-top))',
         right: 'max(10px, env(safe-area-inset-right))',
-        zIndex: 50,
+        zIndex: Z.floating,
         width: '44px',
         height: '44px',
         display: 'flex',
