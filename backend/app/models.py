@@ -83,6 +83,22 @@ class ReferralPayout(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class HiddenMachine(Base):
+    """Máquina de gacha que NO se ofrece, aunque Collector Crypt la sirva.
+
+    Se apagan a mano desde `scripts/machines.py`. Vive en la base y se lee en cada petición, así que
+    encender o apagar una no exige reiniciar nada — y el frontend, que repregunta el catálogo cada
+    poco, la hace desaparecer sola.
+
+    Ocultar afecta al CATÁLOGO, no al histórico: una partida ya jugada con esta máquina conserva su
+    nombre y su imagen. Lo que se impide es empezar partidas nuevas con ella.
+    """
+    __tablename__ = "hidden_machines"
+    code: Mapped[str] = mapped_column(String, primary_key=True)
+    reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Match(Base):
     __tablename__ = "matches"
     battle_pubkey: Mapped[str] = mapped_column(String, primary_key=True)

@@ -33,7 +33,9 @@ def _client(api_key="k123", rate_limit=10, base_url=BASE):
     gacha = GachaService(base_url=base_url, api_key=api_key)
     app = create_app(sf, MockChainSource(), elo_start=1200, elo_k=32,
                      gacha=gacha, gacha_rate_limit=rate_limit, privy=privy)
-    return TestClient(app), priv
+    client = TestClient(app)
+    client.session_factory = sf     # los tests que apagan máquinas necesitan la base
+    return client, priv
 
 
 def _hdrs(priv, wallet):
@@ -619,3 +621,43 @@ def test_el_autosell_del_turbo_se_guarda_y_viaja_en_pendientes(monkeypatch):
     assert len(body) == 1
     assert body[0]["auto_sold"] is True
     assert body[0]["buyback_amount"] == 12_500_000
+
+
+# ── máquinas apagadas a mano ──────────────────────────────────────────────────
+# Se apagan desde scripts/machines.py y el backend lo lee en cada petición, así que el efecto es
+# inmediato sin reiniciar. Lo que se comprueba aquí es que el filtro está en el CATÁLOGO.
+
+def _dos_maquinas():
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "name": "P50", "price": 50, "odds": {}, "stock": {},
+         "ev": 1.0, "image": None, "turboMode": True},
+        {"code": "sweet_99", "name": "Sweets", "price": 99, "odds": {}, "stock": {},
+         "ev": 1.0, "image": None, "turboMode": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+
+
+@respx.mock
+def test_una_maquina_apagada_no_sale_en_el_catalogo():
+    from app.services.machine_visibility import hide
+    _dos_maquinas()
+    c, _ = _client(api_key="")
+    assert {m["code"] for m in c.get("/gacha/machines").json()} == {"pokemon_50", "sweet_99"}
+
+    with c.session_factory() as s:
+        hide(s, "sweet_99", reason="miniatura rota")
+
+    # Sin reiniciar nada ni tocar la caché del catálogo de CC: la siguiente petición ya no la trae.
+    assert {m["code"] for m in c.get("/gacha/machines").json()} == {"pokemon_50"}
+
+
+@respx.mock
+def test_volver_a_encenderla_la_devuelve_al_catalogo():
+    from app.services.machine_visibility import hide, show
+    _dos_maquinas()
+    c, _ = _client(api_key="")
+    with c.session_factory() as s:
+        hide(s, "sweet_99")
+    assert {m["code"] for m in c.get("/gacha/machines").json()} == {"pokemon_50"}
+    with c.session_factory() as s:
+        show(s, "sweet_99")
+    assert {m["code"] for m in c.get("/gacha/machines").json()} == {"pokemon_50", "sweet_99"}

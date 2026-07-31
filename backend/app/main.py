@@ -27,7 +27,7 @@ from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
-from .services import escrow_pool
+from .services import escrow_pool, machine_visibility
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
                    recent_chat_messages, big_hit_multiple)
@@ -452,10 +452,10 @@ def create_app(session_factory, chain: ChainSource,
         return gacha
 
     @app.get("/gacha/machines")
-    async def gacha_machines():
+    async def gacha_machines(s: Session = Depends(db)):
         svc = _gacha_or_503()
         try:
-            return await svc.machines()
+            return machine_visibility.visible(s, await svc.machines())
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
@@ -660,6 +660,8 @@ def create_app(session_factory, chain: ChainSource,
         if not machine_code:
             return None
         try:
+            # SIN filtrar por visibilidad: esto nombra drops ya ocurridos. Apagar una máquina no
+            # puede borrar el nombre de lo que ya se jugó con ella.
             machines = await gacha.machines()
             m = next((x for x in machines if x.get("code") == machine_code), None)
             return (m.get("shortName") or m.get("name")) if m else None
@@ -806,7 +808,10 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(402, "USDC disponible insuficiente")
 
     async def _machine_price(machine_code: str) -> int:
-        machines = await gacha.machines()
+        # Sobre el catálogo FILTRADO: una máquina apagada a mano no puede estrenar partidas. Se
+        # apoya en el mismo 409 que ya usaba la indisponibilidad de CC.
+        with session_factory() as s:
+            machines = machine_visibility.visible(s, await gacha.machines())
         m = next((x for x in machines if x.get("code") == machine_code), None)
         if not m or not m.get("available", True):
             raise HTTPException(409, "máquina no disponible")
