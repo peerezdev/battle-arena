@@ -300,7 +300,10 @@ function CompactPacksPot({ battle: b, byCode, modeColor, mult }: { battle: LiveB
   )
 }
 
-function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
+/** La card compacta de una partida. Exportada porque la pantalla de Battle Royale enseña sus
+ *  partidas recientes con ESTA misma card: si se duplicara, las dos listas de "recientes"
+ *  divergirían al primer retoque. */
+export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
   const wide = useIsWide('(min-width: 760px)')
   const modeColor = MODE_COLOR[b.mode]
   const { filled, total } = parseSlots(b.slots)

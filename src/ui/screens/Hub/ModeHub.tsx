@@ -1,15 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../../theme'
 import type { LiveBattle, BattleMode } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
-import { LiveBattles } from './LiveBattles'
+import { LiveBattles, BattleCard } from './LiveBattles'
 import { RoyaleBattleWide } from './RoyaleBattleWide'
-import { LastRoyaleCard } from './LastRoyaleCard'
 import { RoyaleDemoNotice } from './RoyaleDemoNotice'
-import { lastSettledRoyale } from './lastRoyale'
-import { useIsWide } from '../../useIsWide'
+import { settledRoyales } from './lastRoyale'
 import { showToast } from '../../toastBus'
 import { useBattles } from '../../../onchain/useBattles'
 import { openBattleToLive } from './openBattleToLive'
@@ -19,7 +17,7 @@ import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 import { CreateBattleModal } from './CreateBattleModal'
 import { DemoPicker } from './DemoPicker'
-import { loadMachineList } from '../../useMachines'
+import { loadMachineList, useMachineList } from '../../useMachines'
 import { canCreateRoyale } from '../../../onchain/config'
 
 /**
@@ -31,8 +29,8 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   const { identityToken } = useIdentityToken()
   const meWallet = useEmbeddedSolanaAddress()
   const { battles } = useBattles()
+  const { machines } = useMachineList()
   const gate = useDelegationGate()
-  const sideBySide = useIsWide('(min-width: 980px)')
   const [createOpen, setCreateOpen] = useState(false)
   const [demoOpen, setDemoOpen] = useState(false)
 
@@ -47,8 +45,9 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   // terminadas sí se quedan fuera: para esas está la tarjeta de recap. La card ya distingue el
   // caso (`action: join | watch` y el estado "Live" en rojo).
   const royaleOpen = liveBattles.filter((b) => !b.battleStatus || b.battleStatus === 'lobby' || b.battleStatus === 'running')
-  // Recap card beside Quick Match. Royale page only, and only once a royale has actually finished.
-  const lastRoyale = mode === 'royale' ? lastSettledRoyale(liveBattles) : null
+  // Royale terminadas, para la sección "Recent" bajo los lobbies. Solo en la página de royale.
+  const royaleRecent = mode === 'royale' ? settledRoyales(liveBattles) : []
+  const byCode = useMemo(() => new Map(machines.map((m) => [m.code, m])), [machines])
 
   // Los fallos de estas acciones van SIEMPRE por toast. El aviso nace de pulsar un botón de una
   // card, y un banner sobre la lista deja el mensaje lejos de lo que lo provocó — y encima
@@ -78,26 +77,12 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
       {/* Arriba del todo: ver la demo ANTES de encontrarse con el precio y el botón de unirse. */}
       {mode === 'royale' && <RoyaleDemoNotice />}
 
-      {/* Quick Match with the last-royale recap to its right; stacks under it when there's no room. */}
-      <div style={{ display: 'flex', flexDirection: sideBySide ? 'row' : 'column', alignItems: sideBySide ? 'center' : 'stretch', gap: 26 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <QuickMatch
-            mode={mode}
-            onCreate={() => setCreateOpen(true)}
-            onPlayDemo={mode === 'pack' ? () => setDemoOpen(true) : undefined}
-            canCreate={mode === 'royale' ? canCreateRoyale(meWallet) : true}
-          />
-        </div>
-        {lastRoyale && (
-          <div style={{ flex: 'none', width: sideBySide ? 340 : 'auto' }}>
-            <LastRoyaleCard
-              battle={lastRoyale}
-              onOpen={(b) => navigate(`/play/battle/${b.id}?view=result`)}
-              onReplay={(b) => navigate(`/play/battle/${b.id}`)}
-            />
-          </div>
-        )}
-      </div>
+      <QuickMatch
+        mode={mode}
+        onCreate={() => setCreateOpen(true)}
+        onPlayDemo={mode === 'pack' ? () => setDemoOpen(true) : undefined}
+        canCreate={mode === 'royale' ? canCreateRoyale(meWallet) : true}
+      />
 
       <div>
         {/* Battle Royale uses the new wide lobby card; Pack Battle keeps the compact LiveBattles grid. */}
@@ -109,6 +94,31 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
                   <RoyaleBattleWide key={b.id} battle={b} meWallet={meWallet}
                     onAction={onBattleAction} onCancel={onCancel} onOpen={(x) => navigate('/play/battle/' + x.id)} />
                 ))}
+
+            {/* Recientes bajo los lobbies, con la MISMA card compacta que el Recent de Live Games
+                y su misma rejilla: son la misma cosa enseñada en dos sitios. */}
+            {royaleRecent.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
+                  <span style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.2em', color: COLORS.muted }}>
+                    RECENT
+                  </span>
+                  <span style={{ flex: 1, height: 1, background: COLORS.border }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
+                  {royaleRecent.map((b) => (
+                    <BattleCard
+                      key={b.id}
+                      battle={b}
+                      byCode={byCode}
+                      onAction={onBattleAction}
+                      onCancel={onCancel}
+                      onOpen={(x) => navigate('/play/battle/' + x.id)}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <LiveBattles battles={liveBattles} meWallet={meWallet} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
