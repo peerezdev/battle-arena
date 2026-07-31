@@ -1370,3 +1370,60 @@ def test_me_usdc_requires_auth(client_priv):
     """No Bearer token → 401 (never leaks a balance for an unauthenticated caller)."""
     c, _ = client_priv
     assert c.get("/users/me/usdc").status_code == 401
+
+
+# ── máquinas apagadas a mano: no se pueden estrenar partidas con ellas ─────────
+# Apagar una máquina (scripts/machines.py) la quita del catálogo. Estos tests fijan que la puerta
+# está en AMBOS modos, no solo en la pantalla: alguien que llame a la API a pelo con el código
+# apagado tiene que rebotar igual.
+
+def _con_maquina_apagada(monkeypatch, code="pokemon_50"):
+    async def _high_balance(*args, **kwargs):
+        return 10_000_000_000    # holgado: un royale de 5 con máquina de $99 pide bastante
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True},
+                {"code": "sweet_99", "price": 99, "available": True}]
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _collect(*a, **k):
+        return "collect-sig"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+    # El royale cobra el buy-in on-chain al crear el lobby; sin esto el caso base daría 502 y el
+    # test no distinguiría "rechazada por apagada" de "no hay red".
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.collect_buyin", _collect)
+
+
+@pytest.mark.parametrize("mode", ["pack", "royale"])
+def test_no_se_puede_crear_partida_con_una_maquina_apagada(monkeypatch, mode):
+    from app.services.machine_visibility import hide
+    sf, c, priv = _build_client_with_sf(signer=_FakeSigner())
+    _con_maquina_apagada(monkeypatch)
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    cuerpo = {"machine_code": "sweet_99", "max_players": 2 if mode == "pack" else 5, "mode": mode}
+
+    assert c.post("/pack-battles", json=cuerpo, headers=hdrs).status_code == 200
+
+    with sf() as s:
+        hide(s, "sweet_99", reason="apagada a mano")
+
+    r = c.post("/pack-battles", json=cuerpo, headers=hdrs)
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "máquina no disponible"
+
+
+def test_una_maquina_encendida_sigue_pudiendose_usar(monkeypatch):
+    """La puerta filtra por código, no apaga la creación entera."""
+    from app.services.machine_visibility import hide
+    sf, c, priv = _build_client_with_sf(signer=_FakeSigner())
+    _con_maquina_apagada(monkeypatch)
+    with sf() as s:
+        hide(s, "sweet_99")
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
+    assert r.status_code == 200, r.text

@@ -661,3 +661,39 @@ def test_volver_a_encenderla_la_devuelve_al_catalogo():
     with c.session_factory() as s:
         show(s, "sweet_99")
     assert {m["code"] for m in c.get("/gacha/machines").json()} == {"pokemon_50", "sweet_99"}
+
+
+@respx.mock
+def test_apagar_la_maquina_no_le_quita_los_gimmighouls_a_quien_ya_tiro(monkeypatch):
+    """Apagar una máquina es una decisión de catálogo POSTERIOR a la compra del jugador.
+
+    El precio del sobre se anota al abrirlo, y esa anotación es lo que dispara la recompensa de
+    lealtad. Si se resolviese sobre el catálogo filtrado, apagar la máquina justo entre la compra y
+    la apertura dejaba el precio a None y el jugador se quedaba sin sus gimmighouls, en silencio.
+    """
+    from app.models import GachaPack, User
+    from app.services.machine_visibility import hide
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "pokemon_50", "price": 50, "available": True}]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+    respx.post(f"{BASE}/api/generatePack").mock(
+        return_value=Response(200, json={"memo": "slug-off", "transaction": "dA=="}))
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json={
+        "success": True, "nft_address": "Mint" + "9" * 40, "rarity": "Rare",
+        "nftWon": {"content": {"metadata": {"name": "Pika"}}, "image": "https://x/p.png"}}))
+    async def _high_bal(*a, **kw): return 100_000_000
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_bal)
+
+    c, priv = _client()
+    hdrs = _hdrs(priv, WALLET_A)
+    c.post("/gacha/generate-pack", json={"pack_type": "pokemon_50"}, headers=hdrs)
+
+    with c.session_factory() as s:      # se apaga DESPUÉS de comprar, antes de abrir
+        hide(s, "pokemon_50", reason="retirada del catálogo")
+
+    assert c.post("/gacha/open-pack", json={"memo": "slug-off"}, headers=hdrs).status_code == 200
+
+    with c.session_factory() as s:
+        pack = s.get(GachaPack, "slug-off")
+        assert pack.price == 50_000_000, "el precio del sobre ya comprado tiene que resolverse igual"
+        assert (s.get(User, WALLET_A).gimmighouls or 0) > 0, "y su recompensa no puede perderse"

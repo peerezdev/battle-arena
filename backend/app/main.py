@@ -632,7 +632,9 @@ def create_app(session_factory, chain: ChainSource,
             pack.auto_sold = bool(out.get("auto_sold"))
             pack.buyback_amount = out.get("buyback_amount")
             try:
-                pack.price = await _machine_price(pack.pack_type)
+                # Histórico: el sobre YA se abrió. No puede depender de si la máquina sigue
+                # ofreciéndose — si dependiera, apagarla le quitaría los gimmighouls al jugador.
+                pack.price = await _machine_price_historico(pack.pack_type)
             except Exception:
                 pass  # best-effort; the open already succeeded
             # Loyalty: award gimmighouls once, at the gacha rate (lower than battles).
@@ -808,14 +810,26 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(402, "USDC disponible insuficiente")
 
     async def _machine_price(machine_code: str) -> int:
-        # Sobre el catálogo FILTRADO: una máquina apagada a mano no puede estrenar partidas. Se
-        # apoya en el mismo 409 que ya usaba la indisponibilidad de CC.
+        """Precio como PUERTA: sobre el catálogo filtrado. Una máquina apagada a mano no puede
+        estrenar partidas ni tiradas. Se apoya en el mismo 409 que ya usaba la indisponibilidad de
+        CC. Para anotar lo que costó algo YA hecho, usar `_machine_price_historico`."""
         with session_factory() as s:
             machines = machine_visibility.visible(s, await gacha.machines())
         m = next((x for x in machines if x.get("code") == machine_code), None)
         if not m or not m.get("available", True):
             raise HTTPException(409, "máquina no disponible")
         return int(m["price"]) * 1_000_000   # USDC base units
+
+    async def _machine_price_historico(machine_code: str) -> Optional[int]:
+        """Lo que cuesta esa máquina, SIN filtrar por visibilidad ni disponibilidad.
+
+        Es para registrar el coste de un sobre ya abierto. Con el filtro puesto, apagar una máquina
+        hacía que su precio dejara de resolverse y el jugador perdía en silencio los gimmighouls de
+        esa tirada — un pago retroactivo por una decisión de catálogo posterior a su compra.
+        """
+        machines = await gacha.machines()
+        m = next((x for x in machines if x.get("code") == machine_code), None)
+        return int(m["price"]) * 1_000_000 if m and m.get("price") is not None else None
 
     _RECONCILE_DELAY_S = 300   # reintento de reconciliación tras un void en caliente
 
