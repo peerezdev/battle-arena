@@ -11,7 +11,7 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 pytest -q                          # 32 tests, totalmente offline
-uvicorn app.main:app --port 8080   # SQLite local (battlearena.db, gitignored)
+uvicorn app.main:app --port 9090   # SQLite local (battlearena.db, gitignored)
 ```
 
 ## Modelo: lobby abierto, sin matchmaking

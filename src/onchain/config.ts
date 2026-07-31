@@ -19,7 +19,17 @@ function assertSecureUrl(label: string, url: string): void {
 }
 
 const oracleUrl = import.meta.env.VITE_ORACLE_URL ?? 'http://localhost:8787'
-const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8080'
+// Sin variable, el MISMO ORIGEN que sirve la página. Es como funciona en los tres entornos: en dev
+// lo enruta el proxy de vite.config.ts y en producción Caddy, ambos hacia el backend real. El valor
+// que había aquí, http://localhost:8080, no acertaba en ninguno — ese puerto no lo escucha nadie,
+// así que un clon sin .env fallaba sin decir por qué.
+//
+// Se usa el origen y no una cadena vacía a propósito: useServerEvents construye el WebSocket con
+// `backendUrl.replace(/^http/, 'ws')`, y con cadena vacía saldría `new WebSocket('/ws/chat')`, que
+// depende de que el navegador resuelva URLs relativas. Con el origen sale un ws:// absoluto.
+const backendUrl =
+  import.meta.env.VITE_BACKEND_URL ??
+  (typeof window !== 'undefined' ? window.location.origin : '')
 const dasRpcUrl =
   (import.meta.env.VITE_DAS_RPC as string | undefined) ??
   (import.meta.env.VITE_SOLANA_RPC as string | undefined) ??

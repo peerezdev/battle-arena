@@ -23,7 +23,7 @@ Las transacciones se firman/envían **desde el cliente** (el RPC de devnet acept
 VITE_SOLANA_RPC=https://api.devnet.solana.com
 VITE_PROGRAM_ID=89qGDjXGcV9zi3968DtRLNzBn5KXhYmSGJkjKntksCdk
 VITE_ORACLE_URL=http://localhost:8787
-VITE_BACKEND_URL=http://localhost:8080
+VITE_BACKEND_URL=http://localhost:5173   # mismo origen; lo enruta el proxy de Vite
 VITE_REOWN_PROJECT_ID=<tu project id de Reown/WalletConnect Cloud>
 VITE_STAKE_MINT=<mint SPL de la apuesta; en devnet, un USDC de test que controles>
 VITE_TREASURY=<token account SPL del treasury para el rake>
@@ -36,7 +36,7 @@ VITE_TREASURY=<token account SPL del treasury para el rake>
 cd oracle && source .venv/bin/activate && PRICING_SOURCE=collectorcrypt uvicorn app.main:app --port 8787
 
 # Backend (ELO + lobby)
-cd backend && source .venv/bin/activate && uvicorn app.main:app --port 8080
+cd backend && source .venv/bin/activate && uvicorn app.main:app --port 9090
 
 # Frontend
 npm run dev   # http://localhost:5173
@@ -90,7 +90,7 @@ Flujo completo para adquirir cartas on-chain vía el módulo Gacha (máquinas de
    - Wallet A: `npm run dev` → **On-chain (devnet)** → conectar Phantom → autenticar → Colección: pega el mint y "Valorar" → Lobby → **Crear** (apuesta + límites de ELO opcionales) → firma `initialize_battle`.
    - Wallet B: conectar → Lobby → la partida aparece con tu **diferencia de ELO** y `joinable` → **Unirse** → firma `join_battle`.
    - Ambos: por ronda, repartir energía → **Commit** (firma) → **Reveal** (firma) → **Resolver** (cualquiera). Al decidirse, **Settle** paga al ganador.
-   - Confirma el ELO actualizado: `GET http://localhost:8080/elo/compare?a=<A>&b=<B>`.
+   - Confirma el ELO actualizado: `GET http://localhost:9090/elo/compare?a=<A>&b=<B>`.
 
 ## Qué queda por validar contra datos reales (al correr lo anterior)
 

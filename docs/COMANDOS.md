@@ -35,7 +35,7 @@ herencia de haberse escrito en momentos distintos:
 | `--execute` | `distribute_bot_usdc`, `buyback_bot_nfts` |
 
 **Ports en local:** devnet frontend `5173` → backend `9090`; mainnet frontend `5273` → backend
-`9190`; oráculo `8787`. (El `backend/README.md` menciona 8080; está desfasado.)
+`9190`; oráculo `8787`.
 
 ---
 
