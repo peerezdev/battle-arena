@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { COLORS } from './ui/theme'
-import { Landing } from './ui/screens/Landing'
 import { Hub } from './ui/screens/Hub/Hub'
 import { ModeHub } from './ui/screens/Hub/ModeHub'
 import { AppShell } from './ui/layouts/AppShell'
@@ -18,7 +17,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        {/* La landing se retiró: la raíz entra directa al hub. */}
+        <Route path="/" element={<Navigate to="/home" replace />} />
         <Route element={<AppShell />}>
           <Route path="/home" element={<Hub />} />
           <Route path="/play/arena" element={<ModeHub mode="pack" />} />

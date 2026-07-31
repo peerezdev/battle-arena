@@ -2,8 +2,9 @@
  * AuthButtons — Log in / Account chip using Privy.
  *
  * Works in two layouts:
- *   variant="nav"     → normal padding/font for the Landing nav bar
- *   variant="compact" → smaller padding/font for the Hub topbar
+ *   variant="compact" → smaller padding/font for the Hub topbar (el único en uso)
+ *   variant="nav"     → padding/tipografía normales. Era para la barra de la landing, que se
+ *                       retiró; se mantiene por si vuelve una pantalla de entrada propia.
  *
  * No-provider safety: when VITE_PRIVY_APP_ID is unset, AppPrivyProvider renders
  * plain children (no <PrivyProvider>). Privy's context has a non-null default
