@@ -326,3 +326,21 @@ export function fetchGachaWinners(
   q.set('count', String(opts.count ?? 10))
   return gachaFetch<GachaWinner[]>(`/gacha/winners?${q}`)
 }
+
+export interface RarityGaps {
+  machine: string
+  /** Cuántos ganadores se han mirado (200 como mucho: es el techo de CC). */
+  sampled: number
+  /** rareza → tiradas desde la última vez que salió. `null` = no salió en toda la muestra. */
+  gaps: Record<string, number | null>
+}
+
+/**
+ * Cuántas tiradas lleva cada rareza sin salir en una máquina.
+ *
+ * Es telemetría, no una predicción: el gacha usa VRF y cada tirada es independiente, así que un
+ * hueco largo no hace la rareza más probable.
+ */
+export function fetchRarityGaps(machine: string): Promise<RarityGaps> {
+  return gachaFetch<RarityGaps>(`/gacha/winners/gaps?machine=${encodeURIComponent(machine)}`)
+}

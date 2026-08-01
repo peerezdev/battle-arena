@@ -485,6 +485,27 @@ def create_app(session_factory, chain: ChainSource,
             filas = [w for w in filas if (w.get("rarity") or "").lower() == pedida]
         return filas
 
+    @app.get("/gacha/winners/gaps")
+    async def gacha_rarity_gaps(machine: str):
+        """Cuántas tiradas lleva cada rareza sin salir en una máquina.
+
+        Siempre sobre las 200 últimas de ESA máquina y SIN filtrar por rareza: el hueco es una
+        posición dentro del feed, así que recortarlo por rareza o por el `count` de la pantalla
+        daría un número que no significa nada.
+
+        Una rareza que no aparece en las 200 vuelve como null, no como 200: no se ha medido su
+        hueco, solo se sabe que es mayor que la muestra.
+        """
+        svc = _gacha_or_503()
+        try:
+            filas = await svc.winners(pack_type=machine, count=200)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+        from .services.rarity_gaps import gaps
+        return {"machine": machine, "sampled": len(filas), "gaps": gaps(filas)}
+
     @app.get("/gacha/machines/{code}/cards")
     async def gacha_machine_cards(code: str,
                                   rarity: Optional[str] = None,

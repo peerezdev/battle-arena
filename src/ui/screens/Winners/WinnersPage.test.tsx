@@ -2,8 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { GachaWinner } from '../../../onchain/gachaClient'
 
-const mocks = vi.hoisted(() => ({ fetchWinners: vi.fn() }))
-vi.mock('../../../onchain/gachaClient', () => ({ fetchGachaWinners: mocks.fetchWinners }))
+const mocks = vi.hoisted(() => ({ fetchWinners: vi.fn(), fetchGaps: vi.fn() }))
+vi.mock('../../../onchain/gachaClient', () => ({
+  fetchGachaWinners: mocks.fetchWinners,
+  fetchRarityGaps: mocks.fetchGaps,
+}))
 vi.mock('../../useMachines', () => ({
   useMachineList: () => ({ machines: [{ code: 'pokemon_50', name: 'Elite Pokémon', shortName: 'PKMN 50', price: 50 }] }),
 }))
@@ -20,7 +23,12 @@ function ganador(over: Partial<GachaWinner> = {}): GachaWinner {
   }
 }
 
-beforeEach(() => { mocks.fetchWinners.mockReset(); mocks.fetchWinners.mockResolvedValue([ganador()]) })
+beforeEach(() => {
+  mocks.fetchWinners.mockReset(); mocks.fetchWinners.mockResolvedValue([ganador()])
+  mocks.fetchGaps.mockReset()
+  mocks.fetchGaps.mockResolvedValue({ machine: 'pokemon_50', sampled: 200,
+    gaps: { Common: 0, Uncommon: 1, Rare: 33, Epic: null } })
+})
 
 describe('WinnersPage', () => {
   it('pide las últimas 10 de todas las máquinas al entrar', async () => {
@@ -94,5 +102,53 @@ describe('WinnersPage', () => {
     mocks.fetchWinners.mockRejectedValue(new Error('boom'))
     render(<WinnersPage />)
     expect(await screen.findByText(/couldn’t load winners/i)).toBeTruthy()
+  })
+})
+
+
+describe('WinnersPage · packs sin salir por rareza', () => {
+  const elegirMaquina = async () => {
+    fireEvent.change(screen.getByLabelText('Machine'), { target: { value: 'pokemon_50' } })
+    await waitFor(() => expect(mocks.fetchGaps).toHaveBeenCalledWith('pokemon_50'))
+  }
+
+  it('no aparece con "All machines": mezclando máquinas el hueco no significa nada', async () => {
+    render(<WinnersPage />)
+    await waitFor(() => expect(mocks.fetchWinners).toHaveBeenCalled())
+    expect(screen.queryByText(/PACKS SINCE LAST/i)).toBeNull()
+    expect(mocks.fetchGaps).not.toHaveBeenCalled()
+  })
+
+  it('aparece al elegir una máquina, con el hueco de cada rareza', async () => {
+    render(<WinnersPage />)
+    await elegirMaquina()
+    expect(await screen.findByText(/PACKS SINCE LAST/i)).toBeTruthy()
+    const tira = screen.getByText(/PACKS SINCE LAST/i).parentElement as HTMLElement
+    expect(tira.textContent).toContain('Rare33')
+    expect(tira.textContent).toContain('Common0')
+  })
+
+  it('una rareza que no salió en la muestra se marca con "+" y no con el tamaño', async () => {
+    // Sería dar por medido algo que solo se sabe que es mayor que la muestra.
+    render(<WinnersPage />)
+    await elegirMaquina()
+    const tira = (await screen.findByText(/PACKS SINCE LAST/i)).parentElement as HTMLElement
+    expect(tira.textContent).toContain('Epic200+')
+  })
+
+  it('vuelve a ocultarse si se quita el filtro de máquina', async () => {
+    render(<WinnersPage />)
+    await elegirMaquina()
+    await screen.findByText(/PACKS SINCE LAST/i)
+    fireEvent.change(screen.getByLabelText('Machine'), { target: { value: '' } })
+    await waitFor(() => expect(screen.queryByText(/PACKS SINCE LAST/i)).toBeNull())
+  })
+
+  it('si falla, la pantalla sigue funcionando: es un extra', async () => {
+    mocks.fetchGaps.mockRejectedValue(new Error('boom'))
+    render(<WinnersPage />)
+    await elegirMaquina()
+    expect(screen.queryByText(/PACKS SINCE LAST/i)).toBeNull()
+    expect(await screen.findByText('Charizard PSA 10')).toBeTruthy()
   })
 })

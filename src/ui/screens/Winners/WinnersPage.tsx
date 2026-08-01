@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
 import { useMachineList } from '../../useMachines'
 import { useAliases } from '../../useAliases'
-import { fetchGachaWinners, type GachaWinner } from '../../../onchain/gachaClient'
+import { fetchGachaWinners, fetchRarityGaps, type GachaWinner, type RarityGaps }
+  from '../../../onchain/gachaClient'
 
 /** Cuántos ganadores traer. El 200 es el techo de la API de Collector Crypt, no una elección
  *  nuestra: pedirle más devuelve 200 igual, así que ofrecer 500 sería prometer lo que no hay. */
@@ -44,6 +45,61 @@ function Chip({ activo, onClick, children }: {
   )
 }
 
+const ORDEN_RAREZA = ['Common', 'Uncommon', 'Rare', 'Epic'] as const
+
+/**
+ * Tiradas que lleva cada rareza sin salir en la máquina elegida.
+ *
+ * Solo se enseña con una máquina concreta: mezclando todas, el hueco no significa nada porque las
+ * tiradas de máquinas distintas no comparten sorteo.
+ *
+ * El texto dice "since last" y no "due" a propósito. El gacha usa VRF y cada tirada es
+ * independiente: un hueco largo NO hace la rareza más probable, y presentarlo como si tocara sería
+ * empujar a la gente a perseguirlo.
+ */
+function GapsPorRareza({ machine }: { machine: string }) {
+  const [datos, setDatos] = useState<RarityGaps | null>(null)
+
+  useEffect(() => {
+    let cancelado = false
+    setDatos(null)
+    fetchRarityGaps(machine)
+      .then((d) => { if (!cancelado) setDatos(d) })
+      .catch(() => { /* es un extra: si falla, la pantalla sigue */ })
+    return () => { cancelado = true }
+  }, [machine])
+
+  if (!datos) return null
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+      padding: '12px 14px', borderRadius: 12,
+      background: COLORS.panel, border: `1px solid ${COLORS.border}`,
+    }}>
+      <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.18em', color: COLORS.muted }}>
+        PACKS SINCE LAST
+      </span>
+      {ORDEN_RAREZA.map((r) => {
+        const n = datos.gaps[r]
+        return (
+          <span key={r} style={{
+            display: 'inline-flex', alignItems: 'baseline', gap: 6,
+            padding: '5px 10px', borderRadius: 9,
+            background: `${colorDe(r)}14`, border: `1px solid ${colorDe(r)}59`,
+          }}>
+            <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: colorDe(r) }}>{r}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.text }}>
+              {/* null = no salió en la muestra. "200+" y no "200": solo se sabe que es mayor. */}
+              {n == null ? `${datos.sampled}+` : n}
+            </span>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 export function WinnersPage() {
   const { machines } = useMachineList()
   const [maquina, setMaquina] = useState<string>('')
@@ -78,6 +134,8 @@ export function WinnersPage() {
           Live pulls from every Collector Crypt machine — not just ours.
         </p>
       </div>
+
+      {maquina && <GapsPorRareza machine={maquina} />}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
