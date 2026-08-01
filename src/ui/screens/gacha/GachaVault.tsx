@@ -1572,19 +1572,22 @@ export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose 
   return (
     <motion.div key="yolo-summary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(11,14,20,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 22, maxWidth: 760, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: SHADOW.panel }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      {/* Columna de altura acotada: lo único que scrollea es la rejilla de cartas. Los controles
+          de Keep/Sell y el botón de abajo se quedan siempre a la vista — con muchas tiradas había
+          que bajar hasta el final para poder decidir o cobrar. */}
+      <div style={{ background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 18, padding: 22, maxWidth: 760, width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', minHeight: 0, boxShadow: SHADOW.panel }}>
+        <div style={{ flex: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <span style={{ fontFamily: FONTS.display, fontWeight: 900, fontSize: 20, color: COLORS.text }}>You opened {results.length} pack{results.length > 1 ? 's' : ''}</span>
           <button onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.muted, borderRadius: 8, width: 30, height: 30, cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 16 }}>
+        <div style={{ flex: 'none', display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 16 }}>
           <div><div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>TOTAL VALUE</div><div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: COLORS.green }}>{formatUsd(totalValue)}</div></div>
           {autoSold.length > 0 && (<div><div style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>AUTO-SOLD</div><div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 22, color: COLORS.text }}>{autoSold.length} · {formatUsd(autoSoldUsd)}</div></div>)}
         </div>
 
         {/* Keep / sell controls — only when there are cards still in the wallet to decide on */}
         {sellable.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap', marginBottom: 14 }}>
             <button onClick={() => setAll(false)} disabled={claiming}
               style={{ padding: '8px 14px', borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 13, fontWeight: 600 }}>Keep all</button>
             <button onClick={() => setAll(true)} disabled={claiming}
@@ -1592,7 +1595,7 @@ export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose 
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
+        <div data-testid="gacha-summary-cards" style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, alignContent: 'start', paddingRight: 4 }}>
           {results.map((r, i) => {
             const mint = r.nft_address
             const st = mint ? status[mint] : undefined
@@ -1651,7 +1654,7 @@ export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose 
 
         {/* Bottom action — sells every card marked Sell; when none is marked (keep all) it just
             closes the summary, so the button is always clickable. */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
+        <div style={{ flex: 'none', display: 'flex', justifyContent: 'center', marginTop: 20 }}>
           <button onClick={pending.length > 0 ? claim : onClose} disabled={claiming}
             style={{ padding: '13px 30px', borderRadius: 13, border: 0, fontFamily: FONTS.display, fontWeight: 800, fontSize: 15,
               cursor: claiming ? 'default' : 'pointer',
