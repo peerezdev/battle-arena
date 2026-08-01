@@ -34,6 +34,7 @@ import { HoloCard } from '../../components/HoloCard'
 import { showToast } from '../../toastBus'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
+import { useStickyFollow } from '../../useStickyFollow'
 import { CardBadge } from '../../components/CardBadge'
 import { GachaCardReveal } from './GachaCardReveal'
 import { GachaPackTilt, packTitle, priceFromCode } from './GachaPackTilt'
@@ -77,6 +78,9 @@ const STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
 export default function GachaVault() {
   const reduced = useReducedMotion()
   const wideGacha = useIsWide('(min-width: 880px)')
+  // El panel de la máquina sigue la dirección del scroll: anclado arriba, sus odds
+  // quedaban siempre fuera de la ventana.
+  const panelSticky = useStickyFollow(wideGacha)
   const { identityToken } = useIdentityToken()
   const { signTransactionBase64 } = useWallet()
   const { usdc } = useUsdcBalance()
@@ -590,7 +594,7 @@ export default function GachaVault() {
           />
         )
         const panelEl = (
-          <div style={wideGacha ? { position: 'sticky', top: 16 } : undefined}>
+          <div ref={panelSticky} style={wideGacha ? { position: 'sticky', top: 16 } : undefined}>
             <MachineDetailPanel
               machine={selected}
               authed={!!identityToken}
