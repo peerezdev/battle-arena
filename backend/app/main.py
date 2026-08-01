@@ -1607,12 +1607,15 @@ def create_app(session_factory, chain: ChainSource,
             await asyncio.sleep(_AUTO_ROYALE_PERIOD_S)
             try:
                 with session_factory() as s:
-                    machine = house_lobby.maquina_configurada(s)
-                    if not machine or not house_lobby.hace_falta_una(s, machine):
+                    cfg = house_lobby.configuracion(s)
+                    if cfg is None:
+                        continue
+                    machine, plazas = cfg
+                    if not house_lobby.hace_falta_una(s, machine):
                         continue
                     b = create_battle(s, None, None, machine_code=machine,
                                       price=await _machine_price(machine),
-                                      max_players=house_lobby.PLAZAS, mode="royale")
+                                      max_players=plazas, mode="royale")
                     esc = await escrow_pool.adquirir(s, privy_signer, b.id)
                     b.escrow_wallet_id = esc["id"]
                     b.escrow_address = esc["address"]

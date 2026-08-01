@@ -9,7 +9,8 @@ import pytest
 from app.db import init_db, make_engine, make_session_factory
 from app.models import BattlePlayer, PackBattle
 from app.services.flags import clear_flag, set_flag
-from app.services.house_lobby import FLAG, es_de_la_casa, hace_falta_una, maquina_configurada
+from app.services.house_lobby import (FLAG, PLAZAS, configuracion, es_de_la_casa,
+                                      hace_falta_una, maquina_configurada)
 from app.services.pack_lobby import cancel_battle, create_battle, join_battle, LobbyError
 
 
@@ -124,3 +125,37 @@ def test_un_valor_vacio_cuenta_como_apagado(session):
     """Encender sin decir máquina no puede significar "cualquiera": sería abrir salas al azar."""
     set_flag(session, FLAG, "   ")
     assert maquina_configurada(session) is None
+
+
+# ── el tamaño de la sala también se cambia desde consola ─────────────────────
+# Si las plazas viven en el código, tocarlas exige desplegar y reiniciar — justo lo que el
+# interruptor viene a evitar. El valor del flag es `maquina` o `maquina:plazas`.
+
+def test_por_defecto_son_diez_plazas(session):
+    set_flag(session, FLAG, "pokemon_25")
+    assert configuracion(session) == ("pokemon_25", 10)
+    assert PLAZAS == 10
+
+
+def test_las_plazas_se_pueden_fijar_en_el_flag(session):
+    set_flag(session, FLAG, "pokemon_25:7")
+    assert configuracion(session) == ("pokemon_25", 7)
+
+
+@pytest.mark.parametrize("valor", ["pokemon_25:4", "pokemon_25:11", "pokemon_25:0"])
+def test_unas_plazas_fuera_de_los_limites_del_modo_caen_al_defecto(session, valor):
+    """Battle Royale es de 5 a 10. Un número imposible no puede apagar el auto-royale: se avisa y
+    se abre del tamaño de siempre."""
+    set_flag(session, FLAG, valor)
+    assert configuracion(session) == ("pokemon_25", PLAZAS)
+
+
+def test_unas_plazas_ilegibles_tampoco_apagan_nada(session):
+    set_flag(session, FLAG, "pokemon_25:muchas")
+    assert configuracion(session) == ("pokemon_25", PLAZAS)
+
+
+def test_apagado_sigue_devolviendo_none(session):
+    assert configuracion(session) is None
+    set_flag(session, FLAG, ":8")          # plazas sin máquina no es nada
+    assert configuracion(session) is None

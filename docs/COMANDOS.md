@@ -91,7 +91,8 @@ Se encienden y apagan **sin reiniciar**: el backend relee cada flag en cada uso.
 ```bash
 cd backend
 PYTHONPATH=. .venv/bin/python3 scripts/flags.py list
-PYTHONPATH=. .venv/bin/python3 scripts/flags.py on auto_royale pokemon_25
+PYTHONPATH=. .venv/bin/python3 scripts/flags.py on auto_royale pokemon_25      # 10 plazas
+PYTHONPATH=. .venv/bin/python3 scripts/flags.py on auto_royale pokemon_25:7    # 7 plazas
 PYTHONPATH=. .venv/bin/python3 scripts/flags.py off auto_royale
 ```
 
@@ -99,7 +100,7 @@ Un flag **ausente está apagado**: "no configurado" y "desactivado" son el mismo
 
 | Flag | Qué hace |
 |---|---|
-| `auto_royale=<máquina>` | Abre una Battle Royale de la casa cuando no hay ninguna de esa máquina esperando ni en juego. El lobby va **sin creador y sin cobrar a nadie**: el primer jugador que entra ocupa la primera plaza. Siempre 5 plazas, que es lo que antes se llena. |
+| `auto_royale=<máquina>` o `<máquina>:<plazas>` | Abre una Battle Royale de la casa cuando no hay ninguna de esa máquina esperando ni en juego. El lobby va **sin creador y sin cobrar a nadie**: el primer jugador que entra ocupa la primera plaza. Sin plazas, 10; el modo admite de 5 a 10. |
 
 El bucle mira cada 30 s, así que encenderlo o apagarlo tarda menos de un minuto en notarse. Un lobby
 de la casa **no se puede cancelar desde la interfaz** (no tiene creador); si quieres retirarlo,
