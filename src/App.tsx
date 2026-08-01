@@ -10,6 +10,7 @@ import { DemoFlow } from './ui/flows/DemoFlow'
 import { ProfilePage } from './ui/screens/Profile/ProfilePage'
 import { LeaderboardPage } from './ui/screens/Leaderboard/LeaderboardPage'
 import { HelpPage } from './ui/screens/Help/HelpPage'
+import { WinnersPage } from './ui/screens/Winners/WinnersPage'
 
 const GachaVault = lazy(() => import('./ui/screens/gacha/GachaVault'))
 
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/:wallet" element={<ProfilePage />} />
           <Route path="/ranking" element={<LeaderboardPage />} />
+          <Route path="/winners" element={<WinnersPage />} />
           <Route path="/help" element={<HelpPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/home" replace />} />

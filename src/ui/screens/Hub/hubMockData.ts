@@ -1,6 +1,6 @@
 // Datos de EJEMPLO para el Hub presentacional. NO son reales — se sustituirán
 // por backend (chat, drops, battles) cuando exista. No representan saldos reales.
-export type HubNav = 'lobby' | 'pack' | 'royale' | 'gacha' | 'mana' | 'ranks' | 'help'
+export type HubNav = 'lobby' | 'pack' | 'royale' | 'gacha' | 'winners' | 'mana' | 'ranks' | 'help'
 export type BattleMode = 'pack' | 'royale' | 'mana'
 
 export interface DropItem { id: string; name: string; set: string; ago: string; valueUsd: number; emoji: string; accent: string }
@@ -46,6 +46,7 @@ export const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
   { id: 'pack',   icon: '⚔️', label: 'Pack'  },
   { id: 'royale', icon: '👑', label: 'Royale'  },
   { id: 'gacha',  icon: '🎰', label: 'Gacha'  },
+  { id: 'winners', icon: '✦', label: 'Winners' },
   { id: 'ranks',  icon: '🏆', label: 'Ranking'  },
   { id: 'help',   icon: '?',  label: 'Help'  },
 ]

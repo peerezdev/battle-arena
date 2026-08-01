@@ -296,3 +296,33 @@ export function markPacksRevealed(token: string, memos: string[]): Promise<{ mar
     body: JSON.stringify({ memos }),
   })
 }
+
+/** Un ganador del feed público de Collector Crypt: qué salió y a quién. */
+export interface GachaWinner {
+  wallet: string
+  nft_address: string
+  name: string | null
+  images: string[]
+  insured_value: number | null
+  machine: string | null
+  rarity: 'Common' | 'Uncommon' | 'Rare' | 'Epic' | null
+  at: string | null
+  slug: string | null
+}
+
+/**
+ * Últimos ganadores de toda la plataforma de CC.
+ *
+ * `count` llega a 200 como mucho: es el techo de su API y el backend lo rechaza por encima en vez
+ * de aceptarlo y devolver menos en silencio. Con `rarity` distinta de Epic pueden salir MENOS de
+ * `count`, porque CC no filtra esas rarezas y el recorte se hace después.
+ */
+export function fetchGachaWinners(
+  opts: { machine?: string; rarity?: string; count?: number } = {},
+): Promise<GachaWinner[]> {
+  const q = new URLSearchParams()
+  if (opts.machine) q.set('machine', opts.machine)
+  if (opts.rarity) q.set('rarity', opts.rarity)
+  q.set('count', String(opts.count ?? 10))
+  return gachaFetch<GachaWinner[]>(`/gacha/winners?${q}`)
+}

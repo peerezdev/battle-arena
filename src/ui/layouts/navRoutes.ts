@@ -7,6 +7,7 @@ export const NAV_ROUTES: Record<HubNav, string> = {
   pack: '/play/arena',
   royale: '/play/royale',
   gacha: '/play/gacha',
+  winners: '/winners',
   mana: '/play/mana',
   help: '/help',
 }
@@ -18,6 +19,7 @@ export function activeNavFromPath(pathname: string): HubNav | null {
   if (pathname.startsWith('/play/royale')) return 'royale'
   if (pathname.startsWith('/play/gacha')) return 'gacha'
   if (pathname.startsWith('/play/mana')) return 'mana'
+  if (pathname.startsWith('/winners')) return 'winners'
   if (pathname.startsWith('/ranking')) return 'ranks'
   if (pathname === '/home' || pathname.startsWith('/home')) return 'lobby'
   if (pathname.startsWith('/help')) return 'help'
