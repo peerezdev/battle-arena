@@ -593,8 +593,10 @@ export default function GachaVault() {
             loadMoreError={cardsError && cards.length > 0}
           />
         )
+        // El `top` lo pone useStickyFollow, no el JSX: con los dos escribiéndolo se disputarían
+        // la misma propiedad en cada render.
         const panelEl = (
-          <div ref={panelSticky} style={wideGacha ? { position: 'sticky', top: 16 } : undefined}>
+          <div ref={panelSticky} style={wideGacha ? { position: 'sticky' } : undefined}>
             <MachineDetailPanel
               machine={selected}
               authed={!!identityToken}

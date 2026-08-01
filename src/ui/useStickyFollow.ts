@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { siguienteTop } from './stickyFollow'
 
 /** El ancestro que scrollea de verdad. En esta app NO es la ventana: el contenido vive dentro de
@@ -20,14 +20,25 @@ function scrollerDe(el: HTMLElement | null): HTMLElement | null {
  * completo sobre el contenido y no hay nada que pegar.
  */
 export function useStickyFollow(activo: boolean, hueco = 16) {
-  const ref = useRef<HTMLDivElement | null>(null)
+  // Ref de CALLBACK y no useRef a secas: el panel de la máquina no existe en el primer render —el
+  // catálogo se carga por red— y un efecto que solo mira `ref.current` al montar no vuelve a
+  // ejecutarse cuando el nodo aparece, así que el listener no se ponía nunca. Ese era el motivo de
+  // que el scroll no hiciera nada en la pantalla.
+  //
+  // El nodo se guarda en una ref y el estado es solo el disparador que rehace el efecto: lo que
+  // sale del estado se considera inmutable, y aquí hay que escribirle el `style.top`.
+  const nodoRef = useRef<HTMLDivElement | null>(null)
+  const [montado, setMontado] = useState(0)
+  const ref = useCallback((el: HTMLDivElement | null) => {
+    nodoRef.current = el
+    setMontado((n) => n + 1)
+  }, [])
 
   useEffect(() => {
-    const el = ref.current
-    if (!activo || !el) {
-      if (el) el.style.top = ''
-      return
-    }
+    const el = nodoRef.current
+    // Al desactivarse no hace falta limpiar aquí: React ejecuta ANTES la limpieza de la pasada
+    // anterior, que es la que borra el `top`. Hacerlo también aquí sería escribirlo dos veces.
+    if (!activo || !el) return
     const scroller = scrollerDe(el)
     if (!scroller) return
 
@@ -59,7 +70,7 @@ export function useStickyFollow(activo: boolean, hueco = 16) {
       scroller.removeEventListener('scroll', onScroll)
       el.style.top = ''
     }
-  }, [activo, hueco])
+  }, [montado, activo, hueco])
 
   return ref
 }

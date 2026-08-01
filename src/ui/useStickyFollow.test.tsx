@@ -3,11 +3,11 @@ import { render } from '@testing-library/react'
 import { act } from 'react'
 import { useStickyFollow } from './useStickyFollow'
 
-function Panel({ activo = true }: { activo?: boolean }) {
+function Panel({ activo = true, listo = true }: { activo?: boolean; listo?: boolean }) {
   const ref = useStickyFollow(activo)
   return (
     <div data-testid="scroller" style={{ overflowY: 'auto' }}>
-      <div ref={ref} data-testid="panel" style={{ position: 'sticky' }} />
+      {listo && <div ref={ref} data-testid="panel" style={{ position: 'sticky' }} />}
     </div>
   )
 }
@@ -79,4 +79,35 @@ describe('useStickyFollow', () => {
     scrollear(scroller, 10)
     expect(raf).toHaveBeenCalled()
   })
+})
+
+
+it('se engancha aunque el panel aparezca DESPUÉS de montar', () => {
+  // Es el caso real: el catálogo de máquinas se carga por red, así que en el primer render no hay
+  // panel que pegar. Con un efecto que solo mira la ref al montar, el listener no se ponía nunca y
+  // el scroll no hacía nada — que es exactamente lo que se veía en la pantalla.
+  const r = render(<Panel listo={false} />)
+  r.rerender(<Panel listo />)
+  const panel = r.getByTestId('panel')
+  const scroller = r.getByTestId('scroller')
+  medir(panel, 'offsetHeight', 900)
+  medir(scroller, 'clientHeight', 600)
+  scrollear(scroller, 200)
+  expect(panel.style.top).toBe('-184px')
+})
+
+
+it('al desactivarse deja el panel como estaba', () => {
+  // La limpieza la hace el propio efecto al rehacerse. Si alguien la quitara, el panel se quedaría
+  // con un `top` negativo pegado para siempre en móvil.
+  const r = render(<Panel activo />)
+  const panel = r.getByTestId('panel')
+  const scroller = r.getByTestId('scroller')
+  medir(panel, 'offsetHeight', 900)
+  medir(scroller, 'clientHeight', 600)
+  scrollear(scroller, 200)
+  expect(panel.style.top).toBe('-184px')
+
+  r.rerender(<Panel activo={false} />)
+  expect(panel.style.top).toBe('')
 })
