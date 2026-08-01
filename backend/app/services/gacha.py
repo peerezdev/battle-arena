@@ -242,6 +242,52 @@ class GachaService:
                 return m.group(1)
         return None
 
+    # prize_tier de CC → nombre de rareza. Verificado contra 200 filas reales cruzando el
+    # insuredValue con el tierRange de su máquina: 1=Epic, 2=Rare, 3=Uncommon, 4=Common.
+    _TIERS = {1: "Epic", 2: "Rare", 3: "Uncommon", 4: "Common"}
+
+    async def winners(self, pack_type: Optional[str] = None, count: int = 10,
+                      epic_only: bool = False) -> list:
+        """Últimos ganadores del gacha, de toda la plataforma.
+
+        `count` se recorta a 200 porque es el máximo que sirve CC: pedirle más devuelve 200 igual, y
+        prometer en la UI un número que la API no puede dar sería mentir. El endpoint paginado sin
+        tope exige un `slug`, o sea una API key que no tenemos.
+
+        `epic_only` usa el filtro propio de CC en vez de traer una página y quedarse con los Epic:
+        solo 1 de cada 100 tiradas lo es, así que filtrar después devolvería dos o tres resultados.
+        Para las demás rarezas no hay filtro upstream y el recorte se hace aquí.
+        """
+        self._check_enabled()
+        params: dict = {"count": max(1, min(int(count), 200))}
+        if pack_type:
+            params["packType"] = pack_type
+        if epic_only:
+            params["epic"] = "true"
+        raw = await self._request("GET", "/api/getAllWinners", params=params)
+        items = raw.get("data") if isinstance(raw, dict) else raw
+        if not isinstance(items, list):
+            return []
+        out = []
+        for w in items:
+            if not isinstance(w, dict):
+                continue
+            nft = w.get("nft") or {}
+            content = nft.get("content") or {}
+            meta = content.get("metadata") or {}
+            out.append({
+                "wallet": w.get("winner"),
+                "nft_address": w.get("nft_address"),
+                "name": meta.get("json_name") or meta.get("name"),
+                "images": self._extract_images(content, nft.get("image")),
+                "insured_value": w.get("insuredValue"),
+                "machine": w.get("pack_type"),
+                "rarity": self._TIERS.get(w.get("prize_tier")),
+                "at": w.get("created_at"),
+                "slug": w.get("memo_slug"),
+            })
+        return out
+
     async def get_nfts(self, code: str, rarity: Optional[str] = None,
                        page: int = 1, limit: int = 20) -> list:
         self._check_enabled()

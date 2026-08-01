@@ -461,6 +461,30 @@ def create_app(session_factory, chain: ChainSource,
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream no disponible")
 
+    @app.get("/gacha/winners")
+    async def gacha_winners(machine: Optional[str] = None,
+                            rarity: Optional[str] = None,
+                            count: int = Query(default=10, ge=1, le=200)):
+        """Últimos ganadores del gacha de toda la plataforma.
+
+        `count` llega a 200 como mucho porque ese es el techo de CC. Epic se pide con el filtro
+        propio de la API — solo 1 de cada 100 tiradas lo es, así que traer una página y quedarse con
+        los Epic devolvería dos o tres. Las demás rarezas se recortan aquí, y por eso pueden salir
+        MENOS de `count`: es el precio de que upstream no las filtre.
+        """
+        svc = _gacha_or_503()
+        pedida = (rarity or "").strip().lower()
+        try:
+            filas = await svc.winners(pack_type=machine, count=count,
+                                      epic_only=(pedida == "epic"))
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+        if pedida and pedida != "epic":
+            filas = [w for w in filas if (w.get("rarity") or "").lower() == pedida]
+        return filas
+
     @app.get("/gacha/machines/{code}/cards")
     async def gacha_machine_cards(code: str,
                                   rarity: Optional[str] = None,
