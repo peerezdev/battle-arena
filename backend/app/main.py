@@ -1591,6 +1591,43 @@ def create_app(session_factory, chain: ChainSource,
             _chat_mgr.disconnect(ws)
             await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
 
+    # Cada cuánto se mira si hace falta abrir un lobby de la casa. No corre nada si el flag está
+    # apagado, así que el coste en reposo es una consulta a SQLite cada medio minuto.
+    _AUTO_ROYALE_PERIOD_S = 30.0
+
+    async def _auto_royale_loop():
+        """Mantiene una Battle Royale abierta mientras el flag `auto_royale` esté encendido.
+
+        El flag se relee en CADA vuelta: encenderlo o apagarlo desde consola surte efecto en menos
+        de un minuto sin reiniciar. El lobby se abre SIN creador y sin cobrar a nadie — ver
+        services/house_lobby.py.
+        """
+        from .services import house_lobby
+        while True:
+            await asyncio.sleep(_AUTO_ROYALE_PERIOD_S)
+            try:
+                with session_factory() as s:
+                    machine = house_lobby.maquina_configurada(s)
+                    if not machine or not house_lobby.hace_falta_una(s, machine):
+                        continue
+                    b = create_battle(s, None, None, machine_code=machine,
+                                      price=await _machine_price(machine),
+                                      max_players=house_lobby.PLAZAS, mode="royale")
+                    esc = await escrow_pool.adquirir(s, privy_signer, b.id)
+                    b.escrow_wallet_id = esc["id"]
+                    b.escrow_address = esc["address"]
+                    s.commit()
+                    logger.info("auto-royale: abierto lobby de la casa %s (%s)", b.id, machine)
+            except Exception:
+                # Nunca puede tumbar el proceso: es un extra, no parte de ninguna partida en curso.
+                logger.exception("auto-royale: no se pudo abrir el lobby; se reintenta luego")
+
+    @app.on_event("startup")
+    async def _auto_royale_start():
+        if privy_signer is None:
+            return          # sin firmante no hay escrow que asignar
+        _spawn(_auto_royale_loop())
+
     @app.on_event("startup")
     async def _resume_orphaned_battles():
         # A backend restart kills the in-memory battle runners. Without this, a battle left in

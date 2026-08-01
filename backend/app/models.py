@@ -83,6 +83,21 @@ class ReferralPayout(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class AppFlag(Base):
+    """Interruptor de producto que se enciende y apaga sin reiniciar.
+
+    Se lee en cada uso, así que un cambio surte efecto al instante. Es una tabla genérica a
+    propósito: cada interruptor nuevo es una fila, no una columna ni un despliegue.
+
+    Un flag AUSENTE significa apagado. Es lo que hace que "no configurado" y "desactivado" sean lo
+    mismo, y que encender algo sea siempre un acto explícito.
+    """
+    __tablename__ = "app_flags"
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class HiddenMachine(Base):
     """Máquina de gacha que NO se ofrece, aunque Collector Crypt la sirva.
 

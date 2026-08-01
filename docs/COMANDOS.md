@@ -84,6 +84,29 @@ y en royale. No toca el histórico: lo ya jugado conserva su nombre y su imagen.
 
 ---
 
+## Interruptores de producto
+
+Se encienden y apagan **sin reiniciar**: el backend relee cada flag en cada uso.
+
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/python3 scripts/flags.py list
+PYTHONPATH=. .venv/bin/python3 scripts/flags.py on auto_royale pokemon_25
+PYTHONPATH=. .venv/bin/python3 scripts/flags.py off auto_royale
+```
+
+Un flag **ausente está apagado**: "no configurado" y "desactivado" son el mismo estado.
+
+| Flag | Qué hace |
+|---|---|
+| `auto_royale=<máquina>` | Abre una Battle Royale de la casa cuando no hay ninguna de esa máquina esperando ni en juego. El lobby va **sin creador y sin cobrar a nadie**: el primer jugador que entra ocupa la primera plaza. Siempre 5 plazas, que es lo que antes se llena. |
+
+El bucle mira cada 30 s, así que encenderlo o apagarlo tarda menos de un minuto en notarse. Un lobby
+de la casa **no se puede cancelar desde la interfaz** (no tiene creador); si quieres retirarlo,
+apaga el flag y cancélalo por base de datos.
+
+---
+
 ## Referidos
 
 Los códigos son curados: se crean solo por CLI, no hay endpoint de admin.

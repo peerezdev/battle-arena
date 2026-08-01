@@ -31,7 +31,13 @@ def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, p
                    max_players=max_players, status="lobby", server_seed=seed, server_seed_hash=h,
                    creator_wallet=creator_wallet)
     session.add(b)
-    session.add(BattlePlayer(battle_id=b.id, player_wallet=creator_wallet, wallet_id=creator_wallet_id))
+    # creator_wallet None → lobby DE LA CASA: se abre sin creador y sin cobrarle a nadie, y el
+    # primer jugador que entre ocupa la primera plaza. Crear una partida siempre había implicado
+    # que el creador entraba y pagaba su buy-in; para un lobby automático eso significaría que la
+    # casa apuesta $70 cada vez que abre uno.
+    if creator_wallet is not None:
+        session.add(BattlePlayer(battle_id=b.id, player_wallet=creator_wallet,
+                                 wallet_id=creator_wallet_id))
     if mode == "pack":   # the bundle is a pack-mode concept; royale opens its machine per round
         for i, (mc, pr) in enumerate(packs or [(machine_code, price)], start=1):
             session.add(BattlePack(battle_id=b.id, machine_code=mc, price=pr, sequence=i))
