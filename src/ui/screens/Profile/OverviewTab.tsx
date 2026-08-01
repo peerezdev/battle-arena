@@ -95,14 +95,26 @@ export function OverviewTab({ wallet, stats }: { wallet?: string; stats: UserSta
           </div>
           {bv ? (
             <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ flex: 'none', width: 175, height: 275, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,rgba(0,255,196,.18),rgba(8,10,14,.5))', border: '1px solid rgba(0,255,196,.4)', boxShadow: '0 0 30px -8px rgba(0,255,196,.6)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#5cffd8,#00c79a)', boxShadow: '0 6px 20px -6px rgba(0,255,196,.8)' }}>
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#06170f" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
-                </span>
-              </div>
+              {/* La mejor carta de esa partida. Antes había un trofeo genérico, que no contaba nada
+                  de lo que se ganó; solo se cae a él si la partida no dejó ninguna carta. */}
+              {bv.bestCard ? (
+                <BestHitThumb mint={bv.bestCard.nftAddress} rarity={bv.bestCard.rarity} grade={bv.bestCard.grade} />
+              ) : (
+                <div style={{ flex: 'none', width: 175, height: 275, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(160deg,rgba(0,255,196,.18),rgba(8,10,14,.5))', border: '1px solid rgba(0,255,196,.4)', boxShadow: '0 0 30px -8px rgba(0,255,196,.6)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#5cffd8,#00c79a)', boxShadow: '0 6px 20px -6px rgba(0,255,196,.8)' }}>
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#06170f" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
+                  </span>
+                </div>
+              )}
               <div style={{ flex: '1 1 160px', minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-.01em', marginBottom: 3 }}>{machineName}</div>
                 <div style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 12 }}>{bv.mode === 'royale' ? 'Battle Royale' : 'Pack Battle'}{oppText ? ` · ${oppText}` : ''}</div>
+                {bv.bestCard && (
+                  <div style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 12, marginTop: -8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Best card: <span style={{ color: COLORS.text }}>{bv.bestCard.name ?? 'Card'}</span>
+                    {bv.bestCard.valueUsd != null ? ` · ${formatUsd(bv.bestCard.valueUsd)}` : ''}
+                  </div>
+                )}
                 <div style={{ fontFamily: FONTS.display, fontSize: 28, fontWeight: 800, color: COLORS.green, letterSpacing: '-.02em', lineHeight: 1 }}>+{formatUsd(bv.amountUsd)}</div>
                 <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.14em', color: COLORS.muted, marginTop: 3 }}>LOOT WON IN ONE BATTLE</div>
               </div>

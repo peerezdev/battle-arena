@@ -83,17 +83,39 @@ def read_user_stats(session: Session, wallet: str) -> dict:
     ) or 0
     wagered_usd = (sum(_entry_base_units(b) for b in battles) + gacha_spend) / USDC
 
-    # best hit — the single highest-value card this wallet ever pulled
+    # best hit — la mejor carta de TODAS: pack battle, royale y gacha.
+    #
+    # Miraba solo battle_pulls, así que una carta sacada en el gacha no podía ser la mejor por buena
+    # que fuese. Para el jugador es la misma acción — abrir un sobre — y separarlas hacía que su
+    # mejor tirón no apareciese en su propio perfil.
+    #
+    # Un sobre de gacha SIN abrir no compite: todavía no se sabe qué hay dentro, y contarlo sería
+    # enseñar una carta que su dueño aún no ha visto. El gacha no guarda `grade` ni `year`, así que
+    # esos van a None y la tarjeta los omite.
     best_pull = session.scalars(
         select(BattlePull)
         .where(BattlePull.player_wallet == wallet, BattlePull.insured_value.isnot(None))
         .order_by(desc(BattlePull.insured_value)).limit(1)
     ).first()
-    best_hit = None
+    best_pack = session.scalars(
+        select(GachaPack)
+        .where(GachaPack.wallet == wallet, GachaPack.opened_at.isnot(None),
+               GachaPack.insured_value.isnot(None))
+        .order_by(desc(GachaPack.insured_value)).limit(1)
+    ).first()
+
+    candidatos = []
     if best_pull is not None:
-        best_hit = {"name": best_pull.name, "grade": best_pull.grade, "rarity": best_pull.rarity,
-                    "year": best_pull.year, "valueUsd": best_pull.insured_value,
-                    "nftAddress": best_pull.nft_address}
+        candidatos.append({"name": best_pull.name, "grade": best_pull.grade,
+                           "rarity": best_pull.rarity, "year": best_pull.year,
+                           "valueUsd": best_pull.insured_value,
+                           "nftAddress": best_pull.nft_address, "source": "battle"})
+    if best_pack is not None:
+        candidatos.append({"name": best_pack.name, "grade": None,
+                           "rarity": best_pack.rarity, "year": None,
+                           "valueUsd": best_pack.insured_value,
+                           "nftAddress": best_pack.nft_address, "source": "gacha"})
+    best_hit = max(candidatos, key=lambda c: c["valueUsd"]) if candidatos else None
 
     # best victory — biggest combined loot (all cards) of a battle this wallet won
     best_victory = None
@@ -109,8 +131,20 @@ def read_user_stats(session: Session, wallet: str) -> dict:
                 select(BattlePlayer.player_wallet)
                 .where(BattlePlayer.battle_id == b.id, BattlePlayer.player_wallet != wallet)
             )]
+            # La mejor carta de ESA partida. El importe de arriba es el botín entero, que no
+            # cuenta nada de lo que se ganó: la tarjeta enseñaba un trofeo genérico donde debía ir
+            # la carta.
+            mejor = session.scalars(
+                select(BattlePull)
+                .where(BattlePull.battle_id == b.id, BattlePull.insured_value.isnot(None))
+                .order_by(desc(BattlePull.insured_value)).limit(1)
+            ).first()
             best_victory = {"amountUsd": loot, "mode": b.mode, "machineCode": b.machine_code,
-                            "opponents": opponents}
+                            "opponents": opponents,
+                            "bestCard": None if mejor is None else {
+                                "name": mejor.name, "grade": mejor.grade, "rarity": mejor.rarity,
+                                "year": mejor.year, "valueUsd": mejor.insured_value,
+                                "nftAddress": mejor.nft_address}}
 
     return {
         "wallet": wallet,

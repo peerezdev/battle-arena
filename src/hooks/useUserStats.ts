@@ -9,12 +9,17 @@ export interface BestHit {
   year: string | null
   valueUsd: number | null
   nftAddress: string | null
+  /** De dónde salió: una batalla o el gacha. El gacha no guarda grade ni year, así que en esas
+   *  vienen a null y la tarjeta los omite. */
+  source?: 'battle' | 'gacha'
 }
 export interface BestVictory {
   amountUsd: number
   mode: string
   machineCode: string
   opponents: string[]
+  /** La mejor carta de ESA partida. `amountUsd` es el botín entero y no dice qué se ganó. */
+  bestCard: BestHit | null
 }
 export interface UserStats {
   battles: number
