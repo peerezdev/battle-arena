@@ -7,6 +7,7 @@ import type { MachineCard } from '../../../onchain/gachaClient'
 import type { YoloResult } from '../gacha/pendingToResult'
 import { GachaCardReveal } from '../gacha/GachaCardReveal'
 import { PnlCard } from '../battle/PnlCard'
+import { xIntentUrl } from '../battle/shareOnX'
 import type { Pnl } from '../battle/pnl'
 
 // Banco de pruebas de los reveals. No es una pantalla de producto: existe para poder mirar una
@@ -124,7 +125,7 @@ export function DemoPage() {
                 sin jugar. Escala con el hueco, así que se ve igual a cualquier tamaño.
               </p>
               <div style={{ maxWidth: 640 }}>
-                <PnlCard pnl={PNL_EJEMPLO} winnerName="prueba2" />
+                <PnlCard pnl={PNL_EJEMPLO} winnerName="prueba2" shareHref={xIntentUrl(PNL_EJEMPLO)} />
               </div>
               <div style={{ ...row, marginTop: 14, maxWidth: 380 }}>
                 {/* Ganar la partida no garantiza ganar dinero: si el botín entero vale menos que

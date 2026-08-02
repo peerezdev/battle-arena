@@ -145,11 +145,28 @@ describe('BattleResult · tarjeta del ganador', () => {
     expect(screen.queryByTestId('pnl-card')).toBeNull()
   })
 
-  it('también está en escritorio, que es donde viven las standings', () => {
+  it('también está en escritorio', () => {
     mocks.wide = true
     pinta(GANADA)
     expect(screen.getByTestId('pnl-card')).toBeTruthy()
     expect(screen.getByText('FINAL STANDINGS')).toBeTruthy()
+  })
+
+  it('escritorio: las standings van DEBAJO de las ganancias', () => {
+    // Al ganar, lo primero que se mira es lo que uno se lleva; la tabla va después.
+    mocks.wide = true
+    pinta(GANADA)
+    const ganancias = screen.getByText(/your winnings|the haul/i)
+    const tabla = screen.getByText('FINAL STANDINGS')
+    // compareDocumentPosition: FOLLOWING = la tabla viene después en el documento
+    expect(ganancias.compareDocumentPosition(tabla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('escritorio: el botón de compartir va dentro de la tarjeta', () => {
+    mocks.wide = true
+    pinta(GANADA)
+    const boton = screen.getByText('Share on X').closest('a') as HTMLAnchorElement
+    expect(screen.getByTestId('pnl-card').contains(boton)).toBe(true)
   })
 
   it('el botón abre X con el tuit escrito', () => {

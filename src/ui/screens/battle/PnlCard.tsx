@@ -23,7 +23,13 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
  * exportación de 1200px. Con píxeles fijos habría que mantener una escala por cada sitio donde
  * se use. El diseño original está trazado sobre 640px de ancho; de ahí salen las proporciones.
  */
-export function PnlCard({ pnl, winnerName }: { pnl: Pnl; winnerName: string }) {
+export function PnlCard({ pnl, winnerName, shareHref }: {
+  pnl: Pnl
+  winnerName: string
+  /** Con enlace sale el botón de compartir, abajo a la derecha. Sin él la tarjeta queda limpia,
+   *  que es como tiene que ir a una captura o a una exportación. */
+  shareHref?: string
+}) {
   const gano = pnl.profit >= 0
   const signo = gano ? '+' : '−'
 
@@ -90,7 +96,35 @@ export function PnlCard({ pnl, winnerName }: { pnl: Pnl; winnerName: string }) {
 
         <span style={{ fontFamily: FONTS.mono, fontSize: '1.5625cqw', color: '#d8bfa4' }}>{SITE_DOMAIN}</span>
       </div>
+
+      {/* Esquina inferior derecha, sobre la parte donde el velo ya se ha abierto: no pisa ninguna
+          cifra y queda lejos del dominio, que firma abajo a la izquierda. */}
+      {shareHref && (
+        <a
+          href={shareHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            position: 'absolute', right: '3.1cqw', bottom: '3.1cqw', zIndex: 2,
+            display: 'inline-flex', alignItems: 'center', gap: '.9cqw',
+            padding: '1.1cqw 1.9cqw', borderRadius: '1.4cqw',
+            border: `1px solid ${ORO}59`, background: 'rgba(18,8,14,.72)',
+            color: CREMA, fontFamily: FONTS.display, fontSize: '1.5cqw', fontWeight: 700,
+            textDecoration: 'none', whiteSpace: 'nowrap',
+          }}
+        >
+          <XGlyph /> Share on X
+        </a>
+      )}
     </div>
+  )
+}
+
+function XGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="1.6cqw" height="1.6cqw" fill="currentColor" aria-hidden="true">
+      <path d="M18.9 2H22l-6.8 7.8L23 22h-6.3l-4.9-6.4L6.2 22H3l7.3-8.3L2.3 2h6.4l4.4 5.9L18.9 2Z" />
+    </svg>
   )
 }
 

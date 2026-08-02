@@ -8,7 +8,8 @@ import { useAliases } from '../../useAliases'
 import { useIsWide } from '../../useIsWide'
 import { NextBattlePanel } from './NextBattlePanel'
 import { startRematch } from '../../battle/startRematch'
-import { WinnerShare } from './WinnerShare'
+import { PnlCard } from './PnlCard'
+import { xIntentUrl } from './shareOnX'
 import { pnlOf } from './pnl'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
@@ -47,7 +48,9 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
     const ret = vm.entry > 0 ? lootTotal / vm.entry : null
     return (
       <div style={{ padding: 36, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1440, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr .9fr .7fr', gap: 20, alignItems: 'stretch' }}>
+        {/* Héroe · tarjeta del ganador · siguiente partida. Sin tarjeta la rejilla baja a dos
+            columnas: si no, la siguiente partida se quedaría con un hueco al lado. */}
+        <div style={{ display: 'grid', gridTemplateColumns: pnl ? '1.5fr .9fr .7fr' : '1.5fr .7fr', gap: 20, alignItems: 'stretch' }}>
           {/* hero — green when I won, the Next-Battle magenta when I lost, neutral for a spectator */}
           <div style={{
             borderRadius: 20,
@@ -82,30 +85,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
             </div>
           </div>
 
-          {pnl && <WinnerShare pnl={pnl} winnerName={name(winner)} />}
-
-          {/* final standings */}
-          <div style={{ borderRadius: 20, border: `1px solid ${COLORS.border}`, background: '#0c0f15', padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, letterSpacing: '.18em', color: '#7d8794' }}>FINAL STANDINGS</span>
-            {ranked.map((p, i) => {
-              const isW = p.wallet === vm.winner
-              return (
-                <div key={p.wallet} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
-                  background: isW ? 'rgba(60,232,168,.08)' : 'rgba(255,255,255,.03)',
-                  border: `1px solid ${isW ? 'rgba(60,232,168,.35)' : 'rgba(255,255,255,.07)'}`,
-                }}>
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: RANK_INK[i] ?? '#7d8794', width: 20 }}>#{i + 1}</span>
-                  <div onClick={() => navigate(`/profile/${p.wallet}`)} title="View profile"
-                    style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: isW ? COLORS.text : '#cdd4dd', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
-                    {p.isMe && <span style={{ flex: 'none', fontSize: 9, fontWeight: 700, color: '#06221a', background: COLORS.green, borderRadius: 5, padding: '2px 5px' }}>YOU</span>}
-                  </div>
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 13, fontWeight: 700, color: isW ? COLORS.green : '#cdd4dd' }}>{formatUsd(p.total)}</span>
-                </div>
-              )
-            })}
-          </div>
+          {pnl && <PnlCard pnl={pnl} winnerName={name(winner)} shareHref={xIntentUrl(pnl)} />}
 
           {/* next battle */}
           <NextBattlePanel mode="pack" currentBattleId={battleId} meWallet={vm.meWallet} />
@@ -126,6 +106,30 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
             </div>
           </section>
         ))}
+
+        {/* Standings DEBAJO de las ganancias: al ganar, lo primero que se mira es lo que uno se
+        lleva, no la tabla. */}
+        <div style={{ borderRadius: 20, border: `1px solid ${COLORS.border}`, background: '#0c0f15', padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, letterSpacing: '.18em', color: '#7d8794' }}>FINAL STANDINGS</span>
+          {ranked.map((p, i) => {
+            const isW = p.wallet === vm.winner
+            return (
+              <div key={p.wallet} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
+                background: isW ? 'rgba(60,232,168,.08)' : 'rgba(255,255,255,.03)',
+                border: `1px solid ${isW ? 'rgba(60,232,168,.35)' : 'rgba(255,255,255,.07)'}`,
+              }}>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: RANK_INK[i] ?? '#7d8794', width: 20 }}>#{i + 1}</span>
+                <div onClick={() => navigate(`/profile/${p.wallet}`)} title="View profile"
+                  style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: isW ? COLORS.text : '#cdd4dd', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
+                  {p.isMe && <span style={{ flex: 'none', fontSize: 9, fontWeight: 700, color: '#06221a', background: COLORS.green, borderRadius: 5, padding: '2px 5px' }}>YOU</span>}
+                </div>
+                <span style={{ fontFamily: FONTS.mono, fontSize: 13, fontWeight: 700, color: isW ? COLORS.green : '#cdd4dd' }}>{formatUsd(p.total)}</span>
+              </div>
+            )
+          })}
+        </div>
       </div>
     )
   }
@@ -203,7 +207,7 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
           jumping into another game, not scrolling past the full table to find it. */}
       <NextBattlePanel mode="pack" currentBattleId={battleId} meWallet={vm.meWallet} compact />
 
-      {pnl && <WinnerShare pnl={pnl} winnerName={name(winner)} />}
+      {pnl && <PnlCard pnl={pnl} winnerName={name(winner)} shareHref={xIntentUrl(pnl)} />}
 
       {/* standings */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>

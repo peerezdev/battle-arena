@@ -45,4 +45,17 @@ describe('PnlCard', () => {
     rerender(<PnlCard pnl={pnl()} winnerName="p" />)
     expect(screen.getByTestId('pnl-card').style.backgroundImage).toBe('')
   })
+  it('sin enlace no hay botón: la tarjeta queda limpia para una captura', () => {
+    render(<PnlCard pnl={pnl()} winnerName="prueba2" />)
+    expect(screen.queryByText('Share on X')).toBeNull()
+  })
+
+  it('con enlace el botón va DENTRO de la tarjeta, no al lado', () => {
+    render(<PnlCard pnl={pnl()} winnerName="prueba2" shareHref="https://x.com/intent/post?text=hola" />)
+    const boton = screen.getByText('Share on X').closest('a') as HTMLAnchorElement
+    expect(screen.getByTestId('pnl-card').contains(boton)).toBe(true)
+    expect(boton.style.position).toBe('absolute')   // esquina inferior derecha
+    expect(boton.style.right).not.toBe('')
+    expect(boton.style.bottom).not.toBe('')
+  })
 })
