@@ -26,6 +26,11 @@ _BY_CODE = {e["code"]: e for e in EMOTE_CATALOG}
 DEFAULT_EMOTES = [e["code"] for e in EMOTE_CATALOG]   # all emotes granted to every new user (no unlock flow yet)
 MAX_SLOTS = 4   # el mismo tope está en src/ui/emotes/EmoteBar.tsx: los dos tienen que ir a la par
 
+# Los que salen en la barra a falta de elección del usuario, EN ESTE ORDEN. Antes se cogían los
+# primeros del catálogo, que es el orden en que se fueron añadiendo y no quiere decir nada.
+# El resto del catálogo se sigue teniendo: simplemente no ocupa hueco fijo.
+DEFAULT_SLOTS = ["pikachu", "bulbasaur", "charmander", "squirtle"]
+
 
 def catalog() -> list[dict]:
     return [dict(e) for e in EMOTE_CATALOG]
@@ -60,11 +65,12 @@ def read_user_emotes(session: Session, wallet: str) -> dict:
             slots = [c for c in json.loads(user.emote_slots) if c in owned]
         except (ValueError, TypeError):
             slots = []
-    # Rellena hasta el tope con lo que el usuario tenga sin fijar, respetando su orden primero.
-    # Antes solo se rellenaba la lista VACÍA: a quien ya tuviera slots guardados, subir MAX_SLOTS
-    # no le añadía ninguno y seguía viendo los mismos de siempre.
+    # Rellena hasta el tope, respetando primero lo que haya elegido el usuario y tirando después
+    # de DEFAULT_SLOTS. Antes solo se rellenaba la lista VACÍA: a quien ya tuviera slots guardados,
+    # subir MAX_SLOTS no le añadía ninguno y seguía viendo los mismos de siempre.
     if len(slots) < MAX_SLOTS:
-        slots += [c for c in owned if c not in slots][: MAX_SLOTS - len(slots)]
+        relleno = [c for c in DEFAULT_SLOTS if c in owned] + [c for c in owned if c not in DEFAULT_SLOTS]
+        slots += [c for c in relleno if c not in slots][: MAX_SLOTS - len(slots)]
     return {"owned": owned, "slots": slots[:MAX_SLOTS]}
 
 

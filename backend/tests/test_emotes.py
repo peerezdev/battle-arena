@@ -20,8 +20,7 @@ def test_catalog_has_codes_and_urls():
 def test_read_grants_defaults_on_first_access(session):
     out = emotes.read_user_emotes(session, "WALLET_A")
     assert set(out["owned"]) == set(emotes.DEFAULT_EMOTES)
-    # slots default to the first MAX_SLOTS owned, in catalog order
-    assert out["slots"] == out["owned"][:emotes.MAX_SLOTS]
+    assert out["slots"] == emotes.DEFAULT_SLOTS
 
 
 def test_set_slots_keeps_only_owned(session):
@@ -34,6 +33,19 @@ def test_set_slots_keeps_only_owned(session):
     assert "not_owned" not in out["slots"]
     # persists on re-read
     assert emotes.read_user_emotes(session, "A")["slots"][:3] == elegidos
+
+
+def test_default_slots_son_los_cuatro_de_siempre_y_existen(session):
+    """Los que ve alguien que no ha elegido nada, en orden.
+
+    Antes se cogían los primeros del catálogo, que es el orden en que se fueron añadiendo. Un
+    código mal escrito aquí no rompería nada: el hueco se rellenaría en silencio con otro emote,
+    así que el test comprueba también que los cuatro están en el catálogo.
+    """
+    assert emotes.DEFAULT_SLOTS == ["pikachu", "bulbasaur", "charmander", "squirtle"]
+    assert len(emotes.DEFAULT_SLOTS) == emotes.MAX_SLOTS
+    assert all(c in emotes.DEFAULT_EMOTES for c in emotes.DEFAULT_SLOTS)
+    assert emotes.read_user_emotes(session, "NUEVO")["slots"] == emotes.DEFAULT_SLOTS
 
 
 def test_slots_guardados_se_rellenan_hasta_el_tope(session):
