@@ -57,7 +57,12 @@ const MODE_LABEL: Record<BattleMode, string> = {
   mana:   'MANA DUEL',
 }
 
-const CAPTION: React.CSSProperties = { display: 'block', fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.1em', color: '#7a8492', marginBottom: 3 }
+/** El rótulo de cada cifra, igual que en RoyaleBattleWide. Va en su propia celda de la rejilla,
+ *  justo encima de la cifra y en la MISMA columna: así el centrado es exacto por construcción y no
+ *  depende de que dos cajas independientes acaben midiendo lo mismo. */
+const CAPTION: React.CSSProperties = {
+  fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.16em', color: '#7a8492', textAlign: 'center',
+}
 
 const FILTERS = ['All', 'Ready to join', 'Mine', 'Recent']
 // 'Recent' es el único que enseña partidas TERMINADAS; los tres de antes miran a las que siguen
@@ -351,32 +356,28 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onRe
         </div>
         {wide && (
           <>
-            {/* Cada rótulo encima de SU número. Antes iban los dos juntos en una línea debajo
-                ("BUY-IN → ESTIMATED POT") y había que emparejarlos de memoria. */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, minWidth: 0 }}>
-              {/* textAlign en la columna: el rótulo y el número se centran entre ellos, que es lo
-                  que se lee como "una cosa". Alineados a un lado, el más corto queda colgando. */}
-              <span style={{ flex: 'none', minWidth: 0, textAlign: 'center' }}>
-                <span style={CAPTION}>{b.costLabel}</span>
-                <span style={{ display: 'block', fontSize: 18, fontWeight: 700, color: COLORS.muted, whiteSpace: 'nowrap' }}>{formatUsd(b.entry)}</span>
+            {/* La misma rejilla que RoyaleBattleWide: fila de rótulos SOBRE fila de cifras,
+                compartiendo columna. Así el rótulo y su número quedan centrados por construcción
+                —son la misma columna— y las dos cifras, de tamaños distintos, comparten línea
+                central con la flecha, que apunta por el medio de ambas.
+                La columna del medio es 1fr y no un ancho fijo como en la card grande: allí hay
+                máquina y botón a la derecha que ocupan el resto, y aquí no hay nada. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', columnGap: 14, rowGap: 3 }}>
+              <span style={CAPTION}>{b.costLabel}</span>
+              <span />
+              <span style={CAPTION}>{pot.label}</span>
+
+              <span style={{ fontSize: 18, fontWeight: 700, color: COLORS.muted, whiteSpace: 'nowrap', textAlign: 'center' }}>{formatUsd(b.entry)}</span>
+              <span style={{ position: 'relative', display: 'flex', alignItems: 'center', alignSelf: 'center' }}>
+                <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
+                <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
+                {mult && (
+                  <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', padding: '2px 9px', borderRadius: 999, background: '#0c0f15', border: `1px solid ${modeColor}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: modeColor }}>
+                    {mult}
+                  </span>
+                )}
               </span>
-              <span style={{ flex: 1, minWidth: 28 }}>
-                {/* Rótulo invisible: mantiene la flecha a la altura de los números sin cuadrarlo a ojo. */}
-                <span style={{ ...CAPTION, visibility: 'hidden' }}>·</span>
-                <span style={{ position: 'relative', display: 'flex', alignItems: 'center', height: 22 }}>
-                  <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
-                  <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
-                  {mult && (
-                    <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', padding: '2px 9px', borderRadius: 999, background: '#0c0f15', border: `1px solid ${modeColor}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: modeColor }}>
-                      {mult}
-                    </span>
-                  )}
-                </span>
-              </span>
-              <span style={{ flex: 'none', minWidth: 0, textAlign: 'center' }}>
-                <span style={CAPTION}>{pot.label}</span>
-                <span style={{ display: 'block', fontSize: 'clamp(22px,2vw,28px)', fontWeight: 700, letterSpacing: '-.02em', color: modeColor, whiteSpace: 'nowrap' }}>{formatUsd(pot.value)}</span>
-              </span>
+              <span style={{ fontSize: 'clamp(22px,2vw,28px)', fontWeight: 700, letterSpacing: '-.02em', color: modeColor, whiteSpace: 'nowrap', textAlign: 'center' }}>{formatUsd(pot.value)}</span>
             </div>
           </>
         )}

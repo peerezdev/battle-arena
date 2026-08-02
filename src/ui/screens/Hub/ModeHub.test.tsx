@@ -165,9 +165,18 @@ describe('ModeHub · lo que enseña la card de una partida terminada', () => {
   it('el rótulo va centrado sobre su número, no colgando a un lado', () => {
     mocks.wide = true   // la cabecera con los rótulos es de la maqueta ancha
     recientePack({ loot_usd: 40 } as unknown as Partial<OpenBattle>)
-    for (const t of ['BUY-IN', 'TOTAL POT']) {
-      const columna = screen.getByText(t).parentElement as HTMLElement
-      expect(columna.style.textAlign).toBe('center')
+    // Rejilla de dos filas, como en RoyaleBattleWide: el rótulo y su cifra comparten columna,
+    // así que centrarlos no depende de que dos cajas sueltas midan lo mismo.
+    const rejilla = screen.getByText('BUY-IN').parentElement as HTMLElement
+    expect(rejilla.style.display).toBe('grid')
+    expect(rejilla.style.gridTemplateColumns).toBe('auto 1fr auto')
+    // Los cuatro —los dos rótulos y las dos cifras— centrados en su celda.
+    for (const t of ['BUY-IN', 'TOTAL POT', '$10', '$40']) {
+      expect((screen.getByText(t) as HTMLElement).style.textAlign).toBe('center')
+    }
+    // Y todos en la MISMA rejilla, que es lo que hace que compartan columna.
+    for (const t of ['TOTAL POT', '$10', '$40']) {
+      expect(rejilla.contains(screen.getByText(t))).toBe(true)
     }
   })
 
