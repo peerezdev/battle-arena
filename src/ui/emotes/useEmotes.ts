@@ -26,10 +26,12 @@ export function useEmotes() {
 
   const updateSlots = useCallback(async (next: string[]) => {
     if (!identityToken) return
-    const capped = next.slice(0, 3)
-    setSlots(capped)   // optimistic
+    // El tope lo pone el backend (MAX_SLOTS en app/services/emotes.py) y lo aplica al guardar.
+    // Aquí había un 3 a mano que se quedó atrás al subirlo a 4: habría recortado la selección
+    // antes de mandarla. Un solo sitio manda.
+    setSlots(next)   // optimistic
     try {
-      const m = await setEmoteSlots(identityToken, capped)
+      const m = await setEmoteSlots(identityToken, next)
       setSlots(m.slots); setOwned(m.owned)
     } catch { /* keep optimistic value */ }
   }, [identityToken])
