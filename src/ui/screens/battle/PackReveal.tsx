@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { RevealCard, rarityColor } from './RevealCard'
@@ -11,10 +11,15 @@ import { useAliases } from '../../useAliases'
 import { useCountUp } from '../../useCountUp'
 import { useMachines } from '../../useMachines'
 import { useIsWide } from '../../useIsWide'
+import { WinnerDrawOverlay } from './WinnerDrawOverlay'
+import { tieBreakOf } from './packTieBreak'
+import { spinDurationMs } from './royaleShared'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
 // How long a round's revealed cards stay on screen before the next round replaces them.
 const ROUND_HOLD_MS = 3000
+/** Lo que el cartel del sorteo se sostiene sobre el ganador antes de ir al resultado. */
+const WINNER_SHOW_MS = 1600
 
 const RAR: Record<string, { tint: string; border: string }> = {
   common:    { tint: '#3a4250', border: 'rgba(255,255,255,.18)' },
@@ -51,6 +56,11 @@ export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
   const [round, setRound] = useState(0)
   const [doneCount, setDoneCount] = useState(0)
   const [complete, setComplete] = useState(false)
+  const [drawing, setDrawing] = useState(false)
+
+  // Empate en el total más alto: el backend ya sorteó al ganador con la semilla Provably-Fair, y
+  // aquí se enseña ese sorteo antes de pasar al resultado. Con reduced-motion no hay ceremonia.
+  const tie = useMemo(() => (reducedMotion ? null : tieBreakOf(vm)), [vm, reducedMotion])
 
   const roundReady = vm.players.length > 0 && vm.players.every((p) => !!p.cards[round]?.nftAddress)
   const cardShown = doneCount >= vm.players.length
@@ -62,12 +72,29 @@ export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
       const t = setTimeout(() => { setRound((r) => r + 1); setDoneCount(0) }, reducedMotion ? 0 : ROUND_HOLD_MS)
       return () => clearTimeout(t)
     }
-    if (settled && !complete) {
-      const t = setTimeout(() => { setComplete(true); onComplete?.() }, reducedMotion ? 0 : ROUND_HOLD_MS)
+    if (settled && !complete && !drawing) {
+      // Con empate, el hueco entre la última carta y el resultado se llena con el sorteo.
+      const t = setTimeout(
+        () => { if (tie) setDrawing(true); else { setComplete(true); onComplete?.() } },
+        reducedMotion ? 0 : ROUND_HOLD_MS,
+      )
       return () => clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardShown, round, totalRounds, settled, complete, reducedMotion])
+  }, [cardShown, round, totalRounds, settled, complete, drawing, tie, reducedMotion])
+
+  // El giro NO dura un tiempo fijo: crece con el número de empatados. Con una constante, a partir
+  // de cierto punto la ruleta seguiría girando cuando el resultado ya hubiera tapado el cartel
+  // —el mismo fallo que ya tuvo el royale— y el ganador no se llegaría a ver.
+  useEffect(() => {
+    if (!drawing || !tie || !vm.winner) return
+    const t = setTimeout(
+      () => { setComplete(true); onComplete?.() },
+      spinDurationMs(tie.tied, vm.winner) + WINNER_SHOW_MS,
+    )
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawing, tie, vm.winner])
 
   const shownRounds = cardShown ? round + 1 : round
   const machine = machines[vm.machines[round] ?? vm.machines[0] ?? '']
@@ -82,6 +109,15 @@ export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
   const revealedPot = totals.reduce((s, v) => s + v, 0)
   const pot = useCountUp(revealedPot, !reducedMotion)
 
+  const nameByWallet = (w: string) => {
+    const p = vm.players.find((x) => x.wallet === w)
+    return p ? name(p) : shortWallet(w)
+  }
+  // El mismo cartel en las dos maquetas: lo que se sortea no depende del ancho de la pantalla.
+  const sorteo = drawing && tie && vm.winner
+    ? <WinnerDrawOverlay tied={tie.tied} winner={vm.winner} value={tie.value} nameOf={nameByWallet} reducedMotion={reducedMotion} />
+    : null
+
   // ── Mobile (<560px): compact match header + 2-up player grid. Desktop keeps the wide layout below. ──
   if (!wide) {
     const n = vm.players.length
@@ -91,7 +127,7 @@ export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
     const mCardH = Math.round(mCardW * 1.4)
     const pct = Math.round((Math.min(round + (cardShown ? 1 : 0), totalRounds) / totalRounds) * 100)
     return (
-      <div style={{ padding: '10px 14px 0', display: 'flex', flexDirection: 'column', gap: 10, minHeight: '100%' }}>
+      <div style={{ position: 'relative', padding: '10px 14px 0', display: 'flex', flexDirection: 'column', gap: 10, minHeight: '100%' }}>
         {/* compact match header */}
         <div style={{ flex: 'none', borderRadius: 15, background: 'linear-gradient(90deg,rgba(255,46,151,.10),rgba(0,255,196,.08))', border: '1px solid rgba(0,255,196,.25)', padding: '11px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
@@ -142,13 +178,14 @@ export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
           </div>
         </div>
 
+        {sorteo}
         {vm.meWallet && <EmoteDock meWallet={vm.meWallet} battleId={battleId} />}
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '18px clamp(14px,2.4vw,28px) 0', display: 'flex', flexDirection: 'column', gap: 18, minHeight: '100%' }}>
+    <div style={{ position: 'relative', padding: '18px clamp(14px,2.4vw,28px) 0', display: 'flex', flexDirection: 'column', gap: 18, minHeight: '100%' }}>
       {/* ── status bar ── */}
       <section style={{
         position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap',
@@ -220,6 +257,7 @@ export function PackReveal({ vm, reducedMotion, onComplete, battleId }: {
         ))}
       </div>
 
+      {sorteo}
       {/* emotes — fixed dock at the very bottom */}
       {vm.meWallet && <EmoteDock meWallet={vm.meWallet} battleId={battleId} />}
     </div>

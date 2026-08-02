@@ -42,6 +42,8 @@ export function DemoFlow() {
   // ajustar tiempos y sonidos de cada una sin depender de la suerte.
   const [params] = useSearchParams()
   const forced = params.get('forced') === '1' ? FORCED_ORDER : undefined
+  // ?tie=1 → los cuatro sacan la misma carta, así que empatan y hay que sortear al ganador.
+  const tie = params.get('tie') === '1'
   const exit = () => navigate('/home')
 
   const [battle, setBattle] = useState<Battle | null>(null)
@@ -60,14 +62,14 @@ export function DemoFlow() {
         const { machine: m, cards } = await fetchDemoPool()
         const b = isRoyale
           ? buildRoyaleDemo(cards, m.odds, m.code, m.price, ROYALE_PLAYERS, Math.random, forced)
-          : buildPackDemo(cards, m.odds, m.code, m.price, Math.random, forced)
+          : buildPackDemo(cards, m.odds, m.code, m.price, Math.random, forced, tie)
         if (!cancelled) setBattle(b)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Could not start the demo')
       }
     })()
     return () => { cancelled = true }
-  }, [isRoyale, forced])
+  }, [isRoyale, forced, tie])
 
   // Los rivales de la demo NO lanzan emotes. Un emote es una acción de una persona; ponerlo en
   // boca de un bot finge que hay alguien al otro lado. En una batalla real un bot tampoco puede:

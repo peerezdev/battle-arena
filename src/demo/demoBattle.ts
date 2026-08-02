@@ -85,15 +85,22 @@ function toPull(card: MachineCard, round: number, wallet: string): BattlePullInf
 
 const val = (c: MachineCard) => c.insured_value ?? 0
 
-/** Pack Battle demo: you vs one bot, one card each; higher insured value wins the pot. */
-export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, rng: () => number = Math.random, forced?: readonly string[]): Battle {
+/** Pack Battle demo: you vs one bot, one card each; higher insured value wins the pot.
+ *
+ *  `tie` reparte la MISMA carta a los cuatro para forzar un empate a cuatro bandas. Un empate
+ *  real exige que dos cartas valgan exactamente lo mismo, que con valores de verdad es raro: sin
+ *  esto, ver el sorteo del ganador a mano dependería de la suerte. */
+export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, rng: () => number = Math.random, forced?: readonly string[], tie = false): Battle {
   const byRarity = groupByRarity(pool)
   const pick = makePicker(byRarity, odds, rng, forced)
   // El tope de una pack battle real (CreateBattleModal ofrece 2, 3 o 4). La demo tenía 5 y
   // enseñaba una mesa que no existe.
   const PACK_PLAYERS = 4
   const wallets = [DEMO_ME, ...Array.from({ length: PACK_PLAYERS - 1 }, () => fakeWallet(rng))]
-  const cards = wallets.map(() => pick())
+  // `pick()` tiene efectos —avanza el orden forzado y el rng—, así que solo se llama de más
+  // cuando de verdad hace falta: sacarlo fuera desplazaba la secuencia también sin empate.
+  const repetida = tie ? pick() : null
+  const cards = repetida ? wallets.map(() => repetida) : wallets.map(() => pick())
   const pulls: BattlePullInfo[] = wallets.map((w, i) => toPull(cards[i], 1, w))
   // El ⚡ de auto-vendida se sortea por carta. Antes se marcaban las dos últimas de la lista
   // ordenada, o sea siempre los mismos asientos: se leía como un guion, no como suerte.

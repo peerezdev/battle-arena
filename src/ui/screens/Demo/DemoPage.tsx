@@ -108,6 +108,9 @@ export function DemoPage() {
               <div style={{ ...row, marginTop: 10 }}>
                 <button style={ghost} onClick={() => navigate('/play/demo/royale')}>Royale · aleatorio</button>
                 <button style={ghost} onClick={() => navigate('/play/demo/pack')}>Pack · aleatorio</button>
+                {/* Los cuatro sacan la misma carta: empatan y hay que sortear al ganador. Un
+                    empate real exige dos cartas del mismo valor exacto, que casi nunca pasa. */}
+                <button style={ghost} onClick={() => navigate('/play/demo/pack?tie=1')}>Pack · empate a cuatro</button>
               </div>
             </section>
 

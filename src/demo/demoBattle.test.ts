@@ -113,6 +113,22 @@ describe('buildPackDemo', () => {
     expect((b.pulls ?? [])).toHaveLength(4)
   })
 
+  it('con tie los cuatro empatan, que es lo que dispara el sorteo del ganador', () => {
+    const b = buildPackDemo(POOL, ODDS, 'pokemon_50', 50, seeded(6), undefined, true)
+    const totales = b.players.map((p) => p.accumulated_value)
+    expect(new Set(totales).size).toBe(1)          // un solo valor: empate a cuatro
+    expect(b.players).toHaveLength(4)
+  })
+
+  it('sin tie NO se fuerza el empate', () => {
+    // Si esto empatara siempre, la demo normal dejaría de enseñar una partida corriente.
+    const empates = Array.from({ length: 40 }, (_, i) => {
+      const b = buildPackDemo(POOL, ODDS, 'pokemon_50', 50, seeded(i + 1))
+      return new Set(b.players.map((p) => p.accumulated_value)).size === 1
+    })
+    expect(empates.filter(Boolean).length).toBeLessThan(40)
+  })
+
   it('el auto-sold no depende del asiento (antes eran siempre los dos últimos)', () => {
     const seats = new Set<number>()
     for (let i = 1; i <= 40; i++) {
