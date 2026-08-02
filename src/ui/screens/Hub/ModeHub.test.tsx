@@ -131,3 +131,37 @@ describe('ModeHub · partidas terminadas: Result y Replay', () => {
     expect(screen.queryByRole('button', { name: /Replay/ })).toBeNull()
   })
 })
+
+
+describe('ModeHub · lo que enseña la card de una partida terminada', () => {
+  const recientePack = (over: Partial<OpenBattle> = {}) => {
+    // `players` es el número de apuntados; una partida terminada está llena.
+    mocks.battles = [battle({ id: 'x', mode: 'pack', status: 'settled', winner: 'ME',
+                              players: 2, max_players: 2, ...over } as unknown as Partial<OpenBattle>)]
+    pintar('pack')
+    fireEvent.click(screen.getByText('Recent'))
+  }
+
+  it('el bote es el real y el ×N sale de ese número', () => {
+    // buy-in 10 USDC (buyin va en base units) y botín real 40 → ×4, no el ×2 de la estimación.
+    recientePack({ buyin: 10_000_000, price: 50_000_000, loot_usd: 40 } as unknown as Partial<OpenBattle>)
+    expect(screen.getByText('TOTAL POT')).toBeTruthy()
+    expect(screen.getByText('$40')).toBeTruthy()
+    expect(screen.getByText('×4')).toBeTruthy()
+  })
+
+  it('cada rótulo va encima de su número', () => {
+    recientePack({ loot_usd: 40 } as unknown as Partial<OpenBattle>)
+    expect(screen.getByText('BUY-IN')).toBeTruthy()
+    expect(screen.getByText('TOTAL POT')).toBeTruthy()
+    expect(screen.queryByText(/ESTIMATED POT/)).toBeNull()
+    expect(screen.queryByText(/BUY-IN → /)).toBeNull()   // ya no van juntos en una línea
+  })
+
+  it('en vez de "2/2" dice cuántos jugaron, y no quedan círculos', () => {
+    // Los círculos empujaban los botones fuera de la card en cuanto había varios asientos.
+    recientePack({ players: 4, max_players: 4, loot_usd: 40 } as unknown as Partial<OpenBattle>)
+    expect(screen.getByText('4 players')).toBeTruthy()
+    expect(screen.queryByText('4/4')).toBeNull()
+  })
+})

@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
+import { potShown, multLabel } from './battlePot'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { useIsWide } from '../../useIsWide'
 import { useMachineList } from '../../useMachines'
@@ -55,6 +56,8 @@ const MODE_LABEL: Record<BattleMode, string> = {
   royale: 'BATTLE ROYALE',
   mana:   'MANA DUEL',
 }
+
+const CAPTION: React.CSSProperties = { display: 'block', fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.1em', color: '#7a8492', marginBottom: 3 }
 
 const FILTERS = ['All', 'Ready to join', 'Mine', 'Recent']
 // 'Recent' es el único que enseña partidas TERMINADAS; los tres de antes miran a las que siguen
@@ -255,14 +258,9 @@ function parseSlots(slots: string): { filled: number; total: number } {
 
 // The "×N" step from buy-in to full pot (3 players → ×3). One decimal when not whole
 // (royale entry covers a variable pack count, so the ratio is rarely an integer).
-function multLabel(entry: number, pot: number): string | null {
-  if (entry <= 0 || pot <= 0) return null
-  const mult = pot / entry
-  return `×${Math.abs(mult - Math.round(mult)) < 0.05 ? Math.round(mult) : mult.toFixed(1)}`
-}
-
 /** Mobile body: packs panel + pot box side by side (no prices, tighter cells). */
 function CompactPacksPot({ battle: b, byCode, modeColor, mult }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; modeColor: string; mult: string | null }) {
+  const pot = potShown(b)
   const groups = groupCodes(b)
   return (
     <div style={{ display: 'flex', gap: 12, padding: '0 16px', marginBottom: 14 }}>
@@ -287,8 +285,8 @@ function CompactPacksPot({ battle: b, byCode, modeColor, mult }: { battle: LiveB
       </div>
       <div style={{ flex: 'none', width: 112, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 13, background: `${modeColor}0d`, border: `1px solid ${modeColor}38` }}>
         <div style={{ lineHeight: 1.15 }}>
-          <div style={{ fontSize: 9.5, color: '#7a8492', letterSpacing: '.06em', marginBottom: 2 }}>EST. POT</div>
-          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', color: modeColor }}>{formatUsd(b.pot)}</div>
+          <div style={{ fontSize: 9.5, color: '#7a8492', letterSpacing: '.06em', marginBottom: 2 }}>{pot.real ? 'TOTAL POT' : 'EST. POT'}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', color: modeColor }}>{formatUsd(pot.value)}</div>
         </div>
         <div style={{ height: 1, background: 'rgba(255,255,255,.08)' }} />
         <div style={{ lineHeight: 1.15 }}>
@@ -310,7 +308,10 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onRe
   const modeColor = MODE_COLOR[b.mode]
   const { filled, total } = parseSlots(b.slots)
   const openSeats = Math.max(0, total - filled)
-  const mult = multLabel(b.entry, b.pot)
+  // Terminada → lo que cayó de verdad; en juego → la estimación. El ×N sale del mismo número,
+  // así que en una partida terminada es el multiplicador REAL y no el prometido.
+  const pot = potShown(b)
+  const mult = multLabel(b.entry, pot.value)
   return (
     <div
       onClick={() => onOpen(b)}
@@ -350,21 +351,30 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onRe
         </div>
         {wide && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <span style={{ flex: 'none', fontSize: 18, fontWeight: 700, color: COLORS.muted, whiteSpace: 'nowrap' }}>{formatUsd(b.entry)}</span>
-              <span style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minWidth: 28 }}>
-                <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
-                <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
-                {mult && (
-                  <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', padding: '2px 9px', borderRadius: 999, background: '#0c0f15', border: `1px solid ${modeColor}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: modeColor }}>
-                    {mult}
-                  </span>
-                )}
+            {/* Cada rótulo encima de SU número. Antes iban los dos juntos en una línea debajo
+                ("BUY-IN → ESTIMATED POT") y había que emparejarlos de memoria. */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, minWidth: 0 }}>
+              <span style={{ flex: 'none', minWidth: 0 }}>
+                <span style={CAPTION}>{b.costLabel}</span>
+                <span style={{ display: 'block', fontSize: 18, fontWeight: 700, color: COLORS.muted, whiteSpace: 'nowrap' }}>{formatUsd(b.entry)}</span>
               </span>
-              <span style={{ flex: 'none', fontSize: 'clamp(22px,2vw,28px)', fontWeight: 700, letterSpacing: '-.02em', color: modeColor, whiteSpace: 'nowrap' }}>{formatUsd(b.pot)}</span>
-            </div>
-            <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.1em', color: '#7a8492', marginTop: 4 }}>
-              {b.costLabel} → ESTIMATED POT
+              <span style={{ flex: 1, minWidth: 28 }}>
+                {/* Rótulo invisible: mantiene la flecha a la altura de los números sin cuadrarlo a ojo. */}
+                <span style={{ ...CAPTION, visibility: 'hidden' }}>·</span>
+                <span style={{ position: 'relative', display: 'flex', alignItems: 'center', height: 22 }}>
+                  <span style={{ flex: 1, height: 2, background: `linear-gradient(90deg,rgba(139,149,163,.4),${modeColor})`, borderRadius: 2 }} />
+                  <span style={{ flex: 'none', width: 0, height: 0, borderTop: '5px solid transparent', borderBottom: '5px solid transparent', borderLeft: `7px solid ${modeColor}` }} />
+                  {mult && (
+                    <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', padding: '2px 9px', borderRadius: 999, background: '#0c0f15', border: `1px solid ${modeColor}66`, fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: modeColor }}>
+                      {mult}
+                    </span>
+                  )}
+                </span>
+              </span>
+              <span style={{ flex: 'none', textAlign: 'right', minWidth: 0 }}>
+                <span style={CAPTION}>{pot.label}</span>
+                <span style={{ display: 'block', fontSize: 'clamp(22px,2vw,28px)', fontWeight: 700, letterSpacing: '-.02em', color: modeColor, whiteSpace: 'nowrap' }}>{formatUsd(pot.value)}</span>
+              </span>
             </div>
           </>
         )}
@@ -377,33 +387,16 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onRe
 
       {/* footer — seats + action */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: wide ? '14px 18px 16px' : '0 16px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          {b.players.map((p, i) => (
-            <span key={i} style={{
-              width: 32, height: 32, borderRadius: '50%', flex: 'none',
-              background: p.violet ? 'linear-gradient(135deg,#ff6bb5,#c02579)' : 'linear-gradient(135deg,#3df0a0,#13c98a)',
-              border: '2px solid #0c0f15',
-              marginLeft: i > 0 ? -8 : 0,
-            }} />
-          ))}
-          {/* dashed pulsing empty seats — cap the circles, the label carries the real count */}
-          {Array.from({ length: Math.min(openSeats, 3) }, (_, i) => (
-            <span key={`seat-${i}`} className="ba-slotpulse" style={{
-              width: 32, height: 32, borderRadius: '50%', flex: 'none',
-              border: '2px dashed rgba(245,197,66,.5)', background: 'transparent',
-              marginLeft: -8, animationDelay: `${i * 0.35}s`,
-            }} />
-          ))}
-          {b.extra && <span style={{ fontFamily: FONTS.display, fontWeight: 800, color: COLORS.muted, fontSize: 11, marginLeft: 6 }}>{b.extra}</span>}
-          {wide ? (
-            <span style={{ marginLeft: 9, fontFamily: FONTS.mono, fontSize: 12, color: openSeats > 0 ? '#f5c542' : COLORS.muted }}>
-              {openSeats > 0 ? `${openSeats} seat${openSeats === 1 ? '' : 's'} left` : b.slots}
-            </span>
-          ) : (
-            <span style={{ marginLeft: 9, fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>
-              {b.slots}{openSeats > 0 && <> · <span style={{ color: '#f5c542' }}>{openSeats} left</span></>}
-            </span>
-          )}
+        {/* Sin los círculos de jugadores: ocupaban toda la fila y en cuanto la partida tenía
+            varios asientos empujaban los botones fuera de la card. Lo que hacía falta saber
+            —cuántos jugaron, o cuántos huecos quedan— cabe en una línea. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          {b.extra && <span style={{ fontFamily: FONTS.display, fontWeight: 800, color: COLORS.muted, fontSize: 11 }}>{b.extra}</span>}
+          <span style={{ fontFamily: FONTS.mono, fontSize: 12, whiteSpace: 'nowrap', color: openSeats > 0 ? '#f5c542' : COLORS.muted }}>
+            {openSeats > 0
+              ? `${openSeats} seat${openSeats === 1 ? '' : 's'} left`
+              : `${total} player${total === 1 ? '' : 's'}`}
+          </span>
         </div>
 
         {b.action === 'watch' ? (

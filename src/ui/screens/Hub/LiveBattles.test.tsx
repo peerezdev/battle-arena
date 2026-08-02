@@ -15,7 +15,9 @@ describe('LiveBattles', () => {
   it('renders a card and fires join', () => {
     const onBattleAction = vi.fn()
     render(<LiveBattles battles={[b]} onBattleAction={onBattleAction} onOpen={vi.fn()} />)
-    expect(screen.getByText(/ENTRY → ESTIMATED POT/i)).toBeTruthy()   // header buy-in→pot label
+    // Cada rótulo va encima de SU número; antes iban juntos en "ENTRY → ESTIMATED POT".
+    expect(screen.getByText('ENTRY')).toBeTruthy()
+    expect(screen.getByText('ESTIMATED POT')).toBeTruthy()               // en juego: solo se estima
     expect(screen.getByText('×4.1')).toBeTruthy()                        // pot/entry multiplier pill
     fireEvent.click(screen.getByRole('button', { name: /join/i }))
     expect(onBattleAction).toHaveBeenCalledWith(b)
@@ -34,12 +36,14 @@ describe('LiveBattles', () => {
     expect(screen.queryByText(/seats? left/i)).toBeNull()
   })
 
-  it('mobile: compact card shows the pot box and "x/y · N left" instead of the header pot row', () => {
+  it('mobile: compact card shows the pot box and the seats line instead of the header pot row', () => {
     mocks.wide = false
     render(<LiveBattles battles={[b]} onBattleAction={vi.fn()} onOpen={vi.fn()} />)
     expect(screen.getByText('EST. POT')).toBeTruthy()                    // pot box
-    expect(screen.getByText('2 left')).toBeTruthy()                      // footer amber count
-    expect(screen.queryByText(/ENTRY → ESTIMATED POT/i)).toBeNull()      // wide-only header label
+    // El pie ya no lleva "2/4 · 2 left": los círculos se fueron y queda una sola línea.
+    expect(screen.getByText('2 seats left')).toBeTruthy()
+    expect(screen.queryByText('2/4')).toBeNull()
+    expect(screen.queryByText('ESTIMATED POT')).toBeNull()               // rótulo solo de escritorio
   })
 
   it('the segmented filters actually filter (All / Ready to join / Mine / Recent)', () => {
