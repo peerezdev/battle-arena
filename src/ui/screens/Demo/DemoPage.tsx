@@ -6,6 +6,8 @@ import { fetchDemoPool, FORCED_ORDER, DEMO_MACHINE, type DemoPool } from '../../
 import type { MachineCard } from '../../../onchain/gachaClient'
 import type { YoloResult } from '../gacha/pendingToResult'
 import { GachaCardReveal } from '../gacha/GachaCardReveal'
+import { PnlCard } from '../battle/PnlCard'
+import type { Pnl } from '../battle/pnl'
 
 // Banco de pruebas de los reveals. No es una pantalla de producto: existe para poder mirar una
 // y otra vez la misma rareza mientras se ajustan tiempos y sonidos, sin quedar a merced del
@@ -114,6 +116,23 @@ export function DemoPage() {
               </div>
             </section>
 
+            {/* ── Tarjeta de resultado ─────────────────────────────────── */}
+            <section style={{ ...card, marginTop: 18 }}>
+              <h2 style={h2}>Tarjeta del ganador</h2>
+              <p style={sub}>
+                Se dibuja sola a partir de la partida; aquí van cifras de ejemplo para poder mirarla
+                sin jugar. Escala con el hueco, así que se ve igual a cualquier tamaño.
+              </p>
+              <div style={{ maxWidth: 640 }}>
+                <PnlCard pnl={PNL_EJEMPLO} winnerName="prueba2" />
+              </div>
+              <div style={{ ...row, marginTop: 14, maxWidth: 380 }}>
+                {/* Ganar la partida no garantiza ganar dinero: si el botín entero vale menos que
+                    la entrada, el balance es una pérdida y la tarjeta lo dice. */}
+                <PnlCard pnl={{ ...PNL_EJEMPLO, entry: 450, payout: 350, profit: -100, multiple: 350 / 450 }} winnerName="prueba2" />
+              </div>
+            </section>
+
             {/* ── Gacha ────────────────────────────────────────────────── */}
             <section style={{ ...card, marginTop: 18 }}>
               <h2 style={h2}>Gacha</h2>
@@ -155,6 +174,12 @@ export function DemoPage() {
       )}
     </div>
   )
+}
+
+// Las cifras del mock original, para poder mirar la tarjeta sin depender de una partida.
+const PNL_EJEMPLO: Pnl = {
+  mode: 'PACK BATTLE', winner: 'demo', entry: 450, payout: 1812,
+  profit: 1362, multiple: 1812 / 450, background: null,
 }
 
 const POT_WARN = '#f5c542'
