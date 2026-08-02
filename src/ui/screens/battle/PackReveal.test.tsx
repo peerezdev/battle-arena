@@ -47,4 +47,15 @@ describe('PackReveal', () => {
     expect(screen.queryAllByRole('img')).toHaveLength(0)     // no card fronts until the pulls resolve
     expect(screen.getAllByText(/opening/i).length).toBeGreaterThan(0)
   })
+
+  it('enseña año, grado y rareza a la vez, como en Battle Royale', () => {
+    // Antes iban de uno en uno y cada dato borraba al anterior: al llegar la rareza ya no se veía
+    // de qué año era la carta. Apilados conviven, que es como se lee el royale.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+    renderR(<PackReveal vm={settled} reducedMotion={false} />)
+    expect(screen.getByText('2020')).toBeTruthy()
+    expect(screen.getByText('10')).toBeTruthy()
+    expect(screen.getByText('RARE')).toBeTruthy()
+    expect(screen.getAllByText('Year').length).toBeGreaterThan(0)   // las etiquetas del apilado
+  })
 })

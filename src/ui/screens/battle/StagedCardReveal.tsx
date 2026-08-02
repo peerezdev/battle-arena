@@ -16,7 +16,9 @@ type Stage = 'year' | 'grade' | 'rarity' | 'card'
  *
  *  `stacked` swaps the one-at-a-time text for the gacha's column: each value drops in under the
  *  previous one and STAYS, so the card is read as year + grade + rarity together before it flips.
- *  Off by default — Pack Battle's small cards have no room for three stacked rows. */
+ *  Lo usan royale Y pack battle: las cartas de pack son de 140×196 para arriba y las tres filas
+ *  caben (el bloque reparte con space-evenly y saca los tamaños del ancho). Sigue siendo opcional
+ *  porque la parrilla móvil baja hasta ~76px de ancho, donde ya no cabrían. */
 export function StagedCardReveal({
   year, grade, rarity, reduced, dwellMs = PHASE.hold, width = 180, height = 252,
   stacked = false, preloadSrc, onCardShown, onFaceUp, children,

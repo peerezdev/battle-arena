@@ -271,10 +271,10 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
       <div style={{ width: cardW, height: cardH, position: 'relative', overflow: 'hidden' }}>
         {roundReady && currentCard ? (
           <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
-            reduced={reducedMotion} width={cardW} height={cardH}
+            reduced={reducedMotion} width={cardW} height={cardH} stacked
             preloadSrc={currentCard.nftAddress ? ccCardImageUrl(currentCard.nftAddress) : undefined}
             onCardShown={onCardShown}>
-            <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
+            <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} valueColor={COLORS.text} />
           </StagedCardReveal>
         ) : (
           <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="opening…" />
@@ -342,10 +342,10 @@ function MiniPanel({ player, name, round, roundReady, shownRounds, isHot, isWinn
         <div style={{ width: cardW, height: cardH, position: 'relative', overflow: 'hidden' }}>
           {roundReady && currentCard ? (
             <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
-              reduced={reducedMotion} width={cardW} height={cardH}
+              reduced={reducedMotion} width={cardW} height={cardH} stacked
             preloadSrc={currentCard.nftAddress ? ccCardImageUrl(currentCard.nftAddress) : undefined}
             onCardShown={onCardShown}>
-              <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} />
+              <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} valueColor={COLORS.text} />
             </StagedCardReveal>
           ) : (
             <CardBack width={cardW} height={cardH} accent={rarityColor(null)} label="opening…" />

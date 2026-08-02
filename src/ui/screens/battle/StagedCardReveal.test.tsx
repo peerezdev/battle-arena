@@ -41,7 +41,7 @@ describe('StagedCardReveal', () => {
     vi.useRealTimers()
   })
 
-  it('sin stacked solo hay UN valor a la vez (lo que usa Pack Battle)', () => {
+  it('sin stacked solo hay UN valor a la vez', () => {
     vi.useFakeTimers()
     render(
       <StagedCardReveal year="2018" grade={10} rarity="Epic" reduced={false}>
