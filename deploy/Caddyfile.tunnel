@@ -1,0 +1,67 @@
+# BattleArena — mainnet DETRÁS DE CLOUDFLARE TUNNEL (mini PC en casa).
+#
+# Diferencia con ./Caddyfile: aquí Caddy NO termina TLS ni pide certificado. Escucha en :80
+# sobre loopback y quien pone el https y el dominio es Cloudflare, al otro lado del túnel.
+# La máquina no acepta NINGUNA conexión entrante de internet.
+#
+# Instálalo como /etc/caddy/Caddyfile. No hay dominio que editar: lo fija cloudflared.
+
+{
+	# Sin ACME: no hay puerto 443 ni certificado que gestionar.
+	auto_https off
+}
+
+:80 {
+	root * /srv/battlearena/dist
+	encode zstd gzip
+
+	header {
+		# Cloudflare sirve el https de cara al jugador, así que el HSTS sigue teniendo sentido.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# --- Backend (:9190) ------------------------------------------------------
+	# Espejo de `backendProxy` en vite.config.ts. El matcher `not header Accept *text/html*`
+	# es el equivalente al `htmlBypass`: /leaderboard es a la vez ruta del SPA y del backend,
+	# así que una NAVEGACIÓN (Accept: text/html, p.ej. recargar la URL) sirve la app y una
+	# llamada fetch/XHR pasa al backend. Si añades rutas al backend, añádelas aquí también.
+	@api {
+		path /gacha /gacha/* /pack-battles /pack-battles/* /emotes /emotes/* \
+			/wallet /wallet/* /auth /auth/* /users /users/* /matches /matches/* \
+			/elo /elo/* /leaderboard /leaderboard/* /health
+		not header Accept *text/html*
+	}
+	handle @api {
+		reverse_proxy 127.0.0.1:9190
+	}
+
+	# WebSocket: chat de lobby y eventos en vivo. cloudflared lo pasa sin configuración extra.
+	handle /ws* {
+		reverse_proxy 127.0.0.1:9190
+	}
+
+	# --- Oráculo (:8787) ------------------------------------------------------
+	# Lo llama el NAVEGADOR (src/onchain/oracleClient.ts), no solo el backend. /health NO se
+	# enruta aquí (es del backend); para vigilar el oráculo, curl a 127.0.0.1:8787/health.
+	handle /attest* {
+		reverse_proxy 127.0.0.1:8787
+	}
+	handle /pubkey* {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	# --- SPA ------------------------------------------------------------------
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	@html path / /index.html
+	header @html Cache-Control "no-cache"
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

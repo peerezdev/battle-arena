@@ -1,0 +1,27 @@
+# Cloudflare Tunnel — copia a /etc/cloudflared/config.yml y sustituye los dos placeholders.
+#
+# Cómo se obtiene el TUNNEL_ID (ver deploy/INSTALL-MINIPC.md, fase 5):
+#   cloudflared tunnel login                      # abre una URL: ábrela en cualquier navegador
+#   cloudflared tunnel create battlearena         # imprime el UUID y crea el .json de credenciales
+#   cloudflared tunnel route dns battlearena battlearena.tld    # crea el CNAME solo
+#
+# El fichero de credenciales queda en /root/.cloudflared/<UUID>.json — muévelo a
+# /etc/cloudflared/ y déjalo en chmod 600. Es el equivalente a una clave privada: quien lo
+# tenga puede publicar en tu dominio.
+
+tunnel: TUNNEL_ID_AQUI
+credentials-file: /etc/cloudflared/TUNNEL_ID_AQUI.json
+
+# Sin métricas expuestas a la red; solo loopback.
+metrics: 127.0.0.1:9091
+
+ingress:
+  # Todo el tráfico del dominio entra por Caddy en :80, que ya reparte entre SPA, backend y oráculo.
+  - hostname: battlearena.tld
+    service: http://localhost:80
+    originRequest:
+      # El chat mantiene WebSockets largos; sin esto cloudflared los cortaría al minuto y medio.
+      connectTimeout: 30s
+      noHappyEyeballs: false
+  # Regla final obligatoria: cualquier cosa que no case, 404.
+  - service: http_status:404

@@ -1,5 +1,16 @@
 # Despliegue — BattleArena mainnet
 
+**Dos variantes, mismo stack.** Elige una:
+
+| | Dónde | TLS | Caddyfile | Guía |
+|---|---|---|---|---|
+| **Mini PC en casa** | tu máquina, sin IP pública | Cloudflare Tunnel | `Caddyfile.tunnel` | [INSTALL-MINIPC.md](INSTALL-MINIPC.md) ← empieza aquí |
+| **VPS** | proveedor cloud | Caddy + Let's Encrypt | `Caddyfile` | este documento |
+
+Ficheros: `bootstrap-minipc.sh` (prepara la máquina, idempotente) · `deploy.sh` (desplegar) ·
+`verify.sh` (comprobación completa antes de abrir) · `backup.sh` (copia de la DB a offsite) ·
+`systemd/` (los dos servicios) · `cloudflared/` (config del túnel).
+
 Servidor único con root, Debian 12 o Ubuntu 24.04, **en US East**. Cualquier VPS KVM sirve — la
 guía no depende del proveedor.
 

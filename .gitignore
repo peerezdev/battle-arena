@@ -11,6 +11,12 @@ onchain/test-ledger/
 .env.*
 !.env.example
 
+# Credenciales del túnel de Cloudflare. `cloudflared tunnel create` deja un <UUID>.json que es
+# el equivalente a una clave privada: quien lo tenga puede publicar en tu dominio. El config.yml
+# real lleva dentro el ID del túnel. Solo se versiona el .example.
+deploy/cloudflared/*
+!deploy/cloudflared/*.example
+
 # local/test sqlite db
 *.db
 .test_players.json
