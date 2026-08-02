@@ -79,6 +79,18 @@ describe('WinningsBuyback', () => {
     expect(await screen.findByText(/Sell · ~\$50/)).toBeTruthy()
   })
 
+  it('el resultado ancho lleva el mismo par Keep|Sell y el buyback por carta', async () => {
+    // La rama `wide` (resultado de Pack Battle en escritorio) tenía un botón que alternaba, así que
+    // el estado sólo se veía después de pulsar y el buyback no salía mientras la carta estaba en
+    // Keep. Es la misma decisión que en royale, así que es el mismo control.
+    render(<WinningsBuyback cards={[card('a'), card('b')]} winnerWallet="W" lootTotal={120} wide />)
+    await waitFor(() => expect(screen.getAllByText(/↩ \$50/)).toHaveLength(2))
+    expect(screen.getAllByText('Keep')).toHaveLength(2)
+    expect(screen.getAllByText('Sell')).toHaveLength(2)
+    fireEvent.click(screen.getAllByText('Sell')[0]!)
+    expect(await screen.findByText(/Sell 1 · ~\$50/)).toBeTruthy()
+  })
+
   it('renders nothing when there are no cards', () => {
     const { container } = render(<WinningsBuyback cards={[]} winnerWallet="W" lootTotal={0} />)
     expect(container.firstChild).toBeNull()

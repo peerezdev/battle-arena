@@ -87,7 +87,6 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
     })
     return m
   })
-  const toggle = (nft: string) => setSell((s) => ({ ...s, [nft]: !s[nft] }))
 
   async function sellSelected() {
     if (!identityToken || busy || pending.length === 0) return
@@ -165,23 +164,30 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
                 <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 600, color: '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {c.name ?? '—'}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, gap: 8 }}>
+                {/* Valor y buyback en la misma línea: lo que vale la carta y lo que te darían por
+                    ella se comparan de un vistazo, que es justo la decisión del control de abajo. */}
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 4, gap: 8 }}>
                   <span style={{ fontSize: 15, fontWeight: 700, color: isBest ? '#ffd166' : COLORS.text }}>{formatUsd(c.insuredValue ?? 0)}</span>
-                  {/* Igual que en la rejilla compacta: si CC no compra la carta se dice y el
-                      botón se apaga, en vez de dejar pulsar un Sell que devolvería 400. */}
-                  {st !== 'sold' && noBb && (
-                    <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#6b7480' }} title="Collector Crypt does not buy this card back">no buyback</span>
-                  )}
-                  {st !== 'sold' && !noBb && (
-                    <button onClick={() => toggle(nft)} disabled={busy} style={{
-                      padding: '6px 12px', borderRadius: 8, cursor: busy ? 'default' : 'pointer',
-                      fontFamily: FONTS.body, fontSize: 11, fontWeight: 700,
-                      border: `1px solid ${picked ? 'rgba(245,197,66,.6)' : 'rgba(60,232,168,.4)'}`,
-                      background: picked ? 'rgba(245,197,66,.14)' : 'transparent',
-                      color: picked ? '#f5c542' : COLORS.green,
-                    }}>{picked ? `Sell${offer != null ? ` · ${formatUsd(offer)}` : ''}` : 'Keep'}</button>
-                  )}
+                  {offer != null && <span style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }} title="Buyback value">↩ {formatUsd(offer)}</span>}
+                  {/* Si CC no compra la carta se dice; es la razón por la que abajo no se puede
+                      pulsar Sell, en vez de dejar un botón que devolvería 400. */}
+                  {noBb && <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#6b7480' }} title="Collector Crypt does not buy this card back">no buyback</span>}
                 </div>
+                {st !== 'sold' && (
+                  // Mismo control segmentado Keep|Sell que la rejilla compacta (y que el resumen de
+                  // gacha): los dos estados se ven a la vez, en vez de un botón que hay que pulsar
+                  // para saber qué hace.
+                  <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}`, marginTop: 6 }}>
+                    <button onClick={() => setSell((s) => ({ ...s, [nft]: false }))} disabled={busy}
+                      style={{ flex: 1, padding: '7px 0', border: 0, cursor: busy ? 'default' : 'pointer', fontFamily: FONTS.body, fontSize: 11.5, fontWeight: 700,
+                        background: !picked ? 'rgba(0,255,196,.16)' : 'transparent', color: !picked ? COLORS.green : COLORS.muted }}>Keep</button>
+                    <button onClick={() => setSell((s) => ({ ...s, [nft]: true }))} disabled={busy || noBb}
+                      title={noBb ? 'Collector Crypt does not buy this card back' : undefined}
+                      style={{ flex: 1, padding: '7px 0', border: 0, borderLeft: `1px solid ${COLORS.border}`,
+                        cursor: busy || noBb ? 'default' : 'pointer', opacity: noBb ? 0.4 : 1, fontFamily: FONTS.body, fontSize: 11.5, fontWeight: 700,
+                        background: picked ? 'rgba(255,46,151,.18)' : 'transparent', color: picked ? '#c4adff' : COLORS.muted }}>Sell</button>
+                  </div>
+                )}
               </div>
             )
           })}
