@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import type { OpenBattle } from '../../../onchain/packBattleClient'
 
 // La pantalla tira de media docena de hooks; se sustituyen para poder probar SOLO lo que compone.
-const mocks = vi.hoisted(() => ({ battles: [] as OpenBattle[], nav: vi.fn() }))
+const mocks = vi.hoisted(() => ({ battles: [] as OpenBattle[], nav: vi.fn(), wide: false }))
 vi.mock('../../../onchain/useBattles', () => ({ useBattles: () => ({ battles: mocks.battles }) }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'ME' }))
@@ -15,6 +15,9 @@ vi.mock('../../useMachines', () => ({
 vi.mock('../../components/useDelegationGate', () => ({ useDelegationGate: () => ({ open: false }) }))
 vi.mock('../../components/DelegationGate', () => ({ DelegationGate: () => null }))
 vi.mock('./RoyaleDemoNotice', () => ({ RoyaleDemoNotice: () => null }))
+// jsdom no trae matchMedia, así que sin esto TODO se probaría contra la maqueta estrecha —
+// y la cabecera con los rótulos solo existe en la ancha.
+vi.mock('../../useIsWide', () => ({ useIsWide: () => mocks.wide }))
 vi.mock('react-router-dom', async (orig) => ({
   ...(await orig<typeof import('react-router-dom')>()),
   useNavigate: () => mocks.nav,
@@ -34,7 +37,7 @@ function battle(over: Partial<OpenBattle>): OpenBattle {
 const pintar = (mode: 'pack' | 'royale' = 'royale') =>
   render(<MemoryRouter><ModeHub mode={mode} /></MemoryRouter>)
 
-beforeEach(() => { mocks.battles = []; mocks.nav.mockReset() })
+beforeEach(() => { mocks.battles = []; mocks.nav.mockReset(); mocks.wide = false })
 
 describe('ModeHub · royale', () => {
   it('sin partidas terminadas no enseña la sección Recent', () => {
@@ -142,7 +145,8 @@ describe('ModeHub · lo que enseña la card de una partida terminada', () => {
     fireEvent.click(screen.getByText('Recent'))
   }
 
-  it('el bote es el real y el ×N sale de ese número', () => {
+  it('el bote es el real y el ×N sale de ese número (maqueta ancha)', () => {
+    mocks.wide = true
     // buy-in 10 USDC (buyin va en base units) y botín real 40 → ×4, no el ×2 de la estimación.
     recientePack({ buyin: 10_000_000, price: 50_000_000, loot_usd: 40 } as unknown as Partial<OpenBattle>)
     expect(screen.getByText('TOTAL POT')).toBeTruthy()
@@ -156,6 +160,23 @@ describe('ModeHub · lo que enseña la card de una partida terminada', () => {
     expect(screen.getByText('TOTAL POT')).toBeTruthy()
     expect(screen.queryByText(/ESTIMATED POT/)).toBeNull()
     expect(screen.queryByText(/BUY-IN → /)).toBeNull()   // ya no van juntos en una línea
+  })
+
+  it('el rótulo va centrado sobre su número, no colgando a un lado', () => {
+    mocks.wide = true   // la cabecera con los rótulos es de la maqueta ancha
+    recientePack({ loot_usd: 40 } as unknown as Partial<OpenBattle>)
+    for (const t of ['BUY-IN', 'TOTAL POT']) {
+      const columna = screen.getByText(t).parentElement as HTMLElement
+      expect(columna.style.textAlign).toBe('center')
+    }
+  })
+
+  it('ya no queda el "+N" que contaba los círculos', () => {
+    // `extra` era "+6" = los jugadores que no cabían como avatar. Sin avatares, junto a
+    // "10 players" se leía como un número suelto sin sentido.
+    recientePack({ players: 10, max_players: 10, loot_usd: 40 } as unknown as Partial<OpenBattle>)
+    expect(screen.getByText('10 players')).toBeTruthy()
+    expect(screen.queryByText(/^\+\d+$/)).toBeNull()
   })
 
   it('en vez de "2/2" dice cuántos jugaron, y no quedan círculos', () => {

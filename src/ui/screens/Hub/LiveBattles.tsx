@@ -354,7 +354,9 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onRe
             {/* Cada rótulo encima de SU número. Antes iban los dos juntos en una línea debajo
                 ("BUY-IN → ESTIMATED POT") y había que emparejarlos de memoria. */}
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, minWidth: 0 }}>
-              <span style={{ flex: 'none', minWidth: 0 }}>
+              {/* textAlign en la columna: el rótulo y el número se centran entre ellos, que es lo
+                  que se lee como "una cosa". Alineados a un lado, el más corto queda colgando. */}
+              <span style={{ flex: 'none', minWidth: 0, textAlign: 'center' }}>
                 <span style={CAPTION}>{b.costLabel}</span>
                 <span style={{ display: 'block', fontSize: 18, fontWeight: 700, color: COLORS.muted, whiteSpace: 'nowrap' }}>{formatUsd(b.entry)}</span>
               </span>
@@ -371,7 +373,7 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onRe
                   )}
                 </span>
               </span>
-              <span style={{ flex: 'none', textAlign: 'right', minWidth: 0 }}>
+              <span style={{ flex: 'none', minWidth: 0, textAlign: 'center' }}>
                 <span style={CAPTION}>{pot.label}</span>
                 <span style={{ display: 'block', fontSize: 'clamp(22px,2vw,28px)', fontWeight: 700, letterSpacing: '-.02em', color: modeColor, whiteSpace: 'nowrap' }}>{formatUsd(pot.value)}</span>
               </span>
@@ -391,7 +393,6 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onRe
             varios asientos empujaban los botones fuera de la card. Lo que hacía falta saber
             —cuántos jugaron, o cuántos huecos quedan— cabe en una línea. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          {b.extra && <span style={{ fontFamily: FONTS.display, fontWeight: 800, color: COLORS.muted, fontSize: 11 }}>{b.extra}</span>}
           <span style={{ fontFamily: FONTS.mono, fontSize: 12, whiteSpace: 'nowrap', color: openSeats > 0 ? '#f5c542' : COLORS.muted }}>
             {openSeats > 0
               ? `${openSeats} seat${openSeats === 1 ? '' : 's'} left`

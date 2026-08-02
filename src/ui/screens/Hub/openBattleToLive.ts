@@ -10,6 +10,10 @@ const MAX_AVATARS = 4
 // Maps a real open lobby to the presentational LiveBattle row shape.
 // NOTE: secrecy — rows carry NO real NFTs; `cards` is a static teaser.
 export function openBattleToLive(b: OpenBattle, meWallet: string | null = null): LiveBattle {
+  // OJO: `players` y `extra` ya NO los pinta BattleCard — los círculos de jugadores se
+  // retiraron porque empujaban los botones fuera de la card, y `extra` ("+6") contaba
+  // justamente los que no cabían como círculo. Se siguen calculando porque el tipo los exige;
+  // se pueden quitar el día que se limpie LiveBattle.
   const shown = Math.min(b.players, MAX_AVATARS)
   const players = Array.from({ length: shown }, (_, i) => ({ violet: i % 2 === 1 }))
   const extra = b.players > MAX_AVATARS ? `+${b.players - MAX_AVATARS}` : undefined
