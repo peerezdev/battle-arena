@@ -3,6 +3,10 @@ import { SITE_DOMAIN, type Pnl } from './pnl'
 
 // Tarjeta de resultado de un ganador, en 16:9 para poder compartirla tal cual.
 //
+// APARCADA: no está colocada en ninguna pantalla de producto. Estuvo en el resultado de
+// Pack Battle (commits 50fd2c9 y bb265ff) y se retiró para decidir qué hacer con ella. Se
+// mantiene viva y con tests, y se puede mirar en /demo.
+//
 // La paleta es cálida a propósito y NO es la del tema: la interfaz va en cian y magenta, y esta
 // tarjeta vive fuera —en una captura, en un chat— donde lo que tiene que leerse de un vistazo es
 // la cifra. El dorado la sostiene mejor que el verde de la interfaz. Es la misma decisión que ya

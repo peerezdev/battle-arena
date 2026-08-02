@@ -99,10 +99,7 @@ describe('BattleResult', () => {
     expect(screen.getByText(/×4\.0 return/)).toBeTruthy()        // loot 200 / entry 50
     // La fila de MARGIN ("+$120 over #2") se quitó del panel: ya no se afirma.
     expect(screen.getByText('3/4')).toBeTruthy()                 // fewest free seats wins
-    // La tarjeta del ganador también rotula ENTRY, así que se descuenta: lo que se comprueba
-    // aquí son las pastillas del panel de siguiente partida, no las suyas.
-    const tarjeta = screen.getByTestId('pnl-card')
-    expect(screen.getAllByText('ENTRY').filter((el) => !tarjeta.contains(el))).toHaveLength(1)
+    expect(screen.getByText('ENTRY')).toBeTruthy()               // money pills
     expect(screen.getByText('EST. POT')).toBeTruthy()
   })
 
@@ -111,71 +108,5 @@ describe('BattleResult', () => {
     mocks.open = [{ id: 'x1', mode: 'pack', machine_code: 'm', price: 5e7, max_players: 4, players: 2, buyin: 5e7, creator_wallet: 'A', player_wallets: ['A', 'Z'] }]
     render(<MemoryRouter><BattleResult vm={{ ...baseVm, entry: 50 }} battleId="b1" onExit={() => {}} /></MemoryRouter>)
     expect(screen.getByText(/No lobbies are filling right now/i)).toBeTruthy()
-  })
-})
-
-
-describe('BattleResult · tarjeta del ganador', () => {
-  beforeEach(() => {
-    mocks.wide = false
-    mocks.open = []
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
-  })
-  afterEach(() => vi.restoreAllMocks())
-
-  const pinta = (vm: RevealVM) =>
-    render(<MemoryRouter><BattleResult vm={vm} battleId="b1" onExit={() => {}} /></MemoryRouter>)
-
-  const GANADA = { ...baseVm, entry: 50 }
-
-  it('al ganador se le enseña la tarjeta y el botón de compartir', () => {
-    pinta(GANADA)
-    expect(screen.getByTestId('pnl-card')).toBeTruthy()
-    expect(screen.getByText('Share on X')).toBeTruthy()
-  })
-
-  it('a quien pierde NO se le ofrece presumir', () => {
-    pinta({ ...GANADA, winner: 'B' })
-    expect(screen.queryByTestId('pnl-card')).toBeNull()
-    expect(screen.queryByText('Share on X')).toBeNull()
-  })
-
-  it('a un espectador tampoco', () => {
-    pinta({ ...GANADA, meWallet: null })
-    expect(screen.queryByTestId('pnl-card')).toBeNull()
-  })
-
-  it('también está en escritorio', () => {
-    mocks.wide = true
-    pinta(GANADA)
-    expect(screen.getByTestId('pnl-card')).toBeTruthy()
-    expect(screen.getByText('FINAL STANDINGS')).toBeTruthy()
-  })
-
-  it('escritorio: las standings van DEBAJO de las ganancias', () => {
-    // Al ganar, lo primero que se mira es lo que uno se lleva; la tabla va después.
-    mocks.wide = true
-    pinta(GANADA)
-    const ganancias = screen.getByText(/your winnings|the haul/i)
-    const tabla = screen.getByText('FINAL STANDINGS')
-    // compareDocumentPosition: FOLLOWING = la tabla viene después en el documento
-    expect(ganancias.compareDocumentPosition(tabla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-
-  it('escritorio: el botón de compartir va dentro de la tarjeta', () => {
-    mocks.wide = true
-    pinta(GANADA)
-    const boton = screen.getByText('Share on X').closest('a') as HTMLAnchorElement
-    expect(screen.getByTestId('pnl-card').contains(boton)).toBe(true)
-  })
-
-  it('el botón abre X con el tuit escrito', () => {
-    pinta(GANADA)
-    const a = screen.getByText('Share on X').closest('a') as HTMLAnchorElement
-    const u = new URL(a.href)
-    expect(u.hostname).toBe('x.com')
-    expect(u.searchParams.get('text')).toContain('$150 profit')   // botín 200 − entrada 50
-    expect(a.target).toBe('_blank')
-    expect(a.rel).toContain('noopener')
   })
 })
