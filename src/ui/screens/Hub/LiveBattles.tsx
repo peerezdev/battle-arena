@@ -104,9 +104,11 @@ interface Props {
   onBattleAction: (b: LiveBattle) => void
   onCancel?: (b: LiveBattle) => void
   onOpen: (b: LiveBattle) => void
+  /** Revivir el reveal de una partida ya terminada. Sin esto solo se ofrece el marcador. */
+  onReplay?: (b: LiveBattle) => void
 }
 
-export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel, onOpen }: Props) {
+export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel, onOpen, onReplay }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
   const { machines } = useMachineList()
   const byCode = useMemo(() => new Map(machines.map((m) => [m.code, m])), [machines])
@@ -230,7 +232,7 @@ export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
           {filtered.map((b) => (
-            <BattleCard key={b.id} battle={b} byCode={byCode} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} />
+            <BattleCard key={b.id} battle={b} byCode={byCode} onAction={onBattleAction} onCancel={onCancel} onOpen={onOpen} onReplay={onReplay} />
           ))}
         </div>
       )}
@@ -303,7 +305,7 @@ function CompactPacksPot({ battle: b, byCode, modeColor, mult }: { battle: LiveB
 /** La card compacta de una partida. Exportada porque la pantalla de Battle Royale enseña sus
  *  partidas recientes con ESTA misma card: si se duplicara, las dos listas de "recientes"
  *  divergirían al primer retoque. */
-export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void }) {
+export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen, onReplay }: { battle: LiveBattle; byCode: Map<string, GachaMachine>; onAction: (b: LiveBattle) => void; onCancel?: (b: LiveBattle) => void; onOpen: (b: LiveBattle) => void; onReplay?: (b: LiveBattle) => void }) {
   const wide = useIsWide('(min-width: 760px)')
   const modeColor = MODE_COLOR[b.mode]
   const { filled, total } = parseSlots(b.slots)
@@ -405,10 +407,25 @@ export function BattleCard({ battle: b, byCode, onAction, onCancel, onOpen }: { 
         </div>
 
         {b.action === 'watch' ? (
-          <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
-            style={{ border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, borderRadius: 12, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-            {b.battleStatus === 'settled' ? 'Result' : 'Watch'}
-          </button>
+          /* Terminada: las dos salidas conviven. "Result" va al marcador y "Replay" revive el
+             reveal, que si no era inalcanzable — el enlace lleva al resultado por sí solo. */
+          b.battleStatus === 'settled' && onReplay ? (
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button onClick={(e) => { e.stopPropagation(); onReplay(b) }} title="Watch the reveal again"
+                style={{ border: `1px solid ${COLORS.border}`, background: 'transparent', color: COLORS.muted, borderRadius: 12, padding: '10px 15px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                ↻ Replay
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
+                style={{ border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, borderRadius: 12, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                Result
+              </button>
+            </div>
+          ) : (
+            <button onClick={(e) => { e.stopPropagation(); onAction(b) }}
+              style={{ border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, borderRadius: 12, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+              {b.battleStatus === 'settled' ? 'Result' : 'Watch'}
+            </button>
+          )
         ) : b.canCancel && onCancel ? (
           <button onClick={(e) => { e.stopPropagation(); onCancel(b) }}
             style={{ border: `1px solid ${COLORS.red}59`, background: `${COLORS.red}14`, color: '#ff7a8f', borderRadius: 12, padding: '10px 20px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>

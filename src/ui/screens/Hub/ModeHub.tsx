@@ -60,6 +60,9 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
     cancelBattle(identityToken, b.id).catch((e) => showToast(errMsg(e)))
   }
 
+  // Replay = la ruta SIN ?view=result, que es lo que deja correr el reveal otra vez.
+  const onReplay = (b: LiveBattle) => navigate(battleHref(b.id, { view: 'reveal' }))
+
   function onBattleAction(b: LiveBattle) {
     // 'watch' cubre tanto Watch (en juego) como Result (liquidada): battleHref las separa.
     if (b.action === 'watch') { navigate(battleHref(b.id, { status: b.battleStatus })); return }
@@ -116,6 +119,7 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
                       onAction={onBattleAction}
                       onCancel={onCancel}
                       onOpen={(x) => navigate(battleHref(x.id, { status: x.battleStatus }))}
+                      onReplay={onReplay}
                     />
                   ))}
                 </div>
@@ -123,7 +127,7 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
             )}
           </div>
         ) : (
-          <LiveBattles battles={liveBattles} meWallet={meWallet} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate(battleHref(b.id, { status: b.battleStatus }))} />
+          <LiveBattles battles={liveBattles} meWallet={meWallet} onBattleAction={onBattleAction} onCancel={onCancel} onReplay={onReplay} onOpen={(b) => navigate(battleHref(b.id, { status: b.battleStatus }))} />
         )}
       </div>
 

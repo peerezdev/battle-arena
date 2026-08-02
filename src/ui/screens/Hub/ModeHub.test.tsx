@@ -87,13 +87,47 @@ describe('ModeHub · royale', () => {
 })
 
 
-describe('ModeHub · el botón Result abre el resultado', () => {
-  it('una partida liquidada entra por el marcador, no por la primera carta', () => {
-    // Era el fallo: el botón decía "Result" y llevaba al principio del reveal, obligando a ver
-    // la partida entera otra vez. Solo el modal de "While you were away" pasaba ?view=result.
+describe('ModeHub · partidas terminadas: Result y Replay', () => {
+  const terminada = () => {
     mocks.battles = [battle({ id: 'terminada', status: 'settled', winner: 'ME' } as Partial<OpenBattle>)]
     pintar()
+  }
+
+  it('Result entra por el marcador, no por la primera carta', () => {
+    // Era el fallo: el botón decía "Result" y llevaba al principio del reveal, obligando a ver
+    // la partida entera otra vez. Solo el modal de "While you were away" pasaba ?view=result.
+    terminada()
     fireEvent.click(screen.getByRole('button', { name: 'Result' }))
     expect(mocks.nav).toHaveBeenCalledWith('/play/battle/terminada?view=result')
+  })
+
+  it('Replay revive el reveal', () => {
+    // Al arreglar lo anterior el reveal se quedó sin puerta: TODO enlace a una partida terminada
+    // llevaba al marcador. Las dos salidas tienen que convivir.
+    terminada()
+    fireEvent.click(screen.getByRole('button', { name: /Replay/ }))
+    expect(mocks.nav).toHaveBeenCalledWith('/play/battle/terminada')
+  })
+
+  it('en Pack Battle también salen las dos', () => {
+    // Son listas distintas —LiveBattles en pack, la rejilla Recent en royale— y se pidieron las
+    // dos, así que se comprueban las dos.
+    mocks.battles = [battle({ id: 'pb', mode: 'pack', status: 'settled', winner: 'ME' } as Partial<OpenBattle>)]
+    pintar('pack')
+    // En pack las terminadas viven bajo el filtro "Recent"; el de por defecto solo enseña las
+    // que siguen en juego.
+    fireEvent.click(screen.getByText('Recent'))   // el filtro es un span, no un botón
+    expect(screen.getByRole('button', { name: 'Result' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Replay/ }))
+    expect(mocks.nav).toHaveBeenCalledWith('/play/battle/pb')
+  })
+
+  it('una partida en juego NO ofrece Replay: aún no hay nada que revivir', () => {
+    // En pack a propósito: en royale una partida viva la pinta otra card distinta, así que ahí
+    // este test pasaría sin llegar a mirar la rama.
+    mocks.battles = [battle({ id: 'viva', mode: 'pack', status: 'running' } as Partial<OpenBattle>)]
+    pintar('pack')
+    expect(screen.getByRole('button', { name: 'Watch' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Replay/ })).toBeNull()
   })
 })
