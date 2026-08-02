@@ -37,20 +37,65 @@ comprobación.»**
 
 Pídeselo al usuario de golpe al principio, no de uno en uno:
 
-- [ ] URL del repositorio (con acceso de lectura desde esta máquina)
+- [ ] URL del repositorio **en formato SSH** (`git@github.com:usuario/repo.git`) y acceso para
+      añadirle una *deploy key* (Settings → Deploy keys)
 - [ ] Dominio a usar (p. ej. `battlearena.tld`) y **cuenta de Cloudflare** con ese dominio dado de alta
 - [ ] Fichero `oracle_key.json` de la máquina actual
 - [ ] Contenido de `backend/.env` (secretos de Privy, RPC de Helius de servidor, wallet del operador, fee wallet)
 - [ ] Contenido de `.env` y `.env.mainnet` del frontend
 - [ ] Cuenta de Backblaze B2 (o similar) para los backups
 - [ ] Confirmación de que el **wallet del operador está fondeado con SOL en mainnet**
+- [ ] Decidido si el rev-share de referidos va a estar activo (necesita `REFERRAL_PAYOUT_WALLET_ID`
+      y `REFERRAL_PAYOUT_ADDRESS`; vacías → el claim responde 503)
+
+---
+
+## Fase 0 — Acceso al repositorio
+
+**Solo si el repo es privado, que es lo normal.** Va antes que todo lo demás porque sin esto la
+fase 1 aborta a mitad.
+
+El clon y todos los despliegues posteriores los hace el usuario de sistema `battlearena`, no el
+tuyo: `deploy.sh` ejecuta `sudo -u battlearena -H git pull`. Ese usuario no hereda tus
+credenciales, así que necesita las suyas. Tener el repo clonado en tu home NO sirve.
+
+```bash
+# El usuario (lo mismo que hace el bootstrap; idempotente)
+sudo adduser --system --group --home /srv/battlearena battlearena
+
+# Su propia clave, en SU home
+sudo install -d -o battlearena -g battlearena -m 700 /srv/battlearena/.ssh
+sudo -u battlearena -H ssh-keygen -t ed25519 -N '' \
+     -f /srv/battlearena/.ssh/id_ed25519 -C 'battlearena-minipc-deploy'
+sudo -u battlearena -H bash -c 'ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts'
+
+sudo cat /srv/battlearena/.ssh/id_ed25519.pub
+```
+
+Esa pública se añade en el repo como **deploy key con "Allow write access" DESMARCADO**: solo
+lectura, solo este repo, y se revoca sin tocar la cuenta.
+
+**Comprobación — no sigas sin esto en verde:**
+
+```bash
+sudo -u battlearena -H ssh -T git@github.com    # "Hi ...! You've successfully authenticated"
+```
+
+> El `-H` de `sudo` no es opcional: sin él `HOME` sigue siendo `/root` y `ssh` buscaría la clave
+> en `/root/.ssh`. Los dos scripts lo llevan, por eso la clave va en `/srv/battlearena/.ssh`.
 
 ---
 
 ## Fase 1 — Base del sistema
 
 ```bash
-sudo REPO_URL=<URL-DEL-REPO> ~/battlearena-deploy/deploy/bootstrap-minipc.sh
+sudo REPO_URL=git@github.com:usuario/repo.git ~/battlearena-deploy/deploy/bootstrap-minipc.sh
+```
+
+Comprueba al terminar que el `pull` que hará cada despliegue funciona:
+
+```bash
+sudo -u battlearena -H git -C /srv/battlearena pull --ff-only    # "Already up to date."
 ```
 
 Instala paquetes, Node 20, Caddy, `cloudflared`, crea el usuario `battlearena`, clona el repo en
@@ -168,6 +213,19 @@ compilado, la DB, el cron de backup, el remoto de rclone y, por el túnel, que `
 `/pubkey`, la SPA y el matcher de `Accept` en `/leaderboard` funcionan.
 
 **No sigas hasta que salga todo en verde.**
+
+## Fase 6.5 — Configuración que la base de mainnet NO trae hecha
+
+La base de datos de mainnet nace vacía, y hay dos valores que en devnet están puestos y aquí no.
+Repásalos con el usuario antes de abrir:
+
+| Qué | Por qué importa |
+|---|---|
+| `FEE_WALLET_ADDRESS` en `backend/.env` | Su valor por defecto está escrito en `config.py` y es **el mismo en devnet y en mainnet**. Sin ponerlo aquí, los ingresos reales caen en la wallet que se usa para probar. |
+| `BATTLE_FEE_PCT_PER_PLAYER` | Es el interruptor REAL de la fee (0 = no cobrar). Vaciar `FEE_WALLET_ADDRESS` NO la apaga: la manda al operador. |
+| SOL del operador | Paga el gas y la renta de TODAS las operaciones. Sin saldo, las partidas se anulan al llenarse el lobby. |
+| `scripts/machines.py hide` | Ninguna máquina está apagada en esta base. |
+| `scripts/flags.py on auto_royale` | El lobby de la casa arranca desactivado. |
 
 ## Fase 7 — Backups y avisos
 
