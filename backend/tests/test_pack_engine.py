@@ -774,3 +774,69 @@ async def test_void_a_mitad_de_bundle_y_refund_devuelve_lo_ya_sacado(session):
     resolved = [(p.player_wallet, p.nft_address) for p in
                 session.query(BattlePull).filter_by(battle_id="s5").all() if p.nft_address]
     assert set(built) == {(w, n) for w, n in resolved}
+
+
+@pytest.mark.asyncio
+async def test_available_never_dips_while_the_bundle_is_being_paid(session):
+    """Regresión: el saldo DISPONIBLE no puede bajar durante la partida.
+
+    La tirada la paga la wallet del JUGADOR (sign_solana + submit), así que su saldo on-chain
+    va bajando caja a caja. Si la reserva sigue entera mientras tanto, `on-chain − reservado`
+    descuenta el mismo dinero dos veces y el jugador ve cómo se le esfuma el importe de la
+    partida sin haberla perdido — y encima no puede gastarlo (`_require_available` usa la
+    misma cuenta). El invariante: disponible == 1055$ en todo momento, de principio a fin.
+    """
+    from app.models import BattlePack
+    from app.services.reservations import reserve, reserved_total
+
+    PRECIO_CAJA = [30_000_000, 35_000_000]     # bundle de 2 cajas = 65$
+    TOTAL = sum(PRECIO_CAJA)                    # 65_000_000
+    ON_CHAIN_INICIAL = 1_120_000_000            # 1120$
+    DISPONIBLE = ON_CHAIN_INICIAL - TOTAL       # 1055$ — no debe moverse hasta el settle
+
+    b = PackBattle(id="rb1", mode="pack", machine_code="pokemon_30", price=TOTAL,
+                   max_players=2, status="running", server_seed="ab"*32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="rb1", player_wallet="A"),
+                     BattlePlayer(battle_id="rb1", player_wallet="B")])
+    for i, precio in enumerate(PRECIO_CAJA, start=1):
+        session.add(BattlePack(battle_id="rb1", machine_code=f"pokemon_{precio}", price=precio, sequence=i))
+    session.commit()
+    reserve(session, "A", "rb1", TOTAL)
+    reserve(session, "B", "rb1", TOTAL)
+
+    saldo = {"A": ON_CHAIN_INICIAL, "B": ON_CHAIN_INICIAL}
+    disponible_visto: list[int] = []
+
+    class _GachaQueCobra(_Gacha):
+        """Cobra al jugador cada caja, como hace CC, y anota el disponible que vería la UI."""
+        def __init__(self, opens):
+            super().__init__(opens); self.caja = 0; self.turno = 0
+        async def generate_pack(self, player_address, pack_type, alt_player_address=None, turbo=False):
+            self.pendiente = player_address
+            # Estado ESTABLE entre cajas: ni cobro ni consume a medio hacer. Es justo lo que ve
+            # el poll de saldo de la UI (cada 15s), y donde el jugador vio los 990$.
+            disponible_visto.append(saldo["A"] - reserved_total(session, "A"))
+            return await super().generate_pack(player_address, pack_type,
+                                               alt_player_address=alt_player_address, turbo=turbo)
+        async def submit_tx(self, signed_transaction):
+            w = self.pendiente
+            # la caja k se paga en la ronda k (2 jugadores por ronda)
+            precio = PRECIO_CAJA[self.turno // 2]
+            self.turno += 1
+            saldo[w] -= precio                                   # el dinero SALE de la wallet
+            return {"signature": "ccsig", "confirmation_status": "confirmed"}
+
+    gacha = _GachaQueCobra({"A": {"nft_address": "nA", "insured_value": 100, "grade": 9},
+                            "B": {"nft_address": "nB", "insured_value": 300, "grade": 8}})
+    async def prep(addr): pass
+    out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
+                           resolve_wallet_id=lambda w: f"{w}-id",
+                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           prepare_escrow=prep, can_play=lambda w: True,
+                           now_fn=lambda: __import__("datetime").datetime(2026, 8, 2),
+                           sleep_fn=_noslp)
+    assert out == "settled"
+    disponible_visto.append(saldo["A"] - reserved_total(session, "A"))   # al terminar
+    assert disponible_visto == [DISPONIBLE] * len(disponible_visto), (
+        f"el disponible se movió durante la partida: {disponible_visto} (esperado {DISPONIBLE})")

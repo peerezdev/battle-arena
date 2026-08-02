@@ -10,6 +10,7 @@ from app.services.provably_fair import pick_index, client_seed_from_nfts
 from app.services.nft_transfer import UnsupportedNftStandard
 from app.services.battle_fees import collect_battle_fee
 from app.services.onchain_policy import CONFIRM_POLLS, CONFIRM_DELAY
+from app.services.reservations import consume
 
 logger = logging.getLogger(__name__)
 
@@ -177,11 +178,13 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
 
     # Bundle: ordered BattlePack rows (legacy battles → a 1-box bundle of machine_code)
     packs = session.query(BattlePack).filter_by(battle_id=battle.id).order_by(BattlePack.sequence).all()
-    bundle = [p.machine_code for p in packs] or [battle.machine_code]
+    # (machine_code, precio) por caja: el precio hace falta para ir soltando el hold a medida que
+    # cada caja se cobra. Partidas antiguas sin filas BattlePack → una caja por el total.
+    bundle = [(p.machine_code, p.price) for p in packs] or [(battle.machine_code, battle.price)]
 
     # Pull each player round-by-round over the bundle → escrow. On any failure → void.
     outcomes: list[PullOutcome] = []
-    for k, machine_code in enumerate(bundle, start=1):
+    for k, (machine_code, precio_caja) in enumerate(bundle, start=1):
         for w in players:
             try:
                 pack = await gacha.generate_pack(player_address=w, pack_type=machine_code,
@@ -194,6 +197,11 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                 sub = await gacha.submit_tx(signed)
                 if not sub.get("signature"):
                     raise RuntimeError("pull submit returned no signature")
+                # La caja ya está pagada: el saldo on-chain del jugador acaba de bajar, así que
+                # hay que soltar esa parte del hold AHORA. Si se dejara entero hasta el final de
+                # la partida, `on-chain − reservado` restaría el mismo dinero dos veces y el
+                # jugador vería bajar su disponible en pleno combate sin haber perdido nada.
+                consume(session, w, battle.id, precio_caja)
                 # CC opens via webhook → poll while pending (don't void on a not-yet-ready pull).
                 res = await gacha.open_pack(pack["memo"])
                 attempts = 0

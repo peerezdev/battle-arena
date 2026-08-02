@@ -13,6 +13,39 @@ def reserve(session, wallet: str, battle_id: str, amount: int) -> Reservation:
     return r
 
 
+def consume(session, wallet: str, battle_id: str, amount: int) -> int:
+    """Gasta parte del hold porque ese dinero ACABA DE SALIR de la wallet on-chain.
+
+    Las tiradas las paga la wallet del jugador, caja a caja, así que su saldo on-chain baja
+    durante la partida. El hold solo tiene sentido mientras el dinero sigue dentro: si se
+    mantuviera entero, `disponible = on-chain − reservado` restaría lo mismo dos veces y el
+    jugador vería evaporarse el importe de la partida sin haberla perdido (y no podría
+    gastarlo, porque `_require_available` hace esa misma cuenta).
+
+    Devuelve lo realmente consumido. Nunca baja de cero, y al vaciarse marca la fila
+    `released` para que un `release_reservations` posterior sea un no-op limpio.
+    """
+    rows = session.execute(
+        select(Reservation)
+        .where(Reservation.wallet == wallet, Reservation.battle_id == battle_id,
+               Reservation.status == "active")
+        .order_by(Reservation.id)
+    ).scalars().all()
+    pendiente, gastado = max(0, int(amount)), 0
+    for r in rows:
+        if pendiente <= 0:
+            break
+        corte = min(r.amount, pendiente)
+        r.amount -= corte
+        pendiente -= corte
+        gastado += corte
+        if r.amount <= 0:
+            r.status = "released"
+            r.released_at = datetime.now(timezone.utc)
+    session.commit()
+    return gastado
+
+
 def reserved_total(session, wallet: str) -> int:
     total = session.execute(
         select(func.coalesce(func.sum(Reservation.amount), 0))

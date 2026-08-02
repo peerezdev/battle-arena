@@ -1,7 +1,9 @@
 import pytest
 from app.db import make_engine, make_session_factory, init_db
 from app.models import PackBattle, BattlePlayer
-from app.services.reservations import reserve, reserved_total, royale_locked_total, release_reservations
+from app.services.reservations import (
+    reserve, reserved_total, royale_locked_total, release_reservations, consume,
+)
 from app.services.royale_funding import royale_buyin
 
 
@@ -30,6 +32,38 @@ def test_release_reservations_flips_active_and_is_idempotent(session):
     assert reserved_total(session, "A") == 0
     # released rows carry released_at; a second release is a no-op
     assert release_reservations(session, "b1") == 0
+
+
+def test_consume_shrinks_the_hold_as_money_leaves_on_chain(session):
+    # The hold must shrink by exactly what was just paid: the on-chain balance already
+    # dropped by that much, so keeping it reserved would subtract the same money twice.
+    reserve(session, "A", "b1", 65_000_000)
+    assert consume(session, "A", "b1", 30_000_000) == 30_000_000
+    assert reserved_total(session, "A") == 35_000_000
+    assert consume(session, "A", "b1", 35_000_000) == 35_000_000
+    assert reserved_total(session, "A") == 0
+
+
+def test_consume_releases_the_row_once_drained(session):
+    reserve(session, "A", "b1", 50_000_000)
+    consume(session, "A", "b1", 50_000_000)
+    # drained → released, so a later release_reservations finds nothing left to flip
+    assert release_reservations(session, "b1") == 0
+
+
+def test_consume_never_goes_negative_and_touches_only_its_own_wallet_and_battle(session):
+    reserve(session, "A", "b1", 20_000_000)
+    reserve(session, "A", "b2", 70_000_000)
+    reserve(session, "B", "b1", 90_000_000)
+    # asked for more than is held → consumes what's there, never below zero
+    assert consume(session, "A", "b1", 999_000_000) == 20_000_000
+    assert reserved_total(session, "A") == 70_000_000   # b2 untouched
+    assert reserved_total(session, "B") == 90_000_000   # other wallet untouched
+
+
+def test_consume_on_missing_reservation_is_a_noop(session):
+    assert consume(session, "A", "nope", 10_000_000) == 0
+    assert reserved_total(session, "A") == 0
 
 
 def _add_royale(session, bid, status, n=4, price=250_000_000, players=()):
