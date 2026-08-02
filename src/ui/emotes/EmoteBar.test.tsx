@@ -8,9 +8,10 @@ vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToke
 vi.mock('../../onchain/emotesClient', () => ({ throwEmoteToBattle: vi.fn() }))
 
 const emote = { code: 'gg', name: 'GG', video_url: 'gg.webm' }
-vi.mock('./useEmotes', () => ({
-  useEmotes: () => ({ byCode: { gg: emote }, owned: ['gg'], slots: ['gg'], loading: false, updateSlots: vi.fn() }),
-}))
+const CUATRO = ['gg', 'ez', 'wp', 'gl']
+const catalogo = Object.fromEntries(CUATRO.map((c) => [c, { code: c, name: c.toUpperCase(), video_url: `${c}.webm` }]))
+const estado = { byCode: { gg: emote } as Record<string, typeof emote>, owned: ['gg'], slots: ['gg'], loading: false, updateSlots: vi.fn() }
+vi.mock('./useEmotes', () => ({ useEmotes: () => estado }))
 
 import { EmoteBar, EMOTE_COOLDOWN_MS } from './EmoteBar'
 
@@ -40,5 +41,28 @@ describe('EmoteBar cooldown', () => {
     expect(again.disabled).toBe(false)
     fireEvent.click(again)
     expect(throwEmoteSpy).toHaveBeenCalledTimes(2)
+  })
+})
+
+
+describe('EmoteBar · huecos rápidos', () => {
+  beforeEach(() => {
+    estado.byCode = catalogo; estado.owned = [...CUATRO]; estado.slots = [...CUATRO]
+  })
+  afterEach(() => {
+    estado.byCode = { gg: emote }; estado.owned = ['gg']; estado.slots = ['gg']
+  })
+
+  it('caben cuatro emotes a mano', () => {
+    render(<EmoteBar meWallet="W" />)
+    for (const c of CUATRO) expect(screen.getByTitle(`Throw ${c.toUpperCase()}`)).toBeTruthy()
+    fireEvent.click(screen.getByTitle('All emotes'))
+    expect(screen.getByText(/4\/4/)).toBeTruthy()   // el contador del menú, y el tope es 4
+  })
+
+  it('sin cooldown no hay etiqueta: los dibujos ya dicen lo que son', () => {
+    render(<EmoteBar meWallet="W" />)
+    expect(screen.queryByText('EMOTE')).toBeNull()
+    expect(screen.queryByText(/WAIT/)).toBeNull()
   })
 })

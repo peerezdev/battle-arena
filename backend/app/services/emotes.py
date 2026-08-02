@@ -1,7 +1,7 @@
 """Video emotes: a static catalog + per-user ownership + quick-access slots.
 
 Catalog is static config (extend EMOTE_CATALOG freely). Ownership lives in the user_emotes table;
-which 3 emotes are bound to the quick-access bar lives in User.emote_slots (a JSON list of codes).
+which emotes are bound to the quick-access bar lives in User.emote_slots (a JSON list of codes).
 Every user is granted DEFAULT_EMOTES the first time their emotes are read."""
 from __future__ import annotations
 import json
@@ -24,7 +24,7 @@ EMOTE_CATALOG: list[dict] = [
 ]
 _BY_CODE = {e["code"]: e for e in EMOTE_CATALOG}
 DEFAULT_EMOTES = [e["code"] for e in EMOTE_CATALOG]   # all emotes granted to every new user (no unlock flow yet)
-MAX_SLOTS = 3
+MAX_SLOTS = 4   # el mismo tope está en src/ui/emotes/EmoteBar.tsx: los dos tienen que ir a la par
 
 
 def catalog() -> list[dict]:

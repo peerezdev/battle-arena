@@ -6,7 +6,9 @@ import { throwEmote } from './throwEmote'
 import { throwEmoteToBattle, type Emote } from '../../onchain/emotesClient'
 import { AlphaVideo } from '../components/AlphaVideo'
 
-const MAX_SLOTS = 3
+/** Cuántos emotes caben en la barra rápida. El backend tiene su propio tope en
+ *  `app/services/emotes.py`: subirlo aquí sin subirlo allí hace que el cuarto se pierda al guardar. */
+const MAX_SLOTS = 4
 /** Anti-spam: how long the sender must wait between emotes. Tweak here to change the cooldown. */
 export const EMOTE_COOLDOWN_MS = 4000
 
@@ -61,8 +63,13 @@ export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: 
   }
 
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, padding: '5px 11px 5px 14px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: `1px solid ${COLORS.border}` }}>
-      <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>{onCooldown ? `WAIT ${remainingSec}s` : 'EMOTE'}</span>
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, padding: '5px 11px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: `1px solid ${COLORS.border}` }}>
+      {/* Se quitó la etiqueta "EMOTE": los dibujos ya dicen lo que son y el hueco es para un emote
+          más. La cuenta atrás se queda, pero solo mientras corre: sin ella el botón apagado no
+          explicaría por qué no responde. */}
+      {onCooldown && (
+        <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>WAIT {remainingSec}s</span>
+      )}
       <div style={{ display: 'flex', gap: 9 }}>
         {slotEmotes.map((e) => (
           <button key={e.code} onClick={() => throwIt(e)} disabled={onCooldown}
