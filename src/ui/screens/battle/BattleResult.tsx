@@ -8,6 +8,8 @@ import { useAliases } from '../../useAliases'
 import { useIsWide } from '../../useIsWide'
 import { NextBattlePanel } from './NextBattlePanel'
 import { startRematch } from '../../battle/startRematch'
+import { WinnerShare } from './WinnerShare'
+import { pnlOf } from './pnl'
 import type { RevealVM, RevealPlayerVM } from './battleReveal'
 
 const TINTS = ['linear-gradient(135deg,#5cffd8,#00c79a)', 'linear-gradient(135deg,#ff6bb5,#d4127a)', 'linear-gradient(135deg,#4ea8ff,#6a5bff)', 'linear-gradient(135deg,#f5c542,#e8732c)', 'linear-gradient(135deg,#ff6e8a,#d23a5e)']
@@ -28,6 +30,9 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
   // magenta loss hero (the Next-Battle magenta), the counterpart to the green winner hero.
   const iLost = iAmPlayer && !iWon
   const name = (p: RevealPlayerVM) => (p.isMe ? aliases[p.wallet] ?? 'You' : aliases[p.wallet] ?? shortWallet(p.wallet))
+
+  // La tarjeta de resultado es solo para quien ganó: a quien perdió no se le ofrece presumir.
+  const pnl = iWon ? pnlOf(vm) : null
 
   const ranked = [...vm.players].sort((a, b) => b.total - a.total)
   const winner = vm.players.find((p) => p.wallet === vm.winner) ?? ranked[0]
@@ -76,6 +81,8 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
                 style={{ padding: '13px 22px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: 'transparent', color: '#aab3bf', fontFamily: FONTS.body, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Back to lobby</button>
             </div>
           </div>
+
+          {pnl && <WinnerShare pnl={pnl} winnerName={name(winner)} />}
 
           {/* final standings */}
           <div style={{ borderRadius: 20, border: `1px solid ${COLORS.border}`, background: '#0c0f15', padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -195,6 +202,8 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
       {/* next battle — above the standings on mobile: after the winnings, the useful next tap is
           jumping into another game, not scrolling past the full table to find it. */}
       <NextBattlePanel mode="pack" currentBattleId={battleId} meWallet={vm.meWallet} compact />
+
+      {pnl && <WinnerShare pnl={pnl} winnerName={name(winner)} />}
 
       {/* standings */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>

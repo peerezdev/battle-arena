@@ -18,6 +18,10 @@ export interface Pnl {
   background: string | null
 }
 
+/** El dominio público, en un solo sitio: lo firma la tarjeta y lo enlaza el tuit. */
+export const SITE_DOMAIN = 'collectorarena.xyz'
+export const SITE_URL = `https://${SITE_DOMAIN}`
+
 const ETIQUETA: Record<string, string> = { pack: 'PACK BATTLE', royale: 'BATTLE ROYALE' }
 
 /**

@@ -1,5 +1,5 @@
 import { FONTS } from '../../theme'
-import type { Pnl } from './pnl'
+import { SITE_DOMAIN, type Pnl } from './pnl'
 
 // Tarjeta de resultado de un ganador, en 16:9 para poder compartirla tal cual.
 //
@@ -13,9 +13,6 @@ const CREMA = '#fdf3e3'
 const CREMA_2 = '#e8d5c0'
 const APAGADO = '#c9ae95'
 const PERDIDA = '#ff8a8a'
-
-/** El dominio que se firma abajo. Aquí y no repartido por la tarjeta, que es donde se cambia. */
-const DOMINIO = 'collectorarena.xyz'
 
 /** Dólares redondos, sin céntimos: en una cifra a este tamaño los decimales son ruido. */
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`
@@ -91,7 +88,7 @@ export function PnlCard({ pnl, winnerName }: { pnl: Pnl; winnerName: string }) {
           </div>
         </div>
 
-        <span style={{ fontFamily: FONTS.mono, fontSize: '1.5625cqw', color: '#d8bfa4' }}>{DOMINIO}</span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: '1.5625cqw', color: '#d8bfa4' }}>{SITE_DOMAIN}</span>
       </div>
     </div>
   )
