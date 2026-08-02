@@ -638,8 +638,27 @@ def create_app(session_factory, chain: ChainSource,
 
     @app.post("/gacha/buyback")
     async def gacha_buyback(body: BuybackBody, wallet: str = Depends(current_user)):
+        """Vender una carta a CC. `nft_address` lo elige el CLIENTE, así que la propiedad se
+        comprueba aquí, igual que en /users/me/nft/withdraw.
+
+        Sin esta comprobación la única barrera contra "vender la carta de otro" era que CC
+        validase en su `/api/buyback` y que el asset no tuviera un transfer delegate permanente
+        — dos propiedades de un tercero, fuera de nuestro control y sin aviso si cambian. Y la
+        firma no protege: firmamos con la wallet delegada del que pide, así que si CC llegara a
+        construir una tx que no necesita la firma del dueño real, la venta saldría. Este es el
+        único punto por el que pasan TODAS las pantallas de venta (winnings, vault, inventario),
+        así que basta con cerrarlo una vez.
+
+        Un fallo del RPC deja la venta en 502 en vez de dejarla pasar: ante la duda no se vende.
+        """
         svc = _gacha_or_503()
         _gacha_throttle(wallet)
+        try:
+            owns = await nft_in_owner(solana_rpc_url, wallet, body.nft_address)
+        except Exception as exc:
+            raise HTTPException(502, f"ownership check failed: {exc}")
+        if not owns:
+            raise HTTPException(403, "no eres dueño de este NFT")
         try:
             return await svc.buyback(player_address=wallet, nft_address=body.nft_address)
         except GachaDisabled:

@@ -43,6 +43,17 @@ def _hdrs(priv, wallet):
     return privy_auth_headers(priv, APP_ID, wallet)
 
 
+def _owns(monkeypatch, holder=None):
+    """Stub de la comprobación on-chain de propiedad del buyback.
+
+    `holder=None` → la carta es de quien la pide. Si se pasa una wallet, esa es la dueña real,
+    que es como se monta el caso de "vender la carta de otro" sin tocar la cadena.
+    """
+    async def fake(rpc, owner, mint):
+        return owner == holder if holder is not None else True
+    monkeypatch.setattr("app.main.nft_in_owner", fake)
+
+
 @respx.mock
 def test_machines_keyless_ok():
     respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
@@ -295,7 +306,8 @@ def test_buyback_requiere_auth():
 
 
 @respx.mock
-def test_buyback_fija_player_y_whitelista():
+def test_buyback_fija_player_y_whitelista(monkeypatch):
+    _owns(monkeypatch)
     route = respx.post(f"{BASE}/api/buyback").mock(return_value=Response(200, json={
         "success": True,
         "serializedTransaction": "BASE64TX",
@@ -312,13 +324,45 @@ def test_buyback_fija_player_y_whitelista():
 
 
 @respx.mock
-def test_buyback_upstream_error_502():
+def test_buyback_upstream_error_502(monkeypatch):
+    _owns(monkeypatch)
     respx.post(f"{BASE}/api/buyback").mock(
         return_value=Response(400, json={"error": "outside 72-hour window"}))
     c, priv = _client()
     r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
     assert r.status_code == 502
     assert "72-hour" in r.json()["detail"]
+
+
+@respx.mock
+def test_buyback_rechaza_nft_ajeno(monkeypatch):
+    """Vender la carta de otro se corta AQUÍ, sin llegar a CC.
+
+    `nft_address` lo elige el cliente y la pantalla de winnings de una partida vieja sigue siendo
+    accesible con sus mints, así que pedir el buyback de una carta que ya no es tuya (o que nunca
+    lo fue) es un POST trivial. Antes la única barrera era que CC lo validara por su cuenta.
+    """
+    route = respx.post(f"{BASE}/api/buyback").mock(return_value=Response(200, json={
+        "success": True, "serializedTransaction": "BASE64TX", "refundAmount": 42500000}))
+    _owns(monkeypatch, holder=WALLET_B)     # la carta es de B; la pide A
+    c, priv = _client()
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 403
+    assert not route.called     # ni siquiera se le pide a CC que construya la tx
+
+
+@respx.mock
+def test_buyback_no_vende_si_falla_la_comprobacion(monkeypatch):
+    """RPC caído → 502, no venta. Un `except` que se tragara el fallo abriría el agujero entero."""
+    route = respx.post(f"{BASE}/api/buyback").mock(return_value=Response(200, json={
+        "success": True, "serializedTransaction": "BASE64TX", "refundAmount": 42500000}))
+    async def boom(rpc, owner, mint):
+        raise RuntimeError("rpc down")
+    monkeypatch.setattr("app.main.nft_in_owner", boom)
+    c, priv = _client()
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 502
+    assert not route.called
 
 
 @respx.mock
