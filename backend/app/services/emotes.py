@@ -60,8 +60,11 @@ def read_user_emotes(session: Session, wallet: str) -> dict:
             slots = [c for c in json.loads(user.emote_slots) if c in owned]
         except (ValueError, TypeError):
             slots = []
-    if not slots:
-        slots = owned[:MAX_SLOTS]
+    # Rellena hasta el tope con lo que el usuario tenga sin fijar, respetando su orden primero.
+    # Antes solo se rellenaba la lista VACÍA: a quien ya tuviera slots guardados, subir MAX_SLOTS
+    # no le añadía ninguno y seguía viendo los mismos de siempre.
+    if len(slots) < MAX_SLOTS:
+        slots += [c for c in owned if c not in slots][: MAX_SLOTS - len(slots)]
     return {"owned": owned, "slots": slots[:MAX_SLOTS]}
 
 

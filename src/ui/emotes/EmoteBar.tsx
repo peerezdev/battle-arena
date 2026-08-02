@@ -6,9 +6,6 @@ import { throwEmote } from './throwEmote'
 import { throwEmoteToBattle, type Emote } from '../../onchain/emotesClient'
 import { AlphaVideo } from '../components/AlphaVideo'
 
-/** Cuántos emotes caben en la barra rápida. El backend tiene su propio tope en
- *  `app/services/emotes.py`: subirlo aquí sin subirlo allí hace que el cuarto se pierda al guardar. */
-const MAX_SLOTS = 4
 /** Anti-spam: how long the sender must wait between emotes. Tweak here to change the cooldown. */
 export const EMOTE_COOLDOWN_MS = 4000
 
@@ -23,9 +20,8 @@ function VideoThumb({ emote, size }: { emote: Emote; size: number }) {
  *  thrown emote pops over (in the demo this is the simulated 'You'). When `battleId` is a real battle
  *  the emote is also broadcast to the other players; in the demo it's local only. */
 export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: string }) {
-  const { byCode, owned, slots, loading, updateSlots } = useEmotes()
+  const { byCode, owned, slots, loading } = useEmotes()
   const { identityToken } = useIdentityToken()
-  const [menuOpen, setMenuOpen] = useState(false)
   const [cooldownUntil, setCooldownUntil] = useState(0)
   const [now, setNow] = useState(() => Date.now())
 
@@ -54,19 +50,18 @@ export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: 
     }
     setCooldownUntil(Date.now() + EMOTE_COOLDOWN_MS)
   }
+  // Cuántos huecos hay lo decide el backend (`MAX_SLOTS` en app/services/emotes.py), que rellena
+  // la lista hasta el tope con los emotes que el usuario tenga sin fijar. Aquí solo se pintan.
   const slotEmotes = slots.map((c) => byCode[c]).filter(Boolean) as Emote[]
-
-  const toggleSlot = (code: string) => {
-    if (slots.includes(code)) updateSlots(slots.filter((c) => c !== code))
-    else if (slots.length < MAX_SLOTS) updateSlots([...slots, code])
-    else updateSlots([...slots.slice(1), code])   // full → replace the oldest
-  }
 
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, padding: '5px 11px', borderRadius: 14, background: 'rgba(255,255,255,.03)', border: `1px solid ${COLORS.border}` }}>
-      {/* Se quitó la etiqueta "EMOTE": los dibujos ya dicen lo que son y el hueco es para un emote
-          más. La cuenta atrás se queda, pero solo mientras corre: sin ella el botón apagado no
-          explicaría por qué no responde. */}
+      {/* Sin etiqueta "EMOTE": los dibujos ya dicen lo que son y el hueco es para un emote más.
+          La cuenta atrás se queda, pero solo mientras corre: sin ella el botón apagado no
+          explicaría por qué no responde.
+          El botón "+" abría la colección entera y dejaba elegir qué emotes iban a la barra. Se
+          retiró a petición; está en el historial (commit 565a1ea) para recuperarlo. Mientras no
+          esté, los huecos los reparte el backend por orden de catálogo. */}
       {onCooldown && (
         <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.14em', color: COLORS.muted }}>WAIT {remainingSec}s</span>
       )}
@@ -78,44 +73,7 @@ export function EmoteBar({ meWallet, battleId }: { meWallet: string; battleId?: 
             <VideoThumb emote={e} size={42} />
           </button>
         ))}
-        {/* expand: full owned collection + customize quick slots */}
-        <button onClick={() => setMenuOpen((o) => !o)} title="All emotes"
-          style={{ width: 50, height: 50, borderRadius: '50%', border: `1px solid ${menuOpen ? COLORS.green + '88' : COLORS.border}`, background: menuOpen ? 'rgba(0,255,196,.1)' : 'rgba(255,255,255,.04)', color: COLORS.text, cursor: 'pointer', fontSize: 22, fontWeight: 300, lineHeight: 1 }}>
-          +
-        </button>
       </div>
-
-      {menuOpen && (
-        <>
-          <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-          <div style={{ position: 'absolute', bottom: 'calc(100% + 10px)', left: 0, zIndex: 50, width: 'min(340px,86vw)', padding: 14, borderRadius: 16, background: 'rgba(14,17,23,.97)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: `1px solid ${COLORS.border}`, boxShadow: '0 24px 60px -20px #000' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontFamily: FONTS.display, fontWeight: 700, fontSize: 14 }}>Your emotes</span>
-              <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted }}>★ = quick · {slots.length}/{MAX_SLOTS}</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(72px,1fr))', gap: 10 }}>
-              {owned.map((code) => {
-                const e = byCode[code]
-                if (!e) return null
-                const pinned = slots.includes(code)
-                return (
-                  <div key={code} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                    <button onClick={() => { throwIt(e); setMenuOpen(false) }} disabled={onCooldown}
-                      title={onCooldown ? `Cooldown · ${remainingSec}s` : `Throw ${e.name}`}
-                      style={{ width: 60, height: 60, padding: 3, borderRadius: 14, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', cursor: onCooldown ? 'not-allowed' : 'pointer', opacity: onCooldown ? 0.4 : 1, transition: 'opacity .2s ease', overflow: 'hidden' }}>
-                      <AlphaVideo webm={e.video_url} mov={e.video_mov} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
-                    </button>
-                    <button onClick={() => toggleSlot(code)} title={pinned ? 'Remove from quick' : 'Pin to quick'}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 7, border: `1px solid ${pinned ? COLORS.green + '88' : COLORS.border}`, background: pinned ? 'rgba(0,255,196,.12)' : 'transparent', color: pinned ? COLORS.green : COLORS.muted, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>
-                      {pinned ? '★' : '☆'}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   )
 }

@@ -53,11 +53,17 @@ describe('EmoteBar · huecos rápidos', () => {
     estado.byCode = { gg: emote }; estado.owned = ['gg']; estado.slots = ['gg']
   })
 
-  it('caben cuatro emotes a mano', () => {
+  it('pinta un botón por hueco que mande el backend', () => {
     render(<EmoteBar meWallet="W" />)
     for (const c of CUATRO) expect(screen.getByTitle(`Throw ${c.toUpperCase()}`)).toBeTruthy()
-    fireEvent.click(screen.getByTitle('All emotes'))
-    expect(screen.getByText(/4\/4/)).toBeTruthy()   // el contador del menú, y el tope es 4
+    expect(screen.getAllByRole('button')).toHaveLength(CUATRO.length)   // ni uno más
+  })
+
+  it('ya no está el "+" de la colección', () => {
+    // Se retiró a petición. Mientras no vuelva, los huecos los reparte el backend.
+    render(<EmoteBar meWallet="W" />)
+    expect(screen.queryByTitle('All emotes')).toBeNull()
+    expect(screen.queryByText('Your emotes')).toBeNull()
   })
 
   it('sin cooldown no hay etiqueta: los dibujos ya dicen lo que son', () => {

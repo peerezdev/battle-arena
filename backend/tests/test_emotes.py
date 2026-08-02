@@ -26,10 +26,39 @@ def test_read_grants_defaults_on_first_access(session):
 
 def test_set_slots_keeps_only_owned(session):
     emotes.read_user_emotes(session, "A")  # grants defaults
+    elegidos = ["squirtle", "charmander", "bulbasaur"]
     out = emotes.set_emote_slots(session, "A", ["squirtle", "not_owned", "charmander", "bulbasaur"])
-    assert out["slots"] == ["squirtle", "charmander", "bulbasaur"]   # dropped not_owned, order preserved
+    # Lo elegido va primero y en orden; "not_owned" no aparece ni por el relleno, que solo
+    # reparte emotes que el usuario tiene.
+    assert out["slots"][:3] == elegidos
+    assert "not_owned" not in out["slots"]
     # persists on re-read
-    assert emotes.read_user_emotes(session, "A")["slots"] == ["squirtle", "charmander", "bulbasaur"]
+    assert emotes.read_user_emotes(session, "A")["slots"][:3] == elegidos
+
+
+def test_slots_guardados_se_rellenan_hasta_el_tope(session):
+    """Este era el bug: quien ya tuviera slots guardados no veía los huecos nuevos.
+
+    El usuario tenía 3 códigos en `emote_slots` de cuando el tope era 3. Subirlo a 4 no le añadía
+    ninguno porque solo se rellenaba la lista VACÍA, así que seguía viendo 3 botones. Ahora se
+    completa hasta el tope respetando primero su orden.
+    """
+    emotes.read_user_emotes(session, "VIEJO")
+    tres = emotes.DEFAULT_EMOTES[:3]
+    emotes.set_emote_slots(session, "VIEJO", tres)
+
+    out = emotes.read_user_emotes(session, "VIEJO")
+    assert len(out["slots"]) == emotes.MAX_SLOTS
+    assert out["slots"][:3] == tres                    # lo que eligió va primero
+    assert len(set(out["slots"])) == len(out["slots"])  # sin repetidos
+    assert all(c in out["owned"] for c in out["slots"])
+
+
+def test_relleno_no_pasa_del_tope_aunque_no_haya_de_sobra(session):
+    # Con menos emotes que huecos se queda con los que haya, sin inventarse ninguno.
+    emotes.read_user_emotes(session, "POCOS")
+    out = emotes.read_user_emotes(session, "POCOS")
+    assert len(out["slots"]) == min(emotes.MAX_SLOTS, len(out["owned"]))
 
 
 def test_max_slots_no_se_mueve_sin_tocar_el_frontend():
@@ -56,7 +85,9 @@ def test_set_slots_caps_at_max_slots(session):
 def test_set_slots_dedupes_and_drops_unowned(session):
     emotes.read_user_emotes(session, "B")
     out = emotes.set_emote_slots(session, "B", ["charmander", "charmander", "ghost"])
-    assert out["slots"] == ["charmander"]
+    assert out["slots"][0] == "charmander"          # una sola vez, pese a venir repetido
+    assert out["slots"].count("charmander") == 1
+    assert "ghost" not in out["slots"]
 
 
 def test_owns(session):
