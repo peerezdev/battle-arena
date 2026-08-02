@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { OpenBattle } from '../../../onchain/packBattleClient'
 
 // La pantalla tira de media docena de hooks; se sustituyen para poder probar SOLO lo que compone.
-const mocks = vi.hoisted(() => ({ battles: [] as OpenBattle[] }))
+const mocks = vi.hoisted(() => ({ battles: [] as OpenBattle[], nav: vi.fn() }))
 vi.mock('../../../onchain/useBattles', () => ({ useBattles: () => ({ battles: mocks.battles }) }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'ME' }))
@@ -15,6 +15,10 @@ vi.mock('../../useMachines', () => ({
 vi.mock('../../components/useDelegationGate', () => ({ useDelegationGate: () => ({ open: false }) }))
 vi.mock('../../components/DelegationGate', () => ({ DelegationGate: () => null }))
 vi.mock('./RoyaleDemoNotice', () => ({ RoyaleDemoNotice: () => null }))
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig<typeof import('react-router-dom')>()),
+  useNavigate: () => mocks.nav,
+}))
 
 import { ModeHub } from './ModeHub'
 
@@ -30,7 +34,7 @@ function battle(over: Partial<OpenBattle>): OpenBattle {
 const pintar = (mode: 'pack' | 'royale' = 'royale') =>
   render(<MemoryRouter><ModeHub mode={mode} /></MemoryRouter>)
 
-beforeEach(() => { mocks.battles = [] })
+beforeEach(() => { mocks.battles = []; mocks.nav.mockReset() })
 
 describe('ModeHub · royale', () => {
   it('sin partidas terminadas no enseña la sección Recent', () => {
@@ -79,5 +83,17 @@ describe('ModeHub · royale', () => {
     mocks.battles = [battle({ id: 'p', mode: 'pack' })]
     pintar('pack')
     expect(screen.queryByText('RECENT')).toBeNull()
+  })
+})
+
+
+describe('ModeHub · el botón Result abre el resultado', () => {
+  it('una partida liquidada entra por el marcador, no por la primera carta', () => {
+    // Era el fallo: el botón decía "Result" y llevaba al principio del reveal, obligando a ver
+    // la partida entera otra vez. Solo el modal de "While you were away" pasaba ?view=result.
+    mocks.battles = [battle({ id: 'terminada', status: 'settled', winner: 'ME' } as Partial<OpenBattle>)]
+    pintar()
+    fireEvent.click(screen.getByRole('button', { name: 'Result' }))
+    expect(mocks.nav).toHaveBeenCalledWith('/play/battle/terminada?view=result')
   })
 })

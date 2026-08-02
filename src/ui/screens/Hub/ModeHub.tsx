@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { battleHref } from '../../battle/battleHref'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS } from '../../theme'
@@ -60,7 +61,8 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
   }
 
   function onBattleAction(b: LiveBattle) {
-    if (b.action === 'watch') { navigate('/play/battle/' + b.id); return }
+    // 'watch' cubre tanto Watch (en juego) como Result (liquidada): battleHref las separa.
+    if (b.action === 'watch') { navigate(battleHref(b.id, { status: b.battleStatus })); return }
     if (!identityToken) { showToast('Sign in to join'); return }
     gate.requireDelegation(async () => {
       try {
@@ -92,7 +94,7 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
               ? <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted }}>No open Battle Royale lobbies right now.</div>
               : royaleOpen.map((b) => (
                   <RoyaleBattleWide key={b.id} battle={b} meWallet={meWallet}
-                    onAction={onBattleAction} onCancel={onCancel} onOpen={(x) => navigate('/play/battle/' + x.id)} />
+                    onAction={onBattleAction} onCancel={onCancel} onOpen={(x) => navigate(battleHref(x.id, { status: x.battleStatus }))} />
                 ))}
 
             {/* Recientes bajo los lobbies, con la MISMA card compacta que el Recent de Live Games
@@ -113,7 +115,7 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
                       byCode={byCode}
                       onAction={onBattleAction}
                       onCancel={onCancel}
-                      onOpen={(x) => navigate('/play/battle/' + x.id)}
+                      onOpen={(x) => navigate(battleHref(x.id, { status: x.battleStatus }))}
                     />
                   ))}
                 </div>
@@ -121,7 +123,7 @@ export function ModeHub({ mode }: { mode: Extract<BattleMode, 'pack' | 'royale'>
             )}
           </div>
         ) : (
-          <LiveBattles battles={liveBattles} meWallet={meWallet} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate('/play/battle/' + b.id)} />
+          <LiveBattles battles={liveBattles} meWallet={meWallet} onBattleAction={onBattleAction} onCancel={onCancel} onOpen={(b) => navigate(battleHref(b.id, { status: b.battleStatus }))} />
         )}
       </div>
 

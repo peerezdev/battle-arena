@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { battleHref } from '../battle/battleHref'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { usePrivy, useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, GRADIENT, FONTS, formatUsd, Z } from '../theme'
@@ -118,7 +119,7 @@ export function AppShell() {
 
   function goBattle(b: UnseenBattle, straightToResult: boolean) {
     setPendingOpen(false)
-    navigate(`/play/battle/${encodeURIComponent(b.battle_id)}${straightToResult ? '?view=result' : ''}`)
+    navigate(battleHref(b.battle_id, { view: straightToResult ? 'result' : 'reveal' }))
   }
 
   function goOpenPending(packs: PendingPack[]) {
