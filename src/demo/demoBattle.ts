@@ -89,8 +89,10 @@ const val = (c: MachineCard) => c.insured_value ?? 0
 export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>, machineCode: string, price: number, rng: () => number = Math.random, forced?: readonly string[]): Battle {
   const byRarity = groupByRarity(pool)
   const pick = makePicker(byRarity, odds, rng, forced)
-  const TEMP_N = 5
-  const wallets = [DEMO_ME, ...Array.from({ length: TEMP_N - 1 }, () => fakeWallet(rng))]
+  // El tope de una pack battle real (CreateBattleModal ofrece 2, 3 o 4). La demo tenía 5 y
+  // enseñaba una mesa que no existe.
+  const PACK_PLAYERS = 4
+  const wallets = [DEMO_ME, ...Array.from({ length: PACK_PLAYERS - 1 }, () => fakeWallet(rng))]
   const cards = wallets.map(() => pick())
   const pulls: BattlePullInfo[] = wallets.map((w, i) => toPull(cards[i], 1, w))
   // El ⚡ de auto-vendida se sortea por carta. Antes se marcaban las dos últimas de la lista
@@ -109,7 +111,7 @@ export function buildPackDemo(pool: MachineCard[], odds: Record<string, number>,
   // Empate: el backend lo resuelve con la semilla Provably-Fair; aquí no hay, así que se sortea.
   const winner = tied[Math.floor(rng() * tied.length)]
   return {
-    id: 'demo', mode: 'pack', machine_code: machineCode, price, max_players: TEMP_N,
+    id: 'demo', mode: 'pack', machine_code: machineCode, price, max_players: PACK_PLAYERS,
     buyin: price * 1e6,
     status: 'settled', winner, creator_wallet: DEMO_ME,
     players, rounds: [], server_seed_hash: null, pulls,

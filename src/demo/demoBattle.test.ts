@@ -105,6 +105,14 @@ describe('buildPackDemo', () => {
     expect((b.pulls ?? []).length).toBe(b.players.length)
   })
 
+  it('la mesa es de 4, que es el tope de una pack battle real', () => {
+    // CreateBattleModal ofrece 2, 3 o 4. La demo montaba 5 y enseñaba una mesa que no existe.
+    const b = buildPackDemo(POOL, ODDS, 'pokemon_50', 50, seeded(4))
+    expect(b.players).toHaveLength(4)
+    expect(b.max_players).toBe(4)
+    expect((b.pulls ?? [])).toHaveLength(4)
+  })
+
   it('el auto-sold no depende del asiento (antes eran siempre los dos últimos)', () => {
     const seats = new Set<number>()
     for (let i = 1; i <= 40; i++) {
@@ -124,8 +132,7 @@ describe('demo con rarezas forzadas', () => {
   it('el pack reparte las rarezas en el orden pedido, una por asiento', () => {
     const b = buildPackDemo(POOL, ODDS, 'pokemon_50', 50, seeded(5), FORCED)
     const seq = (b.pulls ?? []).map((p) => (p.rarity ?? '').toLowerCase())
-    // 5 asientos y 4 rarezas: la lista se recorre en bucle.
-    expect(seq).toEqual(['epic', 'rare', 'uncommon', 'common', 'epic'])
+    expect(seq).toEqual(['epic', 'rare', 'uncommon', 'common'])
   })
 
   it('forzado no auto-vende nada: cada carta tiene que pasar por la ceremonia', () => {
@@ -143,7 +150,7 @@ describe('demo con rarezas forzadas', () => {
   it('una rareza ausente del pool cae al sorteo en vez de romper', () => {
     const onlyCommons = [card('c1', 'Common', 10), card('c2', 'Common', 20)]
     const b = buildPackDemo(onlyCommons, ODDS, 'pokemon_50', 50, seeded(2), FORCED)
-    expect((b.pulls ?? [])).toHaveLength(5)
+    expect((b.pulls ?? [])).toHaveLength(4)
     expect((b.pulls ?? []).every((p) => (p.rarity ?? '').toLowerCase() === 'common')).toBe(true)
   })
 })
