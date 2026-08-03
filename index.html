@@ -4,7 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- interactive-widget=resizes-content: al abrirse el teclado el navegador encoge el
+         viewport de MAQUETACIÓN, así que lo anclado abajo (el chat) queda encima del teclado
+         en vez de detrás. Lo soporta Chrome/Android; en iOS no hace nada y de eso se encarga
+         useKeyboardInset, que mide con visualViewport. Los dos juntos cubren ambos. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>Collector Arena</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

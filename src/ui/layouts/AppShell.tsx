@@ -24,6 +24,7 @@ import { RematchToastHost } from '../components/RematchToast'
 import { BattleAlertsHost } from '../components/BattleAlertsHost'
 import { OnboardingTutorial } from '../components/OnboardingTutorial'
 import { NAV_ITEMS, type HubNav } from '../screens/Hub/hubMockData'
+import { useKeyboardInset } from '../useKeyboardInset'
 import { NAV_ROUTES, activeNavFromPath } from './navRoutes'
 import { Toaster } from '../toast'
 import { UnseenModal } from '../components/UnseenModal'
@@ -166,6 +167,8 @@ export function AppShell() {
 
   const [depositOpen, setDepositOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  // Alto del teclado del móvil: 0 mientras esté cerrado y en escritorio.
+  const kbInset = useKeyboardInset()
   const [dockCollapsed, setDockCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(DOCK_KEY) === '1' } catch { return false }
   })
@@ -491,7 +494,10 @@ export function AppShell() {
         </>
       ) : (
         // Mobile: chat only, full screen except the bottom nav.
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 60, zIndex: 120, background: '#0c1019', display: 'flex', flexDirection: 'column' }}>
+        // `bottom` sube con el teclado. Sin esto la casilla de texto queda DEBAJO de él —el
+        // teclado no encoge el viewport de maquetación— y había que hacer scroll para leer lo
+        // que uno estaba escribiendo. Con el teclado cerrado el inset es 0 y esto no hace nada.
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 60 + kbInset, zIndex: 120, background: '#0c1019', display: 'flex', flexDirection: 'column' }}>
           <ChatDock chatOnly />
         </div>
       ))}
