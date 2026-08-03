@@ -16,6 +16,9 @@ export interface BannerProps {
   titlePlain: string
   titleAccent?: string
   body: string
+  /** Frase de cierre, separada del cuerpo por una raya. Es el remate —la pregunta o el empujón—
+   *  y pegada al párrafo se leía como una frase más. Sin `tail` no se pinta ninguna raya. */
+  tail?: string
   cta: string
   to: string                 // route the CTA links to
   badge?: string
@@ -38,7 +41,7 @@ export interface BannerProps {
 }
 
 export function Banner({
-  kicker, titlePlain, titleAccent, body, cta, to, badge,
+  kicker, titlePlain, titleAccent, body, tail, cta, to, badge,
   accent = '#ff2e7e', ctaTextColor = '#fff', layout = 'side',
   poster, videoWebm, videoMov,
   mediaX = 30, mediaY = 26, mediaWidth = 640, mediaRotate = -3, mediaHeight = 200,
@@ -97,7 +100,18 @@ export function Banner({
       <h2 style={{ margin: '10px 0 14px', fontFamily: FONTS.display, fontSize: stacked ? 22 : wide ? 26 : 22, fontWeight: 700, lineHeight: 1.25, color: COLORS.text }}>
         {titlePlain} {titleAccent && <span style={{ color: accent }}>{titleAccent}</span>}
       </h2>
-      <p style={{ margin: '0 0 20px', fontSize: stacked ? 14 : 15, lineHeight: 1.6, color: '#aab3bf', maxWidth: 520 }}>{body}</p>
+      <p style={{ margin: tail ? '0 0 14px' : '0 0 20px', fontSize: stacked ? 14 : 15, lineHeight: 1.6, color: '#aab3bf', maxWidth: 520 }}>{body}</p>
+      {tail && (
+        <>
+          {/* Se desvanece hacia la derecha en vez de cruzar de lado a lado: separa sin partir la
+              tarjeta en dos. El color sale del acento del propio banner. */}
+          <div aria-hidden style={{
+            height: 1, maxWidth: 520, marginBottom: 14,
+            background: `linear-gradient(90deg,${accent}66,transparent)`,
+          }} />
+          <p style={{ margin: '0 0 20px', fontSize: stacked ? 14 : 15, lineHeight: 1.6, color: '#aab3bf', maxWidth: 520 }}>{tail}</p>
+        </>
+      )}
       <Link to={to} style={{
         display: 'inline-flex', alignItems: 'center', padding: '12px 22px', borderRadius: 12,
         background: accent, color: ctaTextColor, fontFamily: FONTS.display, fontSize: 14, fontWeight: 700,

@@ -45,7 +45,8 @@ export function Hub() {
             kicker="02 · PACK BATTLE"
             titlePlain="Open a pack."
             titleAccent="Take theirs."
-            body="1v1, same tier, winner takes both cards. Decided by value or by a skill duel — you pick."
+            body="Anyone who's played a Pack Battle knows the feeling is completely different from opening packs alone. More pressure. More adrenaline. More at stake."
+            tail="Think you can handle it?"
             cta="Enter Pack Battle →"
             to={NAV_ROUTES.pack}
             badge="1V1 · WINNER TAKES ALL"
@@ -59,7 +60,8 @@ export function Hub() {
             kicker="03 · GACHA"
             titlePlain="One pull."
             titleAccent="Straight into battle."
-            body="Open Collector Crypt packs solo and jump into a game with whatever card you pull."
+            body="A grail could be waiting in the next pull."
+            tail="Get there before someone else does."
             cta="Open a pack →"
             to={NAV_ROUTES.gacha}
             badge="PULL → PLAY"
