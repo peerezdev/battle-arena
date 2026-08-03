@@ -35,6 +35,16 @@ describe('HelpPage', () => {
     expect(screen.queryByText(/2–10 PLAYERS/)).toBeNull()
   })
 
+  it('el ratio de Gimmighouls dice las dos cifras y coincide con el onboarding', () => {
+    // Las cifras están escritas a mano en dos ficheros y el valor real vive en el backend
+    // (gimmighoul_per_usdc). Sin nada que las ate, cambiar una y olvidar la otra le promete al
+    // jugador dos cosas distintas en la misma app. El backend tiene su propio test recordándolo.
+    render(<MemoryRouter><HelpPage /></MemoryRouter>)
+    const texto = screen.getByText('Gimmighouls').parentElement?.textContent ?? ''
+    expect(texto).toMatch(/0\.5 per dollar in battles/)
+    expect(texto).toMatch(/0\.1 per dollar in gacha/)
+  })
+
   it('ya no se anuncia la radio, que está apagada', () => {
     // RADIO_ENABLED = false en AppShell: describir un control que no existe manda al jugador a
     // buscarlo por la barra superior.

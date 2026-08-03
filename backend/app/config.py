@@ -25,8 +25,12 @@ class Settings(BaseSettings):
     privy_solana_caip2: str = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"  # devnet default
     privy_quorum_id: str = ""
     cc_usdc_mint: str = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
-    gimmighoul_per_usdc: float = 0.1  # battles/royale loyalty rate; env: GIMMIGHOUL_PER_USDC
-    gimmighoul_per_usdc_gacha: float = 0.05  # gacha loyalty rate (half of battles); env: GIMMIGHOUL_PER_USDC_GACHA
+    gimmighoul_per_usdc: float = 0.5  # battles/royale loyalty rate; env: GIMMIGHOUL_PER_USDC
+    # El gacha renta menos que una batalla a propósito: se premia jugar contra alguien, no abrir
+    # sobres en solitario. Si se cambia cualquiera de los dos, hay que tocar también lo que se le
+    # promete al jugador en src/ui/screens/Help/helpContent.ts y OnboardingTutorial.tsx, que
+    # llevan las cifras escritas a mano.
+    gimmighoul_per_usdc_gacha: float = 0.1  # env: GIMMIGHOUL_PER_USDC_GACHA
     # Platform fee on battles: pct per player over the buyback value of the winner's loot,
     # capped at battle_fee_pct_cap total. Collected in USDC from the winner's wallet after
     # settle. fee_wallet_address empty → falls back to privy_operator_address; both empty →

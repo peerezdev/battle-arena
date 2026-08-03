@@ -185,3 +185,19 @@ def test_settle_award_idempotent_guard(Session, unit_rate):
     assert s.get(User, "p1").gimmighouls == 25
     assert s.get(User, "p2").gimmighouls == 25
     assert b.gimmighouls_awarded is True
+
+
+def test_ratios_de_gimmighouls_no_se_mueven_sin_tocar_la_copia():
+    """Las dos cifras están escritas A MANO en la interfaz.
+
+    src/ui/screens/Help/helpContent.ts y src/ui/components/OnboardingTutorial.tsx le prometen al
+    jugador "0.5 per dollar in battles" y "0.1 in gacha". No hay endpoint que las publique, así
+    que si estos valores cambian y la copia no, la ayuda miente sobre lo que se gana. Este test es
+    el aviso: si lo rompes, actualiza también esos dos ficheros.
+    """
+    from app.config import Settings
+    s = Settings()
+    assert s.gimmighoul_per_usdc == 0.5
+    assert s.gimmighoul_per_usdc_gacha == 0.1
+    # Y el gacha renta menos que una batalla: se premia jugar contra alguien.
+    assert s.gimmighoul_per_usdc_gacha < s.gimmighoul_per_usdc
