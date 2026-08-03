@@ -4,7 +4,7 @@ import { COLORS, FONTS, SHADOW } from '../../theme'
 import { rarityColor } from './RevealCard'
 import { CardBack } from './CardBack'
 import { RarityBand } from './RarityBand'
-import { PHASE, EPIC_SPIN_DEG, bandRarity, bandColorFor, buildTimeline } from './revealTiming'
+import { PHASE, EPIC_SPIN_DEG, bandRarity, bandColorFor, buildTimeline, type Fases } from './revealTiming'
 import { playEpicSpin, playFlipThump, stopReveal } from '../../sfx'
 
 type Stage = 'year' | 'grade' | 'rarity' | 'card'
@@ -20,13 +20,16 @@ type Stage = 'year' | 'grade' | 'rarity' | 'card'
  *  caben (el bloque reparte con space-evenly y saca los tamaños del ancho). Sigue siendo opcional
  *  porque la parrilla móvil baja hasta ~76px de ancho, donde ya no cabrían. */
 export function StagedCardReveal({
-  year, grade, rarity, reduced, dwellMs = PHASE.hold, width = 180, height = 252,
+  year, grade, rarity, reduced, fases = PHASE, dwellMs = fases.hold, width = 180, height = 252,
   stacked = false, preloadSrc, onCardShown, onFaceUp, children,
 }: {
   year: string | null
   grade: number | string | null
   rarity: string | null
   reduced: boolean
+  /** El ritmo del guion. Por defecto el de royale (PHASE); Pack Battle pasa PACK_PHASE, que dobla
+   *  lo que dura cada fila. */
+  fases?: Fases
   dwellMs?: number    // how long the revealed card stays before onCardShown advances (ms)
   width?: number
   height?: number
@@ -80,7 +83,7 @@ export function StagedCardReveal({
   useEffect(() => { onFaceUpRef.current = onFaceUp; onCardShownRef.current = onCardShown })
 
   const rowKeys = useMemo(() => rows.map((r) => r.key), [rows])
-  const tl = useMemo(() => buildTimeline(rowKeys, rarity), [rowKeys, rarity])
+  const tl = useMemo(() => buildTimeline(rowKeys, rarity, fases), [rowKeys, rarity, fases])
 
   useEffect(() => {
     if (reduced) return

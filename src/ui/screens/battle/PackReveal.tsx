@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { PACK_PHASE } from './revealTiming'
 import { useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { RevealCard, rarityColor } from './RevealCard'
@@ -309,7 +310,7 @@ function PlayerPanel({ player, name, round, roundReady, shownRounds, isLeader, i
       <div style={{ width: cardW, height: cardH, position: 'relative', overflow: 'hidden' }}>
         {roundReady && currentCard ? (
           <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
-            reduced={reducedMotion} width={cardW} height={cardH} stacked
+            reduced={reducedMotion} width={cardW} height={cardH} stacked fases={PACK_PHASE}
             preloadSrc={currentCard.nftAddress ? ccCardImageUrl(currentCard.nftAddress) : undefined}
             onCardShown={onCardShown}>
             <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} valueColor={COLORS.text} />
@@ -380,7 +381,7 @@ function MiniPanel({ player, name, round, roundReady, shownRounds, isHot, isWinn
         <div style={{ width: cardW, height: cardH, position: 'relative', overflow: 'hidden' }}>
           {roundReady && currentCard ? (
             <StagedCardReveal key={`stage-${round}`} year={currentCard.year} grade={currentCard.grade} rarity={currentCard.rarity}
-              reduced={reducedMotion} width={cardW} height={cardH} stacked
+              reduced={reducedMotion} width={cardW} height={cardH} stacked fases={PACK_PHASE}
             preloadSrc={currentCard.nftAddress ? ccCardImageUrl(currentCard.nftAddress) : undefined}
             onCardShown={onCardShown}>
               <RevealCard reducedMotion={reducedMotion} card={currentCard} w={cardW} h={cardH} valueColor={COLORS.text} />

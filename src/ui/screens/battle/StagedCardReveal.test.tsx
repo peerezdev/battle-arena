@@ -9,7 +9,7 @@ vi.mock('../../sfx', () => ({
   stopReveal: () => stopReveal(),
 }))
 import { StagedCardReveal } from './StagedCardReveal'
-import { PHASE, buildTimeline } from './revealTiming'
+import { PHASE, PACK_PHASE, buildTimeline } from './revealTiming'
 
 describe('StagedCardReveal', () => {
   it('reduced-motion jumps straight to the card and fires onCardShown', () => {
@@ -254,5 +254,35 @@ describe('StagedCardReveal · golpe del volteo y corte al cambiar de carta', () 
     expect(stopReveal).not.toHaveBeenCalled()
     unmount()
     expect(stopReveal).toHaveBeenCalled()
+  })
+})
+
+
+describe('revealTiming · Pack Battle va a su ritmo', () => {
+  it('las tres filas duran el DOBLE que en royale', () => {
+    expect(PACK_PHASE.year).toBe(PHASE.year * 2)
+    expect(PACK_PHASE.grade).toBe(PHASE.grade * 2)
+    expect(PACK_PHASE.rarity).toBe(PHASE.rarity * 2)
+  })
+
+  it('y solo esas tres: el giro y el hold son los mismos', () => {
+    // Lo que se pidió fue alargar la lectura, no la ceremonia entera.
+    for (const k of ['band', 'epicWait', 'epicTurn', 'rareTurn', 'plainTurn', 'hold'] as const) {
+      expect(PACK_PHASE[k]).toBe(PHASE[k])
+    }
+  })
+
+  it('el royale no se entera: sin `fases`, la línea de tiempos es la de siempre', () => {
+    const filas = ['Year', 'Grade', 'Rarity']
+    expect(buildTimeline(filas, 'common').rowAt).toEqual([0, PHASE.year, PHASE.year + PHASE.grade])
+  })
+
+  it('con PACK_PHASE cada fila entra al doble de tarde', () => {
+    const filas = ['Year', 'Grade', 'Rarity']
+    const pack = buildTimeline(filas, 'common', PACK_PHASE)
+    expect(pack.rowAt).toEqual([0, PHASE.year * 2, (PHASE.year + PHASE.grade) * 2])
+    // Y la carta tarda en quedar de cara exactamente lo que se ha alargado la lectura.
+    const royale = buildTimeline(filas, 'common')
+    expect(pack.faceUpAt - royale.faceUpAt).toBe(PHASE.year + PHASE.grade + PHASE.rarity)
   })
 })

@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PackReveal } from './PackReveal'
 import type { RevealVM } from './battleReveal'
+import { PHASE, PACK_PHASE } from './revealTiming'
 
 const renderR = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>)
 
@@ -57,5 +58,28 @@ describe('PackReveal', () => {
     expect(screen.getByText('10')).toBeTruthy()
     expect(screen.getByText('RARE')).toBeTruthy()
     expect(screen.getAllByText('Year').length).toBeGreaterThan(0)   // las etiquetas del apilado
+  })
+})
+
+
+describe('PackReveal · va al ritmo de Pack Battle, no al del royale', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  /** En apilado las tres filas están en el DOM desde el principio; lo que cambia es la opacidad. */
+  const opacidadDe = (texto: string) =>
+    (screen.getAllByText(texto)[0]!.parentElement as HTMLElement).style.opacity
+
+  it('el grado tarda el doble en aparecer que en un royale', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+    renderR(<PackReveal vm={settled} reducedMotion={false} />)
+
+    // A la altura en que el royale ya habría sacado el grado, aquí todavía no.
+    act(() => { vi.advanceTimersByTime(PHASE.year + 10) })
+    expect(opacidadDe('10')).toBe('0')
+
+    // Y sale al doble de tarde, que es lo que se pidió.
+    act(() => { vi.advanceTimersByTime(PACK_PHASE.year - PHASE.year) })
+    expect(opacidadDe('10')).toBe('1')
   })
 })
