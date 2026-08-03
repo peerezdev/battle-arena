@@ -4,7 +4,7 @@ import asyncio
 import base64
 import logging
 import time as _time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, Path, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,7 +28,7 @@ from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
 from .services.privy_signer import PrivySigner
 from .services import escrow_pool, machine_visibility
-from .models import GachaPack, PackBattle, BattlePlayer, BattlePack
+from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
                    recent_chat_messages, big_hit_multiple)
 from .services.pack_lobby import (
@@ -451,6 +451,103 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         return gacha
 
+    # ── ¿Es suya la carta que quiere vender? ─────────────────────────────────
+    # La respuesta honesta la tiene la cadena, pero llega TARDE: la carta acaba de aterrizar en la
+    # wallet y ni el RPC ni el índice de DAS la ven todavía. Medido en mainnet: hasta 5 s de "no
+    # eres dueño de este NFT" justo después de una tirada — o sea, exactamente en el momento en el
+    # que el jugador tiene delante el botón de vender. Un "todavía no lo veo" NO es un "no es
+    # tuya", y tratarlos igual es lo que convirtió una comprobación de seguridad en un error de
+    # cara al usuario.
+    #
+    # Se responde en dos tiempos:
+    #   1. Nuestro propio libro. Si somos NOSOTROS quienes acabamos de entregarle esa carta a esa
+    #      wallet —un sobre que abrimos para él, o el botín de una partida que ganó— ya sabemos de
+    #      quién es sin preguntarle a nadie. Instantáneo y sin depender de índices ajenos.
+    #   2. Si el libro no dice nada (carta vieja, o llegada de fuera), se pregunta a la cadena con
+    #      reintentos cortos antes de dar un 403.
+    #
+    # El libro solo vale un rato (_LEDGER_TTL): pasada la ventana de indexado ya no aporta nada
+    # —la cadena responde bien— y así el permiso no sobrevive a que la carta cambie de manos.
+    _LEDGER_TTL = timedelta(minutes=15)
+    # Cartas que han SALIDO de esa wallet por una vía nuestra: un retiro a una dirección externa, o
+    # un buyback que ya le hemos construido. El libro dice "se la entregamos", no "sigue siendo
+    # suya", así que en cuanto la movemos el atajo tiene que morir para esa carta.
+    #
+    # El caso que lo obliga: el jugador vende la carta, CC la recompra y la devuelve a la máquina,
+    # y a los diez minutos le toca a OTRO. Si el primero volviera a pedir el buyback, su fila del
+    # libro seguiría diciendo "es suya" y le construiríamos la venta de una carta que ya es de un
+    # tercero — apoyándonos en que CC lo rechace, que es justo la dependencia de terceros que la
+    # comprobación de propiedad venía a quitar. Quince minutos dan de sobra para esa vuelta.
+    #
+    # La clave es (wallet, mint), no el mint a secas: invalidar la carta del que la vendió no puede
+    # quitarle el atajo al siguiente que la saque, que la acaba de recibir de verdad.
+    # En memoria a propósito: un reinicio solo devuelve esa carta al camino normal —el sondeo
+    # on-chain— y el atajo caduca solo a los 15 minutos, así que no hace falta persistirlo.
+    _nft_moved_out: dict[tuple[str, str], float] = {}
+
+    def _marcar_fuera(wallet: str, mint: str) -> None:
+        """Esa carta ya no cuenta como recién entregada a esa wallet.
+
+        De paso se limpian las marcas viejas. Podarlas es seguro porque el atajo se mide desde la
+        ENTREGA y la salida es siempre posterior: cuando una marca cumple el TTL, la entrega que
+        podría amparar ya lo había cumplido antes.
+        """
+        ahora = _time.time()
+        ttl = _LEDGER_TTL.total_seconds()
+        for k in [k for k, t in _nft_moved_out.items() if ahora - t > ttl]:
+            _nft_moved_out.pop(k, None)
+        _nft_moved_out[(wallet, mint)] = ahora
+
+    def _reciente(ts: Optional[datetime]) -> bool:
+        if ts is None:
+            return False
+        # SQLite devuelve datetimes sin tzinfo aunque la columna sea timezone=True.
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - ts) <= _LEDGER_TTL
+
+    def _entregada_por_nosotros(s: Session, wallet: str, mint: str) -> bool:
+        """¿Consta en NUESTRO libro que acabamos de entregarle esa carta a esa wallet?"""
+        if not mint or (wallet, mint) in _nft_moved_out:
+            return False
+        # Gacha: CC entrega la carta directamente a la wallet del jugador al abrir el sobre.
+        pack = (s.query(GachaPack)
+                .filter(GachaPack.wallet == wallet, GachaPack.nft_address == mint)
+                .first())
+        if pack is not None and not pack.auto_sold and _reciente(pack.opened_at):
+            return True
+        # Batallas: el botín va del escrow al ganador, y `transferred` marca que ese envío salió.
+        won = (s.query(BattlePull, PackBattle)
+               .join(PackBattle, PackBattle.id == BattlePull.battle_id)
+               .filter(BattlePull.nft_address == mint,
+                       BattlePull.transferred.is_(True),
+                       BattlePull.auto_sold.is_(False),
+                       PackBattle.winner == wallet)
+               .first())
+        return won is not None and _reciente(won[1].settled_at)
+
+    async def _owns_onchain(wallet: str, mint: str, *, attempts: int = 4) -> bool:
+        """`nft_in_owner` con reintentos cortos (~1,75 s en total).
+
+        Un solo sondeo confunde "el índice va con retraso" con "no es suya". Solo se reintenta el
+        NO: en cuanto la cadena confirma que es suya, se sale. Si todos los intentos revientan, el
+        fallo sube y la venta se corta con un 502 — ante la duda no se vende.
+        """
+        delay, last_exc = 0.25, None
+        for i in range(attempts):
+            try:
+                if await nft_in_owner(solana_rpc_url, wallet, mint):
+                    return True
+                last_exc = None
+            except Exception as exc:      # noqa: BLE001 — se reintenta y, si persiste, se relanza
+                last_exc = exc
+            if i + 1 < attempts:
+                await asyncio.sleep(delay)
+                delay *= 2
+        if last_exc is not None:
+            raise last_exc
+        return False
+
     @app.get("/gacha/machines")
     async def gacha_machines(s: Session = Depends(db)):
         svc = _gacha_or_503()
@@ -637,7 +734,8 @@ def create_app(session_factory, chain: ChainSource,
         return {"marked": marked}
 
     @app.post("/gacha/buyback")
-    async def gacha_buyback(body: BuybackBody, wallet: str = Depends(current_user)):
+    async def gacha_buyback(body: BuybackBody, wallet: str = Depends(current_user),
+                            s: Session = Depends(db)):
         """Vender una carta a CC. `nft_address` lo elige el CLIENTE, así que la propiedad se
         comprueba aquí, igual que en /users/me/nft/withdraw.
 
@@ -650,17 +748,34 @@ def create_app(session_factory, chain: ChainSource,
         así que basta con cerrarlo una vez.
 
         Un fallo del RPC deja la venta en 502 en vez de dejarla pasar: ante la duda no se vende.
+
+        Lo que NO puede hacer es cobrarle el retraso al jugador: preguntar a la cadena por una
+        carta recién entregada devuelve "no es suya" durante unos segundos. Por eso primero se mira
+        nuestro propio libro (ver `_entregada_por_nosotros`), que es justo el caso de vender nada
+        más abrir el sobre o ganar la partida, y solo si el libro calla se va a la cadena.
+
+        Y una vez construida la venta, esa carta sale del atajo: a la segunda petición se le vuelve
+        a preguntar a la cadena. Es el único momento en el que el atajo podría amparar una carta
+        que ya cambió de manos —vendida, recomprada por CC y sacada por otro dentro de la ventana—
+        y aquí sí sobra tiempo para el sondeo, porque el jugador ya no está esperando el reveal.
         """
         svc = _gacha_or_503()
         _gacha_throttle(wallet)
+        if not _entregada_por_nosotros(s, wallet, body.nft_address):
+            try:
+                owns = await _owns_onchain(wallet, body.nft_address)
+            except Exception as exc:
+                raise HTTPException(502, f"ownership check failed: {exc}")
+            if not owns:
+                raise HTTPException(403, "no eres dueño de este NFT")
         try:
-            owns = await nft_in_owner(solana_rpc_url, wallet, body.nft_address)
-        except Exception as exc:
-            raise HTTPException(502, f"ownership check failed: {exc}")
-        if not owns:
-            raise HTTPException(403, "no eres dueño de este NFT")
-        try:
-            return await svc.buyback(player_address=wallet, nft_address=body.nft_address)
+            out = await svc.buyback(player_address=wallet, nft_address=body.nft_address)
+            # Se marca con la tx ya construida, no con la venta confirmada: el submit va por otra
+            # ruta (/gacha/submit-tx, un blob firmado sin memo) y desde aquí no hay forma de saber
+            # si llegó a salir. Marcar de más solo cuesta un sondeo si la venta se queda a medias;
+            # marcar de menos deja abierto el agujero.
+            _marcar_fuera(wallet, body.nft_address)
+            return out
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
@@ -1096,6 +1211,9 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(422, f"unsupported nft standard: {exc}")
         except Exception as exc:
             raise HTTPException(502, f"nft withdraw failed: {exc}")
+        # La carta ya no está en su wallet: el atajo del libro (que dice "se la entregamos") deja
+        # de valer para ella, o vendería a CC algo que acaba de mandar fuera.
+        _marcar_fuera(wallet, body.nft_address)
         return {"signature": sig, "nft_address": body.nft_address, "address": body.address}
 
     # ── Delegated signing — once the wallet is delegated, the server signs on the user's behalf

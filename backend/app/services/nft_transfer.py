@@ -293,12 +293,15 @@ async def resolve_cnft_transfer(rpc_url: str, escrow: str, winner: str, mint: st
         proof=prf["proof"], fee_payer=fee_payer)
 
 
-async def _get_account(rpc_url: str, pubkey: str) -> Optional[dict]:
+async def _get_account(rpc_url: str, pubkey: str, *, commitment: Optional[str] = None) -> Optional[dict]:
+    cfg = {"encoding": "base64"}
+    if commitment:
+        cfg["commitment"] = commitment
     async with httpx.AsyncClient() as c:
         r = await c.post(
             rpc_url,
             json={"jsonrpc": "2.0", "id": 1, "method": "getAccountInfo",
-                  "params": [pubkey, {"encoding": "base64"}]},
+                  "params": [pubkey, cfg]},
             timeout=20,
         )
         r.raise_for_status()
@@ -416,8 +419,13 @@ async def nft_in_owner(rpc_url: str, owner: str, mint: str) -> bool:
     Un cNFT comprimido tiene el mismo problema pero peor: no tiene NI cuenta propia, así que ni
     `getAccountInfo` ni las token accounts lo ven. Se pregunta por DAS. Medido en devnet: 28 cartas
     daban "no está en el escrow" cuando su dueño ERA el escrow.
+
+    Se pregunta con commitment `confirmed`, no con el que traiga el RPC por defecto (`finalized`):
+    esto es siempre un "¿ya ha llegado?" sobre una carta recién movida, y con finalized la respuesta
+    tarda un puñado de bloques de más en cambiar. Confirmed cuenta los votos de la supermayoría —
+    para una transferencia de NFT ya entregada es lo bastante firme, y llega antes.
     """
-    info = await _get_account(rpc_url, mint)
+    info = await _get_account(rpc_url, mint, commitment="confirmed")
     if info is not None and info.get("owner") == MPL_CORE_PROGRAM:
         holder = read_core_owner(base64.b64decode(info["data"][0]))
         return holder is not None and str(holder) == owner
@@ -437,7 +445,8 @@ async def nft_in_owner(rpc_url: str, owner: str, mint: str) -> bool:
     # SPL / Token-2022: el saldo vive en una token account del dueño.
     async with httpx.AsyncClient() as c:
         r = await c.post(rpc_url, json={"jsonrpc": "2.0", "id": 1, "method": "getTokenAccountsByOwner",
-                                        "params": [owner, {"mint": mint}, {"encoding": "jsonParsed"}]}, timeout=20)
+                                        "params": [owner, {"mint": mint},
+                                                   {"encoding": "jsonParsed", "commitment": "confirmed"}]}, timeout=20)
         r.raise_for_status()
         # `.get("value", [])` NO protege de un null: si la clave existe con valor nulo devuelve
         # None y el for revienta. Un RPC que responda value:null tumbaría el settle.

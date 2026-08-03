@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import respx
@@ -12,6 +13,7 @@ from app.db import make_session_factory, init_db
 from app.privy import PrivyVerifier
 from app.chain.mock import MockChainSource
 from app.services.gacha import GachaService
+from app.models import GachaPack, PackBattle, BattlePull
 
 from tests.conftest import make_es256, privy_auth_headers
 
@@ -363,6 +365,150 @@ def test_buyback_no_vende_si_falla_la_comprobacion(monkeypatch):
     r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
     assert r.status_code == 502
     assert not route.called
+
+
+# ── Vender la carta recién sacada, sin esperar a que la cadena se entere ──────────────────────
+# El sondeo on-chain llega tarde: la carta ya está en la wallet y el RPC/DAS todavía no la ven.
+# Medido en mainnet: hasta 5 s de "no eres dueño de este NFT" justo cuando el jugador tiene el
+# botón de vender delante. Estos tests fijan las dos mitades del arreglo — el atajo por nuestro
+# propio libro y el reintento — sin aflojar la barrera contra vender la carta de otro.
+
+def _guarda_sobre(c, wallet, mint, *, abierto_hace=timedelta(0), auto_sold=False):
+    """Deja en la base un sobre YA abierto: nuestro libro dice que esa carta se la dimos a esa wallet."""
+    with c.session_factory() as s:
+        s.add(GachaPack(memo=f"memo-{mint}-{wallet}", wallet=wallet, pack_type="pokemon_50",
+                        submitted_at=datetime.now(timezone.utc),
+                        opened_at=datetime.now(timezone.utc) - abierto_hace,
+                        nft_address=mint, auto_sold=auto_sold))
+        s.commit()
+
+
+def _ok_buyback():
+    return respx.post(f"{BASE}/api/buyback").mock(return_value=Response(200, json={
+        "success": True, "serializedTransaction": "BASE64TX", "refundAmount": 42500000}))
+
+
+@respx.mock
+def test_buyback_de_carta_recien_sacada_no_espera_a_la_cadena(monkeypatch):
+    """Sobre abierto hace un momento → se vende YA, sin sondear el RPC.
+
+    Es el caso que rompía: dos tiradas, buyback inmediato y 403 durante segundos. La carta la
+    acabamos de entregar nosotros, así que de quién es lo sabemos sin preguntarle a ningún índice.
+    """
+    route = _ok_buyback()
+    async def nunca(rpc, owner, mint):
+        raise AssertionError("no se pregunta a la cadena por una carta que acabamos de entregar")
+    monkeypatch.setattr("app.main.nft_in_owner", nunca)
+    c, priv = _client()
+    _guarda_sobre(c, WALLET_A, "NFT1")
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 200, r.text
+    assert route.called
+
+
+@respx.mock
+def test_vender_la_carta_la_saca_del_atajo(monkeypatch):
+    """Construida la venta, la segunda petición de esa carta vuelve a preguntar a la cadena.
+
+    CC recompra la carta y la devuelve a la máquina, así que dentro de la ventana del libro le
+    puede tocar a OTRO jugador. Si el atajo siguiera vivo para el que la vendió, pedir el buyback
+    otra vez construiría la venta de una carta que ya es de un tercero — apoyándonos solo en que CC
+    lo rechace, que es la dependencia que esta comprobación venía a quitar.
+    """
+    route = _ok_buyback()
+    c, priv = _client()
+    _guarda_sobre(c, WALLET_A, "NFT1")
+    hdrs = _hdrs(priv, WALLET_A)
+
+    _owns(monkeypatch, holder=WALLET_B)     # la cadena diría que no es de A; el atajo la vende igual
+    assert c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=hdrs).status_code == 200
+    assert route.call_count == 1
+
+    # Vendida: ahora la carta ya es de otro y el libro ya no la ampara.
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=hdrs)
+    assert r.status_code == 403
+    assert route.call_count == 1            # no se le vuelve a pedir a CC que construya nada
+
+
+@respx.mock
+def test_vender_no_le_quita_el_atajo_a_quien_la_saque_despues(monkeypatch):
+    """La marca es por (wallet, carta): que A la vendiera no puede penalizar a B, que la acaba de
+    sacar de la máquina y a quien se la hemos entregado nosotros hace un segundo."""
+    route = _ok_buyback()
+    async def nunca(rpc, owner, mint):
+        raise AssertionError("B la acaba de recibir: su atajo sigue siendo válido")
+    c, priv = _client()
+    _guarda_sobre(c, WALLET_A, "NFT1")
+    monkeypatch.setattr("app.main.nft_in_owner", nunca)
+    assert c.post("/gacha/buyback", json={"nft_address": "NFT1"},
+                  headers=_hdrs(priv, WALLET_A)).status_code == 200
+
+    _guarda_sobre(c, WALLET_B, "NFT1")      # CC la recompró y ahora le ha tocado a B
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_B))
+    assert r.status_code == 200, r.text
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_el_atajo_del_libro_es_por_wallet(monkeypatch):
+    """El sobre es de B: que exista no le sirve a A para vender esa carta."""
+    route = _ok_buyback()
+    _owns(monkeypatch, holder=WALLET_B)
+    c, priv = _client()
+    _guarda_sobre(c, WALLET_B, "NFT1")
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 403
+    assert not route.called
+
+
+@respx.mock
+def test_un_sobre_viejo_vuelve_a_preguntar_a_la_cadena(monkeypatch):
+    """Pasada la ventana de indexado el atajo caduca: el libro dice "se la dimos", no "sigue siendo
+    suya", así que una carta que ya cambió de manos no se vende por haber salido de un sobre suyo."""
+    route = _ok_buyback()
+    _owns(monkeypatch, holder=WALLET_B)     # a día de hoy la carta es de B
+    c, priv = _client()
+    _guarda_sobre(c, WALLET_A, "NFT1", abierto_hace=timedelta(hours=3))
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 403
+    assert not route.called
+
+
+@respx.mock
+def test_el_buyback_reintenta_cuando_la_cadena_aun_no_la_ve(monkeypatch):
+    """Carta sin sobre nuestro (inventario, o llegada de fuera): un "todavía no la veo" no es un
+    "no es tuya". Se reintenta unos segundos antes de negar la venta."""
+    route = _ok_buyback()
+    intentos = []
+    async def tarde(rpc, owner, mint):
+        intentos.append(owner)
+        return len(intentos) >= 2          # el índice se pone al día al segundo sondeo
+    monkeypatch.setattr("app.main.nft_in_owner", tarde)
+    c, priv = _client()
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT1"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 200, r.text
+    assert len(intentos) == 2
+    assert route.called
+
+
+@respx.mock
+def test_el_botin_de_una_partida_ganada_se_vende_al_momento(monkeypatch):
+    """Mismo atajo para la pantalla de winnings: la carta salió del escrow hacia el ganador porque
+    la mandamos nosotros, y `transferred` lo dice."""
+    route = _ok_buyback()
+    async def nunca(rpc, owner, mint):
+        raise AssertionError("el botín entregado por nosotros no necesita sondeo")
+    monkeypatch.setattr("app.main.nft_in_owner", nunca)
+    c, priv = _client()
+    with c.session_factory() as s:
+        s.add(PackBattle(id="b1", mode="pack", machine_code="pokemon_50", price=50, max_players=2,
+                         status="settled", winner=WALLET_A, settled_at=datetime.now(timezone.utc)))
+        s.add(BattlePull(battle_id="b1", player_wallet=WALLET_B, memo="m1",
+                         nft_address="NFT9", transferred=True))
+        s.commit()
+    r = c.post("/gacha/buyback", json={"nft_address": "NFT9"}, headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 200, r.text
+    assert route.called
 
 
 @respx.mock
