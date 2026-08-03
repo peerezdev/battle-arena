@@ -79,7 +79,15 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${identityToken}`, 'ngrok-skip-browser-warning': 'true' },
           body: JSON.stringify({ address: dest.trim(), amount: amountNum }),
         })
+        // Cada motivo dice qué pasa Y qué hacer. Antes todo lo que no fuera 402 o 503 caía en
+        // "Withdrawal failed. Please try again.", que además de no explicar nada era un mal
+        // consejo: reintentar no arregla ni una partida en curso ni un importe por debajo del
+        // mínimo. Los textos son de aquí y no del backend a propósito: sus `detail` van en
+        // español y la interfaz está en inglés.
         if (resp.status === 402) { setError('Insufficient available balance.'); return }
+        if (resp.status === 409) { setError("You're in a battle right now. USDC withdrawals unlock when it ends."); return }
+        if (resp.status === 422) { setError('That amount is below the minimum withdrawal.'); return }
+        if (resp.status === 429) { setError('Too many withdrawals. Wait a moment and try again.'); return }
         if (resp.status === 503) { setError('Withdrawals are temporarily unavailable.'); return }
         if (!resp.ok) { setError('Withdrawal failed. Please try again.'); return }
         showToast(`Withdrew ${formatUsd(amountNum)} to ${dest.slice(0, 4)}…${dest.slice(-4)} ✓`, 'success')
