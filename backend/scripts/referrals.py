@@ -12,10 +12,13 @@ from app.config import get_settings
 from app.db import make_engine, make_session_factory, init_db
 from app.models import ReferralCode
 from app.services.referrals import create_referral_code, get_referral_code
+from scripts._destino import anunciar
 
 
 def _session_factory():
-    engine = make_engine(get_settings().database_url)
+    st = get_settings()
+    anunciar(st)
+    engine = make_engine(st.database_url)
     init_db(engine)
     return make_session_factory(engine)
 

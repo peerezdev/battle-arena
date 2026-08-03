@@ -32,6 +32,7 @@ from app.services.pack_orchestration import fetch_latest_blockhash
 from app.services.privy_signer import PrivySigner
 from app.services.royale_funding import refund_buyin, royale_buyin
 from app.services.solana_tx import build_token_transfer
+from scripts._destino import anunciar
 
 GO = "--go" in sys.argv
 
@@ -50,6 +51,7 @@ async def _mandar(st, signer, escrow, escrow_wallet_id, destino, base_units) -> 
 
 async def main() -> None:
     st = get_settings()
+    anunciar(st)
     s = make_session_factory(make_engine(st.database_url))()
     signer = PrivySigner(app_id=st.privy_app_id, app_secret=st.privy_app_secret,
                          auth_key_pem=st.privy_auth_key, cluster_caip2=st.privy_solana_caip2)
