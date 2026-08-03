@@ -15,6 +15,9 @@ interface Props {
   usdc: number | null
   /** Open `count` packs at once (YOLO); optional turbo (auto-sell Commons). */
   onYolo?: (count: number, turbo: boolean) => void
+  /** Estado de tiradas gratis. Sin él no se pinta el botón: es un extra, no una pieza del flujo. */
+  freeSpins?: { spins_left: number; points_until_next: number; points_per_spin: number } | null
+  onFreePack?: () => void
 }
 
 const RARITY_ORDER = ['epic', 'rare', 'uncommon', 'common'] as const
@@ -27,7 +30,7 @@ const RARITY_COLOR: Record<string, string> = {
 
 const TURBO_ON_MSG = 'Turbo activated — Commons will be auto-sold'
 
-export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
+export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, onFreePack }: Props) {
   const reduced = useReducedMotion()
   const mobile = !useIsWide('(min-width: 760px)')   // bottom nav shows below 760 → use a sticky bar
 
@@ -266,6 +269,25 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo }: Props) {
               border: yoloBlocked ? `1px solid ${COLORS.border}` : 'none', background: yoloBlocked ? COLORS.panel2 : GRADIENT, color: yoloBlocked ? COLORS.muted : '#06120c' }}>
             {openLabel}
           </motion.button>
+
+          {/* Tirada gratis. Solo aparece si CC dice que tiene puntos suficientes: enseñar un
+              botón apagado con "te faltan N" invita a mirar los puntos, no a jugar. Cuando no
+              llega, se dice en una línea de texto y ya. */}
+          {onFreePack && freeSpins && (
+            freeSpins.spins_left > 0 ? (
+              <button
+                onClick={onFreePack}
+                style={{ width: '100%', marginTop: 10, borderRadius: 12, padding: '11px 18px',
+                  fontSize: 13.5, fontWeight: 800, fontFamily: FONTS.display, cursor: 'pointer',
+                  border: `1px solid ${COLORS.green}66`, background: `${COLORS.green}14`, color: COLORS.green }}>
+                ★ Free pack · {freeSpins.spins_left} left
+              </button>
+            ) : (
+              <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
+                {freeSpins.points_until_next.toLocaleString('en-US')} points to your next free pack
+              </div>
+            )
+          )}
         </div>
       )}
 

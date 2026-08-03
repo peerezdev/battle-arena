@@ -14,6 +14,7 @@ import {
   fetchMachineCards,
   machineCardCount,
   generatePack,
+  freePack,
   markPacksRevealed,
   generateYoloPacks,
   submitTx,
@@ -34,6 +35,7 @@ import { HoloCard } from '../../components/HoloCard'
 import { showToast } from '../../toastBus'
 import { useIsWide } from '../../useIsWide'
 import { MachineDetailPanel } from './MachineDetailPanel'
+import { useFreeSpins } from './useFreeSpins'
 import { useStickyFollow } from '../../useStickyFollow'
 import { CardBadge } from '../../components/CardBadge'
 import { GachaCardReveal } from './GachaCardReveal'
@@ -288,6 +290,39 @@ export default function GachaVault() {
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), 'error')
+      setPhase({ kind: 'pending', memo })
+    }
+  }
+
+  const { freeSpins, refrescarFreeSpins } = useFreeSpins()
+
+  /** Canjea una tirada gratis y la revela por el MISMO camino que una de pago.
+   *
+   *  Es más corta que `handleYolo` porque no hay nada que cobrar ni que firmar en el navegador:
+   *  el backend devuelve el memo ya canjeado y desde ahí el flujo es idéntico. */
+  async function handleFreePack() {
+    if (!identityToken || !selected) return
+    setPhase({ kind: 'yolo', step: 'firmando', done: 0, total: 1,
+               machineCode: selected.code, price: 0, results: null })
+    let memo: string
+    try {
+      memo = (await freePack(identityToken, selected.code)).memo
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not claim your free pack', 'error')
+      setPhase({ kind: 'machines' })
+      return
+    }
+    // El saldo de puntos vive en CC: tras gastar uno hay que volver a preguntarle.
+    refrescarFreeSpins()
+    setPhase({ kind: 'yolo', step: 'abriendo', done: 0, total: 1,
+               machineCode: selected.code, price: 0, results: null })
+    try {
+      const r = await pollOpenPack(() => openPack(identityToken, memo))
+      if (r.pending) { setPhase({ kind: 'pending', memo }); return }
+      batchMemos.current = [memo]
+      setPhase({ kind: 'yolo', step: 'abriendo', done: 1, total: 1,
+                 machineCode: selected.code, price: 0, results: [r] })
+    } catch {
       setPhase({ kind: 'pending', memo })
     }
   }
@@ -602,6 +637,8 @@ export default function GachaVault() {
               authed={!!identityToken}
               usdc={usdc}
               onYolo={(c, t) => setConfirm({ count: c, turbo: t })}
+              freeSpins={freeSpins}
+              onFreePack={() => void handleFreePack()}
             />
           </div>
         )

@@ -887,3 +887,141 @@ def test_apagar_la_maquina_no_le_quita_los_gimmighouls_a_quien_ya_tiro(monkeypat
         pack = s.get(GachaPack, "slug-off")
         assert pack.price == 50_000_000, "el precio del sobre ya comprado tiene que resolverse igual"
         assert (s.get(User, WALLET_A).gimmighouls or 0) > 0, "y su recompensa no puede perderse"
+
+
+# ── Tiradas gratis con puntos de Collector Crypt ──────────────────────────────
+#
+# Endpoints NO documentados por CC; el contrato se estableció midiendo contra devnet:
+#   GET  /api/freeSpins?wallet=…  → puntos, tiradas disponibles y coste por tirada
+#   POST /api/freePack            → { publicKey, packType, turbo, transactionSignature } → memo
+# `transactionSignature` es una transacción firmada por la wallet que sirve de PRUEBA DE
+# PROPIEDAD y que CC no envía a la cadena. La firma el backend con la wallet delegada.
+
+# WALLET_A/B son de relleno y NO son direcciones base58 válidas, así que no sirven aquí: el
+# canje construye una transacción de verdad y `Pubkey.from_string` las rechaza.
+WALLET_REAL = "8QDBKx8P3pxkRhiqyXFtYcPPf2CM1F5NiE5A8yjkgtm6"
+
+
+class _SignerFalso:
+    """Firma cualquier cosa. Solo interesa que el endpoint le pase el wallet_id correcto."""
+    enabled = True
+
+    def __init__(self):
+        self.visto = []
+
+    async def sign_solana(self, wallet_id, tx_b64):
+        self.visto.append((wallet_id, tx_b64))
+        return "FIRMADA"
+
+
+def _client_con_firmante(api_key="k123"):
+    engine = create_engine("sqlite:///:memory:",
+                           connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    init_db(engine)
+    sf = make_session_factory(engine)
+    priv = make_es256()
+    privy = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv.public_key())
+    gacha = GachaService(base_url=BASE, api_key=api_key)
+    firmante = _SignerFalso()
+    app = create_app(sf, MockChainSource(), elo_start=1200, elo_k=32,
+                     gacha=gacha, gacha_rate_limit=10, privy=privy, privy_signer=firmante,
+                     solana_rpc_url="https://rpc.test")
+    return TestClient(app), priv, firmante, sf
+
+
+def _hdrs_con_id(priv, wallet, wallet_id="wid-1"):
+    """Como _hdrs, pero con el `id` de la wallet, que es lo que necesita firmar."""
+    from tests.conftest import make_id_token
+    cuenta = {"type": "wallet", "chain_type": "solana", "connector_type": None,
+              "wallet_client_type": "privy", "address": wallet, "id": wallet_id}
+    return {"Authorization": f"Bearer {make_id_token(priv, APP_ID, [cuenta])}"}
+
+
+def _maquinas(mock):
+    """El catálogo que consulta `_machine_price` antes de dejar estrenar una tirada."""
+    mock.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+    mock.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[
+        {"code": "pokemon_50", "name": "Elite", "price": 50}]))
+
+
+def _rpc(mock):
+    """El blockhash que necesita la transacción-prueba. Vale cualquiera válido en base58."""
+    mock.post("https://rpc.test/").mock(return_value=Response(200, json={
+        "jsonrpc": "2.0", "id": 1,
+        "result": {"value": {"blockhash": "11111111111111111111111111111111"}}}))
+
+
+def _spins(mock, **over):
+    d = {"points": 250000, "freeSpinsLeft": 2, "freeSpinsLeftToday": 2,
+         "pointsPerSpin": 100000, "pointsUntilNextSpin": 50000}
+    d.update(over)
+    mock.get(f"{BASE}/api/freeSpins").mock(return_value=Response(200, json=d))
+
+
+@respx.mock
+def test_free_spins_dice_cuantas_quedan_y_lo_que_falta():
+    c, priv = _client()
+    _spins(respx)
+    r = c.get("/users/me/free-spins", headers=_hdrs(priv, WALLET_A))
+    assert r.status_code == 200, r.text
+    assert r.json() == {"points": 250000, "spins_left": 2, "spins_left_today": 2,
+                        "points_per_spin": 100000, "points_until_next": 50000}
+
+
+@respx.mock
+def test_free_pack_canjea_y_deja_el_sobre_listo_para_abrir():
+    c, priv, firmante, sf = _client_con_firmante()
+    _maquinas(respx)
+    _rpc(respx)
+    _spins(respx)
+    ruta = respx.post(f"{BASE}/api/freePack").mock(
+        return_value=Response(200, json={"success": True, "memo": "cc-libre-1",
+                                         "remainingPoints": 150000}))
+    r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},
+               headers=_hdrs_con_id(priv, WALLET_REAL))
+    assert r.status_code == 200, r.text
+    assert r.json()["memo"] == "cc-libre-1"
+
+    enviado = json.loads(ruta.calls[0].request.content)
+    assert enviado["publicKey"] == WALLET_REAL
+    assert enviado["packType"] == "pokemon_50"
+    assert enviado["transactionSignature"] == "FIRMADA"   # la prueba de propiedad va firmada
+    assert firmante.visto[0][0] == "wid-1"                # y con la wallet del JUGADOR
+
+    with sf() as s:
+        pack = s.get(GachaPack, "cc-libre-1")
+        assert pack.wallet == WALLET_REAL
+        assert pack.price == 0                 # gratis: no se le cobró nada
+        assert pack.submitted_at is not None   # sin pago pendiente, listo para abrir
+
+
+@respx.mock
+def test_free_pack_sin_tiradas_dice_cuantos_puntos_faltan():
+    # Un 409 con la cifra exacta, en vez de dejar que CC devuelva un error opaco.
+    c, priv, _, _ = _client_con_firmante()
+    _maquinas(respx)
+    _spins(respx, freeSpinsLeft=0, pointsUntilNextSpin=7611)
+    llamada = respx.post(f"{BASE}/api/freePack")
+    r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},
+               headers=_hdrs_con_id(priv, WALLET_REAL))
+    assert r.status_code == 409
+    assert "7611" in r.json()["detail"]
+    assert not llamada.called      # ni se le pide nada a CC ni se firma nada
+
+
+@respx.mock
+def test_free_pack_traduce_los_rechazos_de_cc():
+    # CC distingue "esta máquina no da gratis" de "sin stock"; las dos son cosas que el jugador
+    # entiende, así que no se esconden detrás de un 502 mudo.
+    for detalle, espera in [("Invalid pack type", "no ofrece tiradas gratis"),
+                            ("Machine is low", "sin cartas")]:
+        c, priv, _, _ = _client_con_firmante()
+        _maquinas(respx)
+        _rpc(respx)
+        _spins(respx)
+        respx.post(f"{BASE}/api/freePack").mock(
+            return_value=Response(400, json={"error": detalle}))
+        r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},
+                   headers=_hdrs_con_id(priv, WALLET_REAL))
+        assert r.status_code == 409, r.text
+        assert espera in r.json()["detail"]

@@ -43,6 +43,7 @@ from .services.pack_orchestration import (
     usdc_balance_base_units, fetch_latest_blockhash,
     reconcile_voided_battle_live,
 )
+from .services.solana_tx import build_memo_tx
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
 from .services.reservations import (reserve, reserved_total, royale_locked_total,
@@ -661,6 +662,20 @@ def create_app(session_factory, chain: ChainSource,
             s.commit()
         return out
 
+    @app.get("/users/me/free-spins")
+    async def me_free_spins(wallet: str = Depends(current_user)):
+        """Cuántas tiradas gratis tiene el jugador y cuánto le falta para la siguiente.
+
+        Los puntos los lleva Collector Crypt, no nosotros: se le preguntan a él en cada consulta.
+        """
+        svc = _gacha_or_503()
+        try:
+            return await svc.free_spins(wallet)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
+
     @app.post("/gacha/submit-tx")
     async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_user),
                            s: Session = Depends(db)):
@@ -1147,6 +1162,63 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(429, "too many withdrawals, try again later")
         hits.append(now)
         _withdraw_hits[wallet] = hits
+
+    @app.post("/gacha/free-pack")
+    async def gacha_free_pack(body: GeneratePackBody, wallet: str = Depends(current_user),
+                              wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        """Canjea una tirada gratis con los puntos de Collector Crypt.
+
+        Se diferencia de una tirada de pago en dos cosas. No hay nada que cobrar, así que no pasa
+        por `_require_available` ni por el flujo de firmar-y-enviar del navegador: aquí lo único
+        que CC pide es una transacción firmada por la wallet como PRUEBA DE PROPIEDAD, que ni
+        siquiera envía a la cadena. La firmamos nosotros con la wallet delegada, igual que las
+        tiradas de una batalla, así que para el jugador es un solo clic.
+
+        Se comprueba el saldo ANTES de firmar: si no le quedan tiradas, un 409 dice cuántos puntos
+        le faltan en vez de dejar que CC devuelva un error opaco.
+
+        La fila de GachaPack se marca `submitted_at` ya: no hay pago pendiente que esperar, así
+        que el sobre queda listo para abrir desde el primer momento.
+        """
+        svc = _gacha_or_503()
+        _gacha_throttle(wallet)
+        if privy_signer is None:
+            raise HTTPException(503, "signer_unavailable")
+        # La máquina tiene que estar ofertada por nosotros: una apagada a mano no puede estrenar
+        # tiradas, ni gratis ni de pago.
+        await _machine_price(body.pack_type)
+        try:
+            estado = await svc.free_spins(wallet)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
+        if estado["spins_left"] <= 0:
+            raise HTTPException(409, f"te faltan {estado['points_until_next']} puntos para una tirada gratis")
+
+        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        firmada = await privy_signer.sign_solana(wallet_id, build_memo_tx(wallet, blockhash))
+        try:
+            out = await svc.free_pack(player_address=wallet, pack_type=body.pack_type,
+                                      signed_transaction=firmada)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            # CC distingue "esta máquina no da sobres gratis" de "no queda stock", y las dos son
+            # cosas que el jugador puede entender; se dejan pasar tal cual en vez de un 502 mudo.
+            msg = str(e) or "gacha upstream unavailable"
+            if "pack type" in msg.lower():
+                raise HTTPException(409, "esta máquina no ofrece tiradas gratis")
+            if "low" in msg.lower():
+                raise HTTPException(409, "esta máquina se ha quedado sin cartas")
+            raise HTTPException(502, msg)
+        if not out.get("memo"):
+            raise HTTPException(502, "gacha upstream unavailable")
+        if s.get(GachaPack, out["memo"]) is None:
+            s.add(GachaPack(memo=out["memo"], wallet=wallet, pack_type=body.pack_type,
+                            price=0, submitted_at=datetime.now(timezone.utc)))
+            s.commit()
+        return {"memo": out["memo"], "remaining_points": out.get("remaining_points")}
 
     @app.post("/users/me/withdraw")
     async def me_withdraw(body: WithdrawBody, wallet: str = Depends(current_user),

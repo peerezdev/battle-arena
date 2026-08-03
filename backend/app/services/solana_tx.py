@@ -22,6 +22,23 @@ ATA_PROGRAM   = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"   # associated-to
 SYS_PROGRAM   = "11111111111111111111111111111111"
 
 
+MEMO_PROGRAM = "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
+
+
+def build_memo_tx(payer: str, recent_blockhash: str, texto: str = "collector-arena") -> str:
+    """Transacción sin firmar con una sola instrucción Memo, en base64.
+
+    Nace para el canje de tiradas gratis: Collector Crypt pide una transacción firmada por la
+    wallet como PRUEBA DE PROPIEDAD, y no llega a enviarla a la cadena (medido). Un memo es lo más
+    barato que se puede firmar y no mueve nada, así que si algún día CC decidiera enviarla, lo
+    peor que pasa es un memo y su fee.
+    """
+    payer_pk = Pubkey.from_string(payer)
+    ix = Instruction(Pubkey.from_string(MEMO_PROGRAM), texto.encode(), [])
+    msg = Message.new_with_blockhash([ix], payer_pk, Hash.from_string(recent_blockhash))
+    return base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
+
+
 def build_token_transfer(
     source_address: str,
     dest_address: str,

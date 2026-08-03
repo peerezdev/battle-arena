@@ -96,3 +96,32 @@ describe('MachineDetailPanel · vídeo de la máquina', () => {
     expect(container.querySelector('video')?.getAttribute('poster')).toContain('comic_25')
   })
 })
+
+
+describe('MachineDetailPanel · tirada gratis', () => {
+  const pintar = (props: Record<string, unknown>) =>
+    render(<MachineDetailPanel machine={machine} authed usdc={500} onYolo={vi.fn()} {...props} />)
+  const conFree = (over = {}) => ({ spins_left: 0, points_until_next: 7611, points_per_spin: 100000, ...over })
+
+  it('con tiradas disponibles ofrece el botón y dice cuántas quedan', () => {
+    const onFreePack = vi.fn()
+    pintar({ freeSpins: conFree({ spins_left: 2 }), onFreePack })
+    const b = screen.getByRole('button', { name: /Free pack/i })
+    expect(b.textContent).toMatch(/2 left/)
+    fireEvent.click(b)
+    expect(onFreePack).toHaveBeenCalled()
+  })
+
+  it('sin tiradas NO deja un botón apagado: dice cuánto falta', () => {
+    // Un botón deshabilitado invita a mirar los puntos; una línea de texto informa y no estorba.
+    pintar({ freeSpins: conFree({ spins_left: 0 }), onFreePack: vi.fn() })
+    expect(screen.queryByRole('button', { name: /Free pack/i })).toBeNull()
+    expect(screen.getByText(/7,611 points to your next free pack/i)).toBeTruthy()
+  })
+
+  it('sin datos de CC no se pinta nada: es un extra, no parte del flujo', () => {
+    pintar({ freeSpins: null, onFreePack: vi.fn() })
+    expect(screen.queryByRole('button', { name: /Free pack/i })).toBeNull()
+    expect(screen.queryByText(/points to your next/i)).toBeNull()
+  })
+})

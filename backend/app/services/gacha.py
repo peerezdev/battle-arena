@@ -121,6 +121,40 @@ class GachaService:
         raw = await self._request("POST", "/api/generatePack", json=body)
         return {"memo": raw.get("memo"), "transaction": raw.get("transaction")}
 
+    async def free_spins(self, wallet: str) -> dict:
+        """Estado de las tiradas gratis de una wallet.
+
+        Endpoint NO documentado: se sacó mirando la red de su propia web. Devuelve los puntos, las
+        tiradas disponibles (`freeSpinsLeft`), el tope de hoy y cuántos puntos cuesta cada una
+        (`pointsPerSpin`, hoy 100.000). Al no estar documentado puede cambiar sin aviso, así que
+        los campos se leen con `.get` y el llamante decide qué hacer si faltan.
+        """
+        raw = await self._request("GET", "/api/freeSpins", params={"wallet": wallet})
+        return {
+            "points": raw.get("points") or 0,
+            "spins_left": raw.get("freeSpinsLeft") or 0,
+            "spins_left_today": raw.get("freeSpinsLeftToday") or 0,
+            "points_per_spin": raw.get("pointsPerSpin") or 0,
+            "points_until_next": raw.get("pointsUntilNextSpin") or 0,
+        }
+
+    async def free_pack(self, player_address: str, pack_type: str, signed_transaction: str,
+                        turbo: bool = False) -> dict:
+        """Canjea una tirada gratis. Endpoint NO documentado.
+
+        `signedTransaction` es una transacción entera firmada por esa wallet, en base64; sirve de
+        prueba de propiedad y NO se envía a la cadena — medido: acepta un memo cualquiera. Devuelve
+        el `memo` del sobre, que se abre después con el mismo `open_pack` que uno de pago.
+
+        La carta va SIEMPRE a `player_address`: `altPlayerAddress` se acepta en el cuerpo pero se
+        ignora (comprobado on-chain). No sirve para entregarla a un tercero.
+        """
+        raw = await self._request("POST", "/api/freePack", json={
+            "publicKey": player_address, "packType": pack_type,
+            "turbo": turbo, "transactionSignature": signed_transaction,
+        })
+        return {"memo": raw.get("memo"), "remaining_points": raw.get("remainingPoints")}
+
     async def generate_yolo_packs(self, player_address: str, pack_type: str,
                                   count: int, turbo: bool) -> dict:
         raw = await self._request("POST", "/api/generateYoloPacks", json={

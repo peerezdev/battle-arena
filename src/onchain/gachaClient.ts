@@ -188,6 +188,30 @@ export function withdrawNft(token: string, nftAddress: string, destAddress: stri
   })
 }
 
+/** Tiradas gratis que Collector Crypt le debe a esta wallet por sus puntos. */
+export interface FreeSpins {
+  points: number
+  spins_left: number
+  spins_left_today: number
+  points_per_spin: number
+  points_until_next: number
+}
+
+export function fetchFreeSpins(token: string): Promise<FreeSpins> {
+  return gachaFetch<FreeSpins>('/users/me/free-spins', { headers: { Authorization: `Bearer ${token}` } })
+}
+
+/** Canjea una tirada gratis. A diferencia de una de pago no hay nada que firmar en el navegador:
+ *  la prueba de propiedad la pone el backend con la wallet delegada, así que devuelve ya el memo
+ *  del sobre, listo para abrir con `openPack`. */
+export function freePack(token: string, packType: string): Promise<{ memo: string; remaining_points: number | null }> {
+  return gachaFetch<{ memo: string; remaining_points: number | null }>('/gacha/free-pack', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ pack_type: packType }),
+  })
+}
+
 export function openPack(token: string, memo: string): Promise<OpenPackResult> {
   return gachaFetch<OpenPackResult>('/gacha/open-pack', {
     method: 'POST', headers: authHeaders(token),
