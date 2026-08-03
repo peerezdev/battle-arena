@@ -1,16 +1,17 @@
 /**
- * DepositModal — receive USDC via address/QR/faucet, or fund via Privy.
+ * DepositModal — receive USDC into the embedded wallet.
  *
  * Props: { open, onClose }
  * - Shows wallet address with QR code and copy button.
- * - Links to SPL faucet for devnet USDC.
- * - "Fund with card/crypto" triggers Privy's Solana fund wallet flow.
+ *
+ * Solo eso. Tenía además un enlace al faucet de devnet y el "Fund with card / crypto" de Privy;
+ * los dos se retiraron a petición, así que el modal hace una sola cosa: enseñar a dónde mandar
+ * el USDC.
  */
 import { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallets } from '@privy-io/react-auth/solana'
-import { useFundWallet } from '@privy-io/react-auth/solana'
-import { COLORS, GRADIENT, FONTS, SHADOW } from '../theme'
+import { COLORS, FONTS, SHADOW } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
 
 interface DepositModalProps {
@@ -20,7 +21,6 @@ interface DepositModalProps {
 
 export function DepositModal({ open, onClose }: DepositModalProps) {
   const { wallets } = useWallets()
-  const { fundWallet } = useFundWallet()
   const reducedMotion = useReducedMotion()
   const [copied, setCopied] = useState(false)
 
@@ -36,10 +36,6 @@ export function DepositModal({ open, onClose }: DepositModalProps) {
     })
   }
 
-  function handleFund() {
-    if (!address) return
-    void fundWallet({ address })
-  }
 
   return (
     <>
@@ -192,82 +188,6 @@ export function DepositModal({ open, onClose }: DepositModalProps) {
               </button>
             </div>
 
-            {/* Divider */}
-            <div
-              style={{
-                height: 1,
-                background: COLORS.border,
-                margin: '0 -4px',
-              }}
-            />
-
-            {/* Faucet link */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <a
-                href="https://spl-token-faucet.com/?token-name=USDC-Dev"
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontFamily: FONTS.body,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: COLORS.green,
-                  textDecoration: 'none',
-                  padding: '8px 12px',
-                  border: `1px solid ${COLORS.green}44`,
-                  borderRadius: 9,
-                  background: `${COLORS.green}0d`,
-                  transition: reducedMotion ? 'none' : 'opacity 0.15s',
-                }}
-              >
-                ↗ Get test USDC
-              </a>
-              <span
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: 11,
-                  color: COLORS.muted,
-                  paddingLeft: 2,
-                }}
-              >
-                Test USDC (devnet)
-              </span>
-            </div>
-
-            {/* Fund with Privy */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <button
-                onClick={handleFund}
-                style={{
-                  background: GRADIENT,
-                  border: 'none',
-                  borderRadius: 10,
-                  padding: '11px 0',
-                  color: '#06120c',
-                  fontWeight: 800,
-                  fontSize: 14,
-                  fontFamily: FONTS.display,
-                  cursor: 'pointer',
-                  width: '100%',
-                  letterSpacing: '0.01em',
-                }}
-              >
-                Fund with card / crypto
-              </button>
-              <span
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: 11,
-                  color: COLORS.muted,
-                  textAlign: 'center',
-                }}
-              >
-                (mainnet)
-              </span>
-            </div>
           </>
         )}
       </div>
