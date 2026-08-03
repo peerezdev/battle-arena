@@ -17,6 +17,10 @@ const htmlBypass = (req: IncomingMessage) =>
 // sets BACKEND_PORT=9190 so this same frontend proxies to the mainnet backend. Two networks side
 // by side: devnet frontend :5173 → backend :9090, mainnet frontend :5273 → backend :9190.
 const backendTarget = `http://localhost:${process.env.BACKEND_PORT || '9090'}`
+// El navegador llama al oráculo directo (oracleClient → `${VITE_ORACLE_URL}/attest`) y exige
+// https. Lo servimos por el MISMO origen (…/oracle/*) para no necesitar CORS/host aparte: el
+// proxy reescribe /oracle/attest → :8787/attest. ORACLE_PORT sigue el patrón de BACKEND_PORT.
+const oracleTarget = `http://localhost:${process.env.ORACLE_PORT || '8787'}`
 const api = { target: backendTarget, changeOrigin: true, bypass: htmlBypass }
 const backendProxy = {
   '/gacha': api,
@@ -30,6 +34,11 @@ const backendProxy = {
   '/leaderboard': api,
   '/health': api,
   '/ws': { target: backendTarget, ws: true, changeOrigin: true },
+  '/oracle': {
+    target: oracleTarget,
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(/^\/oracle/, ''),
+  },
 }
 
 // https://vite.dev/config/

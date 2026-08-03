@@ -919,7 +919,8 @@ def test_create_legacy_single_machine_still_works(client_priv, monkeypatch):
 def test_join_bot_disabled_by_default():
     """SECURITY (A1): the unauthenticated, fund-moving join-bot endpoint must 404
     when DEV_ENDPOINTS_ENABLED is off (the default), so it cannot be reached in prod.
-    The gate runs before the battle lookup, so the 404 detail is "Not Found" (not "no existe")."""
+    The gate runs before the battle lookup, so the 404 detail is FastAPI's own "Not Found",
+    not our "battle not found"."""
     c, _priv = _build_client()  # dev_endpoints_enabled=False by default
     r = c.post("/pack-battles/whatever-id/join-bot")
     assert r.status_code == 404
@@ -928,12 +929,12 @@ def test_join_bot_disabled_by_default():
 
 def test_join_bot_enabled_passes_gate_in_dev():
     """With DEV_ENDPOINTS_ENABLED on, the gate is open: the handler proceeds to the
-    battle lookup. A nonexistent battle then yields 404 "no existe" — proving the
+    battle lookup. A nonexistent battle then yields 404 "battle not found" — proving the
     request got PAST the dev gate (different detail than the disabled case)."""
     c, _priv = _build_client(dev_endpoints_enabled=True)
     r = c.post("/pack-battles/nonexistent/join-bot")
     assert r.status_code == 404
-    assert r.json()["detail"] == "no existe"
+    assert r.json()["detail"] == "battle not found"
 
 
 # ── /dev/announce: chat-event demo endpoint is dev-gated ──────────────────────
@@ -965,7 +966,7 @@ def test_withdraw_below_minimum_rejected():
     hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
     r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 0.000001}, headers=hdrs)
     assert r.status_code == 422, r.text
-    assert "mínimo" in r.json()["detail"]
+    assert "minimum withdrawal" in r.json()["detail"]
 
 
 def test_withdraw_rate_limited(monkeypatch):
@@ -1414,7 +1415,7 @@ def test_no_se_puede_crear_partida_con_una_maquina_apagada(monkeypatch, mode):
 
     r = c.post("/pack-battles", json=cuerpo, headers=hdrs)
     assert r.status_code == 409, r.text
-    assert r.json()["detail"] == "máquina no disponible"
+    assert r.json()["detail"] == "machine unavailable"
 
 
 def test_una_maquina_encendida_sigue_pudiendose_usar(monkeypatch):

@@ -23,9 +23,9 @@ def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, p
     # Per-mode player limits: Pack Battle 2–4, Battle Royale 5–10.
     if mode == "royale":
         if not (5 <= max_players <= 10):
-            raise LobbyError("Battle Royale: entre 5 y 10 jugadores")
+            raise LobbyError("Battle Royale: 5 to 10 players")
     elif not (2 <= max_players <= 4):
-        raise LobbyError("Pack Battle: entre 2 y 4 jugadores")
+        raise LobbyError("Pack Battle: 2 to 4 players")
     seed, h = gen_server_seed()
     b = PackBattle(id=uuid.uuid4().hex, mode=mode, machine_code=machine_code, price=price,
                    max_players=max_players, status="lobby", server_seed=seed, server_seed_hash=h,
@@ -48,12 +48,12 @@ def create_battle(session, creator_wallet, creator_wallet_id, *, machine_code, p
 def join_battle(session, battle_id, player_wallet, player_wallet_id):
     b = session.get(PackBattle, battle_id)
     if b is None or b.status != "lobby":
-        raise LobbyError("partida no disponible")
+        raise LobbyError("battle unavailable")
     players = session.query(BattlePlayer).filter_by(battle_id=battle_id).all()
     if any(p.player_wallet == player_wallet for p in players):
-        raise LobbyError("ya estás en la partida")
+        raise LobbyError("you are already in this battle")
     if len(players) >= b.max_players:
-        raise LobbyError("partida llena")
+        raise LobbyError("battle is full")
     session.add(BattlePlayer(battle_id=battle_id, player_wallet=player_wallet, wallet_id=player_wallet_id))
     session.commit()
     count = session.query(BattlePlayer).filter_by(battle_id=battle_id).count()
@@ -85,11 +85,11 @@ def join_event(*, battle_id, mode, players, joiner_wallet, joiner_name, filled):
 def cancel_battle(session, battle_id, wallet) -> PackBattle:
     b = session.get(PackBattle, battle_id)
     if b is None:
-        raise LobbyError("no existe")
+        raise LobbyError("battle not found")
     if b.creator_wallet != wallet:
-        raise LobbyError("solo el creador puede cancelar")
+        raise LobbyError("only the creator can cancel")
     if b.status != "lobby":
-        raise LobbyError("solo se puede cancelar un lobby no iniciado")
+        raise LobbyError("only a lobby that has not started can be cancelled")
     b.status = "cancelled"
     session.commit()
     return b
@@ -186,7 +186,7 @@ def list_battles(session, recent_limit=25):
 def get_battle(session, battle_id):
     b = session.get(PackBattle, battle_id)
     if b is None:
-        raise LobbyError("no existe")
+        raise LobbyError("battle not found")
     buyin = royale_buyin(b.max_players, b.price) if b.mode == "royale" else b.price
     out = {"id": b.id, "mode": b.mode, "machine_code": b.machine_code, "price": b.price,
            "max_players": b.max_players, "status": b.status, "winner": b.winner,

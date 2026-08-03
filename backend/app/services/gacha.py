@@ -71,9 +71,9 @@ class GachaService:
                         reason = body.get("details") or body.get("error")
                 except Exception:
                     reason = None
-                raise GachaUpstreamError(str(reason)[:140] if reason else "gacha upstream no disponible")
+                raise GachaUpstreamError(str(reason)[:140] if reason else "gacha upstream unavailable")
             except (httpx.HTTPError, ValueError) as e:
-                raise GachaUpstreamError("gacha upstream no disponible")
+                raise GachaUpstreamError("gacha upstream unavailable")
 
     async def _availability(self) -> dict:
         """code -> available (status == 'open') from /api/status. Fail-open: {} on error."""
@@ -163,7 +163,7 @@ class GachaService:
         if raw.get("code") == "WAITING_FOR_WEBHOOK":
             return {"pending": True}
         if not raw.get("nft_address"):
-            raise GachaUpstreamError("gacha upstream: respuesta openPack sin nft_address")
+            raise GachaUpstreamError("gacha upstream: openPack response with no nft_address")
         nft_won = raw.get("nftWon") or {}
         content = nft_won.get("content") or {}
         metadata = content.get("metadata") or {}
@@ -349,9 +349,9 @@ class GachaService:
                 resp.raise_for_status()
                 raw = resp.json()
             except (httpx.HTTPError, ValueError):
-                raise GachaUpstreamError("gacha upstream no disponible")
+                raise GachaUpstreamError("gacha upstream unavailable")
         if not isinstance(raw, dict):
-            raise GachaUpstreamError("gacha upstream: metadata inválida")
+            raise GachaUpstreamError("gacha upstream: invalid metadata")
         attributes = raw.get("attributes") or []
         attr = {t.get("trait_type"): t.get("value") for t in attributes if isinstance(t, dict)}
         name = raw.get("name")

@@ -145,7 +145,7 @@ class SubmitTxBody(BaseModel):
         try:
             base64.b64decode(self.signed_transaction, validate=True)
         except Exception:
-            raise ValueError("signed_transaction debe ser base64 válido")
+            raise ValueError("signed_transaction must be valid base64")
         return self
 
 
@@ -172,7 +172,7 @@ class CreateMatchBody(BaseModel):
     def check_elo_range(self) -> "CreateMatchBody":
         if self.min_elo is not None and self.max_elo is not None:
             if self.min_elo > self.max_elo:
-                raise ValueError("min_elo no puede ser mayor que max_elo")
+                raise ValueError("min_elo cannot be greater than max_elo")
         return self
 
 
@@ -239,13 +239,13 @@ def create_app(session_factory, chain: ChainSource,
 
     def current_user(authorization: Optional[str] = Header(None)) -> str:
         if privy is None:
-            raise HTTPException(503, "privy no configurado")
+            raise HTTPException(503, "privy not configured")
         if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(401, "falta token")
+            raise HTTPException(401, "missing token")
         try:
             return privy.embedded_solana_wallet(authorization[len("Bearer "):])
         except PrivyAuthError:
-            raise HTTPException(401, "identity token inválido")
+            raise HTTPException(401, "invalid identity token")
 
     @app.get("/health")
     async def health():
@@ -447,7 +447,7 @@ def create_app(session_factory, chain: ChainSource,
         now = _time.time()
         hits = [t for t in _gacha_hits.get(wallet, []) if now - t < 60.0]
         if len(hits) >= gacha_rate_limit:
-            raise HTTPException(429, "demasiadas peticiones al gacha")
+            raise HTTPException(429, "too many gacha requests")
         hits.append(now)
         _gacha_hits[wallet] = hits
 
@@ -561,7 +561,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
 
     @app.get("/gacha/winners")
     async def gacha_winners(machine: Optional[str] = None,
@@ -582,7 +582,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
         if pedida and pedida != "epic":
             filas = [w for w in filas if (w.get("rarity") or "").lower() == pedida]
         return filas
@@ -604,7 +604,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
         from .services.rarity_gaps import gaps
         return {"machine": machine, "sampled": len(filas), "gaps": gaps(filas)}
 
@@ -619,7 +619,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
 
     @app.get("/gacha/nft/{mint}")
     async def gacha_nft(mint: str = Path(min_length=32, max_length=44,
@@ -632,7 +632,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
 
     @app.post("/gacha/generate-pack")
     async def gacha_generate(body: GeneratePackBody,
@@ -647,13 +647,13 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
         if not out.get("memo"):
-            raise HTTPException(502, "gacha upstream no disponible")
+            raise HTTPException(502, "gacha upstream unavailable")
         existing = s.get(GachaPack, out["memo"])
         if existing is not None:
             if existing.wallet != wallet:
-                raise HTTPException(502, "gacha upstream no disponible")
+                raise HTTPException(502, "gacha upstream unavailable")
             # mismo wallet: el pack ya existe, devolver sin re-insertar
         else:
             s.add(GachaPack(memo=out["memo"], wallet=wallet, pack_type=body.pack_type))
@@ -672,7 +672,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
         # El pago acaba de cuajar: se marca el sobre como pagado. La fila de GachaPack se crea al
         # GENERAR, antes de pagar, así que `opened_at IS NULL` por sí solo no distingue un sobre
         # pagado y pendiente de uno que se generó y nunca se llegó a comprar. Sin esta marca, la
@@ -692,7 +692,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
 
     @app.get("/gacha/packs/pending")
     async def gacha_pending_packs(wallet: str = Depends(current_user), s: Session = Depends(db)):
@@ -772,7 +772,7 @@ def create_app(session_factory, chain: ChainSource,
             except Exception as exc:
                 raise HTTPException(502, f"ownership check failed: {exc}")
             if not owns:
-                raise HTTPException(403, "no eres dueño de este NFT")
+                raise HTTPException(403, "you do not own this NFT")
         try:
             out = await svc.buyback(player_address=wallet, nft_address=body.nft_address)
             # Se marca con la tx ya construida, no con la venta confirmada: el submit va por otra
@@ -784,7 +784,7 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
 
     @app.post("/gacha/open-pack")
     async def gacha_open(body: OpenPackBody,
@@ -798,13 +798,13 @@ def create_app(session_factory, chain: ChainSource,
         # ownership is still enforced below, so polling is safe and cannot spend money.
         pack = s.get(GachaPack, body.memo)
         if pack is None or pack.wallet != wallet:
-            raise HTTPException(403, "memo no pertenece a esta wallet")
+            raise HTTPException(403, "this memo does not belong to this wallet")
         try:
             out = await svc.open_pack(memo=body.memo)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
         if not out.get("pending") and out.get("nft_address"):
             first_open = pack.opened_at is None
             pack.opened_at = datetime.now(timezone.utc)
@@ -949,15 +949,15 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream no disponible")
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
         if not out.get("transactions"):
-            raise HTTPException(502, "gacha upstream no disponible")
+            raise HTTPException(502, "gacha upstream unavailable")
         for tx in out["transactions"]:
             memo = tx["memo"]
             existing = s.get(GachaPack, memo)
             if existing is not None:
                 if existing.wallet != wallet:
-                    raise HTTPException(502, "gacha upstream no disponible")
+                    raise HTTPException(502, "gacha upstream unavailable")
             else:
                 s.add(GachaPack(memo=memo, wallet=wallet, pack_type=body.pack_type))
         s.commit()
@@ -966,32 +966,32 @@ def create_app(session_factory, chain: ChainSource,
     @app.get("/auth/privy/me")
     async def privy_me(authorization: Optional[str] = Header(None)):
         if privy is None:
-            raise HTTPException(503, "privy no configurado")
+            raise HTTPException(503, "privy not configured")
         if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(401, "falta token")
+            raise HTTPException(401, "missing token")
         try:
             claims = privy.verify(authorization[len("Bearer "):])
         except PrivyAuthError:
-            raise HTTPException(401, "token Privy inválido")
+            raise HTTPException(401, "invalid Privy token")
         return {"sub": claims.get("sub")}
 
     # ── Pack Battle lobby endpoints ───────────────────────────────────────────
 
     def current_user_id(authorization: Optional[str] = Header(None)) -> str:
         if privy is None:
-            raise HTTPException(503, "privy no configurado")
+            raise HTTPException(503, "privy not configured")
         if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(401, "falta token")
+            raise HTTPException(401, "missing token")
         try:
             return privy.embedded_solana_wallet_id(authorization[len("Bearer "):])
         except PrivyAuthError:
-            raise HTTPException(401, "identity token inválido")
+            raise HTTPException(401, "invalid identity token")
 
     async def _require_available(wallet: str, amount: int, s: Session):
         bal = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
         avail = bal - reserved_total(s, wallet)
         if avail < amount:
-            raise HTTPException(402, "USDC disponible insuficiente")
+            raise HTTPException(402, "not enough available USDC")
 
     async def _machine_price(machine_code: str) -> int:
         """Precio como PUERTA: sobre el catálogo filtrado. Una máquina apagada a mano no puede
@@ -1001,7 +1001,7 @@ def create_app(session_factory, chain: ChainSource,
             machines = machine_visibility.visible(s, await gacha.machines())
         m = next((x for x in machines if x.get("code") == machine_code), None)
         if not m or not m.get("available", True):
-            raise HTTPException(409, "máquina no disponible")
+            raise HTTPException(409, "machine unavailable")
         return int(m["price"]) * 1_000_000   # USDC base units
 
     async def _machine_price_historico(machine_code: str) -> Optional[int]:
@@ -1143,7 +1143,7 @@ def create_app(session_factory, chain: ChainSource,
         now = _time.time()
         hits = [t for t in _withdraw_hits.get(wallet, []) if now - t < withdraw_rate_window_s]
         if len(hits) >= withdraw_rate_limit:
-            raise HTTPException(429, "demasiados retiros, inténtalo más tarde")
+            raise HTTPException(429, "too many withdrawals, try again later")
         hits.append(now)
         _withdraw_hits[wallet] = hits
 
@@ -1160,7 +1160,7 @@ def create_app(session_factory, chain: ChainSource,
         # by a flood of 1-base-unit withdrawals to fresh addresses.
         min_base = int(round(min_withdraw_usdc * 1_000_000))
         if amount < min_base:
-            raise HTTPException(422, f"el retiro mínimo es {min_withdraw_usdc} USDC")
+            raise HTTPException(422, f"the minimum withdrawal is {min_withdraw_usdc} USDC")
         _withdraw_throttle(wallet)                      # rate-limit per authed wallet
         await _require_available(wallet, amount, s)     # caps at on-chain balance − reserved
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
@@ -1201,7 +1201,7 @@ def create_app(session_factory, chain: ChainSource,
         except Exception as exc:
             raise HTTPException(502, f"ownership check failed: {exc}")
         if not owns:
-            raise HTTPException(403, "no eres dueño de este NFT")
+            raise HTTPException(403, "you do not own this NFT")
         _withdraw_throttle(wallet)  # same per-wallet throttle as USDC withdraw
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         sponsored = bool(privy_operator_wallet_id and privy_operator_address)
@@ -1253,7 +1253,7 @@ def create_app(session_factory, chain: ChainSource,
 
         if mode == "royale":
             if _royale_allow and wallet not in _royale_allow:
-                raise HTTPException(403, "La creación de Battle Royale está limitada durante el lanzamiento")
+                raise HTTPException(403, "Battle Royale creation is limited during launch")
             # For royale, the funds check is against the buy-in, not just the pack price.
             buyin = royale_buyin(body.max_players, price)
             await _require_available(wallet, buyin, s)
@@ -1275,7 +1275,7 @@ def create_app(session_factory, chain: ChainSource,
             try:
                 await collect_buyin_confirmed(wallet_id, wallet, b.escrow_address, buyin)
             except Exception as exc:
-                raise HTTPException(502, f"No se pudo cobrar tu buy-in: {exc}")
+                raise HTTPException(502, f"could not collect your buy-in: {exc}")
             _anotar_buyin(s, b.id, wallet, buyin)
             resp = get_battle(s, b.id)
             resp["buyin"] = buyin
@@ -1288,17 +1288,17 @@ def create_app(session_factory, chain: ChainSource,
         if body.packs:
             for sel in body.packs:
                 if sel.count < 1:
-                    raise HTTPException(422, "cada count debe ser >= 1")
+                    raise HTTPException(422, "each count must be >= 1")
             bundle: list[tuple[str, int]] = []
             for sel in body.packs:
                 ppx = await _machine_price(sel.machine_code)   # 409 if unavailable
                 bundle += [(sel.machine_code, ppx)] * sel.count
         else:
             if not body.machine_code:
-                raise HTTPException(422, "machine_code o packs requerido")
+                raise HTTPException(422, "machine_code or packs required")
             bundle = [(body.machine_code, await _machine_price(body.machine_code))]
         if not (1 <= len(bundle) <= 10):
-            raise HTTPException(422, "el bundle debe tener entre 1 y 10 cajas")
+            raise HTTPException(422, "a bundle must have between 1 and 10 boxes")
         total = sum(pr for _, pr in bundle)
         await _require_available(wallet, total, s)
         try:
@@ -1316,7 +1316,7 @@ def create_app(session_factory, chain: ChainSource,
                                wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
         b = s.get(PackBattle, battle_id)
         if b is None:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
 
         if b.mode == "royale":
             # For royale, check that the player can cover the buy-in.
@@ -1327,7 +1327,7 @@ def create_app(session_factory, chain: ChainSource,
             try:
                 await collect_buyin_confirmed(wallet_id, wallet, b.escrow_address, buyin)
             except Exception as exc:
-                raise HTTPException(502, f"No se pudo cobrar el buy-in: {exc}")
+                raise HTTPException(502, f"could not collect the buy-in: {exc}")
             try:
                 b, filled = join_battle(s, battle_id, wallet, wallet_id)
                 _anotar_buyin(s, battle_id, wallet, buyin)
@@ -1383,12 +1383,12 @@ def create_app(session_factory, chain: ChainSource,
         auto-join it. Other participants are invited over the WS in case they left the result screen."""
         finished = s.get(PackBattle, battle_id)
         if finished is None:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
         participants = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()}
         if wallet not in participants:
-            raise HTTPException(403, "solo los participantes pueden pedir revancha")
+            raise HTTPException(403, "only players in the battle can ask for a rematch")
         if finished.status not in ("settled", "voided"):
-            raise HTTPException(409, "la batalla aún no ha terminado")
+            raise HTTPException(409, "the battle has not finished yet")
 
         # An open rematch lobby already exists → auto-join it (funds handled by the join path).
         rm = s.get(PackBattle, finished.rematch_battle_id) if finished.rematch_battle_id else None
@@ -1423,16 +1423,16 @@ def create_app(session_factory, chain: ChainSource,
         battle_id)."""
         b = s.get(PackBattle, battle_id)
         if b is None:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
         participants = {p.player_wallet for p in s.query(BattlePlayer).filter_by(battle_id=battle_id).all()}
         if wallet not in participants:
-            raise HTTPException(403, "solo los participantes pueden lanzar emotes")
+            raise HTTPException(403, "only players in the battle can send emotes")
         if not emote_service.owns(s, wallet, body.code):
-            raise HTTPException(403, "no posees ese emote")
+            raise HTTPException(403, "you do not own that emote")
         now = _time.monotonic()
         last = _emote_last.get(wallet)
         if last is not None and now - last < 1.0:
-            raise HTTPException(429, "demasiado rápido")
+            raise HTTPException(429, "too fast")
         _emote_last[wallet] = now
         await _chat_mgr.broadcast({"type": "emote", "battle_id": battle_id, "from": wallet, "code": body.code})
         return {"ok": True}
@@ -1464,7 +1464,7 @@ def create_app(session_factory, chain: ChainSource,
             try:
                 await collect_buyin_confirmed(bid, bw, b.escrow_address, buyin)
             except Exception as exc:
-                raise HTTPException(502, f"No se pudo cobrar el buy-in del bot: {exc}")
+                raise HTTPException(502, f"could not collect the bot buy-in: {exc}")
             try:
                 _b2, filled = join_battle(s, b.id, bw, bid)
                 _anotar_buyin(s, b.id, bw, buyin)
@@ -1508,12 +1508,12 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(404, "Not Found")
         b = s.get(PackBattle, battle_id)
         if b is None:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
         if b.status != "lobby":
-            raise HTTPException(409, "la batalla no está en lobby")
+            raise HTTPException(409, "the battle is not in the lobby")
         filled = await _add_one_bot(s, b)
         if filled is None:
-            raise HTTPException(409, "no hay bots libres con saldo suficiente")
+            raise HTTPException(409, "no free bots with enough balance")
         return get_battle(s, battle_id)
 
     @app.post("/pack-battles/{battle_id}/join-all-bots")
@@ -1528,9 +1528,9 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(404, "Not Found")
         b = s.get(PackBattle, battle_id)
         if b is None:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
         if b.status != "lobby":
-            raise HTTPException(409, "la batalla no está en lobby")
+            raise HTTPException(409, "the battle is not in the lobby")
         added = 0
         while True:
             filled = await _add_one_bot(s, b)
@@ -1540,7 +1540,7 @@ def create_app(session_factory, chain: ChainSource,
             if filled:           # lobby completed → battle started
                 break
         if added == 0:
-            raise HTTPException(409, "no hay bots libres con saldo suficiente")
+            raise HTTPException(409, "no free bots with enough balance")
         return get_battle(s, battle_id)
 
     @app.post("/pack-battles/{battle_id}/cancel")
@@ -1548,7 +1548,7 @@ def create_app(session_factory, chain: ChainSource,
                                  s: Session = Depends(db)):
         b = s.get(PackBattle, battle_id)
         if b is None:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
         is_royale = b.mode == "royale"
         escrow_wallet_id = b.escrow_wallet_id
         escrow_address = b.escrow_address
@@ -1603,13 +1603,13 @@ def create_app(session_factory, chain: ChainSource,
         try:
             return get_battle(s, battle_id)
         except LobbyError:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
 
     @app.get("/pack-battles/{battle_id}/verify")
     async def verify_pack_battle(battle_id: str, s: Session = Depends(db)):
         b = s.get(PackBattle, battle_id)
         if b is None:
-            raise HTTPException(404, "no existe")
+            raise HTTPException(404, "battle not found")
         return verification(s, b)
 
     # ── Chat de lobby por WebSocket ───────────────────────────────────────────

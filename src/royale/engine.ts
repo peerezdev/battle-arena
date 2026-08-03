@@ -10,7 +10,7 @@ export function createRoyale(
   playerNames: string[] = ['Tú'],
 ): RoyaleState {
   if (config.numPlayers < 2 || config.numPlayers > 10) {
-    throw new Error('numPlayers debe estar entre 2 y 10')
+    throw new Error('numPlayers must be between 2 and 10')
   }
   const players: RoyalePlayer[] = Array.from({ length: config.numPlayers }, (_, i) => ({
     id: i,
