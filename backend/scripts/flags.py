@@ -28,10 +28,13 @@ import sys
 from app.config import get_settings
 from app.db import init_db, make_engine, make_session_factory
 from app.services.flags import all_flags, clear_flag, get_flag, set_flag
+from scripts._destino import anunciar
 
 
 def _session():
-    engine = make_engine(get_settings().database_url)
+    st = get_settings()
+    anunciar(st)
+    engine = make_engine(st.database_url)
     init_db(engine)
     return make_session_factory(engine)()
 
