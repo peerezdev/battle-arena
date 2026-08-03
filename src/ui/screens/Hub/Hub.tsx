@@ -26,16 +26,17 @@ export function Hub() {
           titlePlain="The first-ever NFT Battle Royale"
           titleAccent=" powered by real graded cards is here..."
           body="If you've only been into TCGs for two days, this isn't for you."
+          tail="This is gacha for the big boys."
           cta="See how it works →"
           to={NAV_ROUTES.royale}
           badge="● LIVE ROYALE"
           accent="#ff2e7e"
-          poster="/logo2.png"
-          videoWebm="/stickers/scizor-card.webm"
-          videoMov="/stickers/scizor-card.mov"
-          mediaX={70}
-          mediaY={30}
-          mediaWidth={300}
+          poster="/01-hub.png"
+          // videoWebm="/stickers/scizor-card.webm"
+          // videoMov="/stickers/scizor-card.mov"
+          mediaX={-10}
+          mediaY={-40}
+          mediaWidth={600}
         />
 
         {/* Pack Battle + Gacha — stacked banners (image on top, text below), side by side. */}
@@ -47,13 +48,14 @@ export function Hub() {
             titleAccent="Take theirs."
             body="Anyone who's played a Pack Battle knows the feeling is completely different from opening packs alone. More pressure. More adrenaline. More at stake."
             tail="Think you can handle it?"
-            cta="Enter Pack Battle →"
+            cta="Enter the lobby →"
             to={NAV_ROUTES.pack}
-            badge="1V1 · WINNER TAKES ALL"
+            badge="WINNER TAKES ALL"
             accent="#3ce8a8"
             ctaTextColor="#06221a"
-            poster="/logo2.png"
+            poster="/02-hub.png"
             mediaHeight={180}
+            mediaWidth={600}
           />
           <Banner
             layout="stacked"
@@ -62,12 +64,12 @@ export function Hub() {
             titleAccent="Straight into battle."
             body="A grail could be waiting in the next pull."
             tail="Get there before someone else does."
-            cta="Open a pack →"
+            cta="Rip a pack →"
             to={NAV_ROUTES.gacha}
-            badge="PULL → PLAY"
+            badge="PULL"
             accent="#a98bff"
             ctaTextColor="#fff"
-            poster="/logo.png"
+            poster="/03-hub.png"
             mediaHeight={180}
           />
         </div>
