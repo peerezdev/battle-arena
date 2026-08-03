@@ -17,6 +17,11 @@ Environment=APP_NETWORK=mainnet
 Environment=PRICING_SOURCE=collectorcrypt
 Environment=PYTHONUNBUFFERED=1
 
+# La SQLite nacería 644 con el umask por defecto, es decir legible por cualquier usuario local
+# —incluido el `caddy` que sirve la SPA—. Es la contabilidad de dinero real: 0027 la deja en 640,
+# para battlearena y root (que es quien hace los backups) y nadie más.
+UMask=0027
+
 # UN SOLO worker, siempre. El backend guarda estado en memoria por proceso (rate-limits,
 # el asyncio.Lock que serializa los buy-ins, el set de WebSockets del chat) y tareas de
 # fondo con asyncio.create_task. Con dos workers habría doble settle de USDC real.

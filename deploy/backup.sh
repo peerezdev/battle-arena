@@ -12,7 +12,10 @@ DB=/srv/battlearena/backend/battlearena.mainnet.db
 LOCAL_DIR=/var/backups/battlearena
 KEEP_DAYS=14
 # Remoto de rclone (configúralo con `rclone config`, p.ej. Backblaze B2). Vacío = solo local.
-RCLONE_REMOTE="${RCLONE_REMOTE:-b2:battlearena-backups}"
+# `-` y no `:-` a propósito: con `:-` un RCLONE_REMOTE="" caía igualmente al valor de abajo, así
+# que "solo local" era imposible de pedir y el rclone fallaba contra un remoto inexistente —
+# tumbando el backup y, con él, el deploy.sh que lo llama antes de tocar nada.
+RCLONE_REMOTE="${RCLONE_REMOTE-b2:battlearena-backups}"
 # Opcional: URL de healthchecks.io para que te avise si el backup DEJA de correr.
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-}"
 

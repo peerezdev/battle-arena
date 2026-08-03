@@ -8,16 +8,19 @@ Un flag AUSENTE está apagado. "No configurado" y "desactivado" son el mismo est
 Uso (desde backend/):
   PYTHONPATH=. .venv/bin/python3 scripts/flags.py list
   PYTHONPATH=. .venv/bin/python3 scripts/flags.py on auto_royale pokemon_25
+  PYTHONPATH=. .venv/bin/python3 scripts/flags.py on auto_royale pokemon_25:10
   PYTHONPATH=. .venv/bin/python3 scripts/flags.py off auto_royale
 
 Con APP_NETWORK=mainnet trabaja sobre mainnet.
 
 Flags que entiende el backend hoy:
-  auto_royale=<código de máquina>   abre una Battle Royale de la casa cuando no hay ninguna de esa
+  auto_royale=<máquina[:plazas]>    abre una Battle Royale de la casa cuando no hay ninguna de esa
                                     máquina esperando ni en juego. El lobby va SIN creador y sin
                                     cobrar a nadie: el primer jugador que entra ocupa la primera
-                                    plaza. Se abre siempre con 5 plazas, que es lo que antes se
-                                    llena.
+                                    plaza. Sin `:plazas` usa house_lobby.PLAZAS (10); el modo
+                                    admite de 5 a 10. Las plazas mueven el precio de entrada, que
+                                    sale de royale_buyin(): en pokemon_25 son 70 USDC con 5 plazas
+                                    y 135 con 10.
 """
 import argparse
 import sys
