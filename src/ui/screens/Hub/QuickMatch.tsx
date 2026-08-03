@@ -12,7 +12,7 @@ const MODE_COPY: Record<QuickMode, { name: string; lead: string; kicker?: string
     name: 'Pack Battle',
     lead: 'Jump into a',
     kicker: 'Quick match',
-    desc: 'Open a pack head-to-head — the higher pull takes both cards.',
+    desc: 'Two to four players open the same packs, one or more each. Every card adds to your total, and the highest total takes them all.',
     cta: 'Create Pack Battle',
   },
   royale: {

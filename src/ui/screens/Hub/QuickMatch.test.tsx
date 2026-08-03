@@ -46,6 +46,17 @@ describe('QuickMatch · qué texto lleva cada modo', () => {
     render(<QuickMatch mode="pack" onCreate={vi.fn()} />)
     expect(screen.getByRole('heading').textContent).toBe('Jump into a Pack Battle')
     expect(screen.getByText('Quick match')).toBeTruthy()
-    expect(screen.getByText(/higher pull takes both cards/i)).toBeTruthy()
+    expect(screen.getByText(/highest total takes them all/i)).toBeTruthy()
+  })
+
+  it('la descripción de pack no lo llama 1v1', () => {
+    // Una Pack Battle admite de 2 a 4 jugadores. Llamarla 1v1 describía mal el modo y hacía
+    // pensar que solo se juega en pareja.
+    render(<QuickMatch mode="pack" onCreate={vi.fn()} />)
+    const desc = screen.getByText(/highest total takes them all/i).textContent ?? ''
+    expect(desc).not.toMatch(/1v1|head-to-head/i)
+    expect(desc).toMatch(/two to four/i)     // cuántos caben
+    expect(desc).toMatch(/one or more/i)     // uno o varios sobres
+    expect(desc).toMatch(/adds to your total/i)   // se acumula, no es una sola carta
   })
 })
