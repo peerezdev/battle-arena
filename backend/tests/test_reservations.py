@@ -104,21 +104,40 @@ def _add_pack(session, bid, status, players=()):
     session.commit()
 
 
-def test_en_lobby_cuenta_como_partida_sin_terminar(session):
-    # Apuntado y esperando a que se llene: su dinero ya tiene destino.
+def test_royale_esperando_en_el_lobby_NO_bloquea(session):
+    # El buy-in ya salió al escrow al entrar y todavía no ha habido ningún reparto: lo que le
+    # queda en la wallet es suyo. Bloquearlo dejaba a un jugador sin tocar su dinero mientras
+    # espera a que se llene la sala, a veces durante horas.
     _add_royale(session, "r1", "lobby", players=["A"])
-    assert battle_in_progress(session, "A") == "r1"
+    assert battle_in_progress(session, "A") is None
 
 
-def test_jugandose_tambien(session):
+def test_royale_jugandose_SI_bloquea(session):
+    # Aquí está el agujero que justifica la guarda: el escrow le manda el precio de cada caja a
+    # la wallet justo antes de tirar, y ese importe no lleva reserva. Si se pudiera sacar en esa
+    # ventana, la tirada fallaría y el escrow quedaría corto a costa de los demás jugadores.
     _add_royale(session, "r2", "running", players=["A"])
     assert battle_in_progress(session, "A") == "r2"
 
 
-def test_pack_battle_igual_que_royale(session):
-    # La puerta no es solo del royale: en pack battle el dinero también sigue comprometido.
+def test_pack_bloquea_tambien_esperando_en_el_lobby(session):
+    # A diferencia del royale, en pack el buy-in NO ha salido: sigue en su wallet, y es con lo
+    # que va a pagar su caja. Dejarlo salir convierte la tirada en un fallo y la partida en
+    # anulada para todos.
+    _add_pack(session, "p0", "lobby", players=["A"])
+    assert battle_in_progress(session, "A") == "p0"
+
+
+def test_pack_jugandose_bloquea(session):
     _add_pack(session, "p1", "running", players=["A"])
     assert battle_in_progress(session, "A") == "p1"
+
+
+def test_una_pack_abierta_bloquea_aunque_la_royale_no(session):
+    # El caso mixto: se mira si hay ALGUNA partida expuesta, no la primera que aparezca.
+    _add_royale(session, "r3", "lobby", players=["A"])
+    _add_pack(session, "p2", "lobby", players=["A"])
+    assert battle_in_progress(session, "A") == "p2"
 
 
 def test_una_partida_terminada_no_bloquea(session):

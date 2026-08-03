@@ -3,7 +3,7 @@ as on-chain USDC minus reserved_total (the RPC read stays in the endpoint/wiring
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, and_, or_
 from app.models import Reservation, PackBattle, BattlePlayer
 
 
@@ -85,23 +85,35 @@ def royale_locked_total(session, wallet: str) -> int:
 
 
 def battle_in_progress(session, wallet: str) -> Optional[str]:
-    """Id de una partida a la que este wallet está apuntado y que aún no ha terminado, o None.
+    """Id de una partida de este wallet cuyo dinero está EXPUESTO, o None si no hay ninguna.
 
-    Cubre los dos estados en los que el dinero del jugador todavía tiene un destino: `lobby` (se
-    ha unido y espera a que se llene) y `running` (se está jugando).
+    Cierra el retiro solo mientras haga falta de verdad, y eso depende del modo, porque el dinero
+    vive en sitios distintos:
 
-    Existe para cerrar el retiro mientras tanto. En una royale el escrow le manda a la wallet del
-    jugador el precio de cada caja justo antes de tirar, y ese importe NO lleva reserva —el buy-in
-    ya salió al entrar, así que no hay hold que lo cubra—. Sin esta puerta, quien sondeara su
-    wallet podría sacar ese dinero en la ventana entre el reparto y la tirada: la tirada fallaría,
-    la partida se anularía, y el escrow quedaría corto justo por esa cantidad. El agujero no lo
-    paga la plataforma, lo pagan los reembolsos de los demás jugadores.
+      · pack, en `lobby` o `running` → el buy-in SIGUE en la wallet del jugador, cubierto por una
+        reserva (`reserve()` en crear/unirse). Se bloquea igualmente: es el importe con el que va
+        a pagar su caja, y dejarlo salir convierte la tirada en un fallo y la partida en anulada.
+
+      · royale, en `running` → aquí está el agujero que cerró esta guarda. El escrow le manda a la
+        wallet el precio de cada caja JUSTO ANTES de tirar, y ese importe no lleva reserva: el
+        buy-in ya salió al entrar al lobby, así que no hay hold que lo cubra. Sin esto, quien
+        sondeara su wallet lo sacaría en la ventana entre el reparto y la tirada — la tirada
+        fallaría, la partida se anularía y el escrow quedaría corto justo por esa cantidad. Ese
+        agujero no lo paga la plataforma: lo pagan los reembolsos de los DEMÁS jugadores.
+
+      · royale, en `lobby` → NO se bloquea. El buy-in ya está en el escrow y todavía no ha habido
+        ningún reparto, así que lo que le queda en la wallet es suyo y no tiene destino. Antes se
+        bloqueaba también este caso, y era de más: un jugador esperando a que se llene una royale
+        se quedaba sin poder tocar su propio dinero, a veces durante horas.
     """
+    expuesta = or_(
+        and_(PackBattle.mode != "royale", PackBattle.status.in_(_EN_JUEGO)),
+        and_(PackBattle.mode == "royale", PackBattle.status == "running"),
+    )
     return session.execute(
         select(PackBattle.id)
         .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
-        .where(BattlePlayer.player_wallet == wallet,
-               PackBattle.status.in_(_EN_JUEGO))
+        .where(BattlePlayer.player_wallet == wallet, expuesta)
         .limit(1)
     ).scalars().first()
 
