@@ -40,13 +40,14 @@ export const MOCK_CHAT: ChatMsg[] = [
   { id: 'm4', user: 'kappa', color: '#b78cff', ts: '15:52', text: 'anyone up for a royale?' },
 ]
 
-// ─── Bottom-nav / LeftRail items — shared between Hub and AppShell ────────────
+// ─── Barra inferior del MÓVIL ────────────────────────────────────────────────
+// Pese al nombre, el raíl de escritorio no sale de aquí: LeftRail tiene su propia lista. Esto lo
+// consume solo el BottomNav de AppShell.
 export const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
   { id: 'lobby',  icon: '⌂',  label: 'Home'  },
   { id: 'pack',   icon: '⚔️', label: 'Pack'  },
   { id: 'royale', icon: '👑', label: 'Royale'  },
   { id: 'gacha',  icon: '🎰', label: 'Gacha'  },
-  { id: 'winners', icon: '✦', label: 'Winners' },
   { id: 'ranks',  icon: '🏆', label: 'Ranking'  },
   { id: 'help',   icon: '?',  label: 'Help'  },
 ]
