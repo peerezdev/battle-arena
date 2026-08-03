@@ -31,3 +31,27 @@ describe('Banner · frase de cierre', () => {
     expect(container.querySelectorAll('p')).toHaveLength(1)
   })
 })
+
+
+describe('Banner · botones a la misma altura', () => {
+  it('en `stacked` el botón se empuja al fondo de la tarjeta', () => {
+    // Los dos banners de abajo del Hub van en una rejilla, así que las tarjetas ya salen igual de
+    // altas. Lo que se descuadraba era el botón: quedaba justo donde acababa su párrafo, y como
+    // Pack Battle y Gacha tienen textos de distinta longitud, cada uno caía a una altura.
+    render(<MemoryRouter><Banner {...base} layout="stacked" /></MemoryRouter>)
+    const boton = screen.getByText('Enter →').closest('a') as HTMLAnchorElement
+    expect(boton.style.marginTop).toBe('auto')
+    // Sin esto, siendo hijo de una columna flex, el botón se estiraría a todo el ancho.
+    expect(boton.style.alignSelf).toBe('flex-start')
+    // Y el bloque de texto tiene que crecer para que quede hueco que empujar.
+    const bloque = boton.parentElement as HTMLElement
+    expect(bloque.style.flex).toBe('1 1 0%')   // jsdom expande el shorthand
+    expect(bloque.style.flexDirection).toBe('column')
+  })
+
+  it('el banner ancho no se toca: ahí no hay pareja con la que cuadrar', () => {
+    render(<MemoryRouter><Banner {...base} layout="side" /></MemoryRouter>)
+    const boton = screen.getByText('Enter →').closest('a') as HTMLAnchorElement
+    expect(boton.style.marginTop).toBe('')
+  })
+})

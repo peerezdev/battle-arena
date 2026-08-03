@@ -95,7 +95,15 @@ export function Banner({
   )
 
   const copyPanel = (
-    <div style={{ padding: stacked ? '22px 24px 26px' : wide ? '36px 38px' : '26px 22px' }}>
+    // En `stacked` los banners van de dos en dos en una rejilla, así que las secciones ya salen
+    // igual de altas; lo que se descuadraba era el botón, que quedaba pegado al final de su
+    // párrafo. El bloque de texto crece hasta llenar la tarjeta y el botón se empuja al fondo
+    // (marginTop:auto, abajo), de modo que los dos caen a la misma altura por muy distinto que
+    // sea el texto de cada uno.
+    <div style={{
+      padding: stacked ? '22px 24px 26px' : wide ? '36px 38px' : '26px 22px',
+      ...(stacked ? { flex: 1, display: 'flex', flexDirection: 'column' } : null),
+    }}>
       <span style={{ fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, letterSpacing: '.12em', color: accent }}>{kicker}</span>
       <h2 style={{ margin: '10px 0 14px', fontFamily: FONTS.display, fontSize: stacked ? 22 : wide ? 26 : 22, fontWeight: 700, lineHeight: 1.25, color: COLORS.text }}>
         {titlePlain} {titleAccent && <span style={{ color: accent }}>{titleAccent}</span>}
@@ -109,6 +117,9 @@ export function Banner({
       <Link to={to} style={{
         display: 'inline-flex', alignItems: 'center', padding: '12px 22px', borderRadius: 12,
         background: accent, color: ctaTextColor, fontFamily: FONTS.display, fontSize: 14, fontWeight: 700,
+        // `auto` se come todo el hueco sobrante y deja el botón abajo del todo; `flex-start` evita
+        // que, siendo hijo de una columna flex, se estire a lo ancho de la tarjeta.
+        ...(stacked ? { marginTop: 'auto', alignSelf: 'flex-start' } : null),
       }}>{cta}</Link>
     </div>
   )
