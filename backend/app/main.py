@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from . import log_redaccion
 from .config import get_settings
 from .db import make_engine, make_session_factory, init_db
 from .privy import PrivyVerifier, PrivyAuthError
@@ -210,6 +211,10 @@ def create_app(session_factory, chain: ChainSource,
                referral_payout_wallet_id: str = "",
                referral_payout_address: str = "",
                referral_claim_min_base_units: int = 5_000_000) -> FastAPI:
+    # Antes de que se sirva la primera petición: el log de acceso de uvicorn escribe la URL
+    # entera, y el token del chat viaja en la query string. Ver app/log_redaccion.py.
+    log_redaccion.instalar()
+
     app = FastAPI(title="Battle Arena — Backend")
 
     # Wallets allowed to CREATE Battle Royale (empty = open to all). Captured by the
