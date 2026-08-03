@@ -103,7 +103,11 @@ describe('useRoyaleReveal', () => {
     act(() => { result.current.onCardShown() })                    // A's ceremony lands → reveal A
     expect(result.current.stagingWallet).toBe('B')                 // then B
     act(() => { result.current.onCardShown() })                    // B lands → round complete, last, settled
-    act(() => { vi.advanceTimersByTime(0) })                       // effect runs → done
+    // La última ronda pasa por el cartel del eliminado como cualquier otra; antes saltaba al
+    // resultado sin anunciar quién había caído.
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
+    expect(result.current.phase).toBe('elimination')
+    act(() => { vi.advanceTimersByTime(ELIM_SHOW_MS) })
     expect(result.current.phase).toBe('done')
     expect(onComplete).toHaveBeenCalledTimes(1)
   })
@@ -351,5 +355,62 @@ describe('engancharse al directo', () => {
     const avanzado = { ...enCurso, rounds: [...enCurso.rounds] }
     rerender({ vm: avanzado })
     expect(result.current.revealRound).toBe(2)   // el poll no lo ha reseteado
+  })
+})
+
+
+// 2 jugadores que EMPATAN en la última ronda: los dos a 100, y la semilla eligió a B.
+// Es el caso que se pidió y el que más falta hace explicar: quien pierde un empate se queda sin
+// saber por qué perdió él y no el otro.
+const vmEmpateFinal: RevealVM = {
+  mode: 'royale', status: 'settled', winner: 'A', meWallet: 'B',
+  players: [
+    { wallet: 'A', isMe: false, accumulatedValue: 100, eliminatedRound: null, cards: [], total: 100 },
+    { wallet: 'B', isMe: true, accumulatedValue: 100, eliminatedRound: 1, cards: [], total: 100 },
+  ],
+  rounds: [{ roundNumber: 1, eliminatedWallet: 'B',
+             cards: [card('A', false, 100, 'nA1'), card('B', true, 100, 'nB1')] }],
+  potValue: 200, machines: ['m'], buybackTotal: 0, entry: 0,
+}
+
+describe('useRoyaleReveal · la última ronda también tiene ceremonia', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('un empate en la ÚLTIMA ronda enseña la ruleta', () => {
+    // Era el fallo: `isLastRound` cortaba antes de decidir la fase y saltaba directo a 'done',
+    // así que justo la ronda que decide la partida se quedaba sin explicación.
+    const { result } = renderHook(() => useRoyaleReveal(vmEmpateFinal, { reducedMotion: false, onComplete: vi.fn() }))
+    act(() => { result.current.onCardShown() })
+    act(() => { result.current.onCardShown() })
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
+
+    expect(result.current.phase).toBe('tieBreak')
+    expect([...result.current.tiedWallets].sort()).toEqual(['A', 'B'])
+    expect(result.current.eliminatedReveal).toBe('B')
+  })
+
+  it('y cuando la ruleta aterriza, va al resultado (no a una ronda que no existe)', () => {
+    const { result } = renderHook(() => useRoyaleReveal(vmEmpateFinal, { reducedMotion: false, onComplete: vi.fn() }))
+    act(() => { result.current.onCardShown() })
+    act(() => { result.current.onCardShown() })
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
+    act(() => { vi.advanceTimersByTime(spinDurationMs(['A', 'B'], 'B') + ELIM_SHOW_MS) })
+
+    expect(result.current.phase).toBe('done')   // NO 'roundBreak': no hay ronda siguiente
+  })
+
+  it('sin empate, la última ronda anuncia igualmente al eliminado antes del resultado', () => {
+    // La misma ceremonia que cualquier otra ronda: quién cae es el resultado de la ronda.
+    const { result } = renderHook(() => useRoyaleReveal(vm2, { reducedMotion: false, onComplete: vi.fn() }))
+    act(() => { result.current.onCardShown() })
+    act(() => { result.current.onCardShown() })
+    act(() => { vi.advanceTimersByTime(ELIM_BEAT_MS) })
+
+    expect(result.current.phase).toBe('elimination')
+    expect(result.current.eliminatedReveal).toBe('B')
+
+    act(() => { vi.advanceTimersByTime(ELIM_SHOW_MS) })
+    expect(result.current.phase).toBe('done')
   })
 })

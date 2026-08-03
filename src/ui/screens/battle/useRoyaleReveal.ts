@@ -179,19 +179,23 @@ export function useRoyaleReveal(
       return () => clearTimeout(t)
     }
 
-    if (phase === 'tieBreak') {
-      // La fase dura lo que dure el giro MÁS el rato de aterrizaje: con un tiempo fijo, a partir
-      // de 5 empatados la ruleta seguía girando cuando la fase ya había acabado y el eliminado
-      // no se llegaba a ver. Ahora el cartel siempre se sostiene ELIM_SHOW_MS sobre el caído.
-      const t = setTimeout(() => { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }, tieSpinMs + ELIM_SHOW_MS)
-      return () => clearTimeout(t)
-    }
-
-    if (phase === 'elimination') {
-      // Sin empate no hay nada que sortear, pero el eliminado se anuncia igual antes de la cuenta
-      // atrás: quién cae es el resultado de la ronda, y pasar directo al "Round N starts in" lo
-      // dejaba enterrado en un cambio de chip que se pierde de vista.
-      const t = setTimeout(() => { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }, ELIM_SHOW_MS)
+    // Las dos fases de cierre de ronda se resuelven igual; solo cambia cuánto dura el cartel.
+    //
+    //  · tieBreak dura el giro MÁS el rato de aterrizaje: con un tiempo fijo, a partir de 5
+    //    empatados la ruleta seguía girando cuando la fase ya había acabado y el eliminado no se
+    //    llegaba a ver. Así el cartel siempre se sostiene ELIM_SHOW_MS sobre el caído.
+    //  · elimination no tiene nada que sortear, pero anuncia al eliminado igual: quién cae es el
+    //    resultado de la ronda, y pasar directo al "Round N starts in" lo dejaba enterrado.
+    if (phase === 'tieBreak' || phase === 'elimination') {
+      const duracion = (phase === 'tieBreak' ? tieSpinMs : 0) + ELIM_SHOW_MS
+      // En la ÚLTIMA ronda no hay siguiente: el cartel es lo último antes del resultado, y solo
+      // se pasa cuando la batalla está liquidada. Si aún no lo está se sostiene el cartel; el
+      // efecto vuelve a correr en cuanto `settled` cambie.
+      if (isLastRound && !settled) return
+      const t = setTimeout(() => {
+        if (isLastRound) setPhase('done')
+        else { setPhase('roundBreak'); setCountdown(COUNTDOWN_FROM) }
+      }, duracion)
       return () => clearTimeout(t)
     }
 
@@ -199,13 +203,9 @@ export function useRoyaleReveal(
     // ceremony to land via onCardShown). Nothing to schedule until the round completes.
     if (!roundComplete) return
 
-    // round fully revealed
-    if (isLastRound) {
-      if (settled) setPhase('done')
-      return   // else hold on the fully-revealed final round until the battle settles
-    }
-    // A tie for last → run the random-pick roulette; otherwise announce the eliminated player
-    // straight away. Las dos ramas acaban enseñando al caído antes de la cuenta atrás.
+    // Round fully revealed. La última ronda pasa por la MISMA ceremonia que las demás: era el
+    // fallo — cortaba aquí y saltaba a 'done', así que justo la ronda que decide la partida se
+    // quedaba sin cartel, y un empate ahí dejaba al que perdía sin saber por qué perdió él.
     const next: RevealPhase = isTie ? 'tieBreak' : 'elimination'
     const t = setTimeout(() => setPhase(next), ELIM_BEAT_MS)
     return () => clearTimeout(t)
