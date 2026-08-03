@@ -29,3 +29,23 @@ describe('QuickMatch royale create gate', () => {
     expect(screen.queryByText(/create battle royale/i)).toBeNull()
   })
 })
+
+
+describe('QuickMatch · qué texto lleva cada modo', () => {
+  it('royale: solo el titular, y dice "the next"', () => {
+    // Encima de este bloque va RoyaleDemoNotice, que ya presenta el modo entero. El rótulo
+    // "Quick match" y la descripción repetían lo mismo en la misma pantalla.
+    render(<QuickMatch mode="royale" onCreate={vi.fn()} />)
+    expect(screen.getByRole('heading').textContent).toBe('Jump into the next Battle Royale')
+    expect(screen.queryByText('Quick match')).toBeNull()
+    expect(screen.queryByText(/lowest value drops each round/i)).toBeNull()
+  })
+
+  it('pack conserva rótulo, titular y descripción', () => {
+    // Ahí no hay nada encima que lo explique, así que el texto sigue haciendo falta.
+    render(<QuickMatch mode="pack" onCreate={vi.fn()} />)
+    expect(screen.getByRole('heading').textContent).toBe('Jump into a Pack Battle')
+    expect(screen.getByText('Quick match')).toBeTruthy()
+    expect(screen.getByText(/higher pull takes both cards/i)).toBeTruthy()
+  })
+})

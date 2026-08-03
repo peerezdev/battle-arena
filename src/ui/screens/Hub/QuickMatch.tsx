@@ -3,15 +3,23 @@ import { useReducedMotion } from '../../useReducedMotion'
 
 type QuickMode = 'pack' | 'royale'
 
-const MODE_COPY: Record<QuickMode, { name: string; desc: string; cta: string }> = {
+// `kicker` y `desc` son opcionales: en Battle Royale este bloque va justo DEBAJO de
+// RoyaleDemoNotice, que ya presenta el modo y pide ver la demo antes de pagar. Repetir aquí el
+// rótulo y la descripción era decir lo mismo dos veces en la misma pantalla, así que el royale se
+// queda solo con el titular.
+const MODE_COPY: Record<QuickMode, { name: string; lead: string; kicker?: string; desc?: string; cta: string }> = {
   pack: {
     name: 'Pack Battle',
+    lead: 'Jump into a',
+    kicker: 'Quick match',
     desc: 'Open a pack head-to-head — the higher pull takes both cards.',
     cta: 'Create Pack Battle',
   },
   royale: {
     name: 'Battle Royale',
-    desc: 'Up to 10 players open packs in rounds — the lowest value drops each round. Last one standing takes the pot.',
+    // "the next" y no "a": aquí abajo están los lobbies abiertos, así que se entra al siguiente,
+    // no a uno cualquiera.
+    lead: 'Jump into the next',
     cta: 'Create Battle Royale',
   },
 }
@@ -36,18 +44,20 @@ export function QuickMatch({
   return (
     <div style={{ padding: 'clamp(6px,1vw,14px) 2px' }}>
         {/* Kicker */}
-        <div
-          style={{
-            fontFamily: FONTS.mono,
-            fontSize: 10.5,
-            letterSpacing: '0.18em',
-            color: COLORS.violet,
-            textTransform: 'uppercase',
-            marginBottom: 10,
-          }}
-        >
-          Quick match
-        </div>
+        {copy.kicker && (
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 10.5,
+              letterSpacing: '0.18em',
+              color: COLORS.violet,
+              textTransform: 'uppercase',
+              marginBottom: 10,
+            }}
+          >
+            {copy.kicker}
+          </div>
+        )}
 
         {/* Heading */}
         <h2
@@ -56,12 +66,12 @@ export function QuickMatch({
             fontWeight: 800,
             fontSize: 32,
             letterSpacing: '-0.01em',
-            marginBottom: 10,
+            marginBottom: copy.desc ? 10 : 22,
             color: COLORS.text,
             maxWidth: 520,
           }}
         >
-          Jump into a{' '}
+          {copy.lead}{' '}
           <span
             style={{
               background: GRADIENT,
@@ -75,16 +85,18 @@ export function QuickMatch({
         </h2>
 
         {/* Description */}
-        <p
-          style={{
-            color: COLORS.muted,
-            fontSize: 13.5,
-            marginBottom: 22,
-            maxWidth: 460,
-          }}
-        >
-          {copy.desc}
-        </p>
+        {copy.desc && (
+          <p
+            style={{
+              color: COLORS.muted,
+              fontSize: 13.5,
+              marginBottom: 22,
+              maxWidth: 460,
+            }}
+          >
+            {copy.desc}
+          </p>
+        )}
 
         {/* CTA row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>

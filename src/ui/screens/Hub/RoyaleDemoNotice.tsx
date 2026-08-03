@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { COLORS, FONTS } from '../../theme'
 
 // Ruta del vídeo dentro de public/. Cambiar aquí si el fichero se renombra o se mueve.
-export const DEMO_VIDEO_SRC = '/royale-demo.mp4'
+export const DEMO_VIDEO_SRC = '/battleroyale-demo.mp4'
 
 const PINK = '#ff2e7e'
 const PINK_L = '#ff6ba4'

@@ -58,3 +58,15 @@ describe('RoyaleDemoNotice', () => {
     expect(container.querySelector('video')).toBeNull()
   })
 })
+
+
+describe('DEMO_VIDEO_SRC', () => {
+  it('apunta a un fichero que EXISTE en public/', async () => {
+    // El test de arriba compara el src del <video> contra esta misma constante, así que pasaba
+    // con cualquier ruta — y de hecho apuntaba a /royale-demo.mp4, que no existe: el modal se
+    // abría y el vídeo no cargaba. Compararlo contra el disco es lo único que lo detecta.
+    const { existsSync } = await import('node:fs')
+    expect(DEMO_VIDEO_SRC.startsWith('/')).toBe(true)   // ruta desde public/, no relativa
+    expect(existsSync(`public${DEMO_VIDEO_SRC}`)).toBe(true)
+  })
+})
