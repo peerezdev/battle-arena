@@ -1,15 +1,18 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { COLORS, FONTS, GRADIENT } from '../theme'
 
-// First-visit onboarding: a Gimmighoul guide + speech bubble walks a new
-// collector through the four things the app does (packs, battle, ranking).
+// First-visit onboarding: a Gimmighoul guide + speech bubble walks a new collector through the
+// app. Empieza por la WALLET a propósito: aquí se juega con dinero real y lo primero que hay que
+// entender es de quién es y cómo entra y sale, antes de enseñar nada que cueste.
 // Purely presentational — the parent owns the "seen" flag and closes it.
 
-type AccentKey = 'green' | 'pink' | 'amber'
+type AccentKey = 'green' | 'pink' | 'amber' | 'violet'
 const ACCENTS: Record<AccentKey, { accent: string; rgb: string }> = {
-  green: { accent: '#00ffc4', rgb: '0,255,196' },
-  pink:  { accent: '#ff2e97', rgb: '255,46,151' },
-  amber: { accent: '#f5c542', rgb: '245,197,66' },
+  green:  { accent: '#00ffc4', rgb: '0,255,196' },
+  pink:   { accent: '#ff2e97', rgb: '255,46,151' },
+  amber:  { accent: '#f5c542', rgb: '245,197,66' },
+  // El violeta del gacha, para que el paso lleve el color con el que se va a encontrar.
+  violet: { accent: '#a98bff', rgb: '169,139,255' },
 }
 
 const svg = (children: ReactNode) => (
@@ -21,6 +24,8 @@ const ICONS = {
   pack: svg(<><path d="M12 3v4" /><path d="M5 8.5 12 5l7 3.5V17l-7 3.5L5 17z" /><path d="M5 8.5 12 12l7-3.5" /><path d="M12 12v8.5" /></>),
   swords: svg(<><path d="M14.5 17.5 3 6V3h3l11.5 11.5" /><path d="m13 19 6-6" /><path d="m16 16 4 4" /><path d="m19 21 2-2" /><path d="M9.5 6.5 6.5 9.5" /></>),
   trophy: svg(<><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></>),
+  wallet: svg(<><rect x="2.5" y="5.5" width="19" height="13" rx="2.5" /><path d="M2.5 10h19" /><circle cx="17.5" cy="14.5" r="1.1" /></>),
+  coin: svg(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v9" /><path d="M14.5 9.6a2.6 2.6 0 0 0-2.5-1.1c-1.5 0-2.6.8-2.6 1.9 0 2.4 5.2 1.2 5.2 3.5 0 1.1-1.1 1.9-2.6 1.9a2.6 2.6 0 0 1-2.5-1.1" /></>),
 }
 
 type Chip = { label: string; dot: AccentKey }
@@ -28,28 +33,34 @@ type Step = { icon: keyof typeof ICONS; kicker: string; title: string; body: str
 
 const STEPS: Step[] = [
   {
-    icon: 'logo', kicker: 'WELCOME', accent: 'pink',
-    title: 'Welcome to Collector Arena',
-    body: 'The head-to-head card arena. Open real graded packs, battle other collectors, and keep the highest-value pulls.',
-    chips: [{ label: 'REAL GRADED CARDS', dot: 'green' }, { label: 'WINNER TAKES ALL', dot: 'pink' }],
+    icon: 'wallet', kicker: 'FIRST · YOUR WALLET', accent: 'green',
+    title: 'A wallet, without the wallet part',
+    body: 'Signing in creates a Solana wallet for you. No seed phrase to write down, nothing to install. Deposit USDC into it to play, and withdraw to any Solana address when you are not in a battle.',
+    chips: [{ label: 'NO SEED PHRASE', dot: 'green' }, { label: 'USDC ON SOLANA', dot: 'green' }],
   },
   {
-    icon: 'pack', kicker: 'STEP 1 · PACKS', accent: 'green',
-    title: 'Open real graded packs',
-    body: 'Head to Gacha, pick a machine, and rip authenticated graded cards. Watch the reveal live — then keep them or sell back instantly.',
-    chips: [{ label: 'LIVE REVEAL', dot: 'green' }, { label: 'KEEP OR SELL', dot: 'amber' }],
+    icon: 'trophy', kicker: 'STEP 1 · BATTLE ROYALE', accent: 'pink',
+    title: 'Outlast 9 other collectors',
+    body: 'Five to ten players open packs in rounds. After each round the lowest running total is knocked out, and the last one standing takes every card on the table. Your buy-in covers all the rounds up front, not just your first pull.',
+    chips: [{ label: '5–10 PLAYERS', dot: 'pink' }, { label: 'LAST ONE STANDING', dot: 'pink' }],
   },
   {
-    icon: 'swords', kicker: 'STEP 2 · BATTLE', accent: 'pink',
-    title: 'Battle head-to-head',
-    body: 'Jump into a Pack Battle (2–4) or a Battle Royale (5–10). Everyone opens at once — the highest pull takes the pot.',
-    chips: [{ label: 'PACK BATTLE · 2–4', dot: 'pink' }, { label: 'ROYALE · 5–10', dot: 'green' }],
+    icon: 'swords', kicker: 'STEP 2 · PACK BATTLE', accent: 'green',
+    title: 'Same packs, everyone at once',
+    body: 'Two to four players open the same packs at the same time, one pack or several each. Every card adds to your total, and the highest total takes them all. Shorter than a Royale and it starts as soon as the seats fill.',
+    chips: [{ label: '2–4 PLAYERS', dot: 'green' }, { label: 'WINNER TAKES ALL', dot: 'pink' }],
   },
   {
-    icon: 'trophy', kicker: 'STEP 3 · RANKING', accent: 'amber',
-    title: 'Climb the Ranking',
-    body: 'Every win earns Gimmighouls and pushes you up the seasonal Ranking. Top collectors rise to the top of the board.',
-    chips: [{ label: 'EARN GIMMIGHOULS', dot: 'amber' }, { label: 'SEASONAL RANKS', dot: 'green' }],
+    icon: 'pack', kicker: 'STEP 3 · GACHA', accent: 'violet',
+    title: 'Or just open packs',
+    body: 'Pick a machine and rip authenticated graded cards on your own, no opponent and no platform fee. Every card is a real NFT that lands in your wallet: keep it, sell it back instantly, or take it into a battle.',
+    chips: [{ label: 'REAL GRADED CARDS', dot: 'violet' }, { label: 'KEEP OR SELL', dot: 'amber' }],
+  },
+  {
+    icon: 'coin', kicker: 'STEP 4 · GIMMIGHOULS', accent: 'amber',
+    title: 'Points for showing up',
+    body: 'You earn Gimmighouls just by playing: 0.1 per dollar in battles, 0.05 in gacha. They are not a currency and they never touch your odds. They track how much you have played and move you up the ranking.',
+    chips: [{ label: 'EARNED BY PLAYING', dot: 'amber' }, { label: 'FEEDS THE RANKING', dot: 'green' }],
   },
 ]
 
