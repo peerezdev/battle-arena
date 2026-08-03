@@ -35,8 +35,8 @@ export function DemoPicker({ onClose, onPick }: { onClose: () => void; onPick: (
         </div>
         <div style={{ fontSize: 13, color: COLORS.muted, marginBottom: 18 }}>Try a battle with simulated pulls — no funds spent.</div>
         <div style={{ display: 'flex', gap: 12 }}>
-          <DemoCard icon={SWORDS} name="Pack Battle" sub="1v1 · higher pull wins" accent={COLORS.green} onClick={() => onPick('pack')} />
-          <DemoCard icon={CROWN} name="Battle Royale" sub="10 players · last one wins" accent={COLORS.violet} onClick={() => onPick('royale')} />
+          <DemoCard icon={SWORDS} name="Pack Battle" sub="2-4 players" accent={COLORS.green} onClick={() => onPick('pack')} />
+          <DemoCard icon={CROWN} name="Battle Royale" sub="5-10 players" accent={COLORS.violet} onClick={() => onPick('royale')} />
         </div>
       </div>
     </div>
