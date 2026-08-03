@@ -19,13 +19,13 @@ async def register_match(session: Session, chain: ChainSource, creator: str, bat
     try:
         bs = await chain.get_battle(battle_pubkey)
     except BattleNotFound:
-        raise MatchError("la batalla no existe on-chain")
+        raise MatchError("the battle does not exist on-chain")
     if bs["phase"] != "Created":
-        raise MatchError(f"la batalla no está en Created (phase={bs['phase']})")
+        raise MatchError(f"the battle is not in Created (phase={bs['phase']})")
     if bs["player_a"] != creator:
-        raise MatchError("el creador no coincide con player_a on-chain")
+        raise MatchError("the creator does not match player_a on-chain")
     if session.get(Match, battle_pubkey) is not None:
-        raise MatchError("la partida ya está registrada")
+        raise MatchError("the battle is already registered")
     get_or_create_user(session, creator, elo_start)
     m = Match(battle_pubkey=battle_pubkey, creator=creator, stake=bs["stake"],
               min_elo=min_elo, max_elo=max_elo, status="open")
@@ -66,11 +66,11 @@ async def sync_match(session: Session, chain: ChainSource, battle_pubkey: str,
                      elo_start: int, k: int) -> Match:
     m = session.get(Match, battle_pubkey, with_for_update=True)
     if m is None:
-        raise MatchError("partida no registrada")
+        raise MatchError("battle not registered")
     try:
         bs = await chain.get_battle(battle_pubkey)
     except BattleNotFound:
-        raise MatchError("la batalla no existe on-chain")
+        raise MatchError("the battle does not exist on-chain")
 
     if bs["player_b"] and m.status == "open":
         m.opponent = bs["player_b"]
@@ -96,7 +96,7 @@ async def sync_match(session: Session, chain: ChainSource, battle_pubkey: str,
         elif bs["winner"] == b.wallet:
             score_a, res_a, res_b = 0.0, "loss", "win"
         else:
-            raise MatchError(f"estado on-chain inconsistente: winner {bs['winner']} no es ninguno de los jugadores")
+            raise MatchError(f"inconsistent on-chain state: winner {bs['winner']} is not one of the players")
 
         before_a, before_b = a.elo, b.elo
         a.elo, b.elo = updated_ratings(a.elo, b.elo, score_a, k=k)

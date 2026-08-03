@@ -4,13 +4,13 @@ import { hashAllocation } from './hash'
 import { solidez } from './solidez'
 
 export function createMatch(cardA: Card, cardB: Card, config: MatchConfig): MatchState {
-  if (cardA.valueUsd <= 0 || cardB.valueUsd <= 0) throw new Error('valueUsd debe ser > 0')
+  if (cardA.valueUsd <= 0 || cardB.valueUsd <= 0) throw new Error('valueUsd must be > 0')
   const high = cardA.valueUsd >= cardB.valueUsd ? cardA.valueUsd : cardB.valueUsd
   const low = cardA.valueUsd >= cardB.valueUsd ? cardB.valueUsd : cardA.valueUsd
   const ratio = low > 0 ? high / low : Infinity
 
   if (config.mode === 'ranked' && ratio > config.valueRatioCap) {
-    throw new Error(`Matchup rechazado: ratio de valor ${ratio.toFixed(2)} > cap ${config.valueRatioCap}`)
+    throw new Error(`Matchup rejected: value ratio ${ratio.toFixed(2)} > cap ${config.valueRatioCap}`)
   }
 
   const edge = computeEdge(high, low, config)
@@ -43,9 +43,9 @@ function allocTotal(a: Allocation): number {
 }
 
 export function commit(state: MatchState, player: Player, hash: string): MatchState {
-  if (state.phase !== 'committing') throw new Error('No se puede commitear fuera de la fase committing')
-  if (player === 'a' && state.rounds[state.round].commitA) throw new Error('Jugador a ya ha commiteado')
-  if (player === 'b' && state.rounds[state.round].commitB) throw new Error('Jugador b ya ha commiteado')
+  if (state.phase !== 'committing') throw new Error('Cannot commit outside the committing phase')
+  if (player === 'a' && state.rounds[state.round].commitA) throw new Error('Player a has already committed')
+  if (player === 'b' && state.rounds[state.round].commitB) throw new Error('Player b has already committed')
   const round = { ...state.rounds[state.round] }
   if (player === 'a') round.commitA = hash
   else round.commitB = hash
@@ -61,20 +61,20 @@ export async function reveal(
   allocation: Allocation,
   salt: string,
 ): Promise<MatchState> {
-  if (state.phase !== 'revealing') throw new Error('No se puede revelar fuera de la fase revealing')
+  if (state.phase !== 'revealing') throw new Error('Cannot reveal outside the revealing phase')
   // FIX I (engine #1): Guard against double-reveal by the same player in the same round.
-  if (player === 'a' && state.rounds[state.round].revealA) throw new Error('Jugador a ya ha revelado')
-  if (player === 'b' && state.rounds[state.round].revealB) throw new Error('Jugador b ya ha revelado')
+  if (player === 'a' && state.rounds[state.round].revealA) throw new Error('Player a has already revealed')
+  if (player === 'b' && state.rounds[state.round].revealB) throw new Error('Player b has already revealed')
   if (allocation.apertura < 0 || allocation.choque < 0 || allocation.remate < 0)
-    throw new Error('Asignación inválida: valores negativos')
+    throw new Error('Invalid allocation: negative values')
   if (!Number.isInteger(allocation.apertura) || !Number.isInteger(allocation.choque) || !Number.isInteger(allocation.remate))
-    throw new Error('Asignación inválida: debe ser entera')
+    throw new Error('Invalid allocation: must be a whole number')
   if (allocTotal(allocation) > availableEnergy(state, player))
-    throw new Error('Asignación excede el disponible')
+    throw new Error('Allocation exceeds the available energy')
 
   const expected = player === 'a' ? state.rounds[state.round].commitA : state.rounds[state.round].commitB
   const actual = await hashAllocation(allocation, salt)
-  if (actual !== expected) throw new Error('El hash del reveal no casa con el commit')
+  if (actual !== expected) throw new Error('The reveal hash does not match the commit')
 
   const round = { ...state.rounds[state.round] }
   if (player === 'a') { round.revealA = { ...allocation }; round.saltA = salt }
@@ -98,9 +98,9 @@ function resolveFront(
 }
 
 export function resolveRound(state: MatchState): MatchState {
-  if (state.phase !== 'revealing') throw new Error('La ronda no está lista para resolverse')
+  if (state.phase !== 'revealing') throw new Error('The round is not ready to be resolved')
   const r = state.rounds[state.round]
-  if (!r.revealA || !r.revealB) throw new Error('Faltan reveals para resolver')
+  if (!r.revealA || !r.revealB) throw new Error('Missing reveals to resolve the round')
 
   const solA = solidez(state.cardA)
   const solB = solidez(state.cardB)
@@ -149,7 +149,7 @@ export function resolveBattle(state: MatchState): MatchState {
 }
 
 export function nextRound(state: MatchState): MatchState {
-  if (state.phase !== 'roundResolved') throw new Error('nextRound requiere fase roundResolved')
+  if (state.phase !== 'roundResolved') throw new Error('nextRound requires the roundResolved phase')
   const rounds = [...state.rounds, {}]
   return { ...state, round: state.round + 1, rounds, phase: 'committing' }
 }

@@ -23,10 +23,12 @@ from app.db import init_db, make_engine, make_session_factory
 from app.models import HiddenMachine
 from app.services.gacha import GachaService
 from app.services.machine_visibility import hidden_codes, hide, show
+from scripts._destino import anunciar
 
 
 def _session_factory():
     st = get_settings()
+    anunciar(st)
     engine = make_engine(st.database_url)
     init_db(engine)
     return make_session_factory(engine), st

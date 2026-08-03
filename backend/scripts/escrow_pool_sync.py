@@ -27,6 +27,7 @@ from app.config import get_settings
 from app.db import make_engine, make_session_factory, init_db
 from app.models import EscrowWallet, PackBattle
 from app.services.escrow_pool import EstadoDesconocido, motivo_retencion
+from scripts._destino import anunciar
 
 GO = "--go" in sys.argv
 VIVAS = ("lobby", "running")
@@ -38,6 +39,7 @@ def _log(m: str = "") -> None:
 
 async def main() -> None:
     st = get_settings()
+    anunciar(st)
     engine = make_engine(st.database_url)
     init_db(engine)                     # crea escrow_wallets si aún no existe
     s = make_session_factory(engine)()

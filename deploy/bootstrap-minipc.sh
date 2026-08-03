@@ -9,6 +9,7 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-}"
+BRANCH="${BRANCH:-master}"
 ROOT=/srv/battlearena
 USER=battlearena
 
@@ -20,11 +21,15 @@ say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 say "Paquetes base"
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-	git curl ca-certificates gnupg ufw sqlite3 python3-venv rclone jq
+	git curl ca-certificates gnupg ufw sqlite3 python3-venv rclone jq acl
 
-say "Node 20"
-if ! command -v node >/dev/null || [ "$(node -v | cut -c2-3)" -lt 20 ]; then
-	curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+say "Node 22"
+# Vite 8 exige ^20.19 || >=22.12, así que la 20.x que sirva nodesource se queda al filo:
+# fijamos la 22, que es con la que se valida el build. El major se saca con sed y no con
+# `cut -c2-3`, que leía "2." en un hipotético v2 y comparaba mal a partir de tres dígitos.
+node_major() { node -v 2>/dev/null | sed 's/^v//; s/\..*//'; }
+if ! command -v node >/dev/null || [ "$(node_major)" -lt 22 ]; then
+	curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 	DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nodejs
 fi
 node -v
@@ -66,7 +71,11 @@ if [ -d "$ROOT/.git" ]; then
 else
 	[ -n "$REPO_URL" ] || { echo "Falta REPO_URL=... en el entorno"; exit 1; }
 	# El home del usuario ya existe: clona dentro sin borrarlo.
-	sudo -u "$USER" -H git clone "$REPO_URL" "$ROOT/.repo-tmp"
+	# -b master explícito: `git clone` a secas trae la rama por defecto del remoto, que puede
+	# ser cualquier otra —y si no lleva deploy/, este script muere en el cp del Caddyfile.
+	# Además deploy.sh hace `pull --ff-only` sobre la rama que quede puesta, así que el
+	# servidor seguiría esa rama para siempre.
+	sudo -u "$USER" -H git clone -b "$BRANCH" "$REPO_URL" "$ROOT/.repo-tmp"
 	shopt -s dotglob
 	mv "$ROOT/.repo-tmp"/* "$ROOT"/
 	shopt -u dotglob
@@ -93,6 +102,16 @@ fi
 say "Caddy: configuración de túnel"
 cp "$ROOT/deploy/Caddyfile.tunnel" /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile
+# `apt install caddy` deja el servicio arrancado con SU config por defecto: sin este recargado,
+# Caddy sigue sirviendo /usr/share/caddy y la comprobación de esta fase engaña (responde 200,
+# pero es la página de bienvenida, no la app).
+systemctl reload-or-restart caddy
+
+# Caddy corre como usuario `caddy` y `adduser --system --home` deja $ROOT en 750: sin esto no
+# puede ni atravesar el directorio y toda la SPA responde 403. Se concede solo `x` (atravesar),
+# no `r`: llega a dist/ —que ya es legible por todos— pero no puede listar $ROOT ni leer la
+# SQLite, que es la contabilidad.
+setfacl -m u:caddy:x "$ROOT"
 
 say "Servicios systemd (instalados, aún NO arrancados)"
 cp "$ROOT/deploy/systemd/"*.service /etc/systemd/system/

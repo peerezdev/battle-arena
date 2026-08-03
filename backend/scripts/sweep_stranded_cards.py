@@ -35,6 +35,7 @@ from app.services.nft_transfer import (UnsupportedNftStandard, build_transfer, n
                                        submit_signed_tx)
 from app.services.pack_orchestration import fetch_latest_blockhash, sol_balance
 from app.services.privy_signer import PrivySigner
+from scripts._destino import anunciar
 
 GO = "--go" in sys.argv
 ONLY = None
@@ -109,6 +110,7 @@ async def _entregar(s, st, signer, pull, battle) -> str:
 
 async def main() -> None:
     st = get_settings()
+    anunciar(st)
     s = make_session_factory(make_engine(st.database_url))()
     signer = PrivySigner(app_id=st.privy_app_id, app_secret=st.privy_app_secret,
                          auth_key_pem=st.privy_auth_key, cluster_caip2=st.privy_solana_caip2)

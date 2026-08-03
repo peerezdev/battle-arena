@@ -10,7 +10,9 @@ set -euo pipefail
 
 ROOT=/srv/battlearena
 USER=battlearena
-DOMAIN="${DOMAIN:-battlearena.tld}"
+# Sin valor por defecto: uno inventado (battlearena.tld) hacía que el healthcheck consultara un
+# dominio ajeno y diera "Deploy OK" sin haber comprobado nada de esta instalación.
+DOMAIN="${DOMAIN:?Falta DOMAIN=tu-dominio.tld en el entorno}"
 
 # -H fija HOME al del usuario del servicio: sin él npm intenta escribir su caché en el
 # home de root y falla.

@@ -83,7 +83,7 @@ describe('commit + reveal', () => {
     const hA = await hashAllocation(allocA, 'sA')
     s = commit(s, 'a', hA)
     s = commit(s, 'b', 'hB')
-    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/disponible/i)
+    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/exceeds/i)
   })
 
   it('rechaza asignación con valores negativos', async () => {
@@ -92,7 +92,7 @@ describe('commit + reveal', () => {
     const hA = await hashAllocation(allocA, 'sA')
     s = commit(s, 'a', hA)
     s = commit(s, 'b', 'hB')
-    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/negativ|inválid/i)
+    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/negative|invalid/i)
   })
 
   it('rechaza asignación con valores no enteros', async () => {
@@ -101,13 +101,13 @@ describe('commit + reveal', () => {
     const hA = await hashAllocation(allocA, 'sA')
     s = commit(s, 'a', hA)
     s = commit(s, 'b', 'hB')
-    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/entera/i)
+    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/whole number/i)
   })
 
   it('rechaza doble commit del mismo jugador', () => {
     let s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
     s = commit(s, 'a', 'hashA1')
-    expect(() => commit(s, 'a', 'hashA2')).toThrow(/ya ha commiteado/)
+    expect(() => commit(s, 'a', 'hashA2')).toThrow(/already committed/)
   })
 
   it('rechaza doble reveal del jugador a en la misma ronda (FIX I)', async () => {
@@ -119,7 +119,7 @@ describe('commit + reveal', () => {
     s = await reveal(s, 'a', allocA, 'sA')
     // Second reveal by a should throw even though state hasn't advanced (b hasn't revealed)
     const hA2 = await hashAllocation(allocA, 'sA')
-    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/ya ha revelado/)
+    await expect(reveal(s, 'a', allocA, 'sA')).rejects.toThrow(/already revealed/)
     void hA2 // suppress unused var warning
   })
 
@@ -134,7 +134,7 @@ describe('commit + reveal', () => {
     s = await reveal(s, 'a', allocA, 'sA')
     s = await reveal(s, 'b', allocB, 'sB')
     // Second reveal by b should throw
-    await expect(reveal(s, 'b', allocB, 'sB')).rejects.toThrow(/ya ha revelado/)
+    await expect(reveal(s, 'b', allocB, 'sB')).rejects.toThrow(/already revealed/)
   })
 })
 
@@ -285,7 +285,7 @@ describe('phase guards', () => {
   it('resolveRound llamado cuando phase es committing lanza /lista/', () => {
     const s = createMatch(card('A', 1000, 9), card('B', 1000, 8), cfg())
     expect(s.phase).toBe('committing')
-    expect(() => resolveRound(s)).toThrow(/lista/)
+    expect(() => resolveRound(s)).toThrow(/not ready/)
   })
 
   it('resolveRound con solo un reveal lanza /faltan/i', async () => {
@@ -296,7 +296,7 @@ describe('phase guards', () => {
     s = commit(s, 'b', 'hashB')
     expect(s.phase).toBe('revealing')
     s = await reveal(s, 'a', allocA, 'sA')
-    expect(() => resolveRound(s)).toThrow(/faltan/i)
+    expect(() => resolveRound(s)).toThrow(/missing reveals/i)
   })
 
   it('double-resolve: resolveRound tras roundResolved lanza', async () => {
@@ -307,7 +307,7 @@ describe('phase guards', () => {
     )
     s = resolveRound(s)
     expect(s.phase).toBe('roundResolved')
-    expect(() => resolveRound(s)).toThrow(/lista/)
+    expect(() => resolveRound(s)).toThrow(/not ready/)
   })
 })
 

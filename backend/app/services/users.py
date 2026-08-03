@@ -32,7 +32,7 @@ def get_or_create_user(session: Session, wallet: str, elo_start: int) -> User:
 def set_alias(session: Session, wallet: str, alias: str) -> None:
     user = session.get(User, wallet)
     if user is None:
-        raise ValueError("usuario no existe")
+        raise ValueError("user does not exist")
     clash = session.scalar(
         select(User).where(func.lower(User.alias) == alias.lower(), User.wallet != wallet)
     )
@@ -290,5 +290,5 @@ def read_user_battles(session: Session, wallet: str, limit: int = 20) -> list[di
 def set_withdraw_address(session: Session, wallet: str, address: Optional[str]) -> None:
     user = session.get(User, wallet)
     if user is None:
-        raise ValueError("usuario no existe")
+        raise ValueError("user does not exist")
     user.withdraw_address = address

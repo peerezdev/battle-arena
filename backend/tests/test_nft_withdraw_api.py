@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timezone
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -27,6 +28,7 @@ from app.db import make_session_factory, init_db
 from app.privy import PrivyVerifier
 from app.chain.mock import MockChainSource
 from app.services.gacha import GachaService
+from app.models import GachaPack
 
 APP_ID = "testapp"
 
@@ -88,7 +90,9 @@ def _build_client(signer=None):
         privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
         escrow_seed_lamports=10_000_000,
     )
-    return TestClient(app, raise_server_exceptions=True), priv
+    client = TestClient(app, raise_server_exceptions=True)
+    client.session_factory = sf     # los tests que tocan el libro de sobres necesitan la base
+    return client, priv
 
 
 def _mock_chain(monkeypatch, *, owns: bool):
@@ -151,6 +155,31 @@ def test_nft_withdraw_rejects_unowned_nft(monkeypatch):
     assert signer.signed == []           # never signed
     assert calls["build_transfer"] == []  # never built
     assert calls["submit"] == []          # never submitted
+
+
+def test_retirar_la_carta_invalida_el_atajo_del_buyback(monkeypatch):
+    """Retirarla la saca de la wallet, y el buyback tiene que enterarse.
+
+    El buyback se salta el sondeo on-chain cuando nuestro propio libro dice que acabamos de
+    entregarle esa carta a esa wallet (así vender justo tras la tirada es instantáneo). Pero el
+    libro dice "se la dimos", no "sigue siendo suya": si somos NOSOTROS quienes la hemos mandado
+    fuera, el atajo deja de valer para ella o le venderíamos a CC una carta que ya no está ahí.
+    """
+    c, priv = _build_client(signer=FakeSigner())
+    _mock_chain(monkeypatch, owns=True)
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    ahora = datetime.now(timezone.utc)
+    with c.session_factory() as s:
+        s.add(GachaPack(memo="memo-1", wallet=WALLET_A, pack_type="pokemon_50",
+                        submitted_at=ahora, opened_at=ahora, nft_address=MINT))
+        s.commit()
+
+    assert c.post("/users/me/nft/withdraw", json={"nft_address": MINT, "address": DEST},
+                  headers=hdrs).status_code == 200
+
+    _mock_chain(monkeypatch, owns=False)     # la cadena ya no la ve en su wallet
+    r = c.post("/gacha/buyback", json={"nft_address": MINT}, headers=hdrs)
+    assert r.status_code == 403, r.text
 
 
 def test_nft_withdraw_requires_auth():

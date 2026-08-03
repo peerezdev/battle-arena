@@ -92,10 +92,13 @@ sudo -u battlearena -H ssh -T git@github.com    # "Hi ...! You've successfully a
 sudo REPO_URL=git@github.com:usuario/repo.git ~/battlearena-deploy/deploy/bootstrap-minipc.sh
 ```
 
-Comprueba al terminar que el `pull` que hará cada despliegue funciona:
+Clona `master`, no la rama por defecto del remoto (`BRANCH=otra` si algún día hace falta). No es un
+detalle: si el default del repo es otra rama, puede no traer ni `deploy/`, y `deploy.sh` se quedaría
+haciendo `pull --ff-only` sobre esa rama para siempre. Comprueba las dos cosas:
 
 ```bash
-sudo -u battlearena -H git -C /srv/battlearena pull --ff-only    # "Already up to date."
+sudo -u battlearena -H git -C /srv/battlearena branch --show-current   # "master"
+sudo -u battlearena -H git -C /srv/battlearena pull --ff-only          # "Already up to date."
 ```
 
 Instala paquetes, Node 20, Caddy, `cloudflared`, crea el usuario `battlearena`, clona el repo en
@@ -192,8 +195,12 @@ obligatorio, no opcional.
 
 ```bash
 sudo systemctl start battlearena-oracle battlearena-backend
-sudo /srv/battlearena/deploy/deploy.sh
+sudo DOMAIN=battlearena.tld /srv/battlearena/deploy/deploy.sh
 ```
+
+`DOMAIN` es obligatorio: el healthcheck del final lo consulta por HTTPS, y sin él el script aborta
+en vez de darte un «Deploy OK» que no ha comprobado tu instalación. Si el backup aún no tiene
+remoto de rclone, añade `RCLONE_REMOTE=` (vacío) para que se quede en copia local.
 
 `deploy.sh` hace backup, `git pull`, dependencias, build del frontend en `dist.new` con swap
 atómico, reinicia servicios y pasa un healthcheck.
@@ -224,8 +231,15 @@ Repásalos con el usuario antes de abrir:
 | `FEE_WALLET_ADDRESS` en `backend/.env` | Su valor por defecto está escrito en `config.py` y es **el mismo en devnet y en mainnet**. Sin ponerlo aquí, los ingresos reales caen en la wallet que se usa para probar. |
 | `BATTLE_FEE_PCT_PER_PLAYER` | Es el interruptor REAL de la fee (0 = no cobrar). Vaciar `FEE_WALLET_ADDRESS` NO la apaga: la manda al operador. |
 | SOL del operador | Paga el gas y la renta de TODAS las operaciones. Sin saldo, las partidas se anulan al llenarse el lobby. |
-| `scripts/machines.py hide` | Ninguna máquina está apagada en esta base. |
-| `scripts/flags.py on auto_royale` | El lobby de la casa arranca desactivado. |
+| `backend/scripts/machines.py hide` | Ninguna máquina está apagada en esta base. |
+| `backend/scripts/flags.py on auto_royale` | El lobby de la casa arranca desactivado. El valor es `máquina[:plazas]`, de 5 a 10, y **las plazas mueven el precio de entrada**: `pokemon_25` son 70 USDC con 5 y 135 con 10. |
+
+Los dos se lanzan desde `/srv/battlearena/backend` así:
+
+```bash
+sudo -u battlearena -H bash -c 'cd /srv/battlearena/backend && \
+  APP_NETWORK=mainnet PYTHONPATH=. ./.venv/bin/python3 scripts/flags.py list'
+```
 
 ## Fase 7 — Backups y avisos
 
@@ -272,6 +286,9 @@ En el dashboard de Privy tiene que estar `https://battlearena.tld` en dominios p
 | `/leaderboard` devuelve JSON al recargar | El matcher `not header Accept *text/html*` del Caddyfile no está bien |
 | El oráculo devuelve 429 en cuanto hay gente | Falta `--proxy-headers`: todas las peticiones parecen venir de la misma IP |
 | El servicio del oráculo no arranca | La clave está en `/etc`; con `ProtectSystem=strict` el `chmod` de `keys.py` falla |
+| La SPA responde 403 y `/health` no | Caddy no puede atravesar `/srv/battlearena` (750 del `adduser --system`). Lo arregla `setfacl -m u:caddy:x /srv/battlearena`, que hace el bootstrap |
+| Caddy sirve su página de bienvenida | Se copió el Caddyfile pero no se recargó el servicio: `systemctl reload-or-restart caddy` |
+| `deploy.sh` muere en el primer paso con `didn't find section in config file` | `backup.sh` apunta a un remoto de rclone que no existe. Configúralo o pasa `RCLONE_REMOTE=` vacío |
 | Las batallas se anulan al llenarse el lobby | Wallet del operador sin SOL |
 | El chat se cae al minuto y medio | Revisa `connectTimeout` en `/etc/cloudflared/config.yml` |
 | `npm run build` muere sin mensaje | Sin RAM. `bootstrap-minipc.sh` añade swap solo si detecta menos de 4 GB |
@@ -279,10 +296,10 @@ En el dashboard de Privy tiene que estar `https://battlearena.tld` en dominios p
 ## Día a día
 
 ```bash
-sudo /srv/battlearena/deploy/deploy.sh    # desplegar la última versión
+sudo DOMAIN=battlearena.tld /srv/battlearena/deploy/deploy.sh   # desplegar la última versión
 journalctl -u battlearena-backend -f      # logs del backend
 journalctl -u cloudflared -f              # logs del túnel
-DOMAIN=battlearena.tld sudo /srv/battlearena/deploy/verify.sh   # tras cualquier cambio gordo
+sudo DOMAIN=battlearena.tld /srv/battlearena/deploy/verify.sh   # tras cualquier cambio gordo
 ```
 
 Al arrancar, el backend ejecuta `_resume_orphaned_battles`: termina o anula y reembolsa las

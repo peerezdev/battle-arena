@@ -20,6 +20,7 @@ from app.services.gacha import GachaService
 from app.services.nft_transfer import build_transfer, nft_in_owner, submit_signed_tx
 from app.services.pack_orchestration import fetch_latest_blockhash
 from app.services.privy_signer import PrivySigner
+from scripts._destino import anunciar
 
 BATTLE_ID = "6d2e0383f22e4c6d8fbd5e9b84f808b3"
 GO = "--go" in sys.argv
@@ -107,6 +108,7 @@ async def buyback_bots(signer, st, gacha: GachaService) -> None:
 
 async def main() -> None:
     st = get_settings()
+    anunciar(st)
     s = make_session_factory(make_engine(st.database_url))()
     signer = PrivySigner(app_id=st.privy_app_id, app_secret=st.privy_app_secret,
                          auth_key_pem=st.privy_auth_key, cluster_caip2=st.privy_solana_caip2)

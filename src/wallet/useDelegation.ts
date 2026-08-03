@@ -29,7 +29,7 @@ export function useDelegation(): { delegated: boolean; enable: () => Promise<voi
   )
   async function enable() {
     if (!embedded?.address) throw new Error('No embedded Solana wallet found')
-    if (!SIGNER_ID) throw new Error('VITE_PRIVY_SIGNER_ID no configurado')
+    if (!SIGNER_ID) throw new Error('VITE_PRIVY_SIGNER_ID is not configured')
     await addSigners({ address: embedded.address, signers: [{ signerId: SIGNER_ID }] })
   }
   return { delegated, enable }
