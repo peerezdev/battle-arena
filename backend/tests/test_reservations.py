@@ -3,6 +3,7 @@ from app.db import make_engine, make_session_factory, init_db
 from app.models import PackBattle, BattlePlayer
 from app.services.reservations import (
     reserve, reserved_total, royale_locked_total, release_reservations, consume,
+    battle_in_progress,
 )
 from app.services.royale_funding import royale_buyin
 
@@ -93,3 +94,44 @@ def test_royale_locked_sums_multiple_open(session):
     _add_royale(session, "r1", "lobby", n=4, price=250_000_000, players=["A"])
     _add_royale(session, "r2", "running", n=2, price=100_000_000, players=["A"])
     assert royale_locked_total(session, "A") == royale_buyin(4, 250_000_000) + royale_buyin(2, 100_000_000)
+
+
+def _add_pack(session, bid, status, players=()):
+    session.add(PackBattle(id=bid, mode="pack", machine_code="m", price=50_000_000,
+                           max_players=2, status=status))
+    for w in players:
+        session.add(BattlePlayer(battle_id=bid, player_wallet=w))
+    session.commit()
+
+
+def test_en_lobby_cuenta_como_partida_sin_terminar(session):
+    # Apuntado y esperando a que se llene: su dinero ya tiene destino.
+    _add_royale(session, "r1", "lobby", players=["A"])
+    assert battle_in_progress(session, "A") == "r1"
+
+
+def test_jugandose_tambien(session):
+    _add_royale(session, "r2", "running", players=["A"])
+    assert battle_in_progress(session, "A") == "r2"
+
+
+def test_pack_battle_igual_que_royale(session):
+    # La puerta no es solo del royale: en pack battle el dinero también sigue comprometido.
+    _add_pack(session, "p1", "running", players=["A"])
+    assert battle_in_progress(session, "A") == "p1"
+
+
+def test_una_partida_terminada_no_bloquea(session):
+    for estado in ("settled", "voided", "cancelled"):
+        _add_royale(session, f"r-{estado}", estado, players=["A"])
+    assert battle_in_progress(session, "A") is None
+
+
+def test_solo_mira_las_partidas_del_wallet(session):
+    # La partida de otro no puede bloquearme el retiro.
+    _add_royale(session, "r3", "running", players=["B"])
+    assert battle_in_progress(session, "A") is None
+
+
+def test_sin_partidas_no_bloquea(session):
+    assert battle_in_progress(session, "A") is None

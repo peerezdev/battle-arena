@@ -44,7 +44,8 @@ from .services.pack_orchestration import (
 )
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
-from .services.reservations import reserve, reserved_total, royale_locked_total, release_reservations
+from .services.reservations import (reserve, reserved_total, royale_locked_total,
+                                     release_reservations, battle_in_progress)
 from .services import emotes as emote_service
 from .services.bots import load_bots, pick_bot
 
@@ -1042,6 +1043,14 @@ def create_app(session_factory, chain: ChainSource,
         if amount < min_base:
             raise HTTPException(422, f"el retiro mínimo es {min_withdraw_usdc} USDC")
         _withdraw_throttle(wallet)                      # rate-limit per authed wallet
+        # Con una partida sin terminar, el saldo de la wallet todavía tiene destino. En una royale
+        # el escrow le manda el precio de cada caja justo antes de tirar, y ese importe NO lleva
+        # reserva: el buy-in ya salió al entrar. Sin esta puerta se podría sacar ese dinero en la
+        # ventana entre el reparto y la tirada — la tirada fallaría, la partida se anularía y el
+        # escrow quedaría corto, así que el agujero lo pagarían los reembolsos de los demás.
+        en_juego = battle_in_progress(s, wallet)
+        if en_juego:
+            raise HTTPException(409, "tienes una partida sin terminar; puedes retirar al acabarla")
         await _require_available(wallet, amount, s)     # caps at on-chain balance − reserved
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         # Platform fee: withdraw_fee_pct of the withdrawn amount, DEDUCTED from it — the destination

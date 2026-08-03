@@ -2,6 +2,7 @@
 as on-chain USDC minus reserved_total (the RPC read stays in the endpoint/wiring)."""
 from __future__ import annotations
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import select, func, update
 from app.models import Reservation, PackBattle, BattlePlayer
 
@@ -56,7 +57,11 @@ def reserved_total(session, wallet: str) -> int:
 
 # Open royales hold the buy-in in escrow (already collected on-chain), so they are NOT in the
 # reservation ledger above. Funds are released only once the battle settles or voids.
-_OPEN_ROYALE_STATUSES = ("lobby", "running")
+# Una partida en la que el dinero del jugador todavía tiene destino: apuntado y esperando, o
+# jugándose. Lo usan royale_locked_total (para enseñarlo) y battle_in_progress (para cerrar el
+# retiro). Deliberadamente el mismo par: si algún día se añade un estado intermedio, los dos
+# tienen que enterarse a la vez.
+_EN_JUEGO = ("lobby", "running")
 
 
 def royale_locked_total(session, wallet: str) -> int:
@@ -67,7 +72,7 @@ def royale_locked_total(session, wallet: str) -> int:
     from app.services.royale_funding import royale_buyin  # lazy: keeps solana deps out of module load
     battles = session.execute(
         select(PackBattle.id, PackBattle.max_players, PackBattle.price)
-        .where(PackBattle.mode == "royale", PackBattle.status.in_(_OPEN_ROYALE_STATUSES))
+        .where(PackBattle.mode == "royale", PackBattle.status.in_(_EN_JUEGO))
     ).all()
     if not battles:
         return 0
@@ -77,6 +82,28 @@ def royale_locked_total(session, wallet: str) -> int:
         .where(BattlePlayer.player_wallet == wallet, BattlePlayer.battle_id.in_(ids))
     ).scalars().all())
     return sum(royale_buyin(b.max_players, b.price) for b in battles if b.id in joined)
+
+
+def battle_in_progress(session, wallet: str) -> Optional[str]:
+    """Id de una partida a la que este wallet está apuntado y que aún no ha terminado, o None.
+
+    Cubre los dos estados en los que el dinero del jugador todavía tiene un destino: `lobby` (se
+    ha unido y espera a que se llene) y `running` (se está jugando).
+
+    Existe para cerrar el retiro mientras tanto. En una royale el escrow le manda a la wallet del
+    jugador el precio de cada caja justo antes de tirar, y ese importe NO lleva reserva —el buy-in
+    ya salió al entrar, así que no hay hold que lo cubra—. Sin esta puerta, quien sondeara su
+    wallet podría sacar ese dinero en la ventana entre el reparto y la tirada: la tirada fallaría,
+    la partida se anularía, y el escrow quedaría corto justo por esa cantidad. El agujero no lo
+    paga la plataforma, lo pagan los reembolsos de los demás jugadores.
+    """
+    return session.execute(
+        select(PackBattle.id)
+        .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
+        .where(BattlePlayer.player_wallet == wallet,
+               PackBattle.status.in_(_EN_JUEGO))
+        .limit(1)
+    ).scalars().first()
 
 
 def release_reservations(session, battle_id: str) -> int:

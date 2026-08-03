@@ -968,6 +968,81 @@ def test_withdraw_below_minimum_rejected():
     assert "mínimo" in r.json()["detail"]
 
 
+def test_withdraw_bloqueado_con_partida_sin_terminar(monkeypatch):
+    """SEGURIDAD: con una partida en curso el saldo de la wallet todavía tiene destino.
+
+    En una royale el escrow le manda al jugador el precio de cada caja justo ANTES de tirar, y ese
+    importe no lleva reserva —el buy-in ya salió al entrar—, así que `on-chain − reservado` no lo
+    protege. Sin esta puerta se podría sacar ese dinero en la ventana entre el reparto y la tirada:
+    la tirada fallaría, la partida se anularía y el escrow quedaría corto justo por esa cantidad,
+    de modo que el agujero lo pagarían los reembolsos de los OTROS jugadores.
+    """
+    from app.models import PackBattle, BattlePlayer
+    sf, c, priv = _build_client_with_sf(signer=object())
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    body = {"address": WALLET_B, "amount": 1.0}
+
+    with sf() as s:
+        s.add(PackBattle(id="r1", mode="royale", machine_code="m", price=25_000_000,
+                         max_players=5, status="running"))
+        s.add(BattlePlayer(battle_id="r1", player_wallet=WALLET_A))
+        s.commit()
+
+    r = c.post("/users/me/withdraw", json=body, headers=hdrs)
+    assert r.status_code == 409, r.text
+    assert "sin terminar" in r.json()["detail"]
+
+    # Y al acabar la partida, el retiro vuelve a estar abierto.
+    with sf() as s:
+        s.get(PackBattle, "r1").status = "settled"
+        s.commit()
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _wd(*a, **k):
+        return "sig-stub"
+
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.withdraw_usdc", _wd)
+    assert c.post("/users/me/withdraw", json=body, headers=hdrs).status_code == 200
+
+
+def test_withdraw_no_lo_bloquea_la_partida_de_otro(monkeypatch):
+    """La puerta mira SOLO las partidas del que pide: si no, cualquiera podría congelar el
+    retiro de otro con solo abrir un lobby."""
+    from app.models import PackBattle, BattlePlayer
+    sf, c, priv = _build_client_with_sf(signer=object())
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _wd(*a, **k):
+        return "sig-stub"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.withdraw_usdc", _wd)
+
+    with sf() as s:
+        s.add(PackBattle(id="r2", mode="royale", machine_code="m", price=25_000_000,
+                         max_players=5, status="running"))
+        s.add(BattlePlayer(battle_id="r2", player_wallet=WALLET_B))
+        s.commit()
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 1.0}, headers=hdrs)
+    assert r.status_code == 200, r.text
+
+
 def test_withdraw_rate_limited(monkeypatch):
     """SECURITY (A2): withdrawals are rate-limited per wallet. With the default limit of 5
     per window, the 6th withdrawal is throttled (429) — the throttle fires before the
