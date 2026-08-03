@@ -29,10 +29,27 @@ export function keyboardInset(
  * Devuelve 0 con el teclado cerrado, en escritorio y en cualquier navegador sin `visualViewport`,
  * así que quien lo use puede sumarlo siempre sin condicionales.
  */
+/**
+ * Atajo SOLO en desarrollo: `?kb=300` finge un teclado de 300 px.
+ *
+ * El modo dispositivo de DevTools cambia el tamaño del lienzo pero NO abre ningún teclado, así que
+ * `visualViewport` no encoge y esto no se ejercita nunca desde el escritorio. Con el parámetro se
+ * puede comprobar que la maquetación reacciona bien; lo que NO comprueba es el teclado de verdad,
+ * que solo se ve en un móvil o en un simulador.
+ *
+ * Se lee una vez al cargar el módulo, no en un efecto: el parámetro no cambia durante la sesión.
+ */
+const KB_FORZADO: number = (() => {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return 0
+  const v = Number(new URLSearchParams(window.location.search).get('kb'))
+  return Number.isFinite(v) && v > 0 ? v : 0
+})()
+
 export function useKeyboardInset(): number {
-  const [inset, setInset] = useState(0)
+  const [inset, setInset] = useState(KB_FORZADO)
 
   useEffect(() => {
+    if (KB_FORZADO) return   // atajo de desarrollo: no hay nada que medir
     const vv = window.visualViewport
     if (!vv) return
     const medir = () => setInset(keyboardInset(window.innerHeight, vv))
