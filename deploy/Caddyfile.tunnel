@@ -53,6 +53,20 @@
 		reverse_proxy 127.0.0.1:8787
 	}
 
+	# --- Medios pesados (fuera del repo) --------------------------------------
+	# El vídeo del demo son 13 MB. En git se quedaría en el historial PARA SIEMPRE —y otros
+	# tantos por cada versión nueva—, y el clon del servidor los arrastraría todos. Vive en
+	# /srv/battlearena/media, que `deploy.sh` no toca: solo intercambia dist/. Sustituir el
+	# vídeo es copiar el fichero, sin commit, sin build y sin desplegar.
+	handle /media/* {
+		root * /srv/battlearena
+		# Una hora, no `immutable` como /assets: el nombre del fichero NO cambia al sustituir
+		# el vídeo, así que un caché eterno dejaría a los jugadores viendo el viejo. Para que
+		# un cambio se vea al momento, purga la ruta en Cloudflare.
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
 	# --- SPA ------------------------------------------------------------------
 	@assets path /assets/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"

@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { COLORS, FONTS } from '../../theme'
 
 // Ruta del vídeo dentro de public/. Cambiar aquí si el fichero se renombra o se mueve.
-export const DEMO_VIDEO_SRC = '/battleroyale-demo.mp4'
+// Servido desde /srv/battlearena/media por Caddy, NO desde public/: un mp4 de 13 MB en git se
+// queda en el historial para siempre y cada versión nueva suma otros tantos. Fuera del repo se
+// sustituye copiando el fichero, sin commit ni despliegue. Que exista lo comprueba verify.sh.
+export const DEMO_VIDEO_SRC = '/media/battleroyale-demo.mp4'
 
 const PINK = '#ff2e7e'
 const PINK_L = '#ff6ba4'

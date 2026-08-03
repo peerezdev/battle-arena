@@ -61,12 +61,16 @@ describe('RoyaleDemoNotice', () => {
 
 
 describe('DEMO_VIDEO_SRC', () => {
-  it('apunta a un fichero que EXISTE en public/', async () => {
+  it('apunta a /media/, que es lo que sirve Caddy fuera del repo', () => {
     // El test de arriba compara el src del <video> contra esta misma constante, así que pasaba
     // con cualquier ruta — y de hecho apuntaba a /royale-demo.mp4, que no existe: el modal se
-    // abría y el vídeo no cargaba. Compararlo contra el disco es lo único que lo detecta.
-    const { existsSync } = await import('node:fs')
-    expect(DEMO_VIDEO_SRC.startsWith('/')).toBe(true)   // ruta desde public/, no relativa
-    expect(existsSync(`public${DEMO_VIDEO_SRC}`)).toBe(true)
+    // abría y el vídeo no cargaba. Antes eso se detectaba mirando el disco (`public/…`).
+    //
+    // Ya no se puede: el vídeo vive fuera del repositorio, en /srv/battlearena/media, para no
+    // dejar 13 MB por versión en el historial de git. Aquí solo queda fijar la FORMA de la ruta;
+    // que el fichero exista y se sirva de verdad lo comprueba verify.sh contra el servidor, que
+    // es donde esa pregunta tiene respuesta.
+    expect(DEMO_VIDEO_SRC.startsWith('/media/')).toBe(true)
+    expect(DEMO_VIDEO_SRC.endsWith('.mp4')).toBe(true)
   })
 })

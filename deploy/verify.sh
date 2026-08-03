@@ -96,6 +96,12 @@ if [ -n "$DOMAIN" ]; then
 	body=$(curl -s --max-time 10 -H 'Accept: text/html' "https://$DOMAIN/leaderboard" | head -c 200)
 	case "$body" in *"<!doctype"*|*"<!DOCTYPE"*|*"<html"*) pass "/leaderboard sirve la app (matcher de Accept)";;
 		*) fail "/leaderboard devuelve algo que no es HTML: la colisión SPA/backend está mal";; esac
+	# El vídeo del demo vive FUERA del repo (/srv/battlearena/media), así que ningún test del
+	# build puede comprobar que existe: si falta, el botón "Watch demo" abre un modal en negro
+	# y nadie se entera. Un HTML aquí significa que /media cayó en el catch-all de la SPA.
+	tipo=$(curl -s -o /dev/null -w '%{content_type}' --max-time 15 "https://$DOMAIN/media/battleroyale-demo.mp4")
+	case "$tipo" in video/*) pass "el vídeo del demo se sirve ($tipo)";;
+		*) fail "el vídeo del demo no se sirve: devuelve '$tipo'";; esac
 else
 	head_ "Público"
 	echo "  (omitido: pasa DOMAIN=tu-dominio para comprobarlo)"

@@ -24,3 +24,4 @@ backend/.test_players.json
 
 # Logs de los stacks lanzados por scripts/run-net.sh
 .run/
+public/*.mp4
