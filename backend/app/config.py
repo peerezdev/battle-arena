@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     privy_operator_wallet_id: str = ""
     privy_operator_address: str = ""
     escrow_seed_lamports: int = 10_000_000
+    # Inventario COMPARTIDO de wallets de escrow (ver services/escrow_inventory.py). Vacío = no se
+    # usa y todo funciona como antes. La ruta debe ser ABSOLUTA: una relativa se resuelve contra el
+    # directorio de trabajo, y dos inventarios divergentes repartirían la misma wallet dos veces.
+    escrow_inventory_url: str = ""    # env: ESCROW_INVENTORY_URL
     # Endpoints SOLO de desarrollo/test (p.ej. /pack-battles/{id}/join-bot, que mete un bot
     # financiado en un lobby SIN autenticación y mueve USDC on-chain). Deshabilitados por
     # defecto: en producción NUNCA deben estar activos. env: DEV_ENDPOINTS_ENABLED=true

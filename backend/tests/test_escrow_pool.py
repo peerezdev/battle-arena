@@ -246,3 +246,108 @@ async def test_el_motivo_guardado_no_contiene_la_api_key(session):
     motivo = session.get(EscrowWallet, A).unavailable_reason
     assert "SECRETO123" not in motivo
     assert "[redactada]" in motivo
+
+
+# ── Inventario COMPARTIDO entre redes ─────────────────────────────────────────
+#
+# Una wallet de Privy es la misma en todas las cadenas; lo que cambia por red es lo que tiene
+# dentro. El inventario guarda la IDENTIDAD (dirección + wallet_id) y `escrow_wallets` sigue
+# guardando el ESTADO de cada red. Así mainnet deja de crear wallets teniendo decenas ya hechas,
+# y la lista deja de vivir en la base de devnet.
+
+class _SignerQueCrea:
+    """Cuenta cuántas wallets NUEVAS se piden a Privy. Es la cifra que hay que bajar a cero."""
+
+    def __init__(self):
+        self.creadas = 0
+
+    async def create_solana_wallet(self):
+        self.creadas += 1
+        return {"id": f"wid-nueva-{self.creadas}", "address": f"NuevaWallet{self.creadas}"}
+
+
+@pytest.fixture
+def inventario(tmp_path, monkeypatch):
+    """Inventario compartido en un fichero temporal, con la caché del módulo limpia."""
+    from app.services import escrow_inventory as inv
+    from app.config import Settings, get_settings
+    ruta = f"sqlite:///{tmp_path/'inventario.db'}"
+    monkeypatch.setattr(inv, "get_settings",
+                        lambda: Settings(escrow_inventory_url=ruta))
+    inv._factory = None; inv._url_cacheada = None
+    return inv
+
+
+@pytest.mark.anyio
+async def test_sin_inventario_todo_sigue_igual(session, monkeypatch):
+    # Por defecto está apagado: una instalación que no lo quiera no cambia por actualizar.
+    from app.services import escrow_inventory as inv
+    inv._factory = None; inv._url_cacheada = None
+    signer = _SignerQueCrea()
+    r = await pool.adquirir(session, signer, "b1")
+    assert signer.creadas == 1
+    assert r["address"] == "NuevaWallet1"
+
+
+@pytest.mark.anyio
+async def test_una_red_nueva_reutiliza_las_del_inventario_sin_crear_ninguna(session, inventario):
+    # El caso que motiva todo: mainnet arranca con el pool vacío y 79 wallets ya existentes.
+    inventario.registrar("WalletDeDevnet1", "wid-1")
+    inventario.registrar("WalletDeDevnet2", "wid-2")
+    signer = _SignerQueCrea()
+
+    r1 = await pool.adquirir(session, signer, "b1")
+    r2 = await pool.adquirir(session, signer, "b2")
+
+    assert signer.creadas == 0, "no se puede pedir una wallet nueva teniendo inventario"
+    assert {r1["address"], r2["address"]} == {"WalletDeDevnet1", "WalletDeDevnet2"}
+    assert r1["id"] == "wid-1"          # el wallet_id viaja: es lo que hace falta para firmar
+    # Y quedan con su fila de ESTADO en esta red, ocupadas por su partida.
+    fila = session.get(EscrowWallet, r1["address"])
+    assert fila.status == "in_use" and fila.battle_id == "b1"
+
+
+@pytest.mark.anyio
+async def test_no_reparte_dos_veces_la_misma_en_la_misma_red(session, inventario):
+    inventario.registrar("Unica", "wid-u")
+    signer = _SignerQueCrea()
+    r1 = await pool.adquirir(session, signer, "b1")
+    r2 = await pool.adquirir(session, signer, "b2")
+    assert r1["address"] == "Unica"
+    # Agotado el inventario, la segunda SÍ tiene que ser nueva: repetir la misma daría dos
+    # partidas simultáneas escribiendo en el mismo escrow de la misma cadena.
+    assert r2["address"] == "NuevaWallet1" and signer.creadas == 1
+
+
+@pytest.mark.anyio
+async def test_una_retenida_de_esta_red_no_se_vuelve_a_repartir(session, inventario):
+    # Aunque el inventario la liste, si aquí tiene algo dentro no se puede tocar.
+    session.add(EscrowWallet(address="Sucia", wallet_id="wid-s", status="retained",
+                             unavailable_reason="2 carta(s)"))
+    session.commit()
+    inventario.registrar("Sucia", "wid-s")
+    signer = _SignerQueCrea()
+    r = await pool.adquirir(session, signer, "b1")
+    assert r["address"] != "Sucia"
+    assert signer.creadas == 1
+
+
+@pytest.mark.anyio
+async def test_la_wallet_nueva_entra_al_inventario_para_la_otra_red(session, inventario):
+    # Si la red que la estrena se la guardase, el inventario dejaría de servir con el tiempo.
+    signer = _SignerQueCrea()
+    r = await pool.adquirir(session, signer, "b1")
+    assert [w["address"] for w in inventario.todas()] == [r["address"]]
+
+
+@pytest.mark.anyio
+async def test_el_pool_de_la_red_manda_sobre_el_inventario(session, inventario):
+    # Una libre de aquí ya está comprobada vacía ON-CHAIN en esta cadena; la del inventario no
+    # se ha usado nunca aquí. Se prefiere la conocida.
+    session.add(EscrowWallet(address="LibreAqui", wallet_id="wid-l", status="free"))
+    session.commit()
+    inventario.registrar("DelInventario", "wid-i")
+    signer = _SignerQueCrea()
+    r = await pool.adquirir(session, signer, "b1")
+    assert r["address"] == "LibreAqui"
+    assert signer.creadas == 0

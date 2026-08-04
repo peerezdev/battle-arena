@@ -25,6 +25,7 @@ from solders.pubkey import Pubkey
 from solders.token.associated import get_associated_token_address
 
 from app.models import EscrowWallet
+from app.services import escrow_inventory
 from app.services.nft_transfer import sin_secretos
 
 logger = logging.getLogger(__name__)
@@ -129,18 +130,43 @@ def reclamar_del_pool(session, battle_id: str) -> Optional[dict]:
         # Otra partida se la llevó entre el SELECT y el UPDATE: a por otra.
 
 
+def _anotar_en_uso(session, address: str, wallet_id: str, battle_id: str) -> dict:
+    """Crea la fila de ESTADO de esta red para una wallet, ya reclamada por esta partida."""
+    session.add(EscrowWallet(address=address, wallet_id=wallet_id, status="in_use",
+                             battle_id=battle_id, claimed_at=_ahora(), times_used=1))
+    session.commit()
+    return {"id": wallet_id, "address": address}
+
+
 async def adquirir(session, signer, battle_id: str) -> dict:
-    """Wallet de escrow para esta partida: del pool si hay, y solo si no, una nueva en Privy."""
+    """Wallet de escrow para esta partida, por orden de preferencia:
+
+      1. una libre del pool de ESTA red — la que ya se sabe vacía on-chain aquí;
+      2. una del inventario compartido que esta red no haya estrenado nunca;
+      3. y solo si no queda ninguna, una nueva en Privy.
+
+    El paso 2 es el que evita que mainnet cree wallets teniendo decenas ya hechas y sin usar. Una
+    wallet recién sacada del inventario está limpia EN ESTA CADENA por no haberse usado aquí, así
+    que entra igual que una nueva: `prepare_escrow` la sembrará porque su saldo es cero.
+    """
     del_pool = reclamar_del_pool(session, battle_id)
     if del_pool is not None:
         return del_pool
 
+    if escrow_inventory.activo():
+        # Las que esta red ya conoce, en cualquier estado: las libres ya las miró el paso 1, y una
+        # `retained` o `in_use` de aquí no se puede tocar aunque el inventario la liste.
+        conocidas = {a for (a,) in session.query(EscrowWallet.address).all()}
+        libre = escrow_inventory.sin_estrenar(conocidas)
+        if libre is not None:
+            logger.info("escrow pool: del inventario compartido %s para %s", libre["address"], battle_id)
+            return _anotar_en_uso(session, libre["address"], libre["id"], battle_id)
+
     esc = await signer.create_solana_wallet()
-    session.add(EscrowWallet(address=esc["address"], wallet_id=esc["id"], status="in_use",
-                             battle_id=battle_id, claimed_at=_ahora(), times_used=1))
-    session.commit()
+    # Al inventario también: la red que la estrena no se la guarda para sí.
+    escrow_inventory.registrar(esc["address"], esc["id"])
     logger.info("escrow pool: vacío, creada wallet nueva %s para %s", esc["address"], battle_id)
-    return {"id": esc["id"], "address": esc["address"]}
+    return _anotar_en_uso(session, esc["address"], esc["id"], battle_id)
 
 
 async def liberar(session, rpc_url: str, address: str, usdc_mint: str) -> bool:
