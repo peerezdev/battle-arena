@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
-import { config } from '../onchain/config'
+import { fijarToken, suscribir, suscribirEstado, enviar } from './serverSocket'
 import { addDrop, seedDrops, type LiveDrop } from '../ui/drops/dropsStore'
 
 export interface ChatAction { label: string; battleId: string; mode: string }
@@ -17,12 +17,8 @@ export interface ChatLine {
   mode?: string              // 'pack' | 'royale'
 }
 
-function buildWsUrl(identityToken: string | null | undefined): string {
-  // Replace leading http(s) with ws(s), then append /ws/chat
-  const base = config.backendUrl.replace(/^http/, 'ws')
-  const path = `${base}/ws/chat`
-  return identityToken ? `${path}?token=${encodeURIComponent(identityToken)}` : path
-}
+// La URL y el socket ya no se construyen aquí: los tiene serverSocket.ts, uno por pestaña.
+// Este hook (montado a la vez en AppShell y en ChatDock) abría antes su propia conexión.
 
 // Map a backend drop frame → LiveDrop. Backend emits ts in epoch SECONDS; the
 // drops store + ago() use ms.
@@ -52,123 +48,56 @@ export function useChat(enabled = true): {
   const [connected, setConnected] = useState(false)
   const [online, setOnline] = useState(0)
 
-  const wsRef = useRef<WebSocket | null>(null)
-  const mountedRef = useRef(true)
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const canPost = !!identityToken
 
   useEffect(() => {
-    mountedRef.current = true
+    if (!enabled) return
+    let vivo = true
 
-    function connect() {
-      if (!mountedRef.current) return
+    fijarToken(identityToken ?? null)
+    const bajaEstado = suscribirEstado((abierto) => { if (vivo) setConnected(abierto) })
 
-      const url = buildWsUrl(identityToken)
-      let ws: WebSocket
+    const linea = (m: Record<string, unknown>): ChatLine => ({
+      user: m.user as string,
+      text: m.text as string,
+      ts: m.ts as number,
+      kind: m.kind as 'system' | undefined,
+      action: m.action as ChatAction | undefined,
+      event: m.event as ChatLine['event'],
+      amountUsd: m.amountUsd as number | undefined,
+      mode: m.mode as string | undefined,
+      machine: m.machine as string | undefined,
+      mult: m.mult as number | undefined,
+    })
 
-      try {
-        ws = new WebSocket(url)
-      } catch {
-        // If WebSocket constructor throws (invalid URL, etc.) stay disconnected
-        return
+    const baja = suscribir((crudo) => {
+      if (!vivo) return
+      const msg = crudo as Record<string, unknown> & { type?: string }
+      if (msg.type === 'history' && Array.isArray(msg.messages)) {
+        setMessages((msg.messages as Record<string, unknown>[]).map(linea))
+      } else if (msg.type === 'message') {
+        setMessages((prev) => [...prev, linea(msg)])
+      } else if (msg.type === 'presence') {
+        setOnline(msg.online as number)
+      } else if (msg.type === 'drop') {
+        // Global Live Drop broadcast by the backend (delayed ~30s so the opener
+        // never sees their own drop spoil the reveal).
+        addDrop(dropFromMsg(msg))
+      } else if (msg.type === 'drops_history' && Array.isArray(msg.drops)) {
+        // Recent-drops backlog the server replays on connect, so the feed is
+        // consistent across origins/devices instead of depending on localStorage.
+        seedDrops((msg.drops as Record<string, unknown>[]).map(dropFromMsg))
+      } else if (msg.type === 'error') {
+        console.warn('[useChat] server error:', msg.error)
       }
+    })
 
-      wsRef.current = ws
-
-      ws.onopen = () => {
-        if (mountedRef.current) setConnected(true)
-      }
-
-      ws.onmessage = (event: MessageEvent) => {
-        if (!mountedRef.current) return
-        try {
-          const msg = JSON.parse(event.data as string)
-          if (msg.type === 'history' && Array.isArray(msg.messages)) {
-            setMessages(
-              (msg.messages as Array<Record<string, unknown>>).map((m) => ({
-                user: m.user as string,
-                text: m.text as string,
-                ts: m.ts as number,
-                kind: m.kind as 'system' | undefined,
-                action: m.action as ChatAction | undefined,
-                event: m.event as ChatLine['event'],
-                amountUsd: m.amountUsd as number | undefined,
-                mode: m.mode as string | undefined,
-                machine: m.machine as string | undefined,
-                mult: m.mult as number | undefined,
-              })),
-            )
-          } else if (msg.type === 'message') {
-            setMessages((prev) => [
-              ...prev,
-              {
-                user: msg.user as string,
-                text: msg.text as string,
-                ts: msg.ts as number,
-                kind: msg.kind as 'system' | undefined,
-                action: msg.action as ChatAction | undefined,
-                event: msg.event as ChatLine['event'],
-                amountUsd: msg.amountUsd as number | undefined,
-                mode: msg.mode as string | undefined,
-                machine: msg.machine as string | undefined,
-                mult: msg.mult as number | undefined,
-              },
-            ])
-          } else if (msg.type === 'presence') {
-            setOnline(msg.online as number)
-          } else if (msg.type === 'drop') {
-            // Global Live Drop broadcast by the backend (delayed ~30s so the
-            // opener never sees their own drop spoil the reveal).
-            addDrop(dropFromMsg(msg))
-          } else if (msg.type === 'drops_history' && Array.isArray(msg.drops)) {
-            // Recent-drops backlog the server replays on connect, so the feed is
-            // consistent across origins/devices instead of depending on this
-            // origin's localStorage.
-            seedDrops((msg.drops as Record<string, unknown>[]).map(dropFromMsg))
-          } else if (msg.type === 'error') {
-            console.warn('[useChat] server error:', msg.error)
-          }
-        } catch {
-          // Ignore non-JSON frames
-        }
-      }
-
-      ws.onclose = () => {
-        if (!mountedRef.current) return
-        setConnected(false)
-        // Schedule reconnect
-        reconnectTimerRef.current = setTimeout(() => {
-          if (mountedRef.current) connect()
-        }, 2000)
-      }
-
-      ws.onerror = () => {
-        // onclose will fire right after onerror; reconnect is handled there
-      }
-    }
-
-    if (enabled) connect()
-
-    return () => {
-      mountedRef.current = false
-      if (reconnectTimerRef.current !== null) {
-        clearTimeout(reconnectTimerRef.current)
-        reconnectTimerRef.current = null
-      }
-      if (wsRef.current) {
-        wsRef.current.onclose = null // prevent reconnect loop on cleanup
-        wsRef.current.close()
-        wsRef.current = null
-      }
-    }
+    return () => { vivo = false; baja(); bajaEstado() }
   }, [identityToken, enabled])
 
+  // `enviar` devuelve false si el socket no está abierto; el texto vacío no se manda.
   const send = useCallback((text: string) => {
-    const ws = wsRef.current
-    if (ws && ws.readyState === WebSocket.OPEN && text.trim()) {
-      ws.send(JSON.stringify({ text: text.trim() }))
-    }
+    if (text.trim()) enviar({ text: text.trim() })
   }, [])
 
   return { messages, send, connected, canPost, online }

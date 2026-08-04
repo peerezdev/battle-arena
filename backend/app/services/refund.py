@@ -43,16 +43,23 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
     auto-sold common's buyback_amount USDC. No-op if there is no escrow (pre-flight void). Never raises."""
     sleep_fn = sleep_fn or asyncio.sleep
     if not escrow_address:
+        # Anulación en pre-flight: no se cobró a nadie, así que no hay nada que devolver. Se deja
+        # dicho para que un "cancelada sin reembolso" no parezca dinero perdido.
+        logger.warning("REEMBOLSO %s (pack): nada que devolver, la partida se anuló antes de "
+                       "cobrar (sin escrow)", battle.id)
         return
     from app.models import BattlePull
     pulls = session.query(BattlePull).filter_by(battle_id=battle.id).all()
+    devueltos, fallidos, ya_estaban = 0, 0, 0
     for p in pulls:
         if p.refunded:
+            ya_estaban += 1
             continue
         if p.auto_sold:
             if not p.buyback_amount:
                 p.refunded = True   # nada que devolver; no re-seleccionar en barridos
                 session.commit()
+                ya_estaban += 1
                 continue
             # NOTE: refunded is only set to True AFTER _sign_submit_retry succeeds (below),
             # not before the submit. This ordering is deliberate: if the process crashes
@@ -82,6 +89,17 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
         if ok:
             p.refunded = True
             session.commit()
+            devueltos += 1
+        else:
+            fallidos += 1
+
+    # Resumen SIEMPRE, salga bien o mal: un reembolso silencioso es indistinguible de uno que no
+    # ocurrió, y esa duda es justo la que hay que despejar cuando un jugador dice que le falta
+    # dinero. Con fallos sube a error para que destaque en `journalctl -p warning`.
+    nivel = logger.error if fallidos else logger.info
+    nivel("REEMBOLSO %s (pack): %d devueltos, %d fallidos, %d sin nada que devolver%s",
+          battle.id, devueltos, fallidos, ya_estaban,
+          " — REVISAR A MANO: queda dinero sin devolver" if fallidos else "")
 
 
 async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_address,
@@ -94,6 +112,8 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
     escrow USDC is split equally among the alive. Eliminated get nothing. No-op if no escrow. Never raises."""
     sleep_fn = sleep_fn or asyncio.sleep
     if not escrow_address:
+        logger.warning("REEMBOLSO %s (royale): nada que devolver, la partida se anuló antes de "
+                       "cobrar (sin escrow)", battle.id)
         return
     from app.models import BattlePull, BattlePlayer
     players = session.query(BattlePlayer).filter_by(battle_id=battle.id).all()
@@ -151,11 +171,17 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
 
     # 4+5: split the leftover escrow USDC equally among the alive.
     if not alive:
+        logger.warning("REEMBOLSO %s (royale): no queda ningún jugador vivo, el USDC sobrante se "
+                       "queda en el escrow %s", battle.id, escrow_address)
         return
     leftover = await escrow_usdc_balance(escrow_address)
     share = leftover // len(alive)
     if share <= 0:
+        logger.info("REEMBOLSO %s (royale): escrow con %.2f USDC entre %d vivos, no da para "
+                    "repartir", battle.id, leftover / 1_000_000, len(alive))
         return
+    logger.info("REEMBOLSO %s (royale): repartiendo %.2f USDC entre %d jugadores vivos (%.2f cada uno)",
+                battle.id, leftover / 1_000_000, len(alive), share / 1_000_000)
     por_wallet = {p.player_wallet: p for p in players}
     for w in alive:
         ok = await _sign_submit_retry(

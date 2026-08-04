@@ -1239,14 +1239,13 @@ def create_app(session_factory, chain: ChainSource,
         if amount < min_base:
             raise HTTPException(422, f"the minimum withdrawal is {min_withdraw_usdc} USDC")
         _withdraw_throttle(wallet)                      # rate-limit per authed wallet
-        # Con una partida sin terminar, el saldo de la wallet todavía tiene destino. En una royale
-        # el escrow le manda el precio de cada caja justo antes de tirar, y ese importe NO lleva
-        # reserva: el buy-in ya salió al entrar. Sin esta puerta se podría sacar ese dinero en la
-        # ventana entre el reparto y la tirada — la tirada fallaría, la partida se anularía y el
-        # escrow quedaría corto, así que el agujero lo pagarían los reembolsos de los demás.
+        # Se cierra el retiro solo cuando el saldo todavía tiene destino, que NO es siempre que
+        # haya una partida abierta: una royale esperando en el lobby ya cobró su buy-in al escrow
+        # y lo que quede en la wallet es del jugador. El detalle de qué cuenta como expuesto —y
+        # por qué la royale en juego sí— está en battle_in_progress().
         en_juego = battle_in_progress(s, wallet)
         if en_juego:
-            raise HTTPException(409, "you have an unfinished battle; you can withdraw once it ends")
+            raise HTTPException(409, "you have a battle in play; you can withdraw once it ends")
         await _require_available(wallet, amount, s)     # caps at on-chain balance − reserved
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         # Platform fee: withdraw_fee_pct of the withdrawn amount, DEDUCTED from it — the destination

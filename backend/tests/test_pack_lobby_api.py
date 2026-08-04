@@ -969,6 +969,65 @@ def test_withdraw_below_minimum_rejected():
     assert "minimum withdrawal" in r.json()["detail"]
 
 
+def test_withdraw_permitido_con_royale_esperando_en_lobby(monkeypatch):
+    """Una royale que aún no ha arrancado NO cierra el retiro.
+
+    Su buy-in ya salió de la wallet al entrar (está en el escrow) y todavía no ha habido ningún
+    reparto, así que lo que le queda es suyo y no tiene destino. Antes se bloqueaba igual, y eso
+    dejaba a un jugador sin poder tocar su dinero mientras esperaba a que la sala se llenase.
+
+    El caso peligroso —la misma royale en `running`— lo cubre el test de abajo.
+    """
+    from app.models import PackBattle, BattlePlayer
+    sf, c, priv = _build_client_with_sf(signer=object())
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _wd(*a, **k):
+        return "sig-stub"
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.withdraw_usdc_with_fee", _wd)
+    monkeypatch.setattr("app.main.withdraw_usdc", _wd)
+
+    with sf() as s:
+        s.add(PackBattle(id="r-lobby", mode="royale", machine_code="m", price=25_000_000,
+                         max_players=5, status="lobby"))
+        s.add(BattlePlayer(battle_id="r-lobby", player_wallet=WALLET_A))
+        s.commit()
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 1.0}, headers=hdrs)
+    assert r.status_code == 200, r.text
+
+
+def test_withdraw_bloqueado_con_pack_esperando_en_lobby(monkeypatch):
+    """La pack battle sí cierra el retiro aunque esté solo esperando: a diferencia del royale,
+    su buy-in NO ha salido de la wallet — es con lo que el jugador va a pagar su caja."""
+    from app.models import PackBattle, BattlePlayer
+    sf, c, priv = _build_client_with_sf(signer=object())
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+
+    with sf() as s:
+        s.add(PackBattle(id="p-lobby", mode="pack", machine_code="m", price=25_000_000,
+                         max_players=2, status="lobby"))
+        s.add(BattlePlayer(battle_id="p-lobby", player_wallet=WALLET_A))
+        s.commit()
+
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 1.0}, headers=hdrs)
+    assert r.status_code == 409, r.text
+
+
 def test_withdraw_bloqueado_con_partida_sin_terminar(monkeypatch):
     """SEGURIDAD: con una partida en curso el saldo de la wallet todavía tiene destino.
 
@@ -996,7 +1055,7 @@ def test_withdraw_bloqueado_con_partida_sin_terminar(monkeypatch):
 
     r = c.post("/users/me/withdraw", json=body, headers=hdrs)
     assert r.status_code == 409, r.text
-    assert "unfinished battle" in r.json()["detail"]
+    assert "battle in play" in r.json()["detail"]
 
     # Y al acabar la partida, el retiro vuelve a estar abierto.
     with sf() as s:

@@ -249,6 +249,13 @@ async def run_pack_battle_live(
         )
 
     playable: set[str] = {w for w, bal in balances.items() if bal >= min_usdc_base_units}
+    # El motivo con cifras, aquí y no en el motor, porque es donde se leen los saldos. Sin esto la
+    # anulación solo decía "no puede jugar" y había que ir a la cadena a averiguar por qué.
+    sin_saldo = {w: bal for w, bal in balances.items() if w not in playable}
+    if sin_saldo:
+        detalle = ", ".join(f"{w}={bal / 1_000_000:.2f}" for w, bal in sin_saldo.items())
+        logger.warning("battle %s: saldo insuficiente para arrancar, hacen falta %.2f USDC por jugador — %s",
+                       battle.id, min_usdc_base_units / 1_000_000, detalle)
 
     # Sync closures — no I/O inside; the engine calls these synchronously
     def resolve_wallet_id(wallet: str):
