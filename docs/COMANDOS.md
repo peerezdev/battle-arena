@@ -4,6 +4,10 @@ Todo lo que se puede hacer desde la terminal, agrupado por lo que quieres conseg
 
 Para **levantar los servicios**, ver [STARTUP.md](STARTUP.md); aquí no se repite.
 
+Referencia de lo que hay detrás de estos comandos: las wallets de las partidas en
+[ESCROW-WALLETS.md](ESCROW-WALLETS.md) y la API del gacha en
+[COLLECTOR-CRYPT-API.md](COLLECTOR-CRYPT-API.md).
+
 ---
 
 ## Lo que hay que saber antes
