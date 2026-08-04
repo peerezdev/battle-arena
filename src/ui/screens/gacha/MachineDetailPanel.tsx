@@ -6,6 +6,7 @@ import { useIsWide } from '../../useIsWide'
 import type { GachaMachine } from '../../../onchain/gachaClient'
 import { yoloTotalCost, clampCount } from '../../../onchain/gachaClient'
 import { showToast, dismissToast, setToastInset } from '../../toastBus'
+import { tiradasGratis } from './freeSpins'
 
 interface Props {
   machine: GachaMachine
@@ -15,8 +16,9 @@ interface Props {
   usdc: number | null
   /** Open `count` packs at once (YOLO); optional turbo (auto-sell Commons). */
   onYolo?: (count: number, turbo: boolean) => void
-  /** Estado de tiradas gratis. Sin él no se pinta el botón: es un extra, no una pieza del flujo. */
-  freeSpins?: { spins_left: number; points_until_next: number; points_per_spin: number } | null
+  /** Puntos de CC del jugador. Solo eso: cuántas tiradas dan depende del precio de ESTA máquina,
+   *  y se calcula aquí. Sin él no se pinta el botón: es un extra, no una pieza del flujo. */
+  freeSpins?: { points_available: number } | null
   onFreePack?: () => void
 }
 
@@ -32,6 +34,9 @@ const TURBO_ON_MSG = 'Turbo activated — Commons will be auto-sold'
 
 export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, onFreePack }: Props) {
   const reduced = useReducedMotion()
+  // Lo que dan esos puntos EN ESTA máquina. Cambia con el precio, así que se recalcula por máquina
+  // y no se puede leer de la respuesta de CC, que viene siempre en la escala de la de 50 $.
+  const gratis = tiradasGratis(machine.price, freeSpins?.points_available ?? 0)
   const mobile = !useIsWide('(min-width: 760px)')   // bottom nav shows below 760 → use a sticky bar
 
   const [yoloCount, setYoloCount] = useState(1)
@@ -270,21 +275,25 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, o
             {openLabel}
           </motion.button>
 
-          {/* Tirada gratis. Solo aparece si CC dice que tiene puntos suficientes: enseñar un
-              botón apagado con "te faltan N" invita a mirar los puntos, no a jugar. Cuando no
-              llega, se dice en una línea de texto y ya. */}
-          {onFreePack && freeSpins && (
-            freeSpins.spins_left > 0 ? (
+          {/* Tirada gratis. Dos condiciones, y las dos son de la MÁQUINA, no del jugador: que esta
+              la ofrezca (`machine.freeSpins` — muchas no) y que sus puntos lleguen a lo que cuesta
+              AQUÍ, que sube con el precio. Con puntos de sobra para la de 50 $ puede no haber ni
+              para una en la de 250 $.
+
+              Cuando no llega se dice en texto en vez de un botón apagado: un botón que no se puede
+              pulsar invita a mirar los puntos, no a jugar. */}
+          {onFreePack && freeSpins && machine.freeSpins && (
+            gratis.count > 0 ? (
               <button
                 onClick={onFreePack}
                 style={{ width: '100%', marginTop: 10, borderRadius: 12, padding: '11px 18px',
                   fontSize: 13.5, fontWeight: 800, fontFamily: FONTS.display, cursor: 'pointer',
                   border: `1px solid ${COLORS.green}66`, background: `${COLORS.green}14`, color: COLORS.green }}>
-                ★ Free pack · {freeSpins.spins_left} left
+                ★ Free pack · {gratis.count} left
               </button>
             ) : (
               <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
-                {freeSpins.points_until_next.toLocaleString('en-US')} points to your next free pack
+                {gratis.untilNext.toLocaleString('en-US')} points to a free pack here
               </div>
             )
           )}

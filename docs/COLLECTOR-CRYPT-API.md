@@ -28,8 +28,9 @@ Consecuencias que nos han mordido:
 - **Los puntos del gacha se van al escrow.** En las Pack Battle y Royale el escrow es la
   `altPlayerAddress`, así que los puntos de todas las tiradas de batalla los ha acumulado el
   escrow, no el jugador. En devnet quedaron **3.069.133 puntos gastables repartidos en 57
-  escrows**. Al ser 100.000 por tirada gratis y estar troceados, solo **6 wallets** llegan al
-  mínimo: unas 19 tiradas rescatables de 3 millones de puntos.
+  escrows**. Troceados así, solo **6 wallets** llegan a los 100.000 de una tirada gratis en la
+  máquina más barata: unas 19 tiradas rescatables de 3 millones de puntos. En las máquinas caras,
+  ninguna llega.
 - **El feed público de CC atribuye la tirada al escrow.** Un jugador que mire su historial en CC no
   ve sus tiradas de batalla. Las ve el escrow.
 - **El VRF también.** `GET /api/vrf/verify` devuelve la wallet del escrow, no la del jugador.
@@ -88,15 +89,49 @@ todo lo que leemos de ellos va con `.get` y valor por defecto, nunca por índice
 
 ### `GET /api/freeSpins?wallet=`
 
-Estado de las tiradas gratis. Campos observados:
-
 | campo | qué es |
 |---|---|
-| `points` | puntos gastables |
-| `freeSpinsLeft` | tiradas gratis disponibles ahora |
+| `points` | puntos acumulados |
+| `usedPoints` | ya gastados en tiradas gratis → **lo gastable es la resta** |
 | `freeSpinsLeftToday` | tope diario restante |
-| `pointsPerSpin` | coste de una tirada — **100.000** hoy |
-| `pointsUntilNextSpin` | cuánto falta para la siguiente |
+| `freeSpinsLeft`, `pointsPerSpin`, `pointsUntilNextSpin` | **ver el aviso de abajo** |
+
+**Es de la WALLET, no de la máquina.** Acepta `wallet` y nada más: le pasamos `packType`, `machine`
+y `code` y la respuesta no cambia.
+
+**Cuidado con `freeSpinsLeft` y `pointsPerSpin`.** Parecen la respuesta a "¿cuántas tiradas gratis
+tengo?", pero vienen calculados **siempre sobre una máquina de 50 $**. Una tirada gratis no cuesta
+lo mismo en todas: cuesta 100.000 puntos en la de 50 $ y **sube en proporción al precio**, así que
+en la de 5.000 $ son 10 millones. Leerlos tal cual anunciaba tres tiradas gratis en una máquina
+donde no llegaba ni para una.
+
+La fórmula, tal cual la usa su propia web:
+
+```js
+requeridos = Math.round(100_000 * (precio / 50))
+disponible = points - usedPoints
+tiradas    = Math.floor(disponible / requeridos)
+resto      = disponible % requeridos
+hastaLaSig = (resto === 0 && disponible > 0) ? 0 : requeridos - resto
+```
+
+Comprobada contra una wallet real de 364.060 puntos: la API dice `freeSpinsLeft: 3` y
+`pointsUntilNextSpin: 35.940`, que es exactamente lo que da la fórmula **para el precio base**. En
+la de 250 $ esos mismos puntos no dan ninguna.
+
+Nosotros la tenemos dos veces a propósito: `tiradas_gratis()` en `app/services/gacha.py` —la
+puerta— y `tiradasGratis()` en `src/ui/screens/gacha/freeSpins.ts` —lo que se pinta—.
+
+### Qué máquinas dan tiradas gratis
+
+Dos condiciones, y ninguna es del jugador:
+
+- **`machine.freeSpins`**, en `/api/machines`. Muchas no las dan: en devnet 3 de 9, en mainnet 16
+  de 43. Pedir una en la que no → `400 "Invalid pack type"`.
+- **`freePacksStatus`**, en `/api/status`. Interruptor **global** de CC: en `closed` no hay tiradas
+  gratis en ninguna máquina.
+
+El orden de validación de `freePack`, medido: tipo de máquina → firma → puntos.
 
 ### `POST /api/freePack`
 

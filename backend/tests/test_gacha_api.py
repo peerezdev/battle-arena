@@ -952,20 +952,32 @@ def _rpc(mock):
 
 
 def _spins(mock, **over):
-    d = {"points": 250000, "freeSpinsLeft": 2, "freeSpinsLeftToday": 2,
-         "pointsPerSpin": 100000, "pointsUntilNextSpin": 50000}
+    # `freeSpinsLeft`/`pointsPerSpin`/`pointsUntilNextSpin` vienen en la respuesta real de CC pero
+    # están calculados sobre una máquina de 50 $. Se dejan aquí a propósito, con valores que NO
+    # cuadran con los puntos, para que un test falle si volviéramos a propagarlos.
+    d = {"points": 250000, "usedPoints": 0, "freeSpinsLeft": 99, "freeSpinsLeftToday": 2,
+         "pointsPerSpin": 100000, "pointsUntilNextSpin": 1}
     d.update(over)
     mock.get(f"{BASE}/api/freeSpins").mock(return_value=Response(200, json=d))
 
 
 @respx.mock
-def test_free_spins_dice_cuantas_quedan_y_lo_que_falta():
+def test_free_spins_da_los_puntos_de_la_wallet_y_nada_por_maquina():
     c, priv = _client()
     _spins(respx)
     r = c.get("/users/me/free-spins", headers=_hdrs(priv, WALLET_A))
     assert r.status_code == 200, r.text
-    assert r.json() == {"points": 250000, "spins_left": 2, "spins_left_today": 2,
-                        "points_per_spin": 100000, "points_until_next": 50000}
+    # Solo los puntos y el tope diario. Cuántas tiradas dan depende de la máquina, así que no se
+    # puede responder aquí — y los campos que CC manda calculados sobre la de 50 $ se descartan.
+    assert r.json() == {"points_available": 250000, "spins_left_today": 2}
+
+
+@respx.mock
+def test_free_spins_descuenta_los_puntos_ya_gastados():
+    c, priv = _client()
+    _spins(respx, points=250000, usedPoints=90000)
+    r = c.get("/users/me/free-spins", headers=_hdrs(priv, WALLET_A))
+    assert r.json()["points_available"] == 160000
 
 
 @respx.mock
@@ -1000,13 +1012,34 @@ def test_free_pack_sin_tiradas_dice_cuantos_puntos_faltan():
     # Un 409 con la cifra exacta, en vez de dejar que CC devuelva un error opaco.
     c, priv, _, _ = _client_con_firmante()
     _maquinas(respx)
-    _spins(respx, freeSpinsLeft=0, pointsUntilNextSpin=7611)
+    _spins(respx, points=92389, usedPoints=0)      # faltan 7.611 para los 100.000 de la de 50 $
     llamada = respx.post(f"{BASE}/api/freePack")
     r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},
                headers=_hdrs_con_id(priv, WALLET_REAL))
     assert r.status_code == 409
     assert "7611" in r.json()["detail"]
     assert not llamada.called      # ni se le pide nada a CC ni se firma nada
+
+
+@respx.mock
+def test_free_pack_mide_los_puntos_contra_el_precio_de_esa_maquina():
+    """Los mismos puntos bastan en la máquina barata y no en la cara.
+
+    Es el fallo que motivó el cambio: se miraba `freeSpinsLeft`, que CC calcula siempre sobre una
+    máquina de 50 $, así que en la de 250 $ se dejaba pasar una tirada que no existía y el jugador
+    se comía el error de CC después de haber firmado.
+    """
+    c, priv, _, _ = _client_con_firmante()
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json=[
+        {"code": "cara_250", "name": "Cara", "price": 250, "freeSpins": True}]))
+    _spins(respx, points=300000, usedPoints=0)     # 3 tiradas de 50 $, ninguna de 250 $
+    llamada = respx.post(f"{BASE}/api/freePack")
+    r = c.post("/gacha/free-pack", json={"pack_type": "cara_250"},
+               headers=_hdrs_con_id(priv, WALLET_REAL))
+    assert r.status_code == 409
+    assert "200000" in r.json()["detail"]          # 500.000 − 300.000
+    assert not llamada.called
 
 
 @respx.mock

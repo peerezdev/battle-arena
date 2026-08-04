@@ -99,29 +99,49 @@ describe('MachineDetailPanel · vídeo de la máquina', () => {
 
 
 describe('MachineDetailPanel · tirada gratis', () => {
-  const pintar = (props: Record<string, unknown>) =>
-    render(<MachineDetailPanel machine={machine} authed usdc={500} onYolo={vi.fn()} {...props} />)
-  const conFree = (over = {}) => ({ spins_left: 0, points_until_next: 7611, points_per_spin: 100000, ...over })
+  // Una tirada gratis cuesta 100.000 puntos en una máquina de 50 $ y sube con el precio, así que
+  // lo que se pinta depende de la máquina tanto como del jugador.
+  const maq = (price: number, freeSpins: boolean) =>
+    ({ ...machine, price, freeSpins }) as unknown as GachaMachine
+  const pintar = (m: GachaMachine, props: Record<string, unknown>) =>
+    render(<MachineDetailPanel machine={m} authed usdc={500} onYolo={vi.fn()} {...props} />)
 
-  it('con tiradas disponibles ofrece el botón y dice cuántas quedan', () => {
+  it('con puntos suficientes ofrece el botón y dice cuántas quedan', () => {
     const onFreePack = vi.fn()
-    pintar({ freeSpins: conFree({ spins_left: 2 }), onFreePack })
+    pintar(maq(50, true), { freeSpins: { points_available: 250_000 }, onFreePack })
     const b = screen.getByRole('button', { name: /Free pack/i })
-    expect(b.textContent).toMatch(/2 left/)
+    expect(b.textContent).toMatch(/2 left/)          // 250.000 / 100.000
     fireEvent.click(b)
     expect(onFreePack).toHaveBeenCalled()
   })
 
+  it('la máquina que no ofrece tiradas gratis no enseña nada, por muchos puntos que haya', () => {
+    pintar(maq(50, false), { freeSpins: { points_available: 10_000_000 }, onFreePack: vi.fn() })
+    expect(screen.queryByRole('button', { name: /Free pack/i })).toBeNull()
+    expect(screen.queryByText(/points to a free pack/i)).toBeNull()
+  })
+
+  it('los mismos puntos dan tirada en la barata y no en la cara', () => {
+    // El fallo que motivó el cambio: se anunciaban las mismas tiradas en todas las máquinas.
+    const { unmount } = pintar(maq(50, true), { freeSpins: { points_available: 300_000 }, onFreePack: vi.fn() })
+    expect(screen.getByRole('button', { name: /Free pack/i }).textContent).toMatch(/3 left/)
+    unmount()
+
+    pintar(maq(250, true), { freeSpins: { points_available: 300_000 }, onFreePack: vi.fn() })
+    expect(screen.queryByRole('button', { name: /Free pack/i })).toBeNull()
+    expect(screen.getByText(/200,000 points to a free pack here/i)).toBeTruthy()   // 500.000 − 300.000
+  })
+
   it('sin tiradas NO deja un botón apagado: dice cuánto falta', () => {
     // Un botón deshabilitado invita a mirar los puntos; una línea de texto informa y no estorba.
-    pintar({ freeSpins: conFree({ spins_left: 0 }), onFreePack: vi.fn() })
+    pintar(maq(50, true), { freeSpins: { points_available: 92_389 }, onFreePack: vi.fn() })
     expect(screen.queryByRole('button', { name: /Free pack/i })).toBeNull()
-    expect(screen.getByText(/7,611 points to your next free pack/i)).toBeTruthy()
+    expect(screen.getByText(/7,611 points to a free pack here/i)).toBeTruthy()
   })
 
   it('sin datos de CC no se pinta nada: es un extra, no parte del flujo', () => {
-    pintar({ freeSpins: null, onFreePack: vi.fn() })
+    pintar(maq(50, true), { freeSpins: null, onFreePack: vi.fn() })
     expect(screen.queryByRole('button', { name: /Free pack/i })).toBeNull()
-    expect(screen.queryByText(/points to your next/i)).toBeNull()
+    expect(screen.queryByText(/points to a free pack/i)).toBeNull()
   })
 })

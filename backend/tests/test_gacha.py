@@ -22,6 +22,64 @@ def _svc(now=None):
     return GachaService(base_url=BASE, api_key="k123", now_fn=now or (lambda: 1000.0))
 
 
+def test_tiradas_gratis_cuestan_en_proporcion_al_precio():
+    from app.services.gacha import tiradas_gratis
+    assert tiradas_gratis(50, 0)["required"] == 100_000
+    assert tiradas_gratis(250, 0)["required"] == 500_000
+    assert tiradas_gratis(5000, 0)["required"] == 10_000_000
+
+
+def test_tiradas_gratis_los_mismos_puntos_no_valen_en_toda_maquina():
+    """El fallo que motivó todo esto: 364.060 puntos daban 3 tiradas en cualquier máquina."""
+    from app.services.gacha import tiradas_gratis
+    puntos = 364_060
+    assert tiradas_gratis(50, puntos)["count"] == 3
+    assert tiradas_gratis(250, puntos)["count"] == 0
+    assert tiradas_gratis(5000, puntos)["count"] == 0
+    # Medido contra /api/freeSpins con esa wallet: freeSpinsLeft 3, pointsUntilNextSpin 35.940.
+    assert tiradas_gratis(50, puntos)["until_next"] == 35_940
+
+
+def test_tiradas_gratis_bordes():
+    from app.services.gacha import tiradas_gratis
+    # Sin puntos falta una tirada ENTERA. Con `required - resto` a secas saldría 0.
+    assert tiradas_gratis(50, 0) == {"required": 100_000, "count": 0, "until_next": 100_000}
+    # Con el saldo justo no falta nada.
+    assert tiradas_gratis(50, 100_000) == {"required": 100_000, "count": 1, "until_next": 0}
+    assert tiradas_gratis(50, -5)["count"] == 0
+    # Precio ausente: se cae al base en vez de dividir por cero.
+    assert tiradas_gratis(0, 100_000)["count"] == 1
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_machines_free_spins_combina_maquina_e_interruptor_global():
+    """`freeSpins` responde a "¿puedo pedir una gratis AQUÍ y AHORA?".
+
+    Son dos cosas distintas: la máquina puede no ofrecerlas nunca, y CC puede cerrarlas de golpe en
+    todas con `freePacksStatus`. Pintar el botón mirando solo la bandera de la máquina lo dejaba
+    visible con las tiradas gratis cerradas.
+    """
+    from app.services.gacha import GachaService
+
+    async def codes(status_json):
+        respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+            {"code": "con", "name": "Con", "price": 50, "freeSpins": True},
+            {"code": "sin", "name": "Sin", "price": 50, "freeSpins": False},
+        ]}))
+        respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json=status_json))
+        out = await GachaService(base_url=BASE, api_key="k", now_fn=lambda: 1000.0).machines()
+        return {m["code"]: m["freeSpins"] for m in out}
+
+    assert await codes({"gachas": [], "freePacksStatus": "open"}) == {"con": True, "sin": False}
+    # Cerradas globalmente: ni la que las ofrece.
+    respx.reset()
+    assert await codes({"gachas": [], "freePacksStatus": "closed"}) == {"con": False, "sin": False}
+    # Sin el campo (fail-open): manda la bandera de la máquina.
+    respx.reset()
+    assert await codes({"gachas": []}) == {"con": True, "sin": False}
+
+
 def test_settings_gacha_defaults():
     s = Settings(_env_file=None)
     assert s.gacha_base_url == "https://dev-gacha.collectorcrypt.com"
@@ -77,6 +135,8 @@ async def test_machines_maps_and_caches():
         "instantBuyback": 80, "contains": 1,
         "turboMode": None,
         "available": True,
+        # La máquina de prueba no trae `freeSpins`, y ausente significa que no las da.
+        "freeSpins": False,
     }]
     assert out[0]["tierRanges"] == {"common": {"start": 150, "end": 250}}
     assert "extra_ignored" not in out[0]

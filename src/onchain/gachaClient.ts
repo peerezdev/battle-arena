@@ -19,6 +19,9 @@ export interface GachaMachine {
   videoHevc?: string | null
   available?: boolean | null
   turboMode?: boolean | null
+  /** Si esta máquina admite tiradas gratis AHORA. No todas las ofrecen, y CC además puede
+   *  cerrarlas globalmente; el backend ya combina las dos cosas en esta bandera. */
+  freeSpins?: boolean | null
 }
 
 export interface GeneratePackResponse {
@@ -189,12 +192,11 @@ export function withdrawNft(token: string, nftAddress: string, destAddress: stri
 }
 
 /** Tiradas gratis que Collector Crypt le debe a esta wallet por sus puntos. */
+/** Puntos de la wallet, NADA por máquina: cuántas tiradas dan depende del precio de cada una, y
+ *  eso lo calcula `tiradasGratis()`. */
 export interface FreeSpins {
-  points: number
-  spins_left: number
+  points_available: number
   spins_left_today: number
-  points_per_spin: number
-  points_until_next: number
 }
 
 export function fetchFreeSpins(token: string): Promise<FreeSpins> {

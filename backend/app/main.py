@@ -26,7 +26,7 @@ from .services.users import (
 from .services.matches import register_match, list_open, sync_match, MatchError
 from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
-from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError
+from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
 from .services.privy_signer import PrivySigner
 from .services import escrow_pool, machine_visibility
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull
@@ -1185,16 +1185,20 @@ def create_app(session_factory, chain: ChainSource,
         if privy_signer is None:
             raise HTTPException(503, "signer_unavailable")
         # La máquina tiene que estar ofertada por nosotros: una apagada a mano no puede estrenar
-        # tiradas, ni gratis ni de pago.
-        await _machine_price(body.pack_type)
+        # tiradas, ni gratis ni de pago. El precio, además, es lo que fija lo que cuesta la tirada.
+        precio_base_units = await _machine_price(body.pack_type)
         try:
             estado = await svc.free_spins(wallet)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream unavailable")
-        if estado["spins_left"] <= 0:
-            raise HTTPException(409, f"te faltan {estado['points_until_next']} puntos para una tirada gratis")
+        # Contra el precio de ESTA máquina: los mismos puntos dan tirada en la de 50 $ y no llegan
+        # ni de lejos en la de 5.000 $. `_machine_price` da unidades base, la fórmula usa dólares.
+        cuenta = tiradas_gratis(precio_base_units / 1_000_000, estado["points_available"])
+        if cuenta["count"] <= 0:
+            raise HTTPException(409, f"te faltan {cuenta['until_next']} puntos para una tirada "
+                                     f"gratis en esta máquina")
 
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         firmada = await privy_signer.sign_solana(wallet_id, build_memo_tx(wallet, blockhash))

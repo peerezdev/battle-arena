@@ -22,9 +22,37 @@ class GachaUpstreamError(Exception):
 
 _MACHINE_FIELDS = ("code", "name", "price", "odds", "tierRanges", "stock", "ev", "image",
                    "shortName", "thumbnailUrl", "instantBuyback", "contains",
-                   "videoSrc", "videoHevc", "turboMode")
+                   "videoSrc", "videoHevc", "turboMode", "freeSpins")
 _NFT_FIELDS = ("nft_address", "name", "image", "rarity", "insured_value")
 _CACHE_TTL = 60.0
+
+# Una tirada gratis NO cuesta lo mismo en todas las máquinas: cuesta 100.000 puntos en una de 50 $
+# y sube en proporción al precio, así que la de 5.000 $ vale 10 millones. Las constantes y la
+# fórmula son las de la propia web de Collector Crypt.
+PUNTOS_TIRADA_BASE = 100_000
+PRECIO_BASE = 50
+
+
+def tiradas_gratis(precio: float, puntos: int) -> dict:
+    """Cuántas tiradas gratis dan `puntos` en una máquina de ese precio, y cuánto falta para la
+    siguiente.
+
+    `GET /api/freeSpins` responde `freeSpinsLeft` y `pointsPerSpin`, pero son de la wallet, NO de
+    la máquina: siempre vienen calculados sobre el precio base. Usarlos tal cual decía "te quedan
+    3 tiradas" en una máquina donde no llegaba ni para una. Por eso se recalcula aquí a partir del
+    precio, que es lo que hace su propia web.
+    """
+    requeridos = round(PUNTOS_TIRADA_BASE * ((precio or PRECIO_BASE) / PRECIO_BASE))
+    if requeridos <= 0:                      # precio 0 o negativo: no hay tirada que valorar
+        return {"required": 0, "count": 0, "until_next": 0}
+    puntos = max(0, int(puntos))
+    resto = puntos % requeridos
+    return {
+        "required": requeridos,
+        "count": puntos // requeridos,
+        # Con el saldo justo no falta nada; con saldo cero falta una tirada entera, no cero.
+        "until_next": 0 if (resto == 0 and puntos > 0) else requeridos - resto,
+    }
 
 
 class GachaService:
@@ -75,19 +103,25 @@ class GachaService:
             except (httpx.HTTPError, ValueError) as e:
                 raise GachaUpstreamError("gacha upstream unavailable")
 
-    async def _availability(self) -> dict:
-        """code -> available (status == 'open') from /api/status. Fail-open: {} on error."""
+    async def _availability(self) -> tuple:
+        """(code -> disponible, tiradas gratis abiertas) desde /api/status.
+
+        `freePacksStatus` es un interruptor GLOBAL de CC: cuando está en `closed` no hay tiradas
+        gratis en ninguna máquina, por mucho que la máquina las ofrezca. Fail-open las dos cosas:
+        si /api/status no responde, se asume todo abierto y que decida el intento real.
+        """
         try:
             raw = await self._request("GET", "/api/status")
         except GachaUpstreamError:
-            return {}
+            return {}, True
         gachas = raw.get("gachas") if isinstance(raw, dict) else None
         avail = {}
         if isinstance(gachas, list):
             for g in gachas:
                 if isinstance(g, dict) and g.get("code"):
                     avail[g["code"]] = (g.get("status") == "open")
-        return avail
+        gratis = (raw.get("freePacksStatus") if isinstance(raw, dict) else None) != "closed"
+        return avail, gratis
 
     async def machines(self) -> list[dict]:
         self._check_enabled()
@@ -105,9 +139,13 @@ class GachaService:
         for mach in out:
             for f in ("image", "thumbnailUrl", "videoSrc", "videoHevc"):
                 mach[f] = self._absolutize(mach.get(f))
-        avail = await self._availability()
+        avail, gratis_abiertas = await self._availability()
         for mach in out:
             mach["available"] = avail.get(mach.get("code"), True)  # default available if unknown
+            # No todas las máquinas dan tiradas gratis, y encima CC puede cerrarlas de golpe. Se
+            # combinan aquí en una sola respuesta a "¿puedo pedir una gratis en esta, ahora?", que
+            # es lo único que necesita saber quien pinta el botón.
+            mach["freeSpins"] = bool(mach.get("freeSpins")) and gratis_abiertas
         self._machines_cache = (now, out)
         return out
 
@@ -122,20 +160,23 @@ class GachaService:
         return {"memo": raw.get("memo"), "transaction": raw.get("transaction")}
 
     async def free_spins(self, wallet: str) -> dict:
-        """Estado de las tiradas gratis de una wallet.
+        """Puntos de una wallet para tiradas gratis. Endpoint NO documentado.
 
-        Endpoint NO documentado: se sacó mirando la red de su propia web. Devuelve los puntos, las
-        tiradas disponibles (`freeSpinsLeft`), el tope de hoy y cuántos puntos cuesta cada una
-        (`pointsPerSpin`, hoy 100.000). Al no estar documentado puede cambiar sin aviso, así que
-        los campos se leen con `.get` y el llamante decide qué hacer si faltan.
+        Devuelve SOLO lo que es de la wallet. `freeSpinsLeft`, `pointsPerSpin` y
+        `pointsUntilNextSpin` vienen en la respuesta pero NO se propagan: están calculados sobre el
+        precio base, así que solo valen para una máquina de 50 $. Cuántas tiradas dan estos puntos
+        lo dice `tiradas_gratis(precio, puntos)`, que necesita saber en qué máquina.
+
+        `usedPoints` son los ya gastados en tiradas gratis; lo gastable es la resta. Al no estar
+        documentado el endpoint, todo se lee con `.get`.
         """
         raw = await self._request("GET", "/api/freeSpins", params={"wallet": wallet})
+        puntos = raw.get("points") or 0
+        gastados = raw.get("usedPoints") or 0
         return {
-            "points": raw.get("points") or 0,
-            "spins_left": raw.get("freeSpinsLeft") or 0,
+            "points_available": max(0, puntos - gastados),
+            # Tope diario, este sí de la wallet y no de la máquina.
             "spins_left_today": raw.get("freeSpinsLeftToday") or 0,
-            "points_per_spin": raw.get("pointsPerSpin") or 0,
-            "points_until_next": raw.get("pointsUntilNextSpin") or 0,
         }
 
     async def free_pack(self, player_address: str, pack_type: str, signed_transaction: str,
