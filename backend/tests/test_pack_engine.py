@@ -235,6 +235,42 @@ async def test_run_battle_voids_when_player_cannot_play(session):
 
 
 @pytest.mark.asyncio
+async def test_void_por_preflight_deja_escrito_quien_y_por_que(session, caplog):
+    """Esta rama anulaba EN SILENCIO: sin escrow, sin tiradas y sin una sola línea de log.
+
+    En producción tumbó una pack battle de 25 $ y averiguar el motivo obligó a reconstruir los
+    saldos on-chain transacción a transacción. El log tiene que decir al menos qué partida y qué
+    jugador, o la próxima investigación vuelve a empezar de cero.
+    """
+    import logging
+    b = PackBattle(id="b-mudo", mode="pack", machine_code="pokemon_25", price=25_000_000,
+                   max_players=2, status="running", server_seed="ab" * 32)
+    session.add(b)
+    session.add_all([BattlePlayer(battle_id="b-mudo", player_wallet="A"),
+                     BattlePlayer(battle_id="b-mudo", player_wallet="B")])
+    session.commit()
+
+    async def build_transfer_tx(esc, dest, mint): return "x"
+    async def submit_tx(signed): return "sig"
+    async def confirm_in_escrow(esc, nft): return True
+    async def prepare_escrow(addr): pass
+
+    with caplog.at_level(logging.WARNING, logger="app.services.pack_engine"):
+        out = await run_battle(session, b, gacha=_Gacha({}), signer=_Signer(),
+                               resolve_wallet_id=lambda w: f"{w}-id",
+                               build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
+                               confirm_in_escrow=confirm_in_escrow, prepare_escrow=prepare_escrow,
+                               can_play=lambda w: w != "B",
+                               now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
+
+    assert out == "voided"
+    escrito = caplog.text
+    assert "b-mudo" in escrito          # qué partida
+    assert "B" in escrito               # quién no podía jugar
+    assert "no se cobra" in escrito     # y que nadie ha pagado, que es la duda del jugador
+
+
+@pytest.mark.asyncio
 async def test_run_battle_polls_open_pack_while_pending(session):
     b = PackBattle(id="b4", mode="pack", machine_code="pokemon_50", price=50, max_players=1, status="running", server_seed="ab"*32)
     session.add(b)

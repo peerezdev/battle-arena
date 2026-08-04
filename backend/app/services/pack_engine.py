@@ -160,7 +160,16 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                session.query(BattlePlayer).filter_by(battle_id=battle.id).order_by(BattlePlayer.joined_at).all()]
 
     # Pre-flight: every player must still be able to play (session signer + USDC). Else void, no charge.
-    if not all(can_play(w) for w in players):
+    #
+    # Se registra QUIÉN falla porque esta rama anulaba en silencio: sin escrow, sin tiradas y sin
+    # una línea en el log. En producción tumbó una partida de 25 $ y averiguar el motivo costó
+    # reconstruir los saldos on-chain transacción a transacción. Los saldos concretos los escribe
+    # pack_orchestration, que es donde se leen.
+    no_pueden = [w for w in players if not can_play(w)]
+    if no_pueden:
+        logger.warning("ANULADA %s (%s) al arrancar: %d de %d jugadores no pueden jugar (%s) "
+                       "— no se cobra a nadie y no se llega a crear escrow",
+                       battle.id, battle.mode, len(no_pueden), len(players), ", ".join(no_pueden))
         battle.status = "voided"; session.commit(); return "voided"
 
     # Escrow: del pool si hay alguna vacía, y solo si no, una nueva en Privy. Cada wallet nueva
