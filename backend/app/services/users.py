@@ -76,12 +76,16 @@ def read_user_stats(session: Session, wallet: str) -> dict:
     ))
     n_battles = len(battles)
     wins = sum(1 for b in battles if b.winner == wallet)
-    # Wager = battle stakes + gacha spend (opened packs).
-    gacha_spend = session.scalar(
-        select(func.coalesce(func.sum(GachaPack.price), 0))
-        .where(GachaPack.wallet == wallet, GachaPack.opened_at.isnot(None), GachaPack.price.isnot(None))
-    ) or 0
-    wagered_usd = (sum(_entry_base_units(b) for b in battles) + gacha_spend) / USDC
+    # Wager = SOLO lo apostado en batallas (pack + royale). El gacha NO cuenta.
+    #
+    # Sumaba también los sobres de gacha, y el número quedaba sin significado: se enseña al lado de
+    # BATTLES, WINS y WIN RATE, así que se lee como "cuánto he apostado en estas partidas", pero
+    # incluía compras que no son una apuesta contra nadie. En devnet el gacha era el 16% de la
+    # cifra; en mainnet, el 99,7% — o sea, la métrica de batallas la dominaba el gacha.
+    #
+    # No se pierde nada: el gasto de gacha sigue en `gacha_packs`, y el historial lo sigue
+    # mostrando pack a pack con su neto (valor − coste).
+    wagered_usd = sum(_entry_base_units(b) for b in battles) / USDC
 
     # best hit — la mejor carta de TODAS: pack battle, royale y gacha.
     #

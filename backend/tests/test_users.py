@@ -67,8 +67,9 @@ def test_royale_wager_and_history_use_buyin(Session):
         assert rows[0]["result"] == "loss" and rows[0]["amountUsd"] == -buyin
 
 
-def test_gacha_tracked_in_wager_and_history(Session):
-    """Opened gacha packs count toward the wager (spend) and appear in history (net = value − cost)."""
+def test_gacha_out_of_wager_but_in_history(Session):
+    """El gacha NO cuenta en `totalWageredUsd` —esa cifra es lo apostado en batallas— pero sí
+    aparece en el historial, sobre a sobre, con su neto (valor − coste)."""
     from datetime import datetime, timezone
     from app.models import GachaPack
     with Session() as s:
@@ -79,13 +80,32 @@ def test_gacha_tracked_in_wager_and_history(Session):
         s.commit()
 
         st = read_user_stats(s, "W1")
-        assert st["totalWageredUsd"] == 50.0        # only the opened pack's cost
+        assert st["totalWageredUsd"] == 0.0         # sin batallas, el gacha no aporta nada
 
         rows = read_user_battles(s, "W1")
         gacha = [r for r in rows if r["kind"] == "gacha"]
         assert len(gacha) == 1
         assert gacha[0]["amountUsd"] == 130.0       # 180 pulled − 50 spent
         assert gacha[0]["pullName"] == "Charizard" and gacha[0]["machineCode"] == "pokemon_50"
+
+
+def test_wager_with_battles_and_gacha_counts_only_battles(Session):
+    """El caso que de verdad separa: un jugador con partida Y gacha. Sin este, un `wagered` que
+    sumase el gacha pasaría el test de arriba, porque allí no hay ninguna batalla con la que
+    contrastar."""
+    from datetime import datetime, timezone
+    from app.models import GachaPack
+    with Session() as s:
+        s.add(PackBattle(id="b1", mode="pack", machine_code="pokemon_25", price=25_000_000,
+                         max_players=2, status="settled", winner="W1"))
+        s.add(BattlePlayer(battle_id="b1", player_wallet="W1"))
+        s.add(GachaPack(memo="g1", wallet="W1", pack_type="pokemon_50",
+                        opened_at=datetime.now(timezone.utc), nft_address="N1",
+                        price=50_000_000, insured_value=180.0))
+        s.commit()
+
+        # 25 de la batalla. Si el gacha contase serían 75.
+        assert read_user_stats(s, "W1")["totalWageredUsd"] == 25.0
 
 
 def test_read_user_view_default_and_existing(Session):
