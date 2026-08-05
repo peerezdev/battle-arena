@@ -51,6 +51,9 @@ async def _play_round(session, battle, *, esc_addr, remaining, accumulated, roun
         sub = await gacha.submit_tx(signed)
         if not sub.get("signature"):
             raise RuntimeError("pull submit failed")
+        # Ver pack_engine: la firma es la prueba de que ESTE jugador compró ESTE sobre.
+        pull.tx_signature = sub["signature"]
+        session.commit()
         res = await gacha.open_pack(pack["memo"])
         attempts = 0
         while res.get("pending") and attempts < max_attempts:

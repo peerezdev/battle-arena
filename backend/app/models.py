@@ -232,6 +232,12 @@ class BattlePull(Base):
     refunded: Mapped[bool] = mapped_column(Boolean, default=False)   # devolución post-void enviada
     buyback_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     round_number: Mapped[int] = mapped_column(Integer, default=1)
+    # Firma de la transacción de COMPRA del sobre, que es la prueba de autoría: en esa misma
+    # transacción va el `memo` de arriba y firma la wallet del jugador. Sin esto la prueba existe
+    # igual —está en la cadena— pero hay que buscarla recorriendo el historial de la wallet, así
+    # que no se le puede enseñar a nadie de un clic. Nula en tiradas anteriores a esta columna;
+    # scripts/backfill_pull_signatures.py las reconstruye buscando el memo.
+    tx_signature: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class BattlePack(Base):

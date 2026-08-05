@@ -125,7 +125,11 @@ def test_get_battle_postsettle_pull_recap(session):
     assert v["server_seed"] == "ab" * 32                 # revealed post-settle
     assert v["pulls"] == [{"round_number": 1, "player_wallet": "A", "nft_address": "nftA",
                            "rarity": "Epic", "insured_value": 500.0, "auto_sold": False,
-                           "grade": 10, "year": "2018", "name": "Charizard", "buyback_amount": None}]
+                           "grade": 10, "year": "2018", "name": "Charizard", "buyback_amount": None,
+                           # Las dos piezas de la página de verificación: el memo, que es lo que
+                           # entiende el VRF de Collector Crypt, y la firma de la compra, que es
+                           # donde se ve la wallet del jugador firmando su propia tirada.
+                           "memo": "m1", "tx_signature": None}]
 
 
 def test_verification_royale_rounds_and_reveal_gate(session):

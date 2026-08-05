@@ -217,6 +217,10 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
                 sub = await gacha.submit_tx(signed)
                 if not sub.get("signature"):
                     raise RuntimeError("pull submit returned no signature")
+                # La prueba de autoría: esa transacción lleva el memo de esta tirada Y la firma
+                # del jugador. Se anota ya, no al final, para que sobreviva a un fallo posterior.
+                pull.tx_signature = sub["signature"]
+                session.commit()
                 # La caja ya está pagada: el saldo on-chain del jugador acaba de bajar, así que
                 # hay que soltar esa parte del hold AHORA. Si se dejara entero hasta el final de
                 # la partida, `on-chain − reservado` restaría el mismo dinero dos veces y el

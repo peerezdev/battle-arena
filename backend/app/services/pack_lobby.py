@@ -114,7 +114,14 @@ def _pull_recap(session, battle_id):
              "nft_address": p.nft_address, "rarity": p.rarity,
              "insured_value": p.insured_value, "auto_sold": p.auto_sold,
              "grade": p.grade, "year": p.year, "name": p.name,
-             "buyback_amount": p.buyback_amount}
+             "buyback_amount": p.buyback_amount,
+             # Las dos piezas con las que un jugador comprueba su tirada por su cuenta:
+             #   · `memo`  — lo que se le pasa al VRF de Collector Crypt para ver esa tirada.
+             #   · firma   — la transacción de compra, donde firma SU wallet. Es la prueba de
+             #               autoría, porque el VRF de CC atribuye la tirada al escrow.
+             # Ninguna de las dos es un secreto: las dos están ya en la cadena.
+             "memo": p.memo,
+             "tx_signature": p.tx_signature}
             for p in session.query(BattlePull).filter_by(battle_id=battle_id)
             .order_by(BattlePull.round_number, BattlePull.id).all()]
 
