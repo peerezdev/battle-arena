@@ -14,6 +14,12 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(params.query)],
 }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
+// La sala de espera pide la delegación antes de unirse (BattleFlow.onJoinSelf). Sin estos
+// dobles, el hook real tiraría de usePrivy/useSigners, que el mock de arriba no expone.
+vi.mock('../components/useDelegationGate', () => ({
+  useDelegationGate: () => ({ requireDelegation: (f: () => void) => f(), open: false }),
+}))
+vi.mock('../components/DelegationGate', () => ({ DelegationGate: () => null }))
 vi.mock('../screens/battle/WinningsBuyback', () => ({ WinningsBuyback: () => null }))
 vi.mock('../emotes/useBattleEmotes', () => ({ useBattleEmotes: vi.fn() }))
 vi.mock('../emotes/useEmotes', () => ({ useEmotes: () => ({ byCode: {}, owned: [], slots: [], loading: false, updateSlots: vi.fn() }) }))

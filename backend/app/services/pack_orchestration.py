@@ -248,6 +248,8 @@ async def run_pack_battle_live(
             rpc_url, wallet, usdc_mint, token_program
         )
 
+    # Solo saldo. NO comprueba que el jugador tenga la firma delegada, aunque el motor la necesite
+    # para tirar: eso hoy no lo verifica nadie en el servidor, ni aquí ni en el royale.
     playable: set[str] = {w for w, bal in balances.items() if bal >= min_usdc_base_units}
     # El motivo con cifras, aquí y no en el motor, porque es donde se leen los saldos. Sin esto la
     # anulación solo decía "no puede jugar" y había que ir a la cadena a averiguar por qué.

@@ -159,7 +159,18 @@ async def run_battle(session, battle, *, gacha, signer, resolve_wallet_id, build
     players = [p.player_wallet for p in
                session.query(BattlePlayer).filter_by(battle_id=battle.id).order_by(BattlePlayer.joined_at).all()]
 
-    # Pre-flight: every player must still be able to play (session signer + USDC). Else void, no charge.
+    # Pre-flight: solo SALDO USDC. Lo dice explícito porque este comentario prometía "session
+    # signer + USDC" y la delegación no la mira nadie: can_play() se construye en
+    # pack_orchestration como `bal >= min_usdc_base_units` y ahí no hay firma que valga.
+    #
+    # Consecuencia real, medida en mainnet: un jugador con saldo de sobra pero sin delegación pasa
+    # este filtro, la partida arranca, y revienta después al firmar su tirada ("No valid
+    # authorization keys or user signing keys available") — anulándola para TODA la sala, con el
+    # escrow ya creado. En royale ocurre igual: su comprobación previa mira que el escrow tenga
+    # fondos, no que los jugadores puedan firmar.
+    #
+    # La puerta del frontend (BattleFlow / ModeHub) cubre hoy al usuario honesto, pero se salta
+    # llamando al endpoint directamente. La verificación de verdad va en el backend, al unirse.
     #
     # Se registra QUIÉN falla porque esta rama anulaba en silencio: sin escrow, sin tiradas y sin
     # una línea en el log. En producción tumbó una partida de 25 $ y averiguar el motivo costó

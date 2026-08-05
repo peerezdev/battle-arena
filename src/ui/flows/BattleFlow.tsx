@@ -5,6 +5,8 @@ import { COLORS, FONTS } from '../theme'
 import { useBattle } from '../../onchain/useBattle'
 import { cancelBattle, joinBot, joinAllBots, joinBattle, markBattlesSeen } from '../../onchain/packBattleClient'
 import { useEmbeddedSolanaAddress } from '../../wallet/embedded'
+import { useDelegationGate } from '../components/useDelegationGate'
+import { DelegationGate } from '../components/DelegationGate'
 import { useReducedMotion } from '../useReducedMotion'
 import { battleToReveal } from '../screens/battle/battleReveal'
 import { useBattleEmotes } from '../emotes/useBattleEmotes'
@@ -61,15 +63,22 @@ export function BattleFlow() {
   const [joiningAll, setJoiningAll] = useState(false)
   const [botError, setBotError] = useState<string | null>(null)
   const [joiningSelf, setJoiningSelf] = useState(false)
+  const gate = useDelegationGate()
   const exit = () => navigate('/home')
 
   function onJoinSelf() {
     if (!battle) return
     if (!identityToken) { showToast('Sign in to join'); return }
-    setJoiningSelf(true)
-    joinBattle(identityToken, battle.id)
-      .catch((e) => showToast(e instanceof Error ? e.message : String(e)))   // e.g. insufficient funds
-      .finally(() => setJoiningSelf(false))
+    // Sin delegación el servidor no puede firmar la tirada, y eso NO falla para quien entra: falla
+    // al arrancar y anula la partida para TODOS los de la sala. Pasó en mainnet con una de 250 $.
+    // ModeHub ya pedía la delegación antes de unirse; este camino —el de llegar a la sala por
+    // enlace o desde el lobby de la casa— se había quedado sin ella.
+    gate.requireDelegation(() => {
+      setJoiningSelf(true)
+      joinBattle(identityToken, battle.id)
+        .catch((e) => showToast(e instanceof Error ? e.message : String(e)))   // e.g. insufficient funds
+        .finally(() => setJoiningSelf(false))
+    })
   }
 
   function onCancelLobby() {
@@ -117,6 +126,7 @@ export function BattleFlow() {
 
   if (battle.status === 'lobby') {
     return (
+      <>
       <WaitingRoom
         battle={battle}
         meWallet={meWallet}
@@ -132,6 +142,8 @@ export function BattleFlow() {
         botError={botError}
         cancelError={cancelError}
       />
+      <DelegationGate gate={gate} />
+      </>
     )
   }
 

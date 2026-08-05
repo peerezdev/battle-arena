@@ -6,6 +6,12 @@ vi.mock('../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'A' })
 const nav = vi.hoisted(() => vi.fn())
 vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => nav, useSearchParams: () => [new URLSearchParams()] }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
+// La sala de espera pide la delegación antes de unirse (BattleFlow.onJoinSelf). Sin estos
+// dobles, el hook real tiraría de usePrivy/useSigners, que el mock de arriba no expone.
+vi.mock('../components/useDelegationGate', () => ({
+  useDelegationGate: () => ({ requireDelegation: (f: () => void) => f(), open: false }),
+}))
+vi.mock('../components/DelegationGate', () => ({ DelegationGate: () => null }))
 // The winner's result mounts WinningsBuyback (wallet/buyback); this flow test only checks the result renders.
 vi.mock('../screens/battle/WinningsBuyback', () => ({ WinningsBuyback: () => null }))
 vi.mock('../../onchain/packBattleClient', async (orig) => ({
