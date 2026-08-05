@@ -5,6 +5,7 @@ import { Hub } from './ui/screens/Hub/Hub'
 import { ModeHub } from './ui/screens/Hub/ModeHub'
 import { AppShell } from './ui/layouts/AppShell'
 import { BattleFlow } from './ui/flows/BattleFlow'
+import { VerifyBattlePage } from './ui/screens/battle/VerifyBattlePage'
 import { DemoPage } from './ui/screens/Demo/DemoPage'
 import { DemoFlow } from './ui/flows/DemoFlow'
 import { ProfilePage } from './ui/screens/Profile/ProfilePage'
@@ -25,6 +26,8 @@ export default function App() {
           <Route path="/play/arena" element={<ModeHub mode="pack" />} />
           <Route path="/play/royale" element={<ModeHub mode="royale" />} />
           <Route path="/play/battle/:battleId" element={<BattleFlow />} />
+          {/* Página propia y no un modal: verificar pide una URL que se pueda guardar y mandar. */}
+          <Route path="/play/battle/:battleId/verify" element={<VerifyBattlePage />} />
           <Route path="/play/demo/:mode" element={<DemoFlow />} />
           {/* Banco de pruebas de los reveals. Fuera de la navegación a propósito. */}
           <Route path="/demo" element={<DemoPage />} />

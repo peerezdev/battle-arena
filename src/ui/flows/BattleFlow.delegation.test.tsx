@@ -7,6 +7,10 @@ vi.mock('react-router-dom', () => ({
   useParams: () => ({ battleId: 'b1' }),
   useNavigate: () => vi.fn(),
   useSearchParams: () => [new URLSearchParams()],
+  // El resultado de royale enlaza a la página de verificación. El doble pinta un <a> de
+  // verdad para que un href equivocado siga siendo detectable desde los tests.
+  Link: ({ to, children, ...r }: { to: string; children?: unknown }) =>
+    <a href={to} {...r}>{children as never}</a>,
 }))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 vi.mock('../emotes/useBattleEmotes', () => ({ useBattleEmotes: vi.fn() }))

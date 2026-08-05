@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { shortWallet } from './RoyaleReveal'
@@ -74,6 +74,11 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
                 style={{ padding: '13px 22px', borderRadius: 12, border: 0, background: GRADIENT, color: '#06080b', fontFamily: FONTS.display, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>↻ Rematch</button>
               <button onClick={onExit}
                 style={{ padding: '13px 22px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: 'transparent', color: '#aab3bf', fontFamily: FONTS.body, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Back to lobby</button>
+              {/* Junto al resultado y no escondido en un menú: el momento de querer comprobar una
+                  tirada es justo al ver lo que salió. Lleva a una página propia, con URL, para
+                  poder mandársela a alguien. */}
+              <Link to={`/play/battle/${encodeURIComponent(battleId)}/verify`}
+                style={{ padding: '13px 22px', borderRadius: 12, border: `1px solid ${COLORS.border}`, background: 'transparent', color: '#aab3bf', textDecoration: 'none', fontFamily: FONTS.body, fontSize: 14, fontWeight: 700 }}>VRF</Link>
             </div>
           </div>
 

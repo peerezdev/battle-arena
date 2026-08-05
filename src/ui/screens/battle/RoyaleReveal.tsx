@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { startRematch } from '../../battle/startRematch'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
@@ -116,6 +116,7 @@ export function RoyaleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId?
       <ResultView
         vm={vm} name={name} ranked={ranked}
         onRematch={() => startRematch({ battleId, mode: 'royale', token: identityToken, navigate })} onExit={onExit}
+        battleId={battleId}
       />
     </div>
   )
@@ -443,9 +444,9 @@ function LootShowcase({ cards }: { cards: RevealCardVM[] }) {
 }
 
 // ─────────────────────────── RESULT VIEW ───────────────────────────
-function ResultView({ vm, name, ranked, onRematch, onExit }: {
+function ResultView({ vm, name, ranked, onRematch, onExit, battleId }: {
   vm: RevealVM; name: (p: RevealPlayerVM) => string; ranked: { p: RevealPlayerVM; rank: number }[]
-  onRematch: () => void; onExit?: () => void
+  onRematch: () => void; onExit?: () => void; battleId?: string
 }) {
   const champ = ranked[0]?.p
   const iAmPlayer = vm.players.some((p) => p.isMe)
@@ -532,6 +533,11 @@ function ResultView({ vm, name, ranked, onRematch, onExit }: {
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18, justifyContent: 'center' }}>
         <button onClick={onRematch} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '13px 26px', borderRadius: 13, border: 0, cursor: 'pointer', fontFamily: FONTS.display, fontSize: 15, fontWeight: 700, color: '#06170f', background: GRADIENT, boxShadow: '0 0 22px -6px rgba(0,255,196,.7)' }}>↻ Rematch</button>
         <button onClick={onExit} style={{ padding: '13px 26px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, cursor: 'pointer', fontFamily: FONTS.body, fontSize: 15, fontWeight: 600 }}>Back to lobby</button>
+        {/* Igual que en pack battle: junto al resultado, que es cuando dan ganas de comprobar. */}
+        {battleId && (
+          <Link to={`/play/battle/${encodeURIComponent(battleId)}/verify`}
+            style={{ padding: '13px 26px', borderRadius: 13, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.text, textDecoration: 'none', fontFamily: FONTS.body, fontSize: 15, fontWeight: 600 }}>VRF</Link>
+        )}
       </div>
     </div>
   )

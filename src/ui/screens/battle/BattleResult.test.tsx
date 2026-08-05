@@ -110,3 +110,20 @@ describe('BattleResult', () => {
     expect(screen.getByText(/No lobbies are filling right now/i)).toBeTruthy()
   })
 })
+
+describe('BattleResult · botón de VRF', () => {
+  beforeEach(() => {
+    mocks.wide = true          // el botón vive en el recuadro de You won/You lost, que es de escritorio
+    mocks.open = []
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('lleva a la página de verificación de ESA batalla', () => {
+    // Junto a "Back to lobby" a propósito: el momento de querer comprobar una tirada es al ver
+    // lo que salió, no rebuscando en un menú.
+    render(<MemoryRouter><BattleResult vm={baseVm} battleId="b-42" onExit={() => {}} /></MemoryRouter>)
+    const vrf = screen.getByRole('link', { name: 'VRF' })
+    expect(vrf.getAttribute('href')).toBe('/play/battle/b-42/verify')
+  })
+})

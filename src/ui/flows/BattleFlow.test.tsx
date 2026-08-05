@@ -4,7 +4,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 vi.mock('../../onchain/useBattle', () => ({ useBattle: vi.fn() }))
 vi.mock('../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'A' }))
 const nav = vi.hoisted(() => vi.fn())
-vi.mock('react-router-dom', () => ({ useParams: () => ({ battleId: 'b1' }), useNavigate: () => nav, useSearchParams: () => [new URLSearchParams()] }))
+vi.mock('react-router-dom', () => ({
+  useParams: () => ({ battleId: 'b1' }),
+  useNavigate: () => nav,
+  useSearchParams: () => [new URLSearchParams()],
+  // El resultado de royale enlaza a la página de verificación. El doble pinta un <a> de
+  // verdad para que un href equivocado siga siendo detectable desde los tests.
+  Link: ({ to, children, ...r }: { to: string; children?: unknown }) =>
+    <a href={to} {...r}>{children as never}</a>,
+}))
 vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 // La sala de espera pide la delegación antes de unirse (BattleFlow.onJoinSelf). Sin estos
 // dobles, el hook real tiraría de usePrivy/useSigners, que el mock de arriba no expone.

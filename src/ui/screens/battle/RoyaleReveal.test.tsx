@@ -153,3 +153,27 @@ describe('RoyaleReveal · móvil · separador de eliminados', () => {
     expect(text.indexOf('ELIMINATED')).toBeLessThan(text.indexOf('OUT·R1'))
   })
 })
+
+describe('RoyaleResult · botón de VRF', () => {
+  const settled: RevealVM = {
+    ...vm, status: 'settled', winner: 'A',
+    players: [
+      { wallet: 'A', isMe: true, accumulatedValue: 120, eliminatedRound: null, cards: [], total: 120 },
+      { wallet: 'B', isMe: false, accumulatedValue: 40, eliminatedRound: 1, cards: [], total: 40 },
+    ],
+  }
+
+  it('lleva a la página de verificación de ESA batalla', () => {
+    // Abajo del todo, junto a "Back to lobby", igual que en pack battle.
+    render(<MemoryRouter><RoyaleResult vm={settled} battleId="r-7" /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'VRF' }).getAttribute('href'))
+      .toBe('/play/battle/r-7/verify')
+  })
+
+  it('sin id de batalla no se pinta un enlace roto', () => {
+    // `battleId` es opcional en RoyaleResult; un enlace a /play/battle//verify no lleva a ningún
+    // sitio y en una pantalla de verificación eso desmiente lo que promete.
+    render(<MemoryRouter><RoyaleResult vm={settled} /></MemoryRouter>)
+    expect(screen.queryByRole('link', { name: 'VRF' })).toBeNull()
+  })
+})

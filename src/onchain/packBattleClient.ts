@@ -11,6 +11,11 @@ export interface BattlePullInfo {
   rarity: string | null; insured_value: number | null; auto_sold: boolean
   grade: number | null; year: string | null; name: string | null
   buyback_amount: number | null   // USDC base units (×1e6) when a card was auto-sold
+  /** Lo que entiende el VRF de Collector Crypt. Viaja también dentro de la transacción de compra. */
+  memo?: string | null
+  /** La transacción de compra, firmada por el jugador: la prueba de autoría. Nula en las tiradas
+   *  anteriores a que se guardara. */
+  tx_signature?: string | null
 }
 
 export interface Battle {
