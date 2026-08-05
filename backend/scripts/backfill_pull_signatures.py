@@ -28,7 +28,7 @@ import urllib.request
 from collections import defaultdict
 
 from app.config import get_settings
-from app.db import make_engine, make_session_factory
+from app.db import make_engine, make_session_factory, init_db
 from app.models import BattlePull
 
 PAGINAS = 5          # 5 × 1000 firmas por wallet: de sobra para el histórico actual
@@ -86,7 +86,13 @@ def main() -> int:
     if not url:
         print("falta SOLANA_RPC_URL"); return 1
 
-    Session = make_session_factory(make_engine(s.database_url))
+    # `init_db` antes de consultar, y no solo por costumbre: la columna `tx_signature` la crea
+    # `_ENSURE_COLUMNS`, que solo corre al arrancar el backend. Una base traída de una máquina con
+    # código anterior no la tiene, y la consulta de abajo revienta con "no such column" — que es
+    # justo el caso en el que hace falta este script. Es idempotente.
+    engine = make_engine(s.database_url)
+    init_db(engine)
+    Session = make_session_factory(engine)
     ses = Session()
     pendientes = (ses.query(BattlePull)
                   .filter(BattlePull.tx_signature.is_(None))
