@@ -27,7 +27,7 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
-from .services.privy_signer import PrivySigner
+from .services.privy_signer import PrivySigner, PrivyNoVerificable
 from .services import escrow_pool, machine_visibility
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
@@ -1329,9 +1329,41 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(502, f"sign/submit failed: {exc}")
         return {"signature": sig}
 
+    async def _exigir_delegacion(wallet_id: str) -> None:
+        """Puerta de entrada a una partida: sin poder firmar por el jugador, no entra.
+
+        POR QUÉ AQUÍ. Para tirar una caja, el servidor firma en nombre del jugador vía Privy. Si el
+        jugador no nos ha añadido como firmante, esa firma falla — pero falla al ARRANCAR la
+        partida, no al unirse, y para entonces el motor la anula para TODA la sala, con el escrow
+        ya creado. En mainnet tumbó una Pack Battle de 250 $ por un solo jugador sin delegar. Aquí
+        el daño se queda en quien lo causa: un 409 y nadie más se entera.
+
+        La puerta del frontend (ModeHub / BattleFlow) ya lo pide, pero se salta llamando al
+        endpoint a mano, así que no es una comprobación: es una comodidad.
+
+        SI PRIVY NO CONTESTA, SE RECHAZA (503, reintentable). Es la decisión incómoda: una caída de
+        Privy pasa a ser "no se puede entrar". Se elige eso porque dejar pasar reintroduce
+        exactamente el fallo que esto viene a cerrar, y su coste lo pagan terceros —los demás de la
+        sala— mientras que el coste de rechazar lo paga quien reintenta un minuto después. Además,
+        con Privy caído tampoco se podrían firmar las tiradas, así que "dejarle entrar" solo
+        retrasa el fallo hasta un sitio donde ya hace daño.
+
+        Sin `privy_signer` (dev sin Privy) no se comprueba nada: no hay firma que verificar.
+        """
+        if privy_signer is None:
+            return
+        try:
+            if not await privy_signer.podemos_firmar(wallet_id):
+                raise HTTPException(409, "enable signing on your wallet before playing — the game "
+                                         "signs your pack pulls for you")
+        except PrivyNoVerificable:
+            raise HTTPException(503, "could not verify your wallet right now; try again in a moment")
+
     @app.post("/pack-battles")
     async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),
                                  wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        # Quien crea también juega: la misma puerta que al unirse.
+        await _exigir_delegacion(wallet_id)
         price = await _machine_price(body.machine_code) if body.machine_code else 0
         mode = body.mode
 
@@ -1401,6 +1433,10 @@ def create_app(session_factory, chain: ChainSource,
         b = s.get(PackBattle, battle_id)
         if b is None:
             raise HTTPException(404, "battle not found")
+
+        # Antes de mirar saldo y antes de cobrar nada: si no podemos firmar por él, no entra. Vale
+        # igual para los dos modos, por eso va antes de la bifurcación.
+        await _exigir_delegacion(wallet_id)
 
         if b.mode == "royale":
             # For royale, check that the player can cover the buy-in.

@@ -367,6 +367,10 @@ def _make_royale_app(escrow_created_list=None, escrow_address="So1anaESCROWXXXXX
     counter = [0]
 
     class FakeSigner:
+        # Delegado: estos tests van de otra cosa. Los de la puerta de delegación viven aparte.
+        async def podemos_firmar(self, wallet_id):
+            return True
+
         async def create_solana_wallet(self):
             counter[0] += 1
             if escrow_created_list is not None:
@@ -636,6 +640,10 @@ def test_pack_cancel_releases_reservation_creator_only(client_priv, monkeypatch)
 
 
 class _FakeSigner:
+    # Delegado: estos tests van de otra cosa. Los de la puerta de delegación viven aparte.
+    async def podemos_firmar(self, wallet_id):
+        return True
+
     async def create_solana_wallet(self):
         return {"id": "esc-id", "address": "So1anaESCROW111111111111111111111111111111"}
 
@@ -1561,4 +1569,122 @@ def test_una_maquina_encendida_sigue_pudiendose_usar(monkeypatch):
         hide(s, "sweet_99")
     hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
     r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2}, headers=hdrs)
+    assert r.status_code == 200, r.text
+
+
+# ── Puerta de delegación ───────────────────────────────────────────────────────────────────────
+#
+# Para tirar una caja el servidor firma en nombre del jugador. Si no le ha añadido como firmante,
+# esa firma falla al ARRANCAR la partida y el motor la anula para TODA la sala, con el escrow ya
+# creado — en mainnet tumbó una Pack Battle de 250 $. Estas pruebas fijan que el rechazo ocurre al
+# entrar, donde el daño se queda en quien lo causa.
+#
+# La llamada a Privy va doblada: `podemos_firmar` responde sin salir a la red.
+
+class _SignerSinDelegar:
+    async def podemos_firmar(self, wallet_id):
+        return False
+
+    async def create_solana_wallet(self):
+        raise AssertionError("no debería llegar a crear escrow: la puerta va antes")
+
+
+class _SignerPrivyCaido:
+    async def podemos_firmar(self, wallet_id):
+        from app.services.privy_signer import PrivyNoVerificable
+        raise PrivyNoVerificable("privy no respondió")
+
+    async def create_solana_wallet(self):
+        raise AssertionError("no debería llegar a crear escrow: la puerta va antes")
+
+
+def _con_maquinas(monkeypatch):
+    async def _high_balance(*args, **kwargs):
+        return 200_000_000
+
+    async def _machines():
+        return [{"code": "pokemon_50", "price": 50, "available": True}]
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.services.gacha.GachaService.machines", lambda self: _machines())
+
+
+@pytest.mark.parametrize("mode", ["pack", "royale"])
+def test_sin_delegacion_no_se_puede_crear_partida(monkeypatch, mode):
+    _con_maquinas(monkeypatch)
+    c, priv = _build_client(signer=_SignerSinDelegar())
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2, "mode": mode},
+               headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+    assert r.status_code == 409, r.text
+    assert "enable signing" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("mode", ["pack", "royale"])
+def test_sin_delegacion_no_se_puede_unir_ni_se_le_cobra(monkeypatch, mode):
+    """Lo importante del royale: se rechaza ANTES de cobrar el buy-in."""
+    _con_maquinas(monkeypatch)
+    cobros: list = []
+
+    async def _cobra(*args, **kwargs):
+        cobros.append(args)
+        return "sig"
+
+    async def _bh(rpc_url):
+        return "FakeBH111111111111111111111111111111111111111"
+
+    monkeypatch.setattr("app.main.collect_buyin", _cobra)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+
+    # A (delegado) crea la partida; B (sin delegar) intenta entrar.
+    delegado = [True]
+
+    class _Signer:
+        async def podemos_firmar(self, wallet_id):
+            return delegado[0]
+
+        async def create_solana_wallet(self):
+            return {"id": "esc-id", "address": "So1anaESCROW111111111111111111111111111111"}
+
+    c, priv = _build_client(signer=_Signer())
+    jugadores = 5 if mode == "royale" else 2      # el royale exige de 5 a 10
+    r = c.post("/pack-battles",
+               json={"machine_code": "pokemon_50", "max_players": jugadores, "mode": mode},
+               headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+    assert r.status_code == 200, r.text
+    battle_id = r.json()["id"]
+    cobros_antes = len(cobros)
+
+    delegado[0] = False
+    r2 = c.post(f"/pack-battles/{battle_id}/join",
+                headers=_auth_headers(priv, WALLET_B, WALLET_ID_B))
+    assert r2.status_code == 409, r2.text
+    assert "enable signing" in r2.json()["detail"]
+    assert len(cobros) == cobros_antes, "se le cobró el buy-in a alguien que no puede jugar"
+
+    # Y no entró: la partida sigue esperando.
+    estado = c.get(f"/pack-battles/{battle_id}").json()
+    assert len(estado["players"]) == 1
+
+
+@pytest.mark.parametrize("mode", ["pack", "royale"])
+def test_con_privy_caido_se_rechaza_como_temporal(monkeypatch, mode):
+    """503, no 409: el jugador no ha hecho nada mal y tiene que poder reintentar.
+
+    Es la decisión incómoda —una caída de Privy impide entrar— y se elige porque dejar pasar
+    reintroduce el fallo que esto cierra, y ese lo pagan los demás de la sala.
+    """
+    _con_maquinas(monkeypatch)
+    c, priv = _build_client(signer=_SignerPrivyCaido())
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2, "mode": mode},
+               headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+    assert r.status_code == 503, r.text
+    assert "try again" in r.json()["detail"]
+
+
+def test_sin_privy_configurado_no_se_comprueba_nada(monkeypatch):
+    """En desarrollo sin Privy no hay firma que verificar: la puerta no puede cerrar el paso."""
+    _con_maquinas(monkeypatch)
+    c, priv = _build_client(signer=None)
+    r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2},
+               headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
     assert r.status_code == 200, r.text

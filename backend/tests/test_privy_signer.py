@@ -3,7 +3,8 @@ import pytest, respx
 from httpx import Response
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization, hashes
-from app.services.privy_signer import PrivySigner, PrivySignerError, authorization_signature
+from app.services.privy_signer import (PrivySigner, PrivySignerError, PrivyNoVerificable,
+                                       authorization_signature)
 
 def _p256_pem():
     key = ec.generate_private_key(ec.SECP256R1())
@@ -108,3 +109,112 @@ async def test_sign_solana_returns_signed_tx_camelcase():
     s = PrivySigner(app_id="a", app_secret="s", auth_key_pem=pem, cluster_caip2="solana:dev")
     out = await s.sign_solana("w1", "TX")
     assert out == "SIGNED_CAMEL"
+
+
+# ── podemos_firmar: la puerta de delegación ───────────────────────────────────────────────────
+#
+# La forma real de la respuesta está tomada de una wallet de verdad: el dueño es un key quorum con
+# el usuario dentro, y nuestro quorum aparece en `additional_signers`.
+
+QUORUM = "q9782k24n3445yoqmzwbgapg"
+
+
+def _signer(**kw):
+    pem, _ = _p256_pem()
+    return PrivySigner(app_id="a", app_secret="s", auth_key_pem=pem,
+                       cluster_caip2="solana:dev", quorum_id=QUORUM, **kw)
+
+
+def _ficha(owner="quorum-del-usuario", firmantes=()):
+    return {"id": "w1", "address": "So1ana", "chain_type": "solana", "owner_id": owner,
+            "policy_ids": [], "additional_signers": [{"signer_id": f} for f in firmantes]}
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_podemos_firmar_si_estamos_entre_los_firmantes():
+    respx.get("https://api.privy.io/v1/wallets/w1").mock(
+        return_value=Response(200, json=_ficha(firmantes=[QUORUM])))
+    assert await _signer().podemos_firmar("w1") is True
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_no_podemos_firmar_si_no_nos_ha_delegado():
+    # El caso que tumbó una Pack Battle de 250 $ en mainnet.
+    respx.get("https://api.privy.io/v1/wallets/w1").mock(
+        return_value=Response(200, json=_ficha(firmantes=["quorum-de-otra-app"])))
+    assert await _signer().podemos_firmar("w1") is False
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_podemos_firmar_si_la_wallet_es_nuestra():
+    # Los escrows los creamos nosotros con owner_id = nuestro quorum, sin firmantes añadidos.
+    respx.get("https://api.privy.io/v1/wallets/w1").mock(
+        return_value=Response(200, json=_ficha(owner=QUORUM)))
+    assert await _signer().podemos_firmar("w1") is True
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_la_lectura_no_lleva_firma_de_autorizacion():
+    """Mandar `privy-authorization-signature` en este GET hace que Privy conteste 403/1010.
+
+    Esa cabecera es para el `/rpc`, que USA la wallet, y va calculada sobre método+url+cuerpo.
+    """
+    ruta = respx.get("https://api.privy.io/v1/wallets/w1").mock(
+        return_value=Response(200, json=_ficha(firmantes=[QUORUM])))
+    await _signer().podemos_firmar("w1")
+    enviadas = ruta.calls.last.request.headers
+    assert "privy-authorization-signature" not in enviadas
+    assert enviadas["privy-app-id"] == "a"
+    assert enviadas["authorization"].startswith("Basic ")
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_privy_caido_no_es_un_no():
+    """No saber y saber que no son cosas distintas: quien llama tiene que poder distinguirlas."""
+    respx.get("https://api.privy.io/v1/wallets/w1").mock(return_value=Response(503, json={}))
+    with pytest.raises(PrivyNoVerificable):
+        await _signer().podemos_firmar("w1")
+
+
+@pytest.mark.asyncio
+async def test_sin_quorum_configurado_no_se_deja_pasar_a_nadie():
+    # Sin quorum este servidor no puede firmar por nadie; decir "sí" sería mandarlos a una partida
+    # que se va a caer igual.
+    pem, _ = _p256_pem()
+    s = PrivySigner(app_id="a", app_secret="s", auth_key_pem=pem, cluster_caip2="solana:dev")
+    with pytest.raises(PrivyNoVerificable):
+        await s.podemos_firmar("w1")
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_el_si_se_cachea_y_el_no_no():
+    """Asimetría deliberada: guardar el "no" castigaría al que acaba de delegar y reintenta."""
+    ruta = respx.get("https://api.privy.io/v1/wallets/w1").mock(
+        return_value=Response(200, json=_ficha(firmantes=["otro"])))
+    s = _signer(ttl_verificacion=999)
+    assert await s.podemos_firmar("w1") is False
+    assert await s.podemos_firmar("w1") is False
+    assert ruta.call_count == 2                    # el "no" vuelve a preguntar SIEMPRE
+
+    # Delega y reintenta: se entera al momento, sin esperar a que expire nada.
+    ruta.mock(return_value=Response(200, json=_ficha(firmantes=[QUORUM])))
+    assert await s.podemos_firmar("w1") is True
+    assert await s.podemos_firmar("w1") is True
+    assert ruta.call_count == 3                    # el "sí" ya no pregunta
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_el_si_cacheado_caduca():
+    ruta = respx.get("https://api.privy.io/v1/wallets/w1").mock(
+        return_value=Response(200, json=_ficha(firmantes=[QUORUM])))
+    s = _signer(ttl_verificacion=0)                # sin ventana: revocar se nota al instante
+    assert await s.podemos_firmar("w1") is True
+    assert await s.podemos_firmar("w1") is True
+    assert ruta.call_count == 2
