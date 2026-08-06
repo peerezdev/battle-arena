@@ -343,3 +343,125 @@ def test_el_mismo_jugador_en_otra_batalla_si_devenga(Session):
                           battle_id="b_dos", amount_base_units=500_000))
     s.commit()
     assert s.query(ReferralEarning).filter_by(referred_wallet="A").count() == 2
+
+
+# ── cambiar_dueño: reasignar un código a otra wallet ───────────────────────────────────────────
+
+from app.services.referral_earnings import cambiar_dueño, ClaimEnVuelo
+import pytest
+
+
+def _con_devengos(s, sin_cobrar=2, cobrado=1):
+    """Un código de VIEJA con devengos sin cobrar y, opcionalmente, alguno ya pagado."""
+    s.add(ReferralCode(code="IBAI", name="Ibai", owner_wallet="VIEJA"))
+    if cobrado:
+        pago = ReferralPayout(wallet="VIEJA", amount_base_units=500, status="sent")
+        s.add(pago); s.flush()
+        for _ in range(cobrado):
+            s.add(ReferralEarning(code="IBAI", referrer_wallet="VIEJA", referred_wallet="R",
+                                  battle_id="b0", amount_base_units=500, payout_id=pago.id))
+    for i in range(sin_cobrar):
+        s.add(ReferralEarning(code="IBAI", referrer_wallet="VIEJA", referred_wallet="R",
+                              battle_id=f"b{i+1}", amount_base_units=1000))
+    s.commit()
+
+
+def test_cambiar_dueño_se_lleva_lo_pendiente_y_deja_lo_pagado(Session):
+    """Lo que importa: el dinero sin cobrar sigue siendo reclamable, ahora por la nueva."""
+    s = Session()
+    _con_devengos(s)
+    r = cambiar_dueño(s, "IBAI", "NUEVA")
+    s.commit()
+
+    assert r["movidos"] == 2 and r["importe"] == 2000
+    assert s.get(ReferralCode, "IBAI").owner_wallet == "NUEVA"
+    # La nueva puede cobrarlo…
+    assert referrer_summary(s, "NUEVA")["unclaimed_base_units"] == 2000
+    # …y la vieja ya no lo ve como pendiente, pero conserva su histórico de lo ya pagado.
+    assert referrer_summary(s, "VIEJA")["unclaimed_base_units"] == 0
+    assert referrer_summary(s, "VIEJA")["lifetime_base_units"] == 500
+
+
+def test_cambiar_dueño_no_reescribe_los_pagos_ya_enviados(Session):
+    """Reescribirlos falsearía a quién se le pagó de verdad."""
+    s = Session()
+    _con_devengos(s)
+    cambiar_dueño(s, "IBAI", "NUEVA"); s.commit()
+    pagadas = s.query(ReferralEarning).filter(ReferralEarning.payout_id.isnot(None)).all()
+    assert [e.referrer_wallet for e in pagadas] == ["VIEJA"]
+
+
+def test_cambiar_dueño_se_niega_con_un_cobro_en_vuelo(Session):
+    """El caso peligroso: un payout `pending` NO ha marcado aún sus devengos (a propósito, para
+    que un pago fallido los deje reclamables), así que están con payout_id nulo y entrarían en la
+    mudanza. Si luego confirma, marcaría como pagado dinero que ya es de otra wallet."""
+    s = Session()
+    _con_devengos(s, cobrado=0)
+    pago, ids = claim_earnings(s, "VIEJA")
+    s.commit()
+    assert pago.status == "pending" and len(ids) == 2
+
+    with pytest.raises(ClaimEnVuelo):
+        cambiar_dueño(s, "IBAI", "NUEVA")
+    s.rollback()
+    assert s.get(ReferralCode, "IBAI").owner_wallet == "VIEJA"   # no se ha tocado nada
+
+    # Resuelto el pago (falla → el dinero vuelve a ser reclamable), ya se puede mover.
+    mark_payout_failed(s, pago)
+    r = cambiar_dueño(s, "IBAI", "NUEVA"); s.commit()
+    assert r["movidos"] == 2
+
+
+def test_cambiar_dueño_solo_mueve_los_devengos_de_ESE_codigo(Session):
+    """Una wallet puede tener varios códigos; cambiar uno no arrastra los demás."""
+    s = Session()
+    _con_devengos(s, cobrado=0)
+    s.add(ReferralCode(code="OTRO", name="Otro", owner_wallet="VIEJA"))
+    s.add(ReferralEarning(code="OTRO", referrer_wallet="VIEJA", referred_wallet="R",
+                          battle_id="bX", amount_base_units=777))
+    s.commit()
+
+    cambiar_dueño(s, "IBAI", "NUEVA"); s.commit()
+    assert referrer_summary(s, "NUEVA")["unclaimed_base_units"] == 2000   # no 2777
+    assert referrer_summary(s, "VIEJA")["unclaimed_base_units"] == 777
+    assert s.get(ReferralCode, "OTRO").owner_wallet == "VIEJA"
+
+
+def test_cambiar_dueño_codigo_inexistente(Session):
+    s = Session()
+    with pytest.raises(ValueError):
+        cambiar_dueño(s, "NOEXISTE", "NUEVA")
+
+
+def test_cambiar_dueño_a_la_misma_no_hace_nada(Session):
+    s = Session()
+    _con_devengos(s, cobrado=0)
+    r = cambiar_dueño(s, "IBAI", "VIEJA")
+    assert r["movidos"] == 0
+
+
+def test_no_se_puede_cobrar_dos_veces_lo_mismo(Session):
+    """Un segundo claim no debe volver a incluir lo ya pagado.
+
+    Sin el filtro `payout_id IS NULL` en `claim_earnings` esto pasaba desapercibido: ningún test
+    lo cubría, y el fallo es pagar dos veces el mismo dinero. Se encontró mutando el filtro y
+    viendo que la suite entera seguía en verde.
+    """
+    s = Session()
+    _con_devengos(s, sin_cobrar=2, cobrado=0)
+
+    pago, ids = claim_earnings(s, "VIEJA")
+    assert pago.amount_base_units == 2000
+    mark_payout_sent(s, pago, ids, "firma-1")
+
+    # Ya cobrado: no queda nada que reclamar.
+    assert referrer_summary(s, "VIEJA")["unclaimed_base_units"] == 0
+    otro, ids2 = claim_earnings(s, "VIEJA")
+    assert otro is None and ids2 == []
+
+    # Y con un devengo NUEVO, solo se cobra ese.
+    s.add(ReferralEarning(code="IBAI", referrer_wallet="VIEJA", referred_wallet="R",
+                          battle_id="b9", amount_base_units=333))
+    s.commit()
+    tercero, ids3 = claim_earnings(s, "VIEJA")
+    assert tercero.amount_base_units == 333 and len(ids3) == 1

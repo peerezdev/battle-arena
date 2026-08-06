@@ -129,3 +129,60 @@ def mark_payout_failed(session: Session, payout: ReferralPayout) -> None:
     """El pago no salió: las earnings siguen sin payout_id, así que se pueden volver a reclamar."""
     payout.status = "failed"
     session.commit()
+
+
+class ClaimEnVuelo(Exception):
+    """Hay un cobro a medias: no se sabe todavía de quién es ese dinero."""
+
+
+def cambiar_dueño(session: Session, code: str, nuevo: str) -> dict:
+    """Reasigna un código de referido a otra wallet, con su dinero pendiente.
+
+    POR QUÉ NO BASTA CON TOCAR `referral_codes`. Cada devengo guarda una COPIA de la dirección
+    (`referrer_wallet`) en el momento de generarse, y el cobro filtra por esa copia. Cambiar solo
+    el código dejaría lo ya devengado apuntando a la wallet vieja: invisible y no reclamable para
+    la nueva, sin ningún error que lo explicase.
+
+    QUÉ SE MUEVE Y QUÉ NO:
+
+      · devengos sin cobrar de ESE código  → se mueven; siguen reclamables por la nueva.
+      · pagos ya enviados                  → se quedan. Son el registro de a quién se le pagó,
+                                             y reescribirlo sería falsear el histórico.
+      · gimmighouls del referidor          → no se tocan. Son un contador ya sumado a un usuario;
+                                             moverlos es cosa aparte, y a mano.
+
+    SE NIEGA SI HAY UN COBRO EN VUELO. Un `ReferralPayout` en `pending` todavía NO ha marcado sus
+    devengos —a propósito, para que un pago fallido los deje reclamables—, así que están con
+    `payout_id` a nulo y entrarían en la mudanza. Si la transferencia confirma después, marcaría
+    como pagados unos devengos que ya son de otra wallet; si falla, quedarían reclamables por las
+    dos. No hay forma de acertar: solo se sabe de quién es ese dinero cuando el pago resuelve. Así
+    que se para y se avisa, que cuesta minutos, en vez de adivinar, que cuesta pagar dos veces.
+    """
+    rc = session.get(ReferralCode, code)
+    if rc is None:
+        raise ValueError(f"no existe el código {code!r}")
+    antiguo = rc.owner_wallet
+    if antiguo == nuevo:
+        return {"code": code, "antes": antiguo, "ahora": nuevo, "movidos": 0, "importe": 0}
+
+    if antiguo:
+        en_vuelo = session.query(ReferralPayout).filter(
+            ReferralPayout.wallet == antiguo, ReferralPayout.status == "pending").all()
+        if en_vuelo:
+            ids = ", ".join(str(p.id) for p in en_vuelo)
+            total = sum(p.amount_base_units for p in en_vuelo)
+            raise ClaimEnVuelo(
+                f"{antiguo} tiene {len(en_vuelo)} cobro(s) sin resolver (payout {ids}, "
+                f"${total / 1e6:.2f}). Espera a que confirme o falle y repite.")
+
+    pendientes = session.query(ReferralEarning).filter(
+        ReferralEarning.code == code,
+        ReferralEarning.referrer_wallet == antiguo,
+        ReferralEarning.payout_id.is_(None)).all()
+    importe = sum(e.amount_base_units for e in pendientes)
+    for e in pendientes:
+        e.referrer_wallet = nuevo
+    rc.owner_wallet = nuevo
+    session.flush()
+    return {"code": code, "antes": antiguo, "ahora": nuevo,
+            "movidos": len(pendientes), "importe": importe}

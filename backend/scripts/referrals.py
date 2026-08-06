@@ -3,7 +3,12 @@
 Usage (from backend/):
   PYTHONPATH=. .venv/bin/python3 scripts/referrals.py add CODE --name "Creator" \
       --boost 0.10 --referrer 0.10 --owner WALLET
+  PYTHONPATH=. .venv/bin/python3 scripts/referrals.py set-owner CODE --owner WALLET [--go]
   PYTHONPATH=. .venv/bin/python3 scripts/referrals.py list
+
+La wallet de --owner es siempre la EMBEBIDA del creador: es con la que la app le autentica
+(`privy.embedded_solana_wallet`), y el panel del referidor busca sus códigos por esa dirección
+exacta. Con cualquier otra, entra y ve cero referidos y cero ganancias, sin ningún error.
 """
 import argparse
 import sys
@@ -12,6 +17,7 @@ from app.config import get_settings
 from app.db import make_engine, make_session_factory, init_db
 from app.models import ReferralCode
 from app.services.referrals import create_referral_code, get_referral_code
+from app.services.referral_earnings import cambiar_dueño, ClaimEnVuelo
 from scripts._destino import anunciar
 
 
@@ -36,6 +42,39 @@ def cmd_add(args) -> int:
         s.commit()
         print(f"added {args.code} (name={args.name!r} boost={args.boost} "
               f"rake_share={args.rake_share} owner={args.owner})")
+        return 0
+    finally:
+        s.close()
+
+
+def cmd_set_owner(args) -> int:
+    """Cambia la wallet dueña de un código y se lleva con ella su dinero pendiente.
+
+    Dry-run por defecto, como el resto de scripts que tocan datos: dice qué movería y no escribe
+    hasta que se lo pides con --go.
+    """
+    Session = _session_factory()
+    s = Session()
+    try:
+        try:
+            r = cambiar_dueño(s, args.code, args.owner)
+        except ClaimEnVuelo as e:
+            print(f"NO se toca nada: {e}", file=sys.stderr)
+            return 1
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+
+        print(f"{r['code']}: {r['antes']} → {r['ahora']}")
+        print(f"  devengos sin cobrar que se mueven: {r['movidos']}  (${r['importe'] / 1e6:.2f})")
+        print("  pagos ya enviados: se quedan con la wallet anterior (registro de a quién se pagó)")
+        print("  gimmighouls del referidor: NO se mueven, son un contador ya sumado")
+        if args.go:
+            s.commit()
+            print("\nescrito.")
+        else:
+            s.rollback()
+            print("\n(dry-run: no se ha escrito nada — repite con --go)")
         return 0
     finally:
         s.close()
@@ -76,6 +115,12 @@ def main(argv=None) -> int:
                     help="fracción del rake de sus referidos que cobra el dueño (0.25 = 25%%)")
     pa.add_argument("--owner", default=None, help="owner wallet to credit the referrer cut to")
     pa.set_defaults(func=cmd_add)
+
+    ps = sub.add_parser("set-owner", help="cambiar la wallet dueña de un código")
+    ps.add_argument("code")
+    ps.add_argument("--owner", required=True, help="wallet EMBEBIDA nueva (la que usa la app)")
+    ps.add_argument("--go", action="store_true", help="escribir de verdad (por defecto: dry-run)")
+    ps.set_defaults(func=cmd_set_owner)
 
     pl = sub.add_parser("list", help="list all referral codes")
     pl.set_defaults(func=cmd_list)
