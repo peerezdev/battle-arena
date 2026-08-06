@@ -934,7 +934,8 @@ def create_app(session_factory, chain: ChainSource,
                 machine = await _machine_name(machine_code)
                 if machine:
                     extra["machine"] = machine
-                await _announce(f"pulled {name}", user=who, extra=extra, persist=True)
+                await _announce(f"pulled {name}", user=who, extra=extra, persist=True,
+                                wallet=drop.get("wallet"))
         except Exception:
             logger.exception("live drop broadcast failed")
 
@@ -994,9 +995,12 @@ def create_app(session_factory, chain: ChainSource,
                            for p in s.query(BattlePull).filter_by(battle_id=battle_id).all())
                 if entry <= 0 or take < winner_announce_mult * entry:
                     return
-                who = read_user_view(s, b.winner, elo_start).get("alias") or abbreviate(b.winner)
+                ganador = b.winner
+                who = read_user_view(s, ganador, elo_start).get("alias") or abbreviate(ganador)
+            # Se saca aquí dentro, como `mode` y `take`: fuera del `with`, `b` está desligado de la
+            # sesión y leerle un atributo puede reventar.
             label = "Battle Royale" if mode == "royale" else "Pack Battle"
-            await _announce(f"won a {label}", user=who,
+            await _announce(f"won a {label}", user=who, wallet=ganador,
                             extra={"event": "winner", "amountUsd": take, "mode": mode, "mult": round(take / entry, 2)},
                             action={"label": "View", "battleId": battle_id, "mode": mode}, persist=True)
         except Exception:
@@ -1796,7 +1800,8 @@ def create_app(session_factory, chain: ChainSource,
     _ANNOUNCER = "📢 Arena"
 
     async def _announce(text: str, *, user: Optional[str] = None, action: Optional[dict] = None,
-                        extra: Optional[dict] = None, persist: bool = False) -> None:
+                        extra: Optional[dict] = None, persist: bool = False,
+                        wallet: Optional[str] = None) -> None:
         """Post a system announcement into the lobby chat. `persist=True` stores it in history
         (highlights: big hits, winners); battle-created pings are live-only. `user` overrides the
         announcer name (e.g. the battle creator); `extra` adds structured fields for the client to
@@ -1805,6 +1810,10 @@ def create_app(session_factory, chain: ChainSource,
             author = user or _ANNOUNCER
             msg = {"type": "message", "kind": "system", "user": author,
                    "text": text, "ts": int(_time.time())}
+            # Los avisos nombran a una persona ("X ganó una Pack Battle"), así que ese nombre
+            # también lleva a su perfil. Los de la casa no tienen wallet y se quedan sin enlace.
+            if wallet:
+                msg["wallet"] = wallet
             if action:
                 msg["action"] = action
             if extra:
@@ -1812,7 +1821,7 @@ def create_app(session_factory, chain: ChainSource,
             if persist:
                 with session_factory() as s:
                     save_chat_message(s, author, text, msg["ts"], kind="system", action=action,
-                                      event=(extra or {}).get("event"),
+                                      wallet=wallet, event=(extra or {}).get("event"),
                                       amount_usd=(extra or {}).get("amountUsd"),
                                       machine=(extra or {}).get("machine"),
                                       mult=(extra or {}).get("mult"))
@@ -1842,7 +1851,7 @@ def create_app(session_factory, chain: ChainSource,
             return   # no open seat → nobody to invite
         label = "Battle Royale" if mode == "royale" else "Pack Battle"
         stake = (stake_base or 0) / 1_000_000
-        await _announce(f"created a {label}", user=creator_name,
+        await _announce(f"created a {label}", user=creator_name, wallet=battle.creator_wallet,
                         extra={"event": "created", "amountUsd": stake, "mode": mode},
                         action={"label": "Join", "battleId": battle.id, "mode": mode})
 
@@ -1912,9 +1921,11 @@ def create_app(session_factory, chain: ChainSource,
                 if not _chat_allow(wallet):
                     await ws.send_json({"type": "error", "error": "rate_limited"})
                     continue
-                msg = {"user": display_name, "text": text, "ts": int(_time.time())}
+                # La wallet viaja junto al nombre para poder ir a su perfil desde el chat. Es
+                # la embebida con la que ya está autenticado, así que no se pide nada nuevo.
+                msg = {"user": display_name, "wallet": wallet, "text": text, "ts": int(_time.time())}
                 with session_factory() as s:
-                    save_chat_message(s, display_name, text, msg["ts"])
+                    save_chat_message(s, display_name, text, msg["ts"], wallet=wallet)
                 await _chat_mgr.broadcast({"type": "message", **msg})
         except WebSocketDisconnect:
             _chat_mgr.disconnect(ws)

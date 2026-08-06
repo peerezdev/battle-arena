@@ -29,6 +29,7 @@ _ENSURE_COLUMNS = [
     ("pack_battles", "fee_pct", "FLOAT"),
     ("pack_battles", "fee_charged", "BOOLEAN NOT NULL DEFAULT 0"),
     ("battle_pulls", "tx_signature", "VARCHAR"),
+    ("chat_messages", "wallet", "VARCHAR"),
     ("battle_players", "buyin_paid", "INTEGER NOT NULL DEFAULT 0"),
     ("battle_players", "refund_amount", "INTEGER"),
     ("battle_players", "refunded_at", "DATETIME"),

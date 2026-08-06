@@ -6,6 +6,9 @@ import { addDrop, seedDrops, type LiveDrop } from '../ui/drops/dropsStore'
 export interface ChatAction { label: string; battleId: string; mode: string }
 export interface ChatLine {
   user: string
+  /** Wallet de quien habla, para enlazar a su perfil. Ausente en los mensajes anteriores a
+   *  que se guardara y en los avisos de la casa, que no son de nadie. */
+  wallet?: string
   text: string
   ts: number
   kind?: 'system'            // system announcements (battle created, big hit, winner)
@@ -59,6 +62,7 @@ export function useChat(enabled = true): {
 
     const linea = (m: Record<string, unknown>): ChatLine => ({
       user: m.user as string,
+      wallet: m.wallet as string | undefined,
       text: m.text as string,
       ts: m.ts as number,
       kind: m.kind as 'system' | undefined,

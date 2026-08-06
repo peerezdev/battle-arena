@@ -276,6 +276,10 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     author: Mapped[str] = mapped_column(String)   # display name (alias or abbreviated wallet)
+    # Wallet de quien habla, para poder ir a su perfil desde el chat. Nula en los mensajes
+    # anteriores a esta columna y en los avisos de la casa, que no son de nadie: quien pinte el
+    # nombre tiene que aguantar que falte, no darlo por hecho.
+    wallet: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     text: Mapped[str] = mapped_column(String)
     ts: Mapped[int] = mapped_column(Integer, index=True)   # unix seconds
     kind: Mapped[str] = mapped_column(String, default="user")            # "user" | "system" (announcements)

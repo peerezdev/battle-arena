@@ -1,9 +1,29 @@
 import { useState, useRef, useReducer, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { COLORS, FONTS, GRADIENT, formatUsd, rarityGlow } from '../../theme'
-import { useChat } from '../../../hooks/useChat'
+import { useChat, type ChatLine } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
 import { useProfile } from '../../../hooks/useProfile'
+
+/**
+ * El nombre de quien habla, enlazado a su perfil.
+ *
+ * Solo enlaza si el mensaje trae wallet. NO la tienen los mensajes anteriores a que se empezara a
+ * guardar ni los avisos de la casa, que no son de nadie — y un enlace a `/profile/undefined` es
+ * peor que texto plano: promete algo y lleva a una página vacía.
+ *
+ * El aspecto es el mismo en los dos casos a propósito: el nombre ya va coloreado por usuario, y
+ * subrayar solo unos pocos convertiría una lista de nombres en un mosaico.
+ */
+function Autor({ msg, style }: { msg: ChatLine; style: React.CSSProperties }) {
+  if (!msg.wallet) return <span style={style}>{msg.user}</span>
+  return (
+    <Link to={`/profile/${encodeURIComponent(msg.wallet)}`} title={`View ${msg.user}'s profile`}
+      style={{ ...style, textDecoration: 'none' }}>
+      {msg.user}
+    </Link>
+  )
+}
 import { useReducedMotion } from '../../useReducedMotion'
 import { showToast } from '../../toastBus'
 import { UsernameModal } from '../../components/UsernameModal'
@@ -548,7 +568,7 @@ export function ChatDock({
                   </span>
                 )}
                 <span style={{ flex: 1, fontSize: 12, fontFamily: FONTS.body, lineHeight: 1.35 }}>
-                  <span style={{ color: userColor(msg.user), fontWeight: 700 }}>{msg.user}</span>
+                  <Autor msg={msg} style={{ color: userColor(msg.user), fontWeight: 700 }} />
                   <span style={{ color: COLORS.muted }}> {msg.text} </span>
                   {msg.amountUsd != null && (
                     <span style={{ color: '#f5c542', fontWeight: 800 }}>{formatUsd(msg.amountUsd)}</span>
@@ -605,16 +625,15 @@ export function ChatDock({
                     }}
                   />
                   {/* Username */}
-                  <span
+                  <Autor
+                    msg={msg}
                     style={{
                       fontWeight: 700,
                       fontSize: 11.5,
                       color: userColor(msg.user),
                       fontFamily: FONTS.body,
                     }}
-                  >
-                    {msg.user}
-                  </span>
+                  />
                   {/* Timestamp */}
                   <span style={{ fontSize: 9, color: COLORS.muted, marginLeft: 'auto' }}>
                     {formatTs(msg.ts)}

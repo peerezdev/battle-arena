@@ -18,14 +18,15 @@ CHAT_KEEP = 50   # how many recent messages to retain / replay
 def save_chat_message(session, author: str, text: str, ts: int, *, kind: str = "user",
                       action: Optional[dict] = None, event: Optional[str] = None,
                       amount_usd: Optional[float] = None, machine: Optional[str] = None,
-                      mult: Optional[float] = None, keep: int = CHAT_KEEP) -> None:
+                      mult: Optional[float] = None, wallet: Optional[str] = None,
+                      keep: int = CHAT_KEEP) -> None:
     """Persist one chat message and prune to the newest `keep` (so the table stays bounded).
     kind='system' + optional action={label, battleId, mode} for announcements with a button.
     event ('hit'|'winner'|…) + amount_usd (+ machine, the gacha machine a hit came from) let
     persisted announcements re-render in their structured style (icon + name + gold value)
     after a reconnect, not just as plain text."""
     from app.models import ChatMessage
-    session.add(ChatMessage(author=author, text=text, ts=ts, kind=kind,
+    session.add(ChatMessage(author=author, text=text, ts=ts, kind=kind, wallet=wallet,
                             action=json.dumps(action) if action else None,
                             event=event, amount_usd=amount_usd, machine=machine, mult=mult))
     session.commit()
@@ -45,6 +46,10 @@ def recent_chat_messages(session, limit: int = CHAT_KEEP) -> list[dict]:
     out = []
     for r in rows:
         m = {"user": r.author, "text": r.text, "ts": r.ts}
+        # Solo si la hay: los mensajes viejos y los avisos de la casa no tienen dueño, y mandar
+        # `wallet: null` haría que el cliente pintase un enlace a /profile/null.
+        if r.wallet:
+            m["wallet"] = r.wallet
         if (r.kind or "user") != "user":
             m["kind"] = r.kind
             if r.action:

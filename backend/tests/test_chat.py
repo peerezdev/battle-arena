@@ -170,3 +170,45 @@ def test_ws_chat_falls_back_to_abbreviated_wallet():
         ws.send_json({"text": "hi"})
         msg = ws.receive_json()
         assert msg["user"] == abbreviate(WALLET)
+
+
+# ── La wallet viaja con el mensaje, para poder ir al perfil desde el chat ──────────────────────
+
+def test_el_mensaje_lleva_la_wallet_de_quien_habla():
+    app, priv = _chat_app()
+    token = make_id_token(priv, APP_ID, [solana_embedded(WALLET)])
+    client = TestClient(app)
+    with client.websocket_connect(f"/ws/chat?token={token}") as ws:
+        ws.receive_json(); ws.receive_json(); ws.receive_json()   # history, drops, presence
+        ws.send_json({"text": "hola"})
+        msg = ws.receive_json()
+        assert msg["wallet"] == WALLET
+
+
+def test_el_historial_tambien_la_lleva():
+    """Al reconectar, los mensajes viejos tienen que seguir siendo clicables."""
+    app, priv = _chat_app()
+    token = make_id_token(priv, APP_ID, [solana_embedded(WALLET)])
+    client = TestClient(app)
+    with client.websocket_connect(f"/ws/chat?token={token}") as ws:
+        ws.receive_json(); ws.receive_json(); ws.receive_json()
+        ws.send_json({"text": "hola"})
+        ws.receive_json()
+    with client.websocket_connect("/ws/chat") as otro:
+        historia = otro.receive_json()
+        assert historia["type"] == "history"
+        assert historia["messages"][-1]["wallet"] == WALLET
+
+
+def test_los_mensajes_sin_dueño_no_traen_wallet():
+    """Los avisos de la casa y lo guardado antes de esta columna no son de nadie: mandar
+    `wallet: null` haría que el cliente pintase un enlace a /profile/null."""
+    from app.chat import save_chat_message, recent_chat_messages
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False},
+                           poolclass=StaticPool)
+    init_db(engine)
+    with make_session_factory(engine)() as s:
+        save_chat_message(s, "Battle Arena", "auto royale abierta", 1, kind="system")
+        assert "wallet" not in recent_chat_messages(s)[0]
+        save_chat_message(s, "Mauro", "hola", 2, wallet=WALLET)
+        assert recent_chat_messages(s)[-1]["wallet"] == WALLET

@@ -155,3 +155,45 @@ describe('ChatDock live drops', () => {
     expect(screen.getByRole('button', { name: 'View' })).toBeTruthy()
   })
 })
+
+describe('ChatDock · perfiles clicables', () => {
+  it('el nombre de quien habla lleva a su perfil', () => {
+    chatState.messages = [{ user: 'Mauro', wallet: 'So1anaAAA111', text: 'hola', ts: 1 }]
+    renderDock()
+    const link = screen.getByRole('link', { name: 'Mauro' })
+    expect(link.getAttribute('href')).toBe('/profile/So1anaAAA111')
+  })
+
+  it('un aviso SIN dueño no enlaza, pero sigue enseñando el nombre', () => {
+    // El caso real: los avisos guardados antes de que existiera la columna `wallet`. Se pinta el
+    // nombre igual —la línea tiene que seguir leyéndose— pero sin enlace, porque
+    // `/profile/undefined` prometería un perfil que no existe.
+    //
+    // Con `event` a propósito: es la rama donde el nombre SÍ se pinta. Un aviso sin evento
+    // enseña solo el texto, así que allí no habría nada que comprobar.
+    chatState.messages = [{
+      user: 'Battle Arena', text: 'won a Pack Battle', ts: 1,
+      kind: 'system', event: 'winner', amountUsd: 500,
+    }]
+    renderDock()
+    expect(screen.queryByRole('link', { name: 'Battle Arena' })).toBeNull()
+    expect(screen.getByText('Battle Arena')).toBeTruthy()
+  })
+
+  it('un aviso CON dueño sí enlaza', () => {
+    // "X ganó una Pack Battle" nombra a una persona, y esa persona tiene perfil.
+    chatState.messages = [{
+      user: 'Neo', wallet: 'So1anaBBB222', text: 'won a Pack Battle', ts: 1,
+      kind: 'system', event: 'winner', amountUsd: 500,
+    }]
+    renderDock()
+    expect(screen.getByRole('link', { name: 'Neo' }).getAttribute('href'))
+      .toBe('/profile/So1anaBBB222')
+  })
+
+  it('la wallet va escapada', () => {
+    chatState.messages = [{ user: 'X', wallet: 'a/b?c', text: 'hola', ts: 1 }]
+    renderDock()
+    expect(screen.getByRole('link', { name: 'X' }).getAttribute('href')).toBe('/profile/a%2Fb%3Fc')
+  })
+})
