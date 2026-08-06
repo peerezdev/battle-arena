@@ -879,6 +879,41 @@ function ConfirmOpenModal({ count, machineName, image, total, onYes, onNo, reduc
   )
 }
 
+/**
+ * Una tirada suelta, con su Skip.
+ *
+ * Lo llevaba solo la secuencia de varios sobres (YOLO). En una sola no había forma de saltarse
+ * año → grado → rareza, y se nota sobre todo en el replay: quien abre el enlace ya sabe lo que
+ * salió, y aun así tenía que esperar la ceremonia entera.
+ *
+ * Mismo comportamiento que allí: el botón solo mientras corre la secuencia. En el detalle de la
+ * carta no queda nada que saltar —de ahí se sale con el botón de siempre— y ocupaba el hueco que
+ * la ficha necesita para llegar abajo.
+ */
+export function ResultadoConSkip({ result, reduced, buybackPct, onClose }: {
+  result: YoloResult
+  reduced: boolean
+  buybackPct: number | null
+  onClose: () => void
+}) {
+  const [saltado, setSaltado] = useState(false)
+  const [enLaCarta, setEnLaCarta] = useState(false)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <RevealResult result={result} reduced={reduced} buybackPct={buybackPct}
+        skipToCard={saltado ? 1 : 0} single onNext={onClose}
+        onCardStage={() => setEnLaCarta(true)} />
+      {!enLaCarta && (
+        <button className="ba-ghostbtn" onClick={() => setSaltado(true)}
+          style={{ padding: '9px 16px', borderRadius: 10, border: `1px solid ${COLORS.border}`,
+            background: 'transparent', color: COLORS.text, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
+          Skip ⏭
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── Reveal / opening overlay ──────────────────────────────────────────────────
 function RevealOverlay({
   phase,
@@ -1025,7 +1060,7 @@ function RevealOverlay({
 
       {/* Result — staged reveal (single open → inline Keep/Sell) */}
       {phase.kind === 'result' && (
-        <RevealResult result={phase.result} reduced={reduced} buybackPct={buybackPct ?? null} single onNext={onClose} />
+        <ResultadoConSkip result={phase.result} reduced={reduced} buybackPct={buybackPct ?? null} onClose={onClose} />
       )}
     </motion.div>
   )
