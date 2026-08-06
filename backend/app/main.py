@@ -6,7 +6,7 @@ import logging
 import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import FastAPI, Depends, Header, HTTPException, Path, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, Header, HTTPException, Path, Request, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
@@ -458,6 +458,18 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         return gacha
 
+    # El replay es público (no hay wallet a la que cobrarle el límite), así que se limita por IP.
+    # Sin esto seríamos un proxy gratis a Collector Crypt: una llamada suya por cada visita.
+    _replay_hits: dict[str, list[float]] = {}
+
+    def _replay_throttle(ip: str) -> None:
+        now = _time.time()
+        hits = [t for t in _replay_hits.get(ip, []) if now - t < 60.0]
+        if len(hits) >= gacha_rate_limit:
+            raise HTTPException(429, "too many replay requests")
+        hits.append(now)
+        _replay_hits[ip] = hits
+
     # ── ¿Es suya la carta que quiere vender? ─────────────────────────────────
     # La respuesta honesta la tiene la cadena, pero llega TARDE: la carta acaba de aterrizar en la
     # wallet y ni el RPC ni el índice de DAS la ven todavía. Medido en mainnet: hasta 5 s de "no
@@ -801,6 +813,43 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream unavailable")
+
+    @app.get("/gacha/replay/{memo}")
+    async def gacha_replay(memo: str, request: Request):
+        """Vuelve a montar una tirada ya hecha, para poder enseñarla.
+
+        PÚBLICO A PROPÓSITO. El sentido de esto es pegar el enlace en un vídeo o en X y que se vea
+        sin cuenta; con autenticación no serviría para lo que existe. Y no expone nada nuevo: el
+        memo ya está en la cadena y en el feed público de Collector Crypt, que además tiene su
+        propio replay abierto sobre el mismo dato.
+
+        NO ESCRIBE NADA. `openPack` es idempotente —repetirlo sobre un memo ya abierto devuelve la
+        misma carta—, así que esto es una lectura por mucho que al otro lado sea un POST. En
+        particular NO toca `opened_at`, ni los gimmighouls, ni el precio: repetir una tirada no es
+        volver a hacerla.
+
+        SOLO MEMOS NUESTROS. Se exige que el memo esté en nuestra base —de gacha o de batalla—
+        antes de preguntarle a CC. Sin ese filtro cualquiera podría usarnos de proxy para consultar
+        memos ajenos, y el límite por IP no llegaría a tiempo.
+        """
+        svc = _gacha_or_503()
+        _replay_throttle(request.client.host if request.client else "?")
+        with session_factory() as s:
+            nuestro = (s.get(GachaPack, memo) is not None
+                       or s.query(BattlePull).filter_by(memo=memo).first() is not None)
+        if not nuestro:
+            raise HTTPException(404, "unknown pull")
+        try:
+            out = await svc.open_pack(memo=memo)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
+        if out.get("pending") or not out.get("nft_address"):
+            # Un sobre generado y nunca abierto no tiene nada que repetir. Se distingue de "no
+            # existe" porque son cosas distintas para quien abrió el enlace.
+            raise HTTPException(409, "this pull was never opened")
+        return out
 
     @app.post("/gacha/open-pack")
     async def gacha_open(body: OpenPackBody,

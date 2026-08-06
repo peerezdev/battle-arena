@@ -6,6 +6,7 @@ import { getBattle, type Battle, type BattlePullInfo } from '../../../onchain/pa
 import { useAliases } from '../../useAliases'
 import { battleHref } from '../../battle/battleHref'
 import { solscanTxUrl, ccVrfUrl } from './verifyLinks'
+import { replayHref } from '../../../onchain/gachaClient'
 
 /**
  * Página de verificación de una batalla: una fila por tirada, con sus dos enlaces.
@@ -105,6 +106,9 @@ function Tirada({ p, alias }: { p: BattlePullInfo; alias: string }) {
         )}
       </div>
 
+      {/* El enlace de replay vive aquí porque es donde ya está el memo. Vuelve a reproducir la
+          animación de esa tirada, sin cuenta: es lo que hace falta para enseñarla en un vídeo. */}
+      {p.memo && <Copiable label="REPLAY LINK" value={replayHref(p.memo)} />}
       {p.memo && <Copiable label="MEMO" value={p.memo} />}
       {p.tx_signature && <Copiable label="SIGNATURE" value={p.tx_signature} />}
     </div>

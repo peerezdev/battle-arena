@@ -8,7 +8,7 @@ import { useWallet } from '../../../wallet/useWallet'
 import { useUsdcBalance } from '../../../wallet/useUsdcBalance'
 import { holdBalance } from '../../../wallet/balanceHold'
 import { notifyPendingPacksChanged } from './pendingPacksBus'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchMachines,
   fetchMachineCards,
@@ -28,6 +28,7 @@ import {
   type PendingPack,
   type OpenPackResult,
   type YoloPacksResponse,
+  replayPull,
 } from '../../../onchain/gachaClient'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
@@ -92,6 +93,26 @@ export default function GachaVault() {
   const [disabled, setDisabled] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>({ kind: 'machines' })
+
+  // ── Replay: ?replay=<memo> vuelve a montar una tirada ya hecha ──────────────
+  //
+  // Para poder ENSEÑARLA: se pega el enlace en un vídeo o en X y la animación se reproduce igual
+  // que el día que salió. No hace falta cuenta, y no vuelve a abrir nada — `openPack` de CC es
+  // idempotente, así que repetirlo devuelve la misma carta.
+  //
+  // Se lee una sola vez, al montar. Si el memo no es nuestro o el sobre nunca se abrió, se ignora
+  // en silencio y queda la pantalla de máquinas: un error a pantalla completa por un enlace mal
+  // copiado estorba más de lo que informa.
+  const [replayParams] = useSearchParams()
+  const replayMemo = replayParams.get('replay')
+  useEffect(() => {
+    if (!replayMemo) return
+    let cancelado = false
+    replayPull(replayMemo)
+      .then((result) => { if (!cancelado) setPhase({ kind: 'result', result }) })
+      .catch(() => { /* enlace inválido: se queda en las máquinas */ })
+    return () => { cancelado = true }
+  }, [replayMemo])
 
   // Mientras la tirada no esté revelada, el saldo mostrado se congela. Con turbo, CC recompra
   // las commons nada más abrir el sobre por dentro, así que el USDC sube antes de que el jugador

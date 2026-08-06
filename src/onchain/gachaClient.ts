@@ -221,6 +221,25 @@ export function openPack(token: string, memo: string): Promise<OpenPackResult> {
   })
 }
 
+/**
+ * Vuelve a montar una tirada ya hecha, a partir de su memo.
+ *
+ * SIN TOKEN a propósito: el enlace tiene que verse sin cuenta, que es justo para lo que existe —
+ * pegarlo en un vídeo o en X. El backend comprueba que el memo sea nuestro y limita por IP.
+ *
+ * No vuelve a abrir nada: `openPack` de Collector Crypt es idempotente, así que esto es una
+ * lectura aunque al otro lado sea un POST.
+ */
+export function replayPull(memo: string): Promise<Exclude<OpenPackResult, { pending: true }>> {
+  return gachaFetch(`/gacha/replay/${encodeURIComponent(memo)}`)
+}
+
+/** El enlace que se comparte. Absoluto, porque va a acabar pegado fuera de la app. */
+export function replayHref(memo: string, origin?: string): string {
+  const base = origin ?? (typeof window !== 'undefined' ? window.location.origin : '')
+  return `${base}/play/gacha?replay=${encodeURIComponent(memo)}`
+}
+
 // ── Polling (puro, testeable) ───────────────────────────────────────────────
 
 export function defaultDelayMs(attempt: number): number {

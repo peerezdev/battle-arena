@@ -38,3 +38,18 @@ describe('ccVrfUrl', () => {
     expect(ccVrfUrl('a b&c', true)).toContain('memo=a%20b%26c')
   })
 })
+
+describe('replayHref', () => {
+  it('es absoluto y lleva el memo', async () => {
+    const { replayHref } = await import('../../../onchain/gachaClient')
+    // Absoluto a propósito: acaba pegado fuera de la app (un vídeo, X), donde una ruta
+    // relativa no lleva a ninguna parte.
+    expect(replayHref('cc-abc', 'https://juego.test')).toBe(
+      'https://juego.test/play/gacha?replay=cc-abc')
+  })
+
+  it('escapa el memo', async () => {
+    const { replayHref } = await import('../../../onchain/gachaClient')
+    expect(replayHref('a b&c', 'https://x.test')).toContain('replay=a%20b%26c')
+  })
+})

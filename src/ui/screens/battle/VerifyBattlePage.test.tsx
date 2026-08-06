@@ -46,8 +46,18 @@ describe('VerifyBattlePage', () => {
     // Son el material con el que se comprueba a mano, no adorno: tienen que estar completos.
     getBattle.mockResolvedValue({ id: 'b1', pulls: [tirada()] })
     pintar()
-    expect(await screen.findByText(/cc-abc-123/)).toBeTruthy()
-    expect(screen.getByText(/SIGxyz/)).toBeTruthy()
+    // Exacto: el memo aparece también DENTRO del enlace de replay, así que una coincidencia
+    // parcial encontraría dos cosas y el test dejaría de decir cuál de las dos comprueba.
+    expect(await screen.findByRole('button', { name: 'cc-abc-123 · copy' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'SIGxyz · copy' })).toBeTruthy()
+  })
+
+  it('ofrece el enlace de replay de cada tirada', async () => {
+    // Es lo que se pega en un vídeo: tiene que ser absoluto y llevar el memo.
+    getBattle.mockResolvedValue({ id: 'b1', pulls: [tirada()] })
+    pintar()
+    const boton = await screen.findByRole('button', { name: /\/play\/gacha\?replay=cc-abc-123/ })
+    expect(boton).toBeTruthy()
   })
 
   it('sin firma dice por qué falta en vez de callarlo', async () => {

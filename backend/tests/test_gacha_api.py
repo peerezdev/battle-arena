@@ -1058,3 +1058,103 @@ def test_free_pack_traduce_los_rechazos_de_cc():
                    headers=_hdrs_con_id(priv, WALLET_REAL))
         assert r.status_code == 409, r.text
         assert espera in r.json()["detail"]
+
+
+# ── Replay: repetir una tirada ya hecha, para poder enseñarla ──────────────────────────────────
+#
+# Se apoya en que `openPack` de CC es idempotente: repetirlo sobre un memo ya abierto devuelve la
+# misma carta. Es su propio mecanismo (?replay=<memo>), medido contra su API.
+
+_CARTA = {"success": True, "nft_address": "NFT1", "rarity": "Epic",
+          "nftWon": {"id": "NFT1", "content": {"metadata": {"name": "Charizard"},
+                                               "files": [{"uri": "https://x/c.jpg"}]},
+                     "insuredValue": 500}}
+
+
+def _pack_abierto(c, memo="cc-replay-1", wallet=WALLET_A):
+    from app.models import GachaPack
+    from datetime import datetime, timezone
+    with c.session_factory() as s:
+        s.add(GachaPack(memo=memo, wallet=wallet, pack_type="pokemon_50",
+                        opened_at=datetime.now(timezone.utc), nft_address="NFT1"))
+        s.commit()
+
+
+@respx.mock
+def test_replay_devuelve_la_tirada_sin_autenticarse():
+    """Público a propósito: el enlace tiene que verse sin cuenta o no sirve para enseñar nada."""
+    c, _ = _client()
+    _pack_abierto(c)
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    r = c.get("/gacha/replay/cc-replay-1")          # sin cabecera Authorization
+    assert r.status_code == 200, r.text
+    assert r.json()["nft_address"] == "NFT1" and r.json()["rarity"] == "Epic"
+
+
+@respx.mock
+def test_replay_vale_para_una_tirada_de_batalla():
+    """Las de batalla son donde están los buenos pulls; viven en battle_pulls, no en gacha_packs."""
+    from app.models import BattlePull
+    c, _ = _client()
+    with c.session_factory() as s:
+        s.add(BattlePull(battle_id="b1", player_wallet=WALLET_A, memo="cc-batalla-1",
+                         nft_address="NFT1"))
+        s.commit()
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    assert c.get("/gacha/replay/cc-batalla-1").status_code == 200
+
+
+@respx.mock
+def test_replay_no_es_un_proxy_a_cc_para_memos_ajenos():
+    """Sin este filtro, cualquiera podría consultar memos que no son nuestros a través nuestro."""
+    c, _ = _client()
+    llamada = respx.post(f"{BASE}/api/openPack")
+    r = c.get("/gacha/replay/cc-de-otro")
+    assert r.status_code == 404
+    assert not llamada.called          # ni se le pregunta a CC
+
+
+@respx.mock
+def test_replay_no_reabre_ni_cobra_nada():
+    """Repetir una tirada no es volver a hacerla: no se toca `opened_at` ni el precio."""
+    from app.models import GachaPack
+    from datetime import datetime, timezone
+    c, _ = _client()
+    antes = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    with c.session_factory() as s:
+        s.add(GachaPack(memo="cc-replay-1", wallet=WALLET_A, pack_type="pokemon_50",
+                        opened_at=antes, nft_address="NFT1", price=50_000_000))
+        s.commit()
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    assert c.get("/gacha/replay/cc-replay-1").status_code == 200
+    with c.session_factory() as s:
+        p = s.get(GachaPack, "cc-replay-1")
+        assert p.opened_at.replace(tzinfo=timezone.utc) == antes
+        assert p.price == 50_000_000
+
+
+@respx.mock
+def test_replay_de_un_sobre_nunca_abierto():
+    """Distinto de "no existe": para quien abrió el enlace no es lo mismo."""
+    from app.models import GachaPack
+    c, _ = _client()
+    with c.session_factory() as s:
+        s.add(GachaPack(memo="cc-sin-abrir", wallet=WALLET_A, pack_type="pokemon_50"))
+        s.commit()
+    respx.post(f"{BASE}/api/openPack").mock(
+        return_value=Response(200, json={"code": "WAITING_FOR_WEBHOOK"}))
+    r = c.get("/gacha/replay/cc-sin-abrir")
+    assert r.status_code == 409
+    assert "never opened" in r.json()["detail"]
+
+
+@respx.mock
+def test_replay_limitado_por_ip():
+    """Es público, así que no hay wallet a la que cobrarle el límite: sin esto seríamos un proxy
+    gratis a Collector Crypt, una llamada suya por visita."""
+    c, _ = _client(rate_limit=3)
+    _pack_abierto(c)
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    codigos = [c.get("/gacha/replay/cc-replay-1").status_code for _ in range(5)]
+    assert codigos[:3] == [200, 200, 200]
+    assert codigos[3] == 429 and codigos[4] == 429
