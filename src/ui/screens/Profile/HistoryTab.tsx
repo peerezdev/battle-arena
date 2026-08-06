@@ -5,6 +5,7 @@ import { useMachines } from '../../useMachines'
 import { useAliases } from '../../useAliases'
 import { shortWallet } from '../battle/RoyaleReveal'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
+import { Link } from 'react-router-dom'
 
 interface BattleRow {
   kind?: 'battle' | 'gacha'
@@ -17,6 +18,7 @@ interface BattleRow {
   opponents: string[]
   ts: number | null
   pullName?: string | null   // gacha: pulled card name
+  memo?: string | null       // gacha: lo que identifica la tirada en CC (replay y VRF)
 }
 
 const GachaIcon = (
@@ -85,9 +87,23 @@ export function HistoryTab({ wallet }: { wallet?: string }) {
                   {gacha ? `Pulled ${r.pullName ?? 'a card'}` : `vs ${oppText(r)}`}
                 </div>
               </div>
-              <div style={{ textAlign: 'right', flex: 'none' }}>
-                <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.12em', color: posColor }}>{label}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: posColor }}>{positive ? '+' : '−'}{formatUsd(Math.abs(r.amountUsd))}</div>
+              <div style={{ textAlign: 'right', flex: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Replay de una tirada de gacha. Aquí es donde el jugador tiene su historial de
+                    sobres abiertos, así que es el sitio natural para volver a verla — y la URL
+                    resultante es la que se comparte. Solo en gacha: las de batalla se repiten
+                    desde la página de verificación de su partida. */}
+                {gacha && r.memo && (
+                  <Link to={`/play/gacha?replay=${encodeURIComponent(r.memo)}`} title="Replay this pull"
+                    style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.1em', textDecoration: 'none',
+                      color: COLORS.violet, border: `1px solid ${COLORS.violet}55`, borderRadius: 8,
+                      padding: '5px 9px', background: `${COLORS.violet}12`, whiteSpace: 'nowrap' }}>
+                    ▶ REPLAY
+                  </Link>
+                )}
+                <div>
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, letterSpacing: '.12em', color: posColor }}>{label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: posColor }}>{positive ? '+' : '−'}{formatUsd(Math.abs(r.amountUsd))}</div>
+                </div>
               </div>
             </div>
           )

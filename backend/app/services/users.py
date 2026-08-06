@@ -279,7 +279,12 @@ def read_user_battles(session: Session, wallet: str, limit: int = 20) -> list[di
         spent = (g.price or 0) / USDC
         out.append({
             "kind": "gacha",
-            "battleId": g.memo, "mode": "gacha", "machineCode": g.pack_type,
+            # `battleId` lleva el memo desde siempre —es lo que hace de clave de la fila— pero ese
+            # nombre no dice nada en una tirada de gacha. Se manda TAMBIÉN como `memo`, que es lo
+            # que entienden el replay y el VRF, para que quien lo use no tenga que saberse la
+            # coincidencia. El campo viejo se queda: hay UI que ya lo usa como key.
+            "battleId": g.memo, "memo": g.memo,
+            "mode": "gacha", "machineCode": g.pack_type,
             "result": "gacha", "amountUsd": value - spent,
             "pullName": g.name, "pullValue": value, "spentUsd": spent,
             "cards": 1, "opponents": [],

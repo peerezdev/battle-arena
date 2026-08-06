@@ -252,3 +252,18 @@ def test_una_victoria_sin_cartas_no_inventa_una(Session):
         s.commit()
         bv = read_user_stats(s, "W1")["bestVictory"]
         assert bv is not None and bv["bestCard"] is None
+
+
+def test_el_historial_de_gacha_lleva_el_memo(Session):
+    """El memo es lo que identifica la tirada en Collector Crypt: sin él, el historial no puede
+    ofrecer ni el replay ni el VRF. Viajaba ya como `battleId`, pero ese nombre no lo encuentra
+    nadie que busque una tirada de gacha."""
+    from datetime import datetime, timezone
+    from app.models import GachaPack
+    with Session() as s:
+        s.add(GachaPack(memo="cc-abc-123", wallet="W1", pack_type="pokemon_50",
+                        opened_at=datetime.now(timezone.utc), nft_address="N1",
+                        price=50_000_000, insured_value=180.0, name="Charizard"))
+        s.commit()
+        fila = [r for r in read_user_battles(s, "W1") if r["kind"] == "gacha"][0]
+        assert fila["memo"] == "cc-abc-123"
