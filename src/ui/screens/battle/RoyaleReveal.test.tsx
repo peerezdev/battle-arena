@@ -177,3 +177,27 @@ describe('RoyaleResult · botón de VRF', () => {
     expect(screen.queryByRole('link', { name: 'VRF' })).toBeNull()
   })
 })
+
+describe('RoyaleResult · perfiles clicables en Final standings', () => {
+  const settled: RevealVM = {
+    ...vm, status: 'settled', winner: 'A',
+    players: [
+      { wallet: 'So1anaAAA', isMe: true, accumulatedValue: 120, eliminatedRound: null, cards: [], total: 120 },
+      { wallet: 'So1anaBBB', isMe: false, accumulatedValue: 40, eliminatedRound: 1, cards: [], total: 40 },
+    ],
+  }
+
+  it('cada jugador lleva a su perfil', () => {
+    // Lo tenía el resultado de pack battle y no el de royale: la misma lista, dos comportamientos.
+    render(<MemoryRouter><RoyaleResult vm={settled} battleId="r1" /></MemoryRouter>)
+    const hrefs = screen.getAllByTitle('View profile').map((e) => e.getAttribute('href'))
+    expect(hrefs).toEqual(['/profile/So1anaAAA', '/profile/So1anaBBB'])
+  })
+
+  it('son enlaces, no divs con onClick', () => {
+    // Para poder abrirlos en otra pestaña y llegar con el teclado — mirar a varios jugadores
+    // seguidos es justo lo que se hace en esa lista.
+    render(<MemoryRouter><RoyaleResult vm={settled} battleId="r1" /></MemoryRouter>)
+    expect(screen.getAllByRole('link', { name: /You|So1ana/ }).length).toBeGreaterThanOrEqual(2)
+  })
+})

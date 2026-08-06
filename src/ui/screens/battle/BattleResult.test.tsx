@@ -127,3 +127,21 @@ describe('BattleResult · botón de VRF', () => {
     expect(vrf.getAttribute('href')).toBe('/play/battle/b-42/verify')
   })
 })
+
+describe('BattleResult · perfiles en Final standings', () => {
+  beforeEach(() => {
+    mocks.open = []
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ alias: null }) }))
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each([[true, 'escritorio'], [false, 'móvil']])('son enlaces (%s)', (wide) => {
+    // Eran divs con onClick: solo respondían al ratón. Como enlaces se llega con el teclado y se
+    // pueden abrir en otra pestaña, que es lo que se hace para comparar a varios jugadores.
+    mocks.wide = wide as boolean
+    render(<MemoryRouter><BattleResult vm={baseVm} battleId="b1" onExit={() => {}} /></MemoryRouter>)
+    const hrefs = screen.getAllByTitle('View profile').map((e) => e.getAttribute('href'))
+    expect(hrefs).toContain('/profile/A')
+    expect(hrefs).toContain('/profile/B')
+  })
+})

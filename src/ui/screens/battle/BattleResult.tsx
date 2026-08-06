@@ -94,11 +94,13 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
                   border: `1px solid ${isW ? 'rgba(60,232,168,.35)' : 'rgba(255,255,255,.07)'}`,
                 }}>
                   <span style={{ fontFamily: FONTS.mono, fontSize: 11, fontWeight: 700, color: RANK_INK[i] ?? '#7d8794', width: 20 }}>#{i + 1}</span>
-                  <div onClick={() => navigate(`/profile/${p.wallet}`)} title="View profile"
-                    style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: isW ? COLORS.text : '#cdd4dd', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                  {/* Enlace de verdad, no un div con onClick: se llega con el teclado y se abre
+                      en otra pestaña. Lo de antes solo respondía al ratón. */}
+                  <Link to={`/profile/${encodeURIComponent(p.wallet)}`} title="View profile"
+                    style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: isW ? COLORS.text : '#cdd4dd', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
                     {p.isMe && <span style={{ flex: 'none', fontSize: 9, fontWeight: 700, color: '#06221a', background: COLORS.green, borderRadius: 5, padding: '2px 5px' }}>YOU</span>}
-                  </div>
+                  </Link>
                   <span style={{ fontFamily: FONTS.mono, fontSize: 13, fontWeight: 700, color: isW ? COLORS.green : '#cdd4dd' }}>{formatUsd(p.total)}</span>
                 </div>
               )
@@ -222,11 +224,12 @@ export function BattleResult({ vm, battleId, onExit }: { vm: RevealVM; battleId:
                 background: isW ? '#ffd166' : 'rgba(255,255,255,.08)', color: isW ? '#2b2005' : '#cdd4dd',
               }}>#{i + 1}</span>
               <span style={{ flex: 'none', width: 28, height: 28, borderRadius: '50%', background: tintFor(p.wallet), display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 12, color: '#06170f' }}>{name(p).slice(0, 1).toUpperCase()}</span>
-              <div onClick={() => navigate(`/profile/${p.wallet}`)} style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <Link to={`/profile/${encodeURIComponent(p.wallet)}`} title="View profile"
+                style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: isW ? COLORS.text : '#cdd4dd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name(p)}</span>
                 {isW && <span style={{ flex: 'none', fontFamily: FONTS.mono, fontSize: 7.5, fontWeight: 700, color: '#2b2005', background: '#ffd166', borderRadius: 5, padding: '2px 6px' }}>🏆 WINNER</span>}
                 {p.isMe && <span style={{ flex: 'none', fontFamily: FONTS.mono, fontSize: 7.5, fontWeight: 700, color: COLORS.green, border: '1px solid rgba(60,232,168,.4)', borderRadius: 5, padding: '2px 6px' }}>YOU</span>}
-              </div>
+              </Link>
               <div style={{ marginLeft: 'auto', textAlign: 'right', lineHeight: 1.25, flex: 'none' }}>
                 <div style={{ fontFamily: FONTS.mono, fontSize: 7.5, letterSpacing: '.12em', color: '#7a8492' }}>PACK VALUE</div>
                 <div style={{ fontFamily: FONTS.mono, fontSize: 14, fontWeight: 700, color: isW ? COLORS.green : COLORS.text }}>{formatUsd(p.total)}</div>
