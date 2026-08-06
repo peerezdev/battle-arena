@@ -130,6 +130,12 @@ def main() -> int:
                 encontradas += 1
         fallidas += len(buscados)
         sin_localizar.extend((wallet, m) for m in buscados)
+        # Se guarda al terminar CADA wallet, no al final del todo. Recorrer devnet entero son
+        # decenas de minutos contra un RPC que ya se ha caído una vez a mitad: con un único commit
+        # final, un corte de red tiraba todo el trabajo. Guardando por wallet, relanzarlo continúa
+        # donde se quedó, porque la consulta solo pide las tiradas que siguen sin firma.
+        if args.go:
+            ses.commit()
         print(f"  → {len(tiradas) - len(buscados)} localizadas")
 
     print(f"\nlocalizadas {encontradas} · sin localizar {fallidas}")
@@ -139,7 +145,7 @@ def main() -> int:
             print(f"  {w[:6]}…  {m}")
 
     if args.go:
-        ses.commit()
+        ses.commit()   # por si quedó algo suelto; lo gordo ya se guardó wallet a wallet
         print("\nescrito.")
     else:
         print("\n(dry-run: no se ha escrito nada — repite con --go)")
