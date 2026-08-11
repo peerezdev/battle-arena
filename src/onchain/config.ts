@@ -97,6 +97,15 @@ export const config = {
    */
   dasRpcUrl,
   /**
+   * Redes sociales del proyecto, para los iconos del rail izquierdo.
+   *
+   * Vacías por defecto y el icono NO se pinta: un enlace social que lleva a ninguna parte es peor
+   * que no tenerlo, porque el que lo pulsa se lleva la impresión de que el proyecto está muerto.
+   * Se ponen en `.env` (`VITE_DISCORD_URL`, `VITE_X_URL`), que es donde ya viven el resto de URLs.
+   */
+  discordUrl: (import.meta.env.VITE_DISCORD_URL as string | undefined) ?? '',
+  xUrl: (import.meta.env.VITE_X_URL as string | undefined) ?? '',
+  /**
    * Host de Collector Crypt que sirve la imagen frontal de una carta por mint. Es POR RED
    * (devnet: nft-dev…; mainnet: nft…) — con el de devnet, un mint de mainnet da 404 y la carta
    * sale sin imagen. Espejo del CC_NFT_BASE_URL del backend. env: VITE_CC_NFT_BASE
