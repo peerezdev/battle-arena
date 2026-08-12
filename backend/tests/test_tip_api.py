@@ -208,7 +208,11 @@ def test_tip_is_rate_limited(monkeypatch):
 
 def test_tip_throttle_does_not_block_withdrawals(monkeypatch):
     """Contadores separados: gastar los tips no puede dejarte sin poder retirar."""
-    client, priv = _build_client(tip_rate_limit=1, tip_rate_window_s=60.0)
+    # Los dos límites se igualan a propósito: si los contadores estuvieran compartidos, agotar
+    # el de tip (1) también agotaría el de withdraw (1) y el withdraw fallaría con 429. Con
+    # contadores propios, el withdraw ni se entera de que el tip gastó su cupo.
+    client, priv = _build_client(tip_rate_limit=1, tip_rate_window_s=60.0,
+                                 withdraw_rate_limit=1, withdraw_rate_window_s=60.0)
     _mock_money(monkeypatch)
     _register(client, WALLET_A)
     _register(client, WALLET_B)
@@ -221,7 +225,7 @@ def test_tip_throttle_does_not_block_withdrawals(monkeypatch):
     resp = client.post("/users/me/withdraw",
                        json={"address": "So1anaDESTBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB1", "amount": 1.5},
                        headers=headers)
-    assert resp.status_code != 429
+    assert resp.status_code == 200, resp.text
 
 
 def test_tip_without_signer_is_unavailable(monkeypatch):
