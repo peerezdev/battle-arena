@@ -29,7 +29,7 @@ from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
 from .services.privy_signer import PrivySigner, PrivyNoVerificable
 from .services import escrow_pool, machine_visibility
-from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull
+from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull, Tip, User
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
                    recent_chat_messages, big_hit_multiple)
 from .services.pack_lobby import (
@@ -88,6 +88,12 @@ class WithdrawAddressBody(BaseModel):
 class WithdrawBody(BaseModel):
     address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # destination Solana wallet
     amount: float = Field(gt=0)  # USDC (dollars)
+
+
+class TipBody(BaseModel):
+    to: str
+    amount: float
+    source: str = "profile"     # "profile" | "chat"; solo para el historial
 
 
 class NftWithdrawBody(BaseModel):
@@ -203,6 +209,7 @@ def create_app(session_factory, chain: ChainSource,
                escrow_seed_lamports: int = 10_000_000,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
+               min_tip_usdc: float = 0.10,
                withdraw_rate_limit: int = 5,
                withdraw_rate_window_s: float = 60.0,
                withdraw_fee_pct: float = 0.0,
@@ -1321,6 +1328,50 @@ def create_app(session_factory, chain: ChainSource,
         return {"signature": sig, "amount": body.amount, "net": net / 1_000_000,
                 "fee": fee / 1_000_000, "address": body.address}
 
+    @app.post("/users/me/tip")
+    async def me_tip(body: TipBody, wallet: str = Depends(current_user),
+                     wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        """Propina en USDC de un jugador a OTRO JUGADOR.
+
+        El destino tiene que ser un usuario registrado, y eso no es una comodidad: como
+        `current_user` devuelve siempre la wallet embebida del token de Privy, exigir que el
+        destinatario exista en `users` garantiza que el dinero aterriza en otra wallet delegada
+        nuestra. Con destino libre, esto sería un `/users/me/withdraw` sin mínimo, sin comisión y
+        sin throttle, o sea la puerta de atrás del withdraw.
+
+        A diferencia del withdraw NO cobra comisión (el dinero sigue dentro de la plataforma y ya
+        la pagará al salir) y NO se bloquea durante una batalla: basta con respetar el saldo
+        reservado, y así se puede dar propina justo al terminar una partida, que es cuando apetece.
+        """
+        if privy_signer is None or not (privy_operator_wallet_id and privy_operator_address):
+            raise HTTPException(503, "tips_unavailable")
+        dest = (body.to or "").strip()
+        if s.get(User, dest) is None:
+            raise HTTPException(404, "that player does not have an account")
+        if dest == wallet:
+            raise HTTPException(422, "you cannot tip yourself")
+        amount = int(round(body.amount * 1_000_000))    # USDC base units
+        if amount <= 0:
+            raise HTTPException(422, "amount must be > 0")
+        min_base = int(round(min_tip_usdc * 1_000_000))
+        if amount < min_base:
+            raise HTTPException(422, f"the minimum tip is {min_tip_usdc} USDC")
+        await _require_available(wallet, amount, s)     # saldo on-chain menos lo reservado
+        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        try:
+            sig = await withdraw_usdc(solana_rpc_url, privy_signer, wallet_id, wallet,
+                                      privy_operator_wallet_id, privy_operator_address,
+                                      dest, cc_usdc_mint, amount, blockhash)
+        except Exception as exc:
+            raise HTTPException(502, f"tip failed: {exc}")
+        # La fila se escribe DESPUÉS de la firma: si la transferencia falla no hay historial que
+        # corregir, y si falla esta escritura el dinero ya se movió y la firma está en los logs,
+        # que es el menos malo de los dos fallos posibles.
+        source = body.source if body.source in ("profile", "chat") else "profile"
+        s.add(Tip(from_wallet=wallet, to_wallet=dest, amount=amount, signature=sig, source=source))
+        s.commit()
+        return {"signature": sig, "amount": amount / 1_000_000, "to": dest}
+
     @app.post("/users/me/nft/withdraw")
     async def me_nft_withdraw(body: NftWithdrawBody, wallet: str = Depends(current_user),
                              wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
@@ -2078,6 +2129,7 @@ def build_default_app() -> FastAPI:
                       dev_endpoints_enabled=s.dev_endpoints_enabled,
                       gacha_rate_limit=s.gacha_rate_limit,
                       min_withdraw_usdc=s.min_withdraw_usdc,
+                      min_tip_usdc=s.min_tip_usdc,
                       withdraw_rate_limit=s.withdraw_rate_limit,
                       withdraw_rate_window_s=s.withdraw_rate_window_s,
                       referral_payout_wallet_id=s.referral_payout_wallet_id,
