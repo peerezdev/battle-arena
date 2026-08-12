@@ -193,6 +193,55 @@ def test_tip_cannot_spend_balance_reserved_by_a_battle(monkeypatch):
     assert s.query(Tip).count() == 0
 
 
+def _add_battle(client, battle_id: str, mode: str, status: str, wallet: str):
+    """Mete una partida en la base con este jugador dentro, para probar las guardas de saldo."""
+    from app.models import PackBattle, BattlePlayer
+    s = client.session_factory()
+    s.add(PackBattle(id=battle_id, mode=mode, machine_code="m", price=25_000_000,
+                     max_players=5 if mode == "royale" else 2, status=status))
+    s.add(BattlePlayer(battle_id=battle_id, player_wallet=wallet))
+    s.commit()
+    s.close()
+
+
+def test_tip_is_blocked_while_a_royale_is_running(monkeypatch):
+    """El agujero de verdad: en una royale corriendo, el escrow ya le mandó a la wallet el precio
+    de la caja y ese importe NO lleva reserva, así que `_require_available` lo dejaría salir. Si
+    sale, la tirada falla, la partida se anula y el escrow queda corto a costa de los demás."""
+    client, priv = _build_client()
+    sent = _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    _add_battle(client, "r-running", "royale", "running", WALLET_A)
+
+    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.5},
+                       headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+
+    assert resp.status_code == 409, resp.text
+    # el mensaje dice qué pasa y cuándo se desbloquea, no solo que no
+    assert "royale" in resp.json()["detail"] and "ends" in resp.json()["detail"]
+    # lo que de verdad importa: no salió ni un base unit, ni quedó historial
+    assert sent == []
+    s = client.session_factory()
+    assert s.query(Tip).count() == 0
+
+
+def test_tip_works_during_a_pack_battle(monkeypatch):
+    """Lo que la guarda NO debe romper: en una pack battle el buy-in sigue en la wallet CON su
+    reserva, así que `_require_available` ya protege ese dinero y la propina puede salir."""
+    client, priv = _build_client()
+    sent = _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    _add_battle(client, "p-running", "pack", "running", WALLET_A)
+
+    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.5},
+                       headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+
+    assert resp.status_code == 200, resp.text
+    assert sent == [{"from": WALLET_A, "to": WALLET_B, "amount": 1_500_000}]
+
+
 def test_tip_is_rate_limited(monkeypatch):
     client, priv = _build_client(tip_rate_limit=2, tip_rate_window_s=60.0)
     _mock_money(monkeypatch)

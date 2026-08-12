@@ -51,7 +51,7 @@ from .services.solana_tx import build_memo_tx
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
 from .services.reservations import (reserve, reserved_total, royale_locked_total,
-                                     release_reservations, battle_in_progress)
+                                     release_reservations, battle_in_progress, royale_in_progress)
 from .services import emotes as emote_service
 from .services.bots import load_bots, pick_bot
 
@@ -1377,8 +1377,10 @@ def create_app(session_factory, chain: ChainSource,
         sin throttle, o sea la puerta de atrás del withdraw.
 
         A diferencia del withdraw NO cobra comisión (el dinero sigue dentro de la plataforma y ya
-        la pagará al salir) y NO se bloquea durante una batalla: basta con respetar el saldo
-        reservado, y así se puede dar propina justo al terminar una partida, que es cuando apetece.
+        la pagará al salir) y NO se bloquea durante cualquier batalla, solo durante una royale en
+        juego (`royale_in_progress`): así se puede dar propina en una pack battle o justo al
+        terminar una partida, que es cuando apetece, sin tocar el dinero que una royale en marcha
+        necesita para tirar.
         """
         if privy_signer is None or not (privy_operator_wallet_id and privy_operator_address):
             raise HTTPException(503, "tips_unavailable")
@@ -1394,6 +1396,15 @@ def create_app(session_factory, chain: ChainSource,
         if amount < min_base:
             raise HTTPException(422, f"the minimum tip is {min_tip_usdc} USDC")
         _tip_throttle(wallet)
+        # Solo se cierra la royale EN JUEGO, no la guarda entera del retiro: durante una pack
+        # battle el buy-in lleva reserva y `_require_available` ya lo protege, así que dar
+        # propina ahí (o justo al acabar cualquier partida) se conserva a propósito. La royale en
+        # marcha es otra cosa: el escrow le manda a la wallet el precio de cada caja justo antes
+        # de tirar y ese importe NO lleva reserva, así que se ve como saldo libre y una propina
+        # en esa ventana rompe la tirada, anula la partida y deja el escrow corto a costa de los
+        # reembolsos de los DEMÁS. El detalle está en royale_in_progress().
+        if royale_in_progress(s, wallet):
+            raise HTTPException(409, "you are playing a royale; you can tip once it ends")
         await _require_available(wallet, amount, s)     # saldo on-chain menos lo reservado
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         try:
