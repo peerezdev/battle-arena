@@ -3,11 +3,16 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 // Mock the chat hook so ChatDock doesn't open a real WebSocket. `chatState.messages` is
-// mutable so individual tests can inject system announcements.
-const { chatState } = vi.hoisted(() => ({ chatState: { messages: [] as any[] } }))
+// mutable so individual tests can inject system announcements. `chatState.ownWallet` backs
+// the useEmbeddedSolanaAddress mock below, so tip tests can set "who am I" per test.
+const { chatState } = vi.hoisted(() => ({ chatState: { messages: [] as any[], ownWallet: null as string | null } }))
 vi.mock('../../../hooks/useChat', () => ({
   useChat: () => ({ messages: chatState.messages, send: vi.fn(), canPost: false, online: 0 }),
 }))
+vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => chatState.ownWallet }))
+// TipModal is Task 5's own component, already tested there; ChatDock only needs to know
+// whether it renders (i.e. was opened), not its internals.
+vi.mock('../../components/TipModal', () => ({ TipModal: () => null }))
 
 import { ChatDock } from './ChatDock'
 import { addDrop } from '../../drops/dropsStore'
@@ -18,6 +23,7 @@ const renderDock = () => render(<MemoryRouter><ChatDock /></MemoryRouter>)
 beforeEach(() => {
   localStorage.clear()
   chatState.messages = []
+  chatState.ownWallet = null
 })
 
 describe('ChatDock live drops', () => {
@@ -195,5 +201,35 @@ describe('ChatDock · perfiles clicables', () => {
     chatState.messages = [{ user: 'X', wallet: 'a/b?c', text: 'hola', ts: 1 }]
     renderDock()
     expect(screen.getByRole('link', { name: 'X' }).getAttribute('href')).toBe('/profile/a%2Fb%3Fc')
+  })
+})
+
+describe('ChatDock · propina desde el chat', () => {
+  it('ofrece dar propina a quien habla, pero no a los avisos de la casa sin wallet', () => {
+    chatState.messages = [
+      { user: 'Rival', wallet: 'WalletB', text: 'hola', ts: 1 },
+      { user: 'House', wallet: undefined, text: 'aviso', ts: 2, kind: 'system' },
+    ]
+    renderDock()
+    expect(screen.getAllByRole('button', { name: /tip/i })).toHaveLength(1)
+  })
+
+  it('no ofrece propina en un aviso de la casa aunque nombre a un jugador con wallet', () => {
+    // Un evento estructurado (created/hit/winner) también pasa por `Autor` y puede traer
+    // wallet real (p.ej. "Neo won a Pack Battle") — pero sigue siendo un aviso de la casa,
+    // no un mensaje de Neo, así que no debe ofrecer propina.
+    chatState.messages = [{
+      user: 'Neo', wallet: 'WalletC', text: 'won a Pack Battle', ts: 1,
+      kind: 'system', event: 'winner', amountUsd: 500,
+    }]
+    renderDock()
+    expect(screen.queryByRole('button', { name: /tip/i })).toBeNull()
+  })
+
+  it('no ofrece dar propina a uno mismo', () => {
+    chatState.ownWallet = 'WalletA'
+    chatState.messages = [{ user: 'Yo', wallet: 'WalletA', text: 'hola', ts: 1 }]
+    renderDock()
+    expect(screen.queryByRole('button', { name: /tip/i })).toBeNull()
   })
 })
