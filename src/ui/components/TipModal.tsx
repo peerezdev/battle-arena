@@ -18,6 +18,7 @@ import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalanc
 import { useDelegationGate } from './useDelegationGate'
 import { DelegationGate } from './DelegationGate'
 import { sendTip, TipError, type TipErrorKind } from '../../onchain/tipClient'
+import { markTipInFlight, clearTipInFlight, isTipInFlight } from '../../onchain/tipInFlight'
 import { formatUsd } from '../theme'
 import { showToast } from '../toastBus'
 
@@ -62,7 +63,10 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
 
   const [amount, setAmount] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  // `busy` arranca preguntando al registro de envíos vivos, no en `false`: en el chat este
+  // componente se monta de cero cada vez que se abre el modal, así que su propio estado no sabe
+  // nada de la propina que sigue en vuelo desde la apertura anterior.
+  const [busy, setBusy] = useState(() => isTipInFlight(to.wallet))
 
   // Cada apertura, o un cambio de destinatario mientras está abierto, arranca de cero: si no, el
   // importe o el error de la propina ANTERIOR se cuelan en la siguiente (un tip de 3 a Ana que
@@ -87,7 +91,10 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
     if (open) {
       setAmount('')
       setError(null)
-      setBusy(false)
+      // Ojo: NO es `setBusy(false)`. Si la propina anterior a ESTE destinatario sigue viva (el
+      // jugador cerró el modal sin esperar), volver a habilitar el botón le deja mandar una
+      // segunda al mismo sitio. El envío vivo lo sabe el registro, no este componente.
+      setBusy(isTipInFlight(to.wallet))
     }
   }
 
@@ -121,9 +128,11 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
     setError(null)
     // Needs the wallet delegated so the server can sign the transfer (same as battles).
     gate.requireDelegation(async () => {
+      const dest = to.wallet
       setBusy(true)
+      markTipInFlight(dest)
       try {
-        await sendTip(identityToken, to.wallet, amountNum, source)
+        await sendTip(identityToken, dest, amountNum, source)
         showToast(`Sent ${formatUsd(amountNum)} to ${recipientLabel} ✓`, 'success')
         onClose()
       } catch (e) {
@@ -132,6 +141,7 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
         // segundo nivel para no dejar al jugador sin ningún mensaje.
         setError(e instanceof TipError ? MESSAGE[e.kind] : e instanceof Error ? e.message : String(e))
       } finally {
+        clearTipInFlight(dest)
         setBusy(false)
       }
     })

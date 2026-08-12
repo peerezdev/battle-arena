@@ -22,6 +22,7 @@ vi.mock('../../wallet/useDelegation', () => ({ useDelegation: vi.fn() }))
 
 import { sendTip } from '../../onchain/tipClient'
 import { useDelegation } from '../../wallet/useDelegation'
+import { clearTipInFlight } from '../../onchain/tipInFlight'
 
 const TO = { wallet: 'WalletB', alias: 'Rival' }
 const ALICE = { wallet: 'WalletAlice', alias: 'Alice' }
@@ -33,6 +34,9 @@ function delegationState(delegated: boolean) {
 
 beforeEach(() => {
   vi.mocked(sendTip).mockReset()
+  // El registro de envíos vivos es de módulo, así que sobrevive entre tests: un test que deja
+  // una propina colgada (sendTip que nunca resuelve) dejaría el botón del siguiente apagado.
+  for (const w of [TO.wallet, ALICE.wallet, BOB.wallet]) clearTipInFlight(w)
   // Por defecto, ya delegado: requireDelegation(fn) llama a fn() en el acto, igual que hacía el
   // passthrough del brief, pero ahora es el hook real el que lo decide, no un doble.
   vi.mocked(useDelegation).mockReturnValue(delegationState(true))
@@ -131,6 +135,28 @@ describe('TipModal', () => {
     rerender(<TipModal open to={BOB} source="profile" onClose={() => {}} />)
 
     expect(screen.queryByText(/does not have an account yet/i)).toBeNull()
+  })
+
+  it('en el chat, cerrar con una propina en vuelo y reabrir no deja mandar una segunda', async () => {
+    // El chat monta el modal con `{tipTarget && <TipModal open .../>}`: cerrarlo lo DESMONTA,
+    // así que el `busy` del componente muere con él y el botón volvía a estar activo con la
+    // primera propina todavía viva.
+    vi.mocked(sendTip).mockImplementation(() => new Promise(() => {}))   // nunca resuelve
+    const primera = render(<TipModal open to={BOB} source="chat" onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '4' } })
+    fireEvent.click(screen.getByRole('button', { name: /send tip/i }))
+    await waitFor(() => expect(sendTip).toHaveBeenCalledTimes(1))
+
+    primera.unmount()                                    // el jugador cierra el modal
+    render(<TipModal open to={BOB} source="chat" onClose={() => {}} />)   // y lo reabre sobre Bob
+
+    // El botón sigue apagado porque la primera propina no ha terminado...
+    const btn = screen.getByRole('button', { name: /sending/i })
+    expect((btn as HTMLButtonElement).disabled).toBe(true)
+    // ...y aunque se teclee un importe y se insista, no sale una segunda.
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '4' } })
+    fireEvent.click(btn)
+    expect(sendTip).toHaveBeenCalledTimes(1)
   })
 
   // ── Important 3 ───────────────────────────────────────────────────────────────
