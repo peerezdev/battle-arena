@@ -37,7 +37,11 @@ const MESSAGE: Record<TipErrorKind, string> = {
   too_many: 'Too many tips in a row. Try again in a minute.',
   invalid: 'Check the amount: there is a minimum, and you cannot tip yourself.',
   unavailable: 'Tips are unavailable right now. Try again later.',
-  failed: 'The tip could not be sent. Please try again.',
+  // `failed` cubre los fallos que ocurren DESPUÉS de mandar la transacción (502 tras firmar, o
+  // el commit posterior), así que el dinero puede haberse movido ya. No hay idempotencia en
+  // ninguna capa: invitar a reintentar a ciegas es invitar a pagar dos veces, y por eso el texto
+  // manda comprobar el saldo antes de repetir en vez de ofrecer un "try again".
+  failed: 'Something went wrong sending the tip. It may still have gone through, so check your balance before sending it again.',
 }
 
 const inputStyle: React.CSSProperties = {
