@@ -48,9 +48,15 @@ function Autor({
           title={`Tip ${msg.user}`}
           style={{
             marginLeft: 5,
+            // Área de toque de ~24x17px (antes ~18x11, por debajo del mínimo WCAG 2.2 AA de
+            // 24x24) sin ensanchar la fila del mensaje: el padding vertical crece la caja, y el
+            // margen negativo de igual magnitud la retrae de vuelta a la altura original — el
+            // hit-test usa la caja con padding, el flujo del layout usa la caja con margen.
+            marginTop: -3,
+            marginBottom: -3,
             background: 'transparent',
             border: 'none',
-            padding: 0,
+            padding: '3px 5px',
             color: COLORS.muted,
             fontFamily: FONTS.mono,
             fontSize: 9,
