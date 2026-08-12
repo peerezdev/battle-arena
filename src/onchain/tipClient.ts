@@ -8,6 +8,7 @@ export type TipErrorKind =
   | 'too_many'      // 429: demasiadas propinas seguidas
   | 'invalid'       // 422: importe bajo el mínimo, cero, o a uno mismo
   | 'unavailable'   // 503: firmante u operador no configurados
+  | 'in_royale'     // 409: el jugador tiene una royale en juego, su wallet la necesita la partida
   | 'failed'        // cualquier otra cosa
 
 export class TipError extends Error {
@@ -27,7 +28,7 @@ export interface TipResult {
 
 const BY_STATUS: Record<number, TipErrorKind> = {
   404: 'no_account', 402: 'insufficient', 429: 'too_many',
-  422: 'invalid', 503: 'unavailable',
+  422: 'invalid', 503: 'unavailable', 409: 'in_royale',
 }
 
 export async function sendTip(

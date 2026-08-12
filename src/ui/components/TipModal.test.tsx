@@ -106,6 +106,15 @@ describe('TipModal', () => {
     expect(sendTip).not.toHaveBeenCalledWith('tok', ALICE.wallet, 3, 'profile')
   })
 
+  it('explica que no se puede dar propina con una royale en juego, no el mensaje genérico', async () => {
+    vi.mocked(sendTip).mockRejectedValue(new TipError('in_royale'))
+    render(<TipModal open to={TO} source="profile" onClose={() => {}} />)
+    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: /send tip/i }))
+    expect(await screen.findByText('You cannot tip while a royale is in progress. It unlocks once the match ends.')).toBeTruthy()
+    expect(screen.queryByText(/it may still have gone through/i)).toBeNull()
+  })
+
   // ── Important 2 ───────────────────────────────────────────────────────────────
   it('un envío exitoso no deja el importe listo para reenviarse al reabrir sobre otro jugador', async () => {
     vi.mocked(sendTip).mockResolvedValue({ signature: 'sig', amount: 3, to: ALICE.wallet })

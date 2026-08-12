@@ -33,6 +33,7 @@ describe('sendTip', () => {
     [429, 'too_many'],
     [422, 'invalid'],
     [503, 'unavailable'],
+    [409, 'in_royale'],
     [502, 'failed'],
   ])('traduce el %i a %s', async (status, kind) => {
     vi.stubGlobal('fetch', mockFetch(status, { detail: 'lo que sea' }))
