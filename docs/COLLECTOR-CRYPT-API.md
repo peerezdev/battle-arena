@@ -232,25 +232,48 @@ transferBonusPoints(… nonce, signedTransaction)  →  {transferred, newBonusPo
 El `signedTransaction` es **la misma prueba de propiedad del `freePack`**: un memo firmado que no
 se envía a la cadena. Sirve el mismo `build_memo_tx` + `sign_solana`.
 
-#### Solo se transfiere la bolsa "bonus", y eso lo cambia todo
+#### La bolsa "bonus" es un CUPO, y es lo que limita cuánto se puede enviar
 
-`transferable` **no es** `points - usedPoints`. Solo se puede enviar lo que la wallet ha **recibido
-por transferencia**; los puntos ganados con tiradas no se mueven.
+`transferable` **no es** `points - usedPoints`, y tampoco es "lo recibido por transferencia", que
+es lo que decía aquí antes. El modelo real, medido:
 
-Lo medido en mainnet:
+- Cada wallet tiene un **cupo de envío** (`newBonusPoints` en la respuesta) que **lo crean las
+  transferencias RECIBIDAS** y que **baja exactamente lo que se envía**.
+- Lo que se puede mandar está acotado por ese cupo, pero **los puntos en sí pueden ser de
+  tiradas**: con cupo de sobra se envían puntos ganados jugando.
 
-- Las **19 wallets nuestras con saldo** suman **533.573 puntos gastables** y ninguna ha recibido
-  jamás una transferencia. Las dos que probamos (`2cdajp4Y…` con 29.175 y `EweRxQsf…` con 160.841)
-  dan `transferable: 0`, con el error explícito `you can send up to 0`.
-- `8QDBKx8…` sí tenía puntos recibidos, y ahí `transferable` valía 45.534. Se transfirieron enteros
-  en dos pasos (ids 6127 y 6129 de su historial), y `newBonusPoints` bajó exactamente lo enviado.
+Los números, de tres envíos reales desde `8QDBKx8…`:
 
-**Consecuencia: los ~3 millones varados en los escrows no se pueden rescatar por esta vía.** Son
-puntos de tiradas, no bolsa bonus. La pregunta que abría la sección de `altPlayerAddress` queda
-cerrada, y en negativo.
+| | enviado | cupo después |
+|---|---|---|
+| ids 6127 + 6129 | 1.000 + 44.534 | 347.773 → 302.239 |
+| id 6239 | 74.153 | 302.239 → 228.086 |
+
+El último es la prueba de que no hace falta haber recibido esos puntos: entre el segundo envío y el
+tercero esa wallet **no recibió ninguna transferencia**, solo ganó puntos tirando, y aun así los
+pudo mandar. Lo que se agotó en el segundo envío fue lo gastable, no el cupo.
+
+Al revés también se comprobó: `2cdajp4Y…` (29.175 puntos) y `EweRxQsf…` (160.841), que **nunca han
+recibido una transferencia**, tienen cupo 0 y dan `transferable: 0` con el error explícito
+`you can send up to 0`.
+
+**Consecuencia, que no cambia: los ~3 millones varados en los escrows no se pueden rescatar.** Los
+escrows nunca han recibido una transferencia, así que su cupo es cero. La pregunta que abría la
+sección de `altPlayerAddress` sigue cerrada en negativo, pero por el cupo, no por el origen de los
+puntos.
 
 Y para cualquier función de "enviar puntos": lo enviable hay que leerlo de `prepare`, nunca
 calcularlo con la fórmula de `freeSpins`.
+
+#### Después de un envío, `points - usedPoints` puede quedar NEGATIVO
+
+Medido: `transferable` (74.153) llegó a ser mayor que `points - usedPoints` (72.299), y tras el
+envío la resta quedó en **-1.854**. O sea que la fórmula de `freeSpins` no es la contabilidad que
+usa CC para transferir, y puede quedar por debajo de cero.
+
+No rompe nada nuestro porque los tres sitios que la calculan acotan a cero por su cuenta
+(`free_spins()` en `app/services/gacha.py`, y `tiradas_gratis()` / `tiradasGratis()`), pero
+quien escriba un cuarto tiene que saberlo.
 
 ### `getPoints`
 
