@@ -29,6 +29,7 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 | GET | `/health` | — | ping |
 | GET | `/auth/privy/me` | ✓ (Bearer identity token) | sub del usuario de Privy |
 | POST | `/users/me/alias {alias}` | ✓ | fija alias |
+| POST | `/users/me/tip` | ✓ | propina en USDC a otro jugador registrado, mínimo MIN_TIP_USDC, limitada por TIP_RATE_LIMIT, respeta saldo reservado, sin comisión |
 | GET | `/users/{wallet}` | — | perfil (lectura pura; default 1200 si no existe) |
 | GET | `/users/{wallet}/history` | — | historial de rating |
 | POST | `/matches {battle_pubkey, min_elo?, max_elo?}` | ✓ | registra partida abierta (verificada on-chain) |

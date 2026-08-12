@@ -106,7 +106,7 @@ En `backend/app/config.py`, justo después del bloque de `min_withdraw_usdc` (l�
     # todavía no tiene cuenta de USDC, el operador paga su renta (~0.002 SOL), así que sin mínimo
     # se le drena a base de propinas minúsculas a jugadores nuevos. El rate-limit es contra el
     # spam social, sobre todo desde el chat.
-    min_tip_usdc: float = 0.10            # propina mínima (USDC); env: MIN_TIP_USDC
+    min_tip_usdc: float = 1.0             # propina mínima (USDC); env: MIN_TIP_USDC
     tip_rate_limit: int = 10              # nº máx. de tips por wallet y ventana
     tip_rate_window_s: float = 60.0       # ventana del rate-limit de tips (segundos)
 ```
@@ -199,7 +199,7 @@ def _build_client(**overrides):
                   privy=privy, privy_signer=FakeSigner(), solana_rpc_url=DUMMY_RPC,
                   cc_usdc_mint=DUMMY_MINT, privy_operator_wallet_id="op-wallet-id",
                   privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
-                  min_tip_usdc=0.10)
+                  min_tip_usdc=1.0)
     kwargs.update(overrides)
     app = create_app(sf, MockChainSource(), **kwargs)
     client = TestClient(app, raise_server_exceptions=True)
@@ -277,7 +277,7 @@ class TipBody(BaseModel):
 En la firma de `create_app` (`backend/app/main.py:205`, junto a `min_withdraw_usdc`):
 
 ```python
-               min_tip_usdc: float = 0.10,
+               min_tip_usdc: float = 1.0,
 ```
 
 Y en la llamada de `main.py:2071` que construye la app desde los ajustes, añadir:

@@ -1,7 +1,7 @@
 # Tip en USDC a otro jugador — design
 
 Date: 2026-08-12
-Status: approved-pending-review
+Status: implemented
 
 ## Objetivo
 
@@ -44,7 +44,7 @@ tip sigue dentro de la plataforma y solo sale por el withdraw, con sus reglas in
 | Qué se envía | USDC |
 | A quién | Solo a un jugador registrado en `users` |
 | Desde dónde | Perfil ajeno y chat |
-| Mínimo | Sí, `min_tip_usdc` (0,10 por defecto) |
+| Mínimo | Sí, `min_tip_usdc` (1 USDC por defecto). El operador paga la renta de la cuenta USDC (~0,002 SOL) de cada destinatario nuevo; con 0,10 salía barato hacerle gastar SOL a base de propinas minúsculas a cuentas recién creadas. |
 | Throttle | Sí, por wallet emisora |
 | Comisión | **No.** El dinero sigue dentro de la plataforma y ya pagará comisión al retirarse |
 | Bloqueo por batalla en curso | **No.** Basta respetar el saldo reservado, y así se puede dar propina justo al acabar una partida |
@@ -77,7 +77,7 @@ compartirlos haría que dar propinas dejara al jugador sin poder retirar.
 ### Ajustes nuevos en `config.py`
 
 ```python
-min_tip_usdc: float = 0.10        # env: MIN_TIP_USDC
+min_tip_usdc: float = 1.0         # env: MIN_TIP_USDC
 tip_rate_limit: int = 10          # env: TIP_RATE_LIMIT
 tip_rate_window_s: float = 60.0   # env: TIP_RATE_WINDOW_S
 ```
