@@ -13,8 +13,17 @@ comisión y sin throttle, o sea una puerta trasera para sacar fondos de la plata
 
 Esa defensa se apoya en un hecho del código, verificado: `current_user` devuelve **siempre** la
 wallet embebida derivada del token de identidad de Privy (`main.py:248`), así que la `wallet` de
-una fila de `users` es por construcción una wallet delegada nuestra. El dinero que entra por un
-tip sigue dentro de la plataforma y solo sale por el withdraw, con sus reglas intactas.
+una fila de `users` creada por el alta normal es una wallet delegada nuestra. El dinero que entra
+por un tip sigue dentro de la plataforma y solo sale por el withdraw, con sus reglas intactas.
+
+**Pero esto no es una invariante estructural, es una casualidad que se cumple hoy**: nada obliga a
+que toda fila de `users` sea una wallet embebida. `get_or_create_user` no valida nada, y
+`services/matches.py:89` da de alta usuarios con una wallet leída del estado **on-chain** de una
+batalla, que podría ser una dirección externa cualquiera. No es explotable ahora (ese contrato no
+está desplegado y la ruta muere antes en un 404), y por eso no se toca aquí. Queda anotado en el
+docstring de `me_tip`: si esa vía revive o aparece otra alta con wallet no verificada, el tip pasa
+a poder sacar USDC de la plataforma sin mínimo, sin comisión y sin throttle, y entonces habrá que
+validar en el endpoint que el destino es una wallet embebida delegada, no solo que existe.
 
 ## Contexto (código actual)
 

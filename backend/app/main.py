@@ -1376,6 +1376,16 @@ def create_app(session_factory, chain: ChainSource,
         nuestra. Con destino libre, esto sería un `/users/me/withdraw` sin mínimo, sin comisión y
         sin throttle, o sea la puerta de atrás del withdraw.
 
+        OJO, y esto es lo que hay que vigilar al tocar esto: esa garantía vale mientras TODA fila
+        de `users` sea una wallet embebida nuestra, y eso hoy es cierto por accidente, no por
+        construcción. `get_or_create_user` no comprueba nada, y `services/matches.py:89` da de
+        alta usuarios con una wallet leída del estado ON-CHAIN de una batalla, que podría ser
+        cualquier dirección externa. No es explotable ahora mismo (ese contrato no está desplegado
+        y la ruta muere antes en un 404), pero el día que lo esté, o que aparezca otra alta de
+        usuario con wallet de origen no verificado, este endpoint pasa a poder mandar USDC fuera
+        de la plataforma sin mínimo, sin comisión y sin throttle. Si se añade una vía así, hay que
+        validar aquí que el destino es una wallet embebida delegada, no basta con que exista.
+
         A diferencia del withdraw NO cobra comisión (el dinero sigue dentro de la plataforma y ya
         la pagará al salir) y NO se bloquea durante cualquier batalla, solo durante una royale en
         juego (`royale_in_progress`): así se puede dar propina en una pack battle o justo al
