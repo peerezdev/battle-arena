@@ -214,6 +214,8 @@ def create_app(session_factory, chain: ChainSource,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
                min_tip_usdc: float = 1.0,
+               tip_rate_limit: int = 10,
+               tip_rate_window_s: float = 60.0,
                withdraw_rate_limit: int = 5,
                withdraw_rate_window_s: float = 60.0,
                withdraw_fee_pct: float = 0.0,
@@ -1245,6 +1247,19 @@ def create_app(session_factory, chain: ChainSource,
         hits.append(now)
         _withdraw_hits[wallet] = hits
 
+    # Throttle de tips, con contadores PROPIOS. Compartirlos con el withdraw haría que dar
+    # propinas dejara al jugador sin poder retirar, y son dos límites con motivos distintos: el
+    # del withdraw protege la renta de ATA que paga el operador; este, del spam social.
+    _tip_hits: dict[str, list[float]] = {}
+
+    def _tip_throttle(wallet: str) -> None:
+        now = _time.time()
+        hits = [t for t in _tip_hits.get(wallet, []) if now - t < tip_rate_window_s]
+        if len(hits) >= tip_rate_limit:
+            raise HTTPException(429, "too many tips, try again later")
+        hits.append(now)
+        _tip_hits[wallet] = hits
+
     @app.post("/gacha/free-pack")
     async def gacha_free_pack(body: GeneratePackBody, wallet: str = Depends(current_user),
                               wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
@@ -1378,6 +1393,7 @@ def create_app(session_factory, chain: ChainSource,
         min_base = int(round(min_tip_usdc * 1_000_000))
         if amount < min_base:
             raise HTTPException(422, f"the minimum tip is {min_tip_usdc} USDC")
+        _tip_throttle(wallet)
         await _require_available(wallet, amount, s)     # saldo on-chain menos lo reservado
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         try:
@@ -2153,6 +2169,8 @@ def build_default_app() -> FastAPI:
                       gacha_rate_limit=s.gacha_rate_limit,
                       min_withdraw_usdc=s.min_withdraw_usdc,
                       min_tip_usdc=s.min_tip_usdc,
+                      tip_rate_limit=s.tip_rate_limit,
+                      tip_rate_window_s=s.tip_rate_window_s,
                       withdraw_rate_limit=s.withdraw_rate_limit,
                       withdraw_rate_window_s=s.withdraw_rate_window_s,
                       referral_payout_wallet_id=s.referral_payout_wallet_id,

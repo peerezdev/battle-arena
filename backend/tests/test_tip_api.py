@@ -176,6 +176,54 @@ def test_tip_with_infinite_amount_is_rejected(monkeypatch):
     assert resp.status_code == 422, resp.text
 
 
+def test_tip_cannot_spend_balance_reserved_by_a_battle(monkeypatch):
+    """El saldo on-chain llega, pero está comprometido por una batalla en curso."""
+    client, priv = _build_client()
+    sent = _mock_money(monkeypatch, balance=2_000_000)      # 2 USDC en la wallet
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    monkeypatch.setattr("app.main.reserved_total", lambda s, w: 1_800_000)   # 1.8 comprometidos
+
+    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.0},
+                       headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+
+    assert resp.status_code == 402
+    assert sent == []
+    s = client.session_factory()
+    assert s.query(Tip).count() == 0
+
+
+def test_tip_is_rate_limited(monkeypatch):
+    client, priv = _build_client(tip_rate_limit=2, tip_rate_window_s=60.0)
+    _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    headers = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    body = {"to": WALLET_B, "amount": 1.0}
+
+    assert client.post("/users/me/tip", json=body, headers=headers).status_code == 200
+    assert client.post("/users/me/tip", json=body, headers=headers).status_code == 200
+    assert client.post("/users/me/tip", json=body, headers=headers).status_code == 429
+
+
+def test_tip_throttle_does_not_block_withdrawals(monkeypatch):
+    """Contadores separados: gastar los tips no puede dejarte sin poder retirar."""
+    client, priv = _build_client(tip_rate_limit=1, tip_rate_window_s=60.0)
+    _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    headers = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    assert client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.0},
+                       headers=headers).status_code == 200
+    assert client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.0},
+                       headers=headers).status_code == 429
+    # el withdraw sigue disponible: su throttle es otro
+    resp = client.post("/users/me/withdraw",
+                       json={"address": "So1anaDESTBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB1", "amount": 1.5},
+                       headers=headers)
+    assert resp.status_code != 429
+
+
 def test_tip_without_signer_is_unavailable(monkeypatch):
     client, priv = _build_client(privy_signer=None)
     _mock_money(monkeypatch)
