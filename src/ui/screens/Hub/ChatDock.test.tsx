@@ -251,6 +251,20 @@ describe('ChatDock · propina desde el chat', () => {
     expect(screen.queryByRole('button', { name: /tip/i })).toBeNull()
   })
 
+  it('el botón TIP mide al menos 24px de alto (WCAG 2.2 AA, criterio 2.5.8)', () => {
+    // jsdom no hace layout real (getBoundingClientRect siempre da 0 ahí), así que se mide la
+    // caja a partir de los estilos EN LÍNEA que React aplicó de verdad (no una estimación): con
+    // box-sizing por defecto (content-box), alto de caja = lineHeight + paddingTop + paddingBottom.
+    chatState.messages = [{ user: 'Rival', wallet: 'WalletB', text: 'hola', ts: 1 }]
+    renderDock()
+    const btn = screen.getByRole('button', { name: /tip rival/i })
+    const contentHeight = parseFloat(btn.style.lineHeight)
+    const paddingTop = parseFloat(btn.style.paddingTop)
+    const paddingBottom = parseFloat(btn.style.paddingBottom)
+    const boxHeight = contentHeight + paddingTop + paddingBottom
+    expect(boxHeight).toBeGreaterThanOrEqual(24)
+  })
+
   it('pulsar el botón de UN autor concreto (no el primero) abre el modal con SU wallet y alias', () => {
     // Regresión contra un cableado que siempre coja el primer mensaje de la lista: con un solo
     // modal para toda la lista (decisión de Task 7), un `onTip` que ignore qué botón se pulsó

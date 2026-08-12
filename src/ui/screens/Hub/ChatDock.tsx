@@ -48,18 +48,24 @@ function Autor({
           title={`Tip ${msg.user}`}
           style={{
             marginLeft: 5,
-            // Área de toque de ~24x17px (antes ~18x11, por debajo del mínimo WCAG 2.2 AA de
-            // 24x24) sin ensanchar la fila del mensaje: el padding vertical crece la caja, y el
-            // margen negativo de igual magnitud la retrae de vuelta a la altura original — el
-            // hit-test usa la caja con padding, el flujo del layout usa la caja con margen.
-            marginTop: -3,
-            marginBottom: -3,
+            // Área de toque de al menos 24x24 (WCAG 2.2 AA, criterio 2.5.8: no aplica ninguna
+            // excepción aquí, ni está en un bloque de prosa ni hay 24px de separación con el
+            // enlace del perfil, a solo 5px). `lineHeight` fijo evita depender del alto de línea
+            // 'normal' del navegador (variable según fuente): con 11px de contenido y 7px de
+            // padding arriba y abajo, la caja mide 11+7+7=25px. El margen negativo de la misma
+            // magnitud retrae esa altura del cálculo de "cuánto ocupa este elemento en el flujo"
+            // (un ítem flex contribuye a la altura de la fila por su caja de MARGEN, no la de
+            // contenido) — el padding agranda solo la caja de clic/visible, la fila del mensaje
+            // sigue dominada por el avatar de 21px, sin ensancharse.
+            marginTop: -7,
+            marginBottom: -7,
             background: 'transparent',
             border: 'none',
-            padding: '3px 5px',
+            padding: '7px 5px',
             color: COLORS.muted,
             fontFamily: FONTS.mono,
             fontSize: 9,
+            lineHeight: '11px',
             fontWeight: 700,
             letterSpacing: '.04em',
             cursor: 'pointer',
