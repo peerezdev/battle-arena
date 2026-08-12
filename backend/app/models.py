@@ -312,3 +312,21 @@ class EscrowWallet(Base):
     claimed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     times_used: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Tip(Base):
+    """Propina en USDC de un jugador a otro.
+
+    La transferencia vive en la cadena; esta fila es el historial: sin ella un tip solo existiría
+    como una firma suelta, y no habría forma de enseñar las propinas recibidas en un perfil ni de
+    investigar un abuso después. `source` se guarda porque lo primero que se querrá saber si hay
+    que capar el spam es por dónde entra.
+    """
+    __tablename__ = "tips"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    from_wallet: Mapped[str] = mapped_column(String, index=True)
+    to_wallet: Mapped[str] = mapped_column(String, index=True)
+    amount: Mapped[int] = mapped_column(Integer)          # unidades base de USDC (6 decimales)
+    signature: Mapped[str] = mapped_column(String)        # la prueba: la firma de la transacción
+    source: Mapped[str] = mapped_column(String)           # "profile" | "chat"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

@@ -4,9 +4,10 @@ import { COLORS, FONTS, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useChat, type ChatLine } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
 import { useProfile } from '../../../hooks/useProfile'
+import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 
 /**
- * El nombre de quien habla, enlazado a su perfil.
+ * El nombre de quien habla, enlazado a su perfil, con la acción de propina al lado.
  *
  * Solo enlaza si el mensaje trae wallet. NO la tienen los mensajes anteriores a que se empezara a
  * guardar ni los avisos de la casa, que no son de nadie — y un enlace a `/profile/undefined` es
@@ -14,19 +15,73 @@ import { useProfile } from '../../../hooks/useProfile'
  *
  * El aspecto es el mismo en los dos casos a propósito: el nombre ya va coloreado por usuario, y
  * subrayar solo unos pocos convertiría una lista de nombres en un mosaico.
+ *
+ * La propina hereda esa misma condición (sin wallet no hay a quién dársela) y suma dos más: no es
+ * la wallet propia (nadie se da propina a sí mismo) y el mensaje no es un aviso de la casa —
+ * incluye los eventos estructurados (created/hit/winner), que nombran a un jugador real pero
+ * siguen siendo un anuncio, no algo que "dijo" esa persona. El estado del modal vive en `ChatDock`
+ * (un modal por lista, no uno por mensaje): este componente solo avisa hacia arriba con `onTip`.
  */
-function Autor({ msg, style }: { msg: ChatLine; style: React.CSSProperties }) {
+function Autor({
+  msg,
+  style,
+  ownWallet,
+  onTip,
+}: {
+  msg: ChatLine
+  style: React.CSSProperties
+  ownWallet: string | null
+  onTip: (to: { wallet: string; alias?: string | null }) => void
+}) {
   if (!msg.wallet) return <span style={style}>{msg.user}</span>
+  const canTip = msg.wallet !== ownWallet && msg.kind !== 'system'
   return (
-    <Link to={`/profile/${encodeURIComponent(msg.wallet)}`} title={`View ${msg.user}'s profile`}
-      style={{ ...style, textDecoration: 'none' }}>
-      {msg.user}
-    </Link>
+    <>
+      <Link to={`/profile/${encodeURIComponent(msg.wallet)}`} title={`View ${msg.user}'s profile`}
+        style={{ ...style, textDecoration: 'none' }}>
+        {msg.user}
+      </Link>
+      {canTip && (
+        <button
+          onClick={() => onTip({ wallet: msg.wallet as string, alias: msg.user })}
+          aria-label={`Tip ${msg.user}`}
+          title={`Tip ${msg.user}`}
+          style={{
+            marginLeft: 5,
+            // Área de toque de al menos 24x24 (WCAG 2.2 AA, criterio 2.5.8: no aplica ninguna
+            // excepción aquí, ni está en un bloque de prosa ni hay 24px de separación con el
+            // enlace del perfil, a solo 5px). `lineHeight` fijo evita depender del alto de línea
+            // 'normal' del navegador (variable según fuente): con 11px de contenido y 7px de
+            // padding arriba y abajo, la caja mide 11+7+7=25px. El margen negativo de la misma
+            // magnitud retrae esa altura del cálculo de "cuánto ocupa este elemento en el flujo"
+            // (un ítem flex contribuye a la altura de la fila por su caja de MARGEN, no la de
+            // contenido) — el padding agranda solo la caja de clic/visible, la fila del mensaje
+            // sigue dominada por el avatar de 21px, sin ensancharse.
+            marginTop: -7,
+            marginBottom: -7,
+            background: 'transparent',
+            border: 'none',
+            padding: '7px 5px',
+            color: COLORS.muted,
+            fontFamily: FONTS.mono,
+            fontSize: 9,
+            lineHeight: '11px',
+            fontWeight: 700,
+            letterSpacing: '.04em',
+            cursor: 'pointer',
+            verticalAlign: 'middle',
+          }}
+        >
+          TIP
+        </button>
+      )}
+    </>
   )
 }
 import { useReducedMotion } from '../../useReducedMotion'
 import { showToast } from '../../toastBus'
 import { UsernameModal } from '../../components/UsernameModal'
+import { TipModal } from '../../components/TipModal'
 import type { LiveDrop } from '../../drops/dropsStore'
 
 // Opener label for a drop row: username if known, else a short wallet.
@@ -85,9 +140,13 @@ export function ChatDock({
   const drops = useDrops()
   const { messages, send, canPost, online } = useChat()
   const { username } = useProfile()
+  const ownWallet = useEmbeddedSolanaAddress()
   const reducedMotion = useReducedMotion()
   const [draft, setDraft] = useState('')
   const [nameModal, setNameModal] = useState(false)
+  // Un solo modal de propina para toda la lista (no uno por mensaje): `Autor` solo avisa
+  // hacia arriba con el destinatario, y este estado decide si se muestra y sobre quién.
+  const [tipTarget, setTipTarget] = useState<{ wallet: string; alias?: string | null } | null>(null)
   const promptedName = useRef(false)
 
   // First time the user focuses the chat with no username set, nudge them to pick one.
@@ -568,7 +627,8 @@ export function ChatDock({
                   </span>
                 )}
                 <span style={{ flex: 1, fontSize: 12, fontFamily: FONTS.body, lineHeight: 1.35 }}>
-                  <Autor msg={msg} style={{ color: userColor(msg.user), fontWeight: 700 }} />
+                  <Autor msg={msg} style={{ color: userColor(msg.user), fontWeight: 700 }}
+                    ownWallet={ownWallet} onTip={setTipTarget} />
                   <span style={{ color: COLORS.muted }}> {msg.text} </span>
                   {msg.amountUsd != null && (
                     <span style={{ color: '#f5c542', fontWeight: 800 }}>{formatUsd(msg.amountUsd)}</span>
@@ -633,6 +693,8 @@ export function ChatDock({
                       color: userColor(msg.user),
                       fontFamily: FONTS.body,
                     }}
+                    ownWallet={ownWallet}
+                    onTip={setTipTarget}
                   />
                   {/* Timestamp */}
                   <span style={{ fontSize: 9, color: COLORS.muted, marginLeft: 'auto' }}>
@@ -705,6 +767,9 @@ export function ChatDock({
         </div>
       </div>
       {nameModal && <UsernameModal onClose={() => setNameModal(false)} />}
+      {tipTarget && (
+        <TipModal open to={tipTarget} source="chat" onClose={() => setTipTarget(null)} />
+      )}
     </aside>
   )
 }

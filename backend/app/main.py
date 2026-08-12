@@ -3,11 +3,15 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import math
 import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, Path, Request, Query, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -29,7 +33,7 @@ from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
 from .services.privy_signer import PrivySigner, PrivyNoVerificable
 from .services import escrow_pool, machine_visibility
-from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull
+from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull, Tip, User
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
                    recent_chat_messages, big_hit_multiple)
 from .services.pack_lobby import (
@@ -47,7 +51,7 @@ from .services.solana_tx import build_memo_tx
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
 from .services.reservations import (reserve, reserved_total, royale_locked_total,
-                                     release_reservations, battle_in_progress)
+                                     release_reservations, battle_in_progress, royale_in_progress)
 from .services import emotes as emote_service
 from .services.bots import load_bots, pick_bot
 
@@ -88,6 +92,12 @@ class WithdrawAddressBody(BaseModel):
 class WithdrawBody(BaseModel):
     address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # destination Solana wallet
     amount: float = Field(gt=0)  # USDC (dollars)
+
+
+class TipBody(BaseModel):
+    to: str
+    amount: float = Field(gt=0, allow_inf_nan=False)  # USDC (dollars); NaN/Infinity rompían el round()
+    source: str = "profile"     # "profile" | "chat"; solo para el historial
 
 
 class NftWithdrawBody(BaseModel):
@@ -203,6 +213,9 @@ def create_app(session_factory, chain: ChainSource,
                escrow_seed_lamports: int = 10_000_000,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
+               min_tip_usdc: float = 1.0,
+               tip_rate_limit: int = 10,
+               tip_rate_window_s: float = 60.0,
                withdraw_rate_limit: int = 5,
                withdraw_rate_window_s: float = 60.0,
                withdraw_fee_pct: float = 0.0,
@@ -218,6 +231,24 @@ def create_app(session_factory, chain: ChainSource,
     log_redaccion.instalar()
 
     app = FastAPI(title="Battle Arena — Backend")
+
+    def _json_safe(value):
+        # NaN/Infinity/-Infinity son floats válidos en Python pero JSON no los admite; Starlette
+        # serializa las respuestas con allow_nan=False. Pydantic, al rechazar uno de estos
+        # valores (p.ej. un Field con allow_inf_nan=False), lo deja TAL CUAL en el "input" del
+        # error de validación — así que sin este saneo el propio manejador de errores de FastAPI
+        # revienta al construir el 422, y lo que el cliente ve es un 500.
+        if isinstance(value, float) and not math.isfinite(value):
+            return str(value)
+        if isinstance(value, dict):
+            return {k: _json_safe(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_json_safe(v) for v in value]
+        return value
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_exception_handler(request: Request, exc: RequestValidationError):
+        return JSONResponse(status_code=422, content=_json_safe(jsonable_encoder({"detail": exc.errors()})))
 
     # Wallets allowed to CREATE Battle Royale (empty = open to all). Captured by the
     # /pack-battles handler below. See docs/superpowers/specs/2026-07-17-royale-create-allowlist-design.md.
@@ -1216,6 +1247,19 @@ def create_app(session_factory, chain: ChainSource,
         hits.append(now)
         _withdraw_hits[wallet] = hits
 
+    # Throttle de tips, con contadores PROPIOS. Compartirlos con el withdraw haría que dar
+    # propinas dejara al jugador sin poder retirar, y son dos límites con motivos distintos: el
+    # del withdraw protege la renta de ATA que paga el operador; este, del spam social.
+    _tip_hits: dict[str, list[float]] = {}
+
+    def _tip_throttle(wallet: str) -> None:
+        now = _time.time()
+        hits = [t for t in _tip_hits.get(wallet, []) if now - t < tip_rate_window_s]
+        if len(hits) >= tip_rate_limit:
+            raise HTTPException(429, "too many tips, try again later")
+        hits.append(now)
+        _tip_hits[wallet] = hits
+
     @app.post("/gacha/free-pack")
     async def gacha_free_pack(body: GeneratePackBody, wallet: str = Depends(current_user),
                               wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
@@ -1320,6 +1364,73 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(502, f"withdraw failed: {exc}")
         return {"signature": sig, "amount": body.amount, "net": net / 1_000_000,
                 "fee": fee / 1_000_000, "address": body.address}
+
+    @app.post("/users/me/tip")
+    async def me_tip(body: TipBody, wallet: str = Depends(current_user),
+                     wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
+        """Propina en USDC de un jugador a OTRO JUGADOR.
+
+        El destino tiene que ser un usuario registrado, y eso no es una comodidad: como
+        `current_user` devuelve siempre la wallet embebida del token de Privy, exigir que el
+        destinatario exista en `users` garantiza que el dinero aterriza en otra wallet delegada
+        nuestra. Con destino libre, esto sería un `/users/me/withdraw` sin mínimo, sin comisión y
+        sin throttle, o sea la puerta de atrás del withdraw.
+
+        OJO, y esto es lo que hay que vigilar al tocar esto: esa garantía vale mientras TODA fila
+        de `users` sea una wallet embebida nuestra, y eso hoy es cierto por accidente, no por
+        construcción. `get_or_create_user` no comprueba nada, y `services/matches.py:89` da de
+        alta usuarios con una wallet leída del estado ON-CHAIN de una batalla, que podría ser
+        cualquier dirección externa. No es explotable ahora mismo (ese contrato no está desplegado
+        y la ruta muere antes en un 404), pero el día que lo esté, o que aparezca otra alta de
+        usuario con wallet de origen no verificado, este endpoint pasa a poder mandar USDC fuera
+        de la plataforma sin mínimo, sin comisión y sin throttle. Si se añade una vía así, hay que
+        validar aquí que el destino es una wallet embebida delegada, no basta con que exista.
+
+        A diferencia del withdraw NO cobra comisión (el dinero sigue dentro de la plataforma y ya
+        la pagará al salir) y NO se bloquea durante cualquier batalla, solo durante una royale en
+        juego (`royale_in_progress`): así se puede dar propina en una pack battle o justo al
+        terminar una partida, que es cuando apetece, sin tocar el dinero que una royale en marcha
+        necesita para tirar.
+        """
+        if privy_signer is None or not (privy_operator_wallet_id and privy_operator_address):
+            raise HTTPException(503, "tips_unavailable")
+        dest = (body.to or "").strip()
+        if s.get(User, dest) is None:
+            raise HTTPException(404, "that player does not have an account")
+        if dest == wallet:
+            raise HTTPException(422, "you cannot tip yourself")
+        amount = int(round(body.amount * 1_000_000))    # USDC base units
+        if amount <= 0:
+            raise HTTPException(422, "amount must be > 0")
+        min_base = int(round(min_tip_usdc * 1_000_000))
+        if amount < min_base:
+            raise HTTPException(422, f"the minimum tip is {min_tip_usdc} USDC")
+        _tip_throttle(wallet)
+        # Solo se cierra la royale EN JUEGO, no la guarda entera del retiro: durante una pack
+        # battle el buy-in lleva reserva y `_require_available` ya lo protege, así que dar
+        # propina ahí (o justo al acabar cualquier partida) se conserva a propósito. La royale en
+        # marcha es otra cosa: el escrow le manda a la wallet el precio de cada caja justo antes
+        # de tirar y ese importe NO lleva reserva, así que se ve como saldo libre y una propina
+        # en esa ventana rompe la tirada, anula la partida y deja el escrow corto a costa de los
+        # reembolsos de los DEMÁS. El detalle está en royale_in_progress().
+        if royale_in_progress(s, wallet):
+            raise HTTPException(409, "you are playing a royale; you can tip once it ends")
+        await _require_available(wallet, amount, s)     # saldo on-chain menos lo reservado
+        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        try:
+            sig = await withdraw_usdc(solana_rpc_url, privy_signer, wallet_id, wallet,
+                                      privy_operator_wallet_id, privy_operator_address,
+                                      dest, cc_usdc_mint, amount, blockhash)
+        except Exception as exc:
+            raise HTTPException(502, f"tip failed: {exc}")
+        # La fila se escribe DESPUÉS de la firma: si la transferencia falla no hay historial que
+        # corregir, y si falla esta escritura el dinero ya se movió y la firma está en los logs,
+        # que es el menos malo de los dos fallos posibles.
+        logger.info("tip: %s -> %s, %s unidades base, sig=%s", wallet, dest, amount, sig)
+        source = body.source if body.source in ("profile", "chat") else "profile"
+        s.add(Tip(from_wallet=wallet, to_wallet=dest, amount=amount, signature=sig, source=source))
+        s.commit()
+        return {"signature": sig, "amount": amount / 1_000_000, "to": dest}
 
     @app.post("/users/me/nft/withdraw")
     async def me_nft_withdraw(body: NftWithdrawBody, wallet: str = Depends(current_user),
@@ -2078,6 +2189,9 @@ def build_default_app() -> FastAPI:
                       dev_endpoints_enabled=s.dev_endpoints_enabled,
                       gacha_rate_limit=s.gacha_rate_limit,
                       min_withdraw_usdc=s.min_withdraw_usdc,
+                      min_tip_usdc=s.min_tip_usdc,
+                      tip_rate_limit=s.tip_rate_limit,
+                      tip_rate_window_s=s.tip_rate_window_s,
                       withdraw_rate_limit=s.withdraw_rate_limit,
                       withdraw_rate_window_s=s.withdraw_rate_window_s,
                       referral_payout_wallet_id=s.referral_payout_wallet_id,

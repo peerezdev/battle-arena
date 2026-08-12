@@ -24,6 +24,7 @@ import argparse
 import json
 import sys
 import time
+import urllib.error
 import urllib.request
 from collections import defaultdict
 
@@ -36,12 +37,36 @@ POR_PAGINA = 1000
 PAUSA = 0.08         # no machacar el RPC; el lector de saldos ya nos dio 429 una vez
 
 
+#: Reintentos ante un 429. La PAUSA fija de arriba no basta: una wallet con cientos de
+#: transacciones encadena tantas llamadas que el RPC acaba cortando igual, y sin esto el script
+#: se caía a mitad — medido con una de 366 tx. Se espera cada vez más para darle aire de verdad.
+REINTENTOS = 6
+ESPERA_BASE = 1.5
+
+
 def _rpc(url: str, method: str, params: list) -> dict:
-    req = urllib.request.Request(
-        url, method="POST", headers={"content-type": "application/json"},
-        data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode())
-    with urllib.request.urlopen(req, timeout=40) as r:
-        return json.load(r)
+    cuerpo = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
+    for intento in range(REINTENTOS):
+        req = urllib.request.Request(
+            url, method="POST", headers={"content-type": "application/json"}, data=cuerpo)
+        try:
+            with urllib.request.urlopen(req, timeout=40) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            # 429 = nos está frenando; 5xx = su lado, no el nuestro. Ambos merecen reintento.
+            if e.code != 429 and e.code < 500:
+                raise
+            if intento + 1 == REINTENTOS:
+                raise
+            espera = ESPERA_BASE * (2 ** intento)
+            print(f"    RPC {e.code}: esperando {espera:.0f}s y reintentando…", flush=True)
+            time.sleep(espera)
+        except urllib.error.URLError as e:
+            if intento + 1 == REINTENTOS:
+                raise
+            print(f"    RPC sin respuesta ({e.reason}): reintentando…", flush=True)
+            time.sleep(ESPERA_BASE * (2 ** intento))
+    raise RuntimeError("unreachable")
 
 
 def firmas_de(url: str, wallet: str) -> list[str]:

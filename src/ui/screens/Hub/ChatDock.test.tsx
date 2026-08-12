@@ -1,12 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
+// Shape of what ChatDock hands to <TipModal> — TipModal's own props type isn't exported, and
+// this test only needs the fields it asserts on, not TipModal's internals.
+interface CapturedTipModalProps {
+  open: boolean
+  to: { wallet: string; alias?: string | null }
+  source: 'profile' | 'chat'
+  onClose: () => void
+}
+
 // Mock the chat hook so ChatDock doesn't open a real WebSocket. `chatState.messages` is
-// mutable so individual tests can inject system announcements.
-const { chatState } = vi.hoisted(() => ({ chatState: { messages: [] as any[] } }))
+// mutable so individual tests can inject system announcements. `chatState.ownWallet` backs
+// the useEmbeddedSolanaAddress mock below, so tip tests can set "who am I" per test.
+// `tipModalCalls` records every prop set ChatDock hands to <TipModal>, so wiring tests can
+// assert on WHO the modal was opened for, not just that a tip button exists somewhere.
+const { chatState, tipModalCalls } = vi.hoisted(() => ({
+  chatState: { messages: [] as any[], ownWallet: null as string | null },
+  tipModalCalls: [] as CapturedTipModalProps[],
+}))
 vi.mock('../../../hooks/useChat', () => ({
   useChat: () => ({ messages: chatState.messages, send: vi.fn(), canPost: false, online: 0 }),
+}))
+vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => chatState.ownWallet }))
+// TipModal is Task 5's own component, already tested there; ChatDock only needs to know it was
+// opened for the right recipient, not TipModal's internals — so the mock records its props
+// (open/to/source) instead of rendering anything.
+vi.mock('../../components/TipModal', () => ({
+  TipModal: (props: CapturedTipModalProps) => { tipModalCalls.push(props); return null },
 }))
 
 import { ChatDock } from './ChatDock'
@@ -18,6 +40,8 @@ const renderDock = () => render(<MemoryRouter><ChatDock /></MemoryRouter>)
 beforeEach(() => {
   localStorage.clear()
   chatState.messages = []
+  chatState.ownWallet = null
+  tipModalCalls.length = 0
 })
 
 describe('ChatDock live drops', () => {
@@ -195,5 +219,68 @@ describe('ChatDock · perfiles clicables', () => {
     chatState.messages = [{ user: 'X', wallet: 'a/b?c', text: 'hola', ts: 1 }]
     renderDock()
     expect(screen.getByRole('link', { name: 'X' }).getAttribute('href')).toBe('/profile/a%2Fb%3Fc')
+  })
+})
+
+describe('ChatDock · propina desde el chat', () => {
+  it('ofrece dar propina a quien habla, pero no a los avisos de la casa sin wallet', () => {
+    chatState.messages = [
+      { user: 'Rival', wallet: 'WalletB', text: 'hola', ts: 1 },
+      { user: 'House', wallet: undefined, text: 'aviso', ts: 2, kind: 'system' },
+    ]
+    renderDock()
+    expect(screen.getAllByRole('button', { name: /tip/i })).toHaveLength(1)
+  })
+
+  it('no ofrece propina en un aviso de la casa aunque nombre a un jugador con wallet', () => {
+    // Un evento estructurado (created/hit/winner) también pasa por `Autor` y puede traer
+    // wallet real (p.ej. "Neo won a Pack Battle") — pero sigue siendo un aviso de la casa,
+    // no un mensaje de Neo, así que no debe ofrecer propina.
+    chatState.messages = [{
+      user: 'Neo', wallet: 'WalletC', text: 'won a Pack Battle', ts: 1,
+      kind: 'system', event: 'winner', amountUsd: 500,
+    }]
+    renderDock()
+    expect(screen.queryByRole('button', { name: /tip/i })).toBeNull()
+  })
+
+  it('no ofrece dar propina a uno mismo', () => {
+    chatState.ownWallet = 'WalletA'
+    chatState.messages = [{ user: 'Yo', wallet: 'WalletA', text: 'hola', ts: 1 }]
+    renderDock()
+    expect(screen.queryByRole('button', { name: /tip/i })).toBeNull()
+  })
+
+  it('el botón TIP mide al menos 24px de alto (WCAG 2.2 AA, criterio 2.5.8)', () => {
+    // jsdom no hace layout real (getBoundingClientRect siempre da 0 ahí), así que se mide la
+    // caja a partir de los estilos EN LÍNEA que React aplicó de verdad (no una estimación): con
+    // box-sizing por defecto (content-box), alto de caja = lineHeight + paddingTop + paddingBottom.
+    chatState.messages = [{ user: 'Rival', wallet: 'WalletB', text: 'hola', ts: 1 }]
+    renderDock()
+    const btn = screen.getByRole('button', { name: /tip rival/i })
+    const contentHeight = parseFloat(btn.style.lineHeight)
+    const paddingTop = parseFloat(btn.style.paddingTop)
+    const paddingBottom = parseFloat(btn.style.paddingBottom)
+    const boxHeight = contentHeight + paddingTop + paddingBottom
+    expect(boxHeight).toBeGreaterThanOrEqual(24)
+  })
+
+  it('pulsar el botón de UN autor concreto (no el primero) abre el modal con SU wallet y alias', () => {
+    // Regresión contra un cableado que siempre coja el primer mensaje de la lista: con un solo
+    // modal para toda la lista (decisión de Task 7), un `onTip` que ignore qué botón se pulsó
+    // pasaría cualquier test que solo cuente botones. Aquí se pulsa el de en medio (Bob) y se
+    // exige que el modal reciba EXACTAMENTE su wallet/alias, no los de Ana ni los de Cid.
+    chatState.messages = [
+      { user: 'Ana', wallet: 'WalletAAA', text: 'hola', ts: 1 },
+      { user: 'Bob', wallet: 'WalletBBB', text: 'qué tal', ts: 2 },
+      { user: 'Cid', wallet: 'WalletCCC', text: 'ey', ts: 3 },
+    ]
+    renderDock()
+    fireEvent.click(screen.getByRole('button', { name: /tip bob/i }))
+    expect(tipModalCalls.length).toBeGreaterThan(0)
+    const lastCall = tipModalCalls[tipModalCalls.length - 1]
+    expect(lastCall.to.wallet).toBe('WalletBBB')
+    expect(lastCall.to.alias).toBe('Bob')
+    expect(lastCall.source).toBe('chat')
   })
 })

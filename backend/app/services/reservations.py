@@ -84,6 +84,44 @@ def royale_locked_total(session, wallet: str) -> int:
     return sum(royale_buyin(b.max_players, b.price) for b in battles if b.id in joined)
 
 
+def _primera_partida(session, wallet: str, condicion) -> Optional[str]:
+    """Id de la primera partida de este wallet que cumple `condicion`, o None.
+
+    La consulta vive AQUÍ y no duplicada en cada guarda: `battle_in_progress` y
+    `royale_in_progress` miran el mismo par de tablas con el mismo join y solo cambian en qué
+    partidas consideran expuestas. Si mañana cambia el modelo (otra tabla de participantes, por
+    ejemplo), se toca un sitio y las dos guardas siguen de acuerdo.
+    """
+    return session.execute(
+        select(PackBattle.id)
+        .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
+        .where(BattlePlayer.player_wallet == wallet, condicion)
+        .limit(1)
+    ).scalars().first()
+
+
+def _royale_jugandose():
+    return and_(PackBattle.mode == "royale", PackBattle.status == "running")
+
+
+def royale_in_progress(session, wallet: str) -> Optional[str]:
+    """Id de una royale de este wallet que se está JUGANDO ahora mismo, o None.
+
+    Es el subconjunto de `battle_in_progress` en el que el dinero expuesto NO tiene reserva que
+    lo cubra: el escrow le manda a la wallet el precio de cada caja justo antes de tirar, y ese
+    importe no pasa por el ledger de reservas (el buy-in ya salió al entrar al lobby). Como
+    `reserved_total` no lo ve, cualquier comprobación de saldo disponible lo toma por dinero
+    libre, y gastarlo en esa ventana rompe la tirada, anula la partida y deja el escrow corto a
+    costa de los reembolsos de los DEMÁS jugadores.
+
+    Existe aparte porque el tip quiere cerrar solo este agujero, no la guarda entera del retiro:
+    dar propina durante una pack battle (cuyo buy-in sí lleva reserva) o justo al acabar una
+    partida se conserva a propósito. Los detalles de dónde vive el dinero en cada modo y estado
+    están en el docstring de `battle_in_progress`.
+    """
+    return _primera_partida(session, wallet, _royale_jugandose())
+
+
 def battle_in_progress(session, wallet: str) -> Optional[str]:
     """Id de una partida de este wallet cuyo dinero está EXPUESTO, o None si no hay ninguna.
 
@@ -108,14 +146,9 @@ def battle_in_progress(session, wallet: str) -> Optional[str]:
     """
     expuesta = or_(
         and_(PackBattle.mode != "royale", PackBattle.status.in_(_EN_JUEGO)),
-        and_(PackBattle.mode == "royale", PackBattle.status == "running"),
+        _royale_jugandose(),
     )
-    return session.execute(
-        select(PackBattle.id)
-        .join(BattlePlayer, BattlePlayer.battle_id == PackBattle.id)
-        .where(BattlePlayer.player_wallet == wallet, expuesta)
-        .limit(1)
-    ).scalars().first()
+    return _primera_partida(session, wallet, expuesta)
 
 
 def release_reservations(session, battle_id: str) -> int:

@@ -1,7 +1,7 @@
 # Tip en USDC a otro jugador — design
 
 Date: 2026-08-12
-Status: approved-pending-review
+Status: implemented
 
 ## Objetivo
 
@@ -13,8 +13,17 @@ comisión y sin throttle, o sea una puerta trasera para sacar fondos de la plata
 
 Esa defensa se apoya en un hecho del código, verificado: `current_user` devuelve **siempre** la
 wallet embebida derivada del token de identidad de Privy (`main.py:248`), así que la `wallet` de
-una fila de `users` es por construcción una wallet delegada nuestra. El dinero que entra por un
-tip sigue dentro de la plataforma y solo sale por el withdraw, con sus reglas intactas.
+una fila de `users` creada por el alta normal es una wallet delegada nuestra. El dinero que entra
+por un tip sigue dentro de la plataforma y solo sale por el withdraw, con sus reglas intactas.
+
+**Pero esto no es una invariante estructural, es una casualidad que se cumple hoy**: nada obliga a
+que toda fila de `users` sea una wallet embebida. `get_or_create_user` no valida nada, y
+`services/matches.py:89` da de alta usuarios con una wallet leída del estado **on-chain** de una
+batalla, que podría ser una dirección externa cualquiera. No es explotable ahora (ese contrato no
+está desplegado y la ruta muere antes en un 404), y por eso no se toca aquí. Queda anotado en el
+docstring de `me_tip`: si esa vía revive o aparece otra alta con wallet no verificada, el tip pasa
+a poder sacar USDC de la plataforma sin mínimo, sin comisión y sin throttle, y entonces habrá que
+validar en el endpoint que el destino es una wallet embebida delegada, no solo que existe.
 
 ## Contexto (código actual)
 
@@ -44,10 +53,10 @@ tip sigue dentro de la plataforma y solo sale por el withdraw, con sus reglas in
 | Qué se envía | USDC |
 | A quién | Solo a un jugador registrado en `users` |
 | Desde dónde | Perfil ajeno y chat |
-| Mínimo | Sí, `min_tip_usdc` (0,10 por defecto) |
+| Mínimo | Sí, `min_tip_usdc` (1 USDC por defecto). El operador paga la renta de la cuenta USDC (~0,002 SOL) de cada destinatario nuevo; con 0,10 salía barato hacerle gastar SOL a base de propinas minúsculas a cuentas recién creadas. |
 | Throttle | Sí, por wallet emisora |
 | Comisión | **No.** El dinero sigue dentro de la plataforma y ya pagará comisión al retirarse |
-| Bloqueo por batalla en curso | **No.** Basta respetar el saldo reservado, y así se puede dar propina justo al acabar una partida |
+| Bloqueo por batalla en curso | **Solo si hay una royale en `running`** (409). En ese estado el escrow le manda a la wallet el precio de cada caja justo antes de tirar y ese importe no lleva reserva, así que `_require_available` lo daría por libre y sacarlo rompería la tirada, anulando la partida a costa de los reembolsos de los demás. En una pack battle (buy-in reservado) y al acabar cualquier partida se puede dar propina |
 
 ## Backend
 
@@ -63,9 +72,10 @@ inútil:
 3. `to != wallet` del emisor → si no, 422.
 4. `amount > 0` y `amount >= min_tip_usdc` → si no, 422 con el mínimo en el mensaje.
 5. `_tip_throttle(wallet)` → si no, 429.
-6. `_require_available(wallet, amount_base_units, s)` → 402 si no llega.
-7. `withdraw_usdc(...)` con `dest_address` = la wallet del destinatario.
-8. Guardar la fila de `Tip` y devolver `{"signature", "amount", "to"}`.
+6. `royale_in_progress(s, wallet)` → 409 si está jugando una royale (ver la tabla de decisiones).
+7. `_require_available(wallet, amount_base_units, s)` → 402 si no llega.
+8. `withdraw_usdc(...)` con `dest_address` = la wallet del destinatario.
+9. Guardar la fila de `Tip` y devolver `{"signature", "amount", "to"}`.
 
 El importe se convierte a unidades base con `int(round(amount * 1_000_000))`, igual que el
 withdraw (`main.py:1286`).
@@ -77,7 +87,7 @@ compartirlos haría que dar propinas dejara al jugador sin poder retirar.
 ### Ajustes nuevos en `config.py`
 
 ```python
-min_tip_usdc: float = 0.10        # env: MIN_TIP_USDC
+min_tip_usdc: float = 1.0         # env: MIN_TIP_USDC
 tip_rate_limit: int = 10          # env: TIP_RATE_LIMIT
 tip_rate_window_s: float = 60.0   # env: TIP_RATE_WINDOW_S
 ```
@@ -124,6 +134,7 @@ disponible, no "not enough available USDC"; el 404 dice que ese jugador todavía
 |---|---|
 | 402 | Saldo disponible insuficiente (ya descontado lo reservado por una batalla) |
 | 404 | El destinatario no tiene cuenta |
+| 409 | El emisor está jugando una royale (`running`): ese dinero lo necesita para tirar |
 | 422 | Importe por debajo del mínimo, importe no positivo, o tip a uno mismo |
 | 429 | Demasiados tips seguidos |
 | 502 | La transferencia falló |
