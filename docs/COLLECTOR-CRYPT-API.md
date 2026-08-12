@@ -31,6 +31,10 @@ Consecuencias que nos han mordido:
   escrows**. Troceados así, solo **6 wallets** llegan a los 100.000 de una tirada gratis en la
   máquina más barata: unas 19 tiradas rescatables de 3 millones de puntos. En las máquinas caras,
   ninguna llega.
+
+  **Y no se pueden mover a otra wallet.** `transferBonusPoints` solo transfiere puntos recibidos
+  por transferencia, no los ganados con tiradas: ver su sección más abajo. Esos puntos se gastan
+  donde están o no se gastan.
 - **El feed público de CC atribuye la tirada al escrow.** Un jugador que mire su historial en CC no
   ve sus tiradas de batalla. Las ve el escrow.
 - **El VRF también.** `GET /api/vrf/verify` devuelve la wallet del escrow, no la del jugador.
@@ -93,6 +97,7 @@ todo lo que leemos de ellos va con `.get` y valor por defecto, nunca por índice
 |---|---|
 | `points` | puntos acumulados |
 | `usedPoints` | ya gastados en tiradas gratis → **lo gastable es la resta** |
+| — | esa resta es lo **gastable en tiradas**, y NO es lo transferible: ver `transferBonusPoints` |
 | `freeSpinsLeftToday` | tope diario restante |
 | `freeSpinsLeft`, `pointsPerSpin`, `pointsUntilNextSpin` | **ver el aviso de abajo** |
 
@@ -157,9 +162,95 @@ Historial de transferencias de puntos.
 
 ### `POST /api/user/transferBonusPoints` (y `/prepare`)
 
-La vía teórica para mover puntos de una wallet a otra — sería la solución a los 3 millones varados
-en los escrows. **No nos sirve: `/prepare` devuelve 401.** Sin resolverlo desde el servidor, no hay
-forma de mover los puntos.
+Mueve puntos de una wallet a otra. **Funciona, y sabemos usarlo desde el servidor** — pero no
+sirve para rescatar los puntos de los escrows, por el motivo del final de esta sección.
+
+Aquí decía antes que `/prepare` devolvía 401 y que no había forma de resolverlo. Era un
+diagnóstico equivocado: el 401 venía de mandar un token con el `aud` de otra red.
+
+**El orden de validación**, medido: enviarse a uno mismo → importe mínimo → autorización. Como la
+autorización se comprueba la última, un 401 aquí ya garantiza que el cuerpo era válido.
+
+- **Mínimo 1.000 puntos** por transferencia.
+- **No se puede enviar a uno mismo.**
+
+#### La autorización: un JWT de Privy que emitimos nosotros
+
+La cabecera es `Authorization: Bearer <JWT>`, un token de Privy de **la app de CC**, y CC lo ata al
+`fromWallet`: con el token de otra wallet responde 401 aunque el cuerpo sea correcto.
+
+No hace falta que nadie inicie sesión a mano. El token se emite por servidor con el login
+Sign-In-With-Solana de Privy, firmando el mensaje con la wallet:
+
+```
+POST auth.privy.io/api/v1/siws/init          {address}                → nonce
+     firmar el mensaje con la wallet (Privy: signMessage, base64)     → signature
+POST auth.privy.io/api/v1/siws/authenticate  {message, signature, …}  → token (24 h)
+```
+
+Tres cosas que hacen fallar el login si faltan:
+
+- La cabecera `origin` con el host de CC, o Privy responde `403 missing_origin`.
+- Un `User-Agent` de navegador: sin él, 403 de Cloudflare. Es el mismo tropiezo que ya
+  documentamos en `privy_signer._wallet`.
+- El **texto exacto** del mensaje. Cualquier variación da `invalid_data`. Es el de la web de CC:
+
+```
+<host> wants you to sign in with your Solana account:
+<address>
+
+You are proving you own <address>.
+
+URI: https://<host>
+Version: 1
+Chain ID: mainnet
+Nonce: <nonce>
+Issued At: <ISO-8601>
+Resources:
+- https://privy.io
+```
+
+**Cada red de CC tiene su propia app de Privy**, y confundirlas es exactamente el 401 que nos
+costó el diagnóstico anterior:
+
+| red | `privy-app-id` |
+|---|---|
+| mainnet | `cmdgt21w400lgky0mkn069jui` |
+| devnet | `cmcwv1wi201tnjm0mmexyzxyi` |
+
+**En devnet no se puede**: su app tiene lista blanca y el login responde
+`401 allowlist_rejected` para cualquier wallet nuestra. Esto es **solo mainnet**.
+
+#### El flujo
+
+```
+prepare(fromWallet, toWallet, amount)   →  {nonce, expiry (~5 min), transferable}
+firmar un memo con la wallet            →  prueba de propiedad
+transferBonusPoints(… nonce, signedTransaction)  →  {transferred, newBonusPoints, newPointsRemaining}
+```
+
+El `signedTransaction` es **la misma prueba de propiedad del `freePack`**: un memo firmado que no
+se envía a la cadena. Sirve el mismo `build_memo_tx` + `sign_solana`.
+
+#### Solo se transfiere la bolsa "bonus", y eso lo cambia todo
+
+`transferable` **no es** `points - usedPoints`. Solo se puede enviar lo que la wallet ha **recibido
+por transferencia**; los puntos ganados con tiradas no se mueven.
+
+Lo medido en mainnet:
+
+- Las **19 wallets nuestras con saldo** suman **533.573 puntos gastables** y ninguna ha recibido
+  jamás una transferencia. Las dos que probamos (`2cdajp4Y…` con 29.175 y `EweRxQsf…` con 160.841)
+  dan `transferable: 0`, con el error explícito `you can send up to 0`.
+- `8QDBKx8…` sí tenía puntos recibidos, y ahí `transferable` valía 45.534. Se transfirieron enteros
+  en dos pasos (ids 6127 y 6129 de su historial), y `newBonusPoints` bajó exactamente lo enviado.
+
+**Consecuencia: los ~3 millones varados en los escrows no se pueden rescatar por esta vía.** Son
+puntos de tiradas, no bolsa bonus. La pregunta que abría la sección de `altPlayerAddress` queda
+cerrada, y en negativo.
+
+Y para cualquier función de "enviar puntos": lo enviable hay que leerlo de `prepare`, nunca
+calcularlo con la fórmula de `freeSpins`.
 
 ### `getPoints`
 
