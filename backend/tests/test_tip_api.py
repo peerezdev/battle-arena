@@ -56,8 +56,7 @@ def _build_client(**overrides):
     kwargs = dict(gacha=GachaService(base_url="https://dev-gacha.example.com", api_key=""),
                   privy=privy, privy_signer=FakeSigner(), solana_rpc_url=DUMMY_RPC,
                   cc_usdc_mint=DUMMY_MINT, privy_operator_wallet_id="op-wallet-id",
-                  privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
-                  min_tip_usdc=0.10)
+                  privy_operator_address="So1anaOPERATOR1111111111111111111111111111")
     kwargs.update(overrides)
     app = create_app(sf, MockChainSource(), **kwargs)
     client = TestClient(app, raise_server_exceptions=True)
@@ -116,11 +115,16 @@ def test_tip_moves_usdc_and_records_the_row(monkeypatch):
 
 def test_tip_to_someone_without_an_account_is_rejected(monkeypatch):
     client, priv = _build_client()
-    _mock_money(monkeypatch)
+    sent = _mock_money(monkeypatch)
     _register(client, WALLET_A)      # B NO está registrado: es el agujero que cerramos
     resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.5},
                        headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
     assert resp.status_code == 404
+    # el detalle distingue este 404 (destinatario sin cuenta) de un 404 de ruta inexistente,
+    # que es lo único que "status_code == 404" a secas no podría distinguir
+    assert resp.json()["detail"] == "that player does not have an account"
+    # lo que de verdad importa: no salió ni un base unit
+    assert sent == []
     s = client.session_factory()
     assert s.query(Tip).count() == 0
 
@@ -139,10 +143,37 @@ def test_tip_below_the_minimum_is_rejected(monkeypatch):
     _mock_money(monkeypatch)
     _register(client, WALLET_A)
     _register(client, WALLET_B)
-    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 0.05},
+    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 0.5},
                        headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
     assert resp.status_code == 422
-    assert "0.1" in resp.json()["detail"]
+    assert "1.0" in resp.json()["detail"]
+
+
+def test_tip_with_nan_amount_is_rejected(monkeypatch):
+    client, priv = _build_client()
+    _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    headers = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    headers["Content-Type"] = "application/json"
+    # json.dumps(float("nan")) también emite el literal NaN (no es JSON estricto, pero Python lo
+    # acepta por defecto); se manda crudo con `content=` para no depender de cómo serialice el
+    # cliente de test y comprobar que de verdad llega tal cual.
+    body = ('{"to": "%s", "amount": NaN}' % WALLET_B).encode()
+    resp = client.post("/users/me/tip", content=body, headers=headers)
+    assert resp.status_code == 422, resp.text
+
+
+def test_tip_with_infinite_amount_is_rejected(monkeypatch):
+    client, priv = _build_client()
+    _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    headers = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    headers["Content-Type"] = "application/json"
+    body = ('{"to": "%s", "amount": Infinity}' % WALLET_B).encode()
+    resp = client.post("/users/me/tip", content=body, headers=headers)
+    assert resp.status_code == 422, resp.text
 
 
 def test_tip_without_signer_is_unavailable(monkeypatch):

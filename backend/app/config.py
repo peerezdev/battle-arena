@@ -72,9 +72,11 @@ class Settings(BaseSettings):
     withdraw_rate_window_s: float = 60.0  # ventana del rate-limit de retiros (segundos)
     # Tips entre jugadores. El mínimo existe por lo mismo que el del withdraw: si el destinatario
     # todavía no tiene cuenta de USDC, el operador paga su renta (~0.002 SOL), así que sin mínimo
-    # se le drena a base de propinas minúsculas a jugadores nuevos. El rate-limit es contra el
-    # spam social, sobre todo desde el chat.
-    min_tip_usdc: float = 0.10            # propina mínima (USDC); env: MIN_TIP_USDC
+    # se le drena a base de propinas minúsculas a jugadores nuevos. Mismo valor que
+    # min_withdraw_usdc, y por el mismo motivo: por debajo de 1 USDC sale barato hacer gastar SOL
+    # al operador a costa de destinatarios nuevos. El rate-limit es contra el spam social, sobre
+    # todo desde el chat.
+    min_tip_usdc: float = 1.0             # propina mínima (USDC); env: MIN_TIP_USDC
     tip_rate_limit: int = 10              # nº máx. de tips por wallet y ventana
     tip_rate_window_s: float = 60.0       # ventana del rate-limit de tips (segundos)
     # Rate-limit del gacha por wallet (ventana fija de 60s). Solo cuenta INICIAR una tirada

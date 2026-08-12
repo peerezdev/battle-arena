@@ -3,11 +3,15 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import math
 import time as _time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, Path, Request, Query, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -92,7 +96,7 @@ class WithdrawBody(BaseModel):
 
 class TipBody(BaseModel):
     to: str
-    amount: float
+    amount: float = Field(gt=0, allow_inf_nan=False)  # USDC (dollars); NaN/Infinity rompían el round()
     source: str = "profile"     # "profile" | "chat"; solo para el historial
 
 
@@ -209,7 +213,7 @@ def create_app(session_factory, chain: ChainSource,
                escrow_seed_lamports: int = 10_000_000,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
-               min_tip_usdc: float = 0.10,
+               min_tip_usdc: float = 1.0,
                withdraw_rate_limit: int = 5,
                withdraw_rate_window_s: float = 60.0,
                withdraw_fee_pct: float = 0.0,
@@ -225,6 +229,24 @@ def create_app(session_factory, chain: ChainSource,
     log_redaccion.instalar()
 
     app = FastAPI(title="Battle Arena — Backend")
+
+    def _json_safe(value):
+        # NaN/Infinity/-Infinity son floats válidos en Python pero JSON no los admite; Starlette
+        # serializa las respuestas con allow_nan=False. Pydantic, al rechazar uno de estos
+        # valores (p.ej. un Field con allow_inf_nan=False), lo deja TAL CUAL en el "input" del
+        # error de validación — así que sin este saneo el propio manejador de errores de FastAPI
+        # revienta al construir el 422, y lo que el cliente ve es un 500.
+        if isinstance(value, float) and not math.isfinite(value):
+            return str(value)
+        if isinstance(value, dict):
+            return {k: _json_safe(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_json_safe(v) for v in value]
+        return value
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_exception_handler(request: Request, exc: RequestValidationError):
+        return JSONResponse(status_code=422, content=_json_safe(jsonable_encoder({"detail": exc.errors()})))
 
     # Wallets allowed to CREATE Battle Royale (empty = open to all). Captured by the
     # /pack-battles handler below. See docs/superpowers/specs/2026-07-17-royale-create-allowlist-design.md.
@@ -1367,6 +1389,7 @@ def create_app(session_factory, chain: ChainSource,
         # La fila se escribe DESPUÉS de la firma: si la transferencia falla no hay historial que
         # corregir, y si falla esta escritura el dinero ya se movió y la firma está en los logs,
         # que es el menos malo de los dos fallos posibles.
+        logger.info("tip: %s -> %s, %s unidades base, sig=%s", wallet, dest, amount, sig)
         source = body.source if body.source in ("profile", "chat") else "profile"
         s.add(Tip(from_wallet=wallet, to_wallet=dest, amount=amount, signature=sig, source=source))
         s.commit()
