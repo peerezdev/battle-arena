@@ -60,17 +60,56 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Cada apertura, o un cambio de destinatario mientras está abierto, arranca de cero: si no, el
+  // importe o el error de la propina ANTERIOR se cuelan en la siguiente (un tip de 3 a Ana que
+  // sigue en el campo al abrir sobre Bob, listo para irse con un solo click).
+  //
+  // Y si había una confirmación de delegación pendiente sin resolver, se cancela aquí: `open ===
+  // false` solo desmonta el <DelegationGate> que la MUESTRA, no el estado que vive dentro de
+  // useDelegationGate. Sin este cancel, cerrar el modal con una propina pendiente para A y
+  // reabrirlo sobre B hace reaparecer el diálogo de delegación solo, y confirmarlo paga la
+  // propina VIEJA (a A) mientras la pantalla muestra a B. Es el camino común, no un borde: es la
+  // primera propina de cualquier jugador que todavía no delegó.
+  //
+  // Se resuelve en el CUERPO del render, no en un useEffect: comparamos con la clave del render
+  // anterior y, si cambió, ajustamos aquí mismo (el patrón que React recomienda para "resetear
+  // estado cuando cambia una prop"). Un efecto que llama a setState de forma síncrona encadena
+  // un render extra evitable, además de disparar la regla de lint react-hooks/set-state-in-effect.
+  const resetKey = `${open}:${to.wallet}`
+  const [lastResetKey, setLastResetKey] = useState(resetKey)
+  if (resetKey !== lastResetKey) {
+    setLastResetKey(resetKey)
+    gate.cancel()
+    if (open) {
+      setAmount('')
+      setError(null)
+      setBusy(false)
+    }
+  }
+
   if (!open) return null
 
-  const recipientLabel = to.alias || `${to.wallet.slice(0, 4)}…${to.wallet.slice(-4)}`
+  const recipientLabel = to.alias || (to.wallet ? `${to.wallet.slice(0, 4)}…${to.wallet.slice(-4)}` : 'No recipient selected')
 
   const amountNum = Number(amount)
-  // No se exige aquí que el importe quepa en `available`: eso lo valida `submit()` y pinta el
-  // motivo (igual que el resto de reglas), en vez de dejar el botón deshabilitado sin explicar
-  // por qué. Sí bloquea mientras vuela la petición.
-  const canSubmit = amount !== '' && Number.isFinite(amountNum) && amountNum > 0 && !busy
+  const amountEntered = amount !== '' && Number.isFinite(amountNum) && amountNum > 0
+  // Derivado del estado (no solo comprobado al click) para que el motivo se lea en pantalla
+  // mientras el jugador todavía está tecleando, y el botón se apague en consecuencia — igual
+  // que ya hace WithdrawModal con la dirección de destino inválida.
+  const overBalance = amountEntered && available != null && amountNum > available
+  const noRecipient = !to.wallet
+  const canSubmit = amountEntered && !overBalance && !noRecipient && !busy
+
+  const overBalanceMessage = overBalance && available != null
+    ? `Amount exceeds your available balance (${formatUsd(available)}).`
+    : null
+  const shownError = overBalanceMessage ?? error
 
   function submit() {
+    // El destino lo fija quien abre el modal, no el jugador: si por lo que sea llega vacío, no
+    // se manda nada al backend con un destinatario en blanco (el 404 que devolvería el server
+    // dice "esa cuenta no existe", que no describe lo que pasó de verdad).
+    if (!to.wallet) { setError('Select a recipient to send a tip.'); return }
     if (available == null) { setError('Balance unavailable. Try again.'); return }
     if (amount === '' || !Number.isFinite(amountNum) || amountNum <= 0) { setError('Enter an amount greater than 0.'); return }
     if (amountNum > available) { setError(`Amount exceeds your available balance (${formatUsd(available)}).`); return }
@@ -153,7 +192,7 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
           </div>
         </div>
 
-        {error && <div style={{ fontSize: 12.5, color: COLORS.red }}>{error}</div>}
+        {shownError && <div style={{ fontSize: 12.5, color: COLORS.red }}>{shownError}</div>}
 
         <button
           onClick={submit}
