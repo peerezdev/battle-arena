@@ -106,3 +106,15 @@ def test_battle_pull_buyback_amount_defaults_none():
         assert row.buyback_amount is None
         row.buyback_amount = 42_500_000; s.commit()
         assert s.query(BattlePull).first().buyback_amount == 42_500_000
+
+
+def test_tip_round_trip(Session):
+    from app.models import Tip
+    s = Session()
+    s.add(Tip(from_wallet="WalletA", to_wallet="WalletB", amount=250_000,
+              signature="sig-1", source="profile"))
+    s.commit()
+    row = s.query(Tip).one()
+    assert row.amount == 250_000
+    assert row.source == "profile"
+    assert row.created_at is not None
