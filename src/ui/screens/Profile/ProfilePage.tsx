@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { COLORS, FONTS, formatUsd } from '../../theme'
+import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import { useProfile } from '../../../hooks/useProfile'
 import { useUserStats } from '../../../hooks/useUserStats'
@@ -8,6 +8,7 @@ import { OverviewTab } from './OverviewTab'
 import { InventoryTab } from './InventoryTab'
 import { HistoryTab } from './HistoryTab'
 import { SettingsTab } from './SettingsTab'
+import { TipModal } from '../../components/TipModal'
 
 type Tab = 'overview' | 'inventory' | 'history' | 'settings'
 
@@ -42,6 +43,7 @@ export function ProfilePage() {
   const wanted = params.get('tab')
   const initialTab: Tab = wanted === 'inventory' || wanted === 'history' || wanted === 'settings' ? wanted : 'overview'
   const [tab, setTab] = useState<Tab>(initialTab)
+  const [tipOpen, setTipOpen] = useState(false)
 
   const handle = username ?? (address ? shortWallet(address) : 'Player')
   const initial = (username ?? address ?? '?').slice(0, 1).toUpperCase()
@@ -73,6 +75,12 @@ export function ProfilePage() {
                 <button onClick={() => setTab('settings')} title="Edit profile"
                   style={{ width: 30, height: 30, borderRadius: 9, border: `1px solid ${COLORS.border}`, background: '#ffffff08', color: COLORS.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                </button>
+              )}
+              {!isSelf && wallet && (
+                <button onClick={() => setTipOpen(true)}
+                  style={{ padding: '7px 16px', borderRadius: 10, border: 'none', background: GRADIENT, color: '#06120c', fontWeight: 800, fontSize: 13, fontFamily: FONTS.display, cursor: 'pointer' }}>
+                  Send tip
                 </button>
               )}
             </div>
@@ -109,6 +117,10 @@ export function ProfilePage() {
       {tab === 'inventory' && <InventoryTab wallet={target} />}
       {tab === 'history' && <HistoryTab wallet={target} />}
       {tab === 'settings' && isSelf && <SettingsTab />}
+
+      {!isSelf && wallet && (
+        <TipModal open={tipOpen} to={{ wallet, alias: username }} source="profile" onClose={() => setTipOpen(false)} />
+      )}
     </div>
   )
 }
