@@ -33,10 +33,18 @@ def test_rejects_wrong_audience():
 
 
 def test_rejects_expired():
+    """Caducado de verdad, o sea MÁS ALLÁ de la tolerancia de reloj.
+
+    El margen era de 10 segundos y dejó de fallar al añadir `LEEWAY_SEGUNDOS`: esa tolerancia
+    existe porque Privy fecha los tokens con su reloj y el nuestro puede ir por detrás, y PyJWT la
+    aplica también a `exp`. Es el precio consciente del arreglo: un token se acepta hasta un minuto
+    después de caducar, sobre una vida de una hora. Lo que no puede pasar es que se acepte uno
+    caducado de verdad, y eso es lo que fija este test.
+    """
     priv = _es256()
     v = PrivyVerifier(app_id="app123", key_resolver=lambda kid: priv.public_key())
     with pytest.raises(PrivyAuthError):
-        v.verify(_make_token(priv, "app123", exp_delta=-10))
+        v.verify(_make_token(priv, "app123", exp_delta=-3600))
 
 
 def test_rejects_tampered_signature():

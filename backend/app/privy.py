@@ -45,12 +45,22 @@ class PrivyVerifier:
             raise PrivyAuthError("kid desconocido")
         return key
 
+    # Tolerancia de reloj al validar `iat`/`nbf`/`exp`. NO es un capricho: Privy fecha el token con
+    # SU reloj, y basta con que el nuestro vaya UN segundo por detrás para que `iat` quede en el
+    # futuro y PyJWT —que por defecto no tolera nada— lo rechace con ImmatureSignatureError. Eso
+    # tumba TODAS las llamadas autenticadas a la vez, y volver a entrar lo empeora: el token recién
+    # emitido es el más adelantado de todos. Ocurrió en desarrollo con 4 segundos de desfase, y
+    # desde la pantalla parecía "no tengo puntos". 60 s cubre el desfase típico de una máquina sin
+    # sincronizar sin alargar de forma apreciable la vida de un token (caducan en una hora).
+    LEEWAY_SEGUNDOS = 60
+
     def verify(self, token: str) -> dict:
         try:
             kid = jwt.get_unverified_header(token).get("kid", "")
             public_key = self._resolver(kid)
             return jwt.decode(token, public_key, algorithms=["ES256"],
-                              audience=self._app_id, issuer="privy.io")
+                              audience=self._app_id, issuer="privy.io",
+                              leeway=self.LEEWAY_SEGUNDOS)
         except PrivyAuthError:
             raise
         except jwt.PyJWTError as e:

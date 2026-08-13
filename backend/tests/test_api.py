@@ -220,3 +220,44 @@ def test_alias_same_wallet_can_keep_its_name():
     h = {"Authorization": f"Bearer {tok}"}
     assert c.post("/users/me/alias", json={"alias": "Trinity"}, headers=h).status_code == 200
     assert c.post("/users/me/alias", json={"alias": "Trinity"}, headers=h).status_code == 200
+
+
+def test_privy_acepta_un_token_fechado_unos_segundos_en_el_futuro():
+    """Un reloj local unos segundos por detrás no puede tumbar la sesión entera.
+
+    Privy fecha el token con SU reloj. Si el nuestro va por detrás, `iat`/`nbf` quedan en el
+    futuro y PyJWT, que no tolera nada por defecto, lanza ImmatureSignatureError: 401 en TODA
+    llamada autenticada, y volver a entrar lo empeora porque el token nuevo es el más "futuro"
+    de todos. Pasó de verdad, con 4 segundos de desfase.
+    """
+    import time as _t
+    import jwt as _jwt
+    from app.privy import PrivyVerifier
+
+    priv = make_es256()
+    ahora = int(_t.time())
+    payload = {"aud": APP_ID, "iss": "privy.io", "sub": "did:privy:futuro",
+               "iat": ahora + 20, "nbf": ahora + 20, "exp": ahora + 3600,
+               "linked_accounts": "[]"}
+    token = _jwt.encode(payload, priv, algorithm="ES256", headers={"kid": "k", "alg": "ES256"})
+
+    v = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv.public_key())
+    assert v.verify(token)["sub"] == "did:privy:futuro"
+
+
+def test_privy_sigue_rechazando_un_token_caducado_de_verdad():
+    """La tolerancia es para el desfase de relojes, no una puerta abierta."""
+    import time as _t
+    import jwt as _jwt
+    import pytest as _pytest
+    from app.privy import PrivyVerifier, PrivyAuthError
+
+    priv = make_es256()
+    ahora = int(_t.time())
+    payload = {"aud": APP_ID, "iss": "privy.io", "sub": "did:privy:viejo",
+               "iat": ahora - 7200, "exp": ahora - 3600, "linked_accounts": "[]"}
+    token = _jwt.encode(payload, priv, algorithm="ES256", headers={"kid": "k", "alg": "ES256"})
+
+    v = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv.public_key())
+    with _pytest.raises(PrivyAuthError):
+        v.verify(token)
