@@ -20,6 +20,16 @@ class GachaUpstreamError(Exception):
     """La API del Gacha falló (4xx/5xx/timeout/JSON inválido)."""
 
 
+class GachaEndpointMissing(GachaUpstreamError):
+    """El endpoint no existe en ESTE host (404).
+
+    Se distingue del resto de fallos a propósito: las redes de CC no van a la par, así que un 404
+    significa "esta red todavía no tiene esta función", no "CC está caído". Es lo que permite
+    canjear una tirada gratis en devnet, que sigue sin pedir nonce, sin dejar de exigirlo en
+    mainnet. Como hereda de GachaUpstreamError, quien no distinga sigue tratándolo como un fallo.
+    """
+
+
 _MACHINE_FIELDS = ("code", "name", "price", "odds", "tierRanges", "stock", "ev", "image",
                    "shortName", "thumbnailUrl", "instantBuyback", "contains",
                    "videoSrc", "videoHevc", "turboMode", "freeSpins")
@@ -99,7 +109,10 @@ class GachaService:
                         reason = body.get("details") or body.get("error")
                 except Exception:
                     reason = None
-                raise GachaUpstreamError(str(reason)[:140] if reason else "gacha upstream unavailable")
+                msg = str(reason)[:140] if reason else "gacha upstream unavailable"
+                if e.response.status_code == 404:
+                    raise GachaEndpointMissing(msg)
+                raise GachaUpstreamError(msg)
             except (httpx.HTTPError, ValueError) as e:
                 raise GachaUpstreamError("gacha upstream unavailable")
 
@@ -179,23 +192,32 @@ class GachaService:
             "spins_left_today": raw.get("freeSpinsLeftToday") or 0,
         }
 
-    async def generate_free_pack(self, player_address: str, pack_type: str) -> str:
-        """Nonce para canjear una tirada gratis. Endpoint NO documentado.
+    async def generate_free_pack(self, player_address: str, pack_type: str) -> Optional[str]:
+        """Nonce para canjear una tirada gratis, o None si esta red todavía no lo pide.
 
         Primer paso de un canje: CC devuelve un `nonce` con caducidad de minutos que hay que
         meter DENTRO de la transacción de prueba (ver `build_free_pack_proof_tx`) y repetir en el
-        cuerpo de `free_pack`. Antes no existía; se añadió cuando CC endureció el canje.
+        cuerpo de `free_pack`.
+
+        **Devuelve None cuando el endpoint no existe (404)**, que es el caso de devnet: allí el
+        canje sigue siendo el de antes. Las redes de CC no van a la par y exigir el nonce en las
+        dos dejó devnet sin tiradas gratis, con un 502 mudo. Cualquier OTRO fallo sí se propaga:
+        confundir una caída de CC con "esta red es la vieja" mandaría el formato antiguo a mainnet
+        y el jugador acabaría viendo "Missing or invalid nonce", que no explica nada.
         """
-        raw = await self._request("POST", "/api/generateFreePack", json={
-            "publicKey": player_address, "packType": pack_type,
-        })
+        try:
+            raw = await self._request("POST", "/api/generateFreePack", json={
+                "publicKey": player_address, "packType": pack_type,
+            })
+        except GachaEndpointMissing:
+            return None
         nonce = raw.get("nonce")
         if not nonce:
             raise GachaUpstreamError("gacha upstream unavailable")
         return nonce
 
     async def free_pack(self, player_address: str, pack_type: str, signed_transaction: str,
-                        nonce: str, turbo: bool = False) -> dict:
+                        nonce: Optional[str] = None, turbo: bool = False) -> dict:
         """Canjea una tirada gratis. Endpoint NO documentado.
 
         `signedTransaction` es una transacción entera firmada por esa wallet, en base64; sirve de
@@ -209,10 +231,13 @@ class GachaService:
         La carta va SIEMPRE a `player_address`: `altPlayerAddress` se acepta en el cuerpo pero se
         ignora (comprobado on-chain). No sirve para entregarla a un tercero.
         """
-        raw = await self._request("POST", "/api/freePack", json={
-            "publicKey": player_address, "packType": pack_type,
-            "turbo": turbo, "transactionSignature": signed_transaction, "nonce": nonce,
-        })
+        cuerpo = {"publicKey": player_address, "packType": pack_type,
+                  "turbo": turbo, "transactionSignature": signed_transaction}
+        # Sin nonce ni siquiera va la clave: en las redes que no lo piden, mandarla vacía sería
+        # inventarse un contrato que allí no existe.
+        if nonce is not None:
+            cuerpo["nonce"] = nonce
+        raw = await self._request("POST", "/api/freePack", json=cuerpo)
         return {"memo": raw.get("memo"), "remaining_points": raw.get("remainingPoints")}
 
     async def generate_yolo_packs(self, player_address: str, pack_type: str,

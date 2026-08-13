@@ -144,6 +144,20 @@ El orden de validación de `freePack`, medido: **nonce** → tipo de máquina �
 transacción firmada cualquiera; ahora hay un reto de dos pasos. Con el formato viejo responde
 `400 {"error":"Missing or invalid nonce"}`, y ninguna tirada gratis se puede canjear.
 
+**Y SOLO EN MAINNET.** Devnet sigue con el contrato viejo: allí `/api/generateFreePack` **no
+existe** (404) y `/api/freePack` acepta el formato de antes. Comprobado también en su frontend, que
+en devnet manda el cuerpo sin `nonce` y no llama a `generateFreePack` en ninguna parte: es un
+despliegue suyo que va por detrás.
+
+Exigir el nonce en las dos redes dejó devnet con un 502 y ninguna tirada gratis, así que el código
+lo decide en caliente: `generate_free_pack` devuelve `None` cuando el endpoint da 404, y entonces
+la prueba vuelve a ser el `build_memo_tx` de siempre. El 404 se distingue del resto de fallos con
+`GachaEndpointMissing`; cualquier otro error se propaga, porque tratar una caída de CC como "esta
+red es la vieja" mandaría el formato antiguo a mainnet y el jugador vería el error del nonce.
+
+Cuando devnet se actualice no habrá que tocar nada: en cuanto `generateFreePack` deje de dar 404,
+el canje pasa solo al flujo nuevo.
+
 ```
 POST /api/generateFreePack  {publicKey, packType}   →  {nonce, expiry}   (minutos)
 POST /api/freePack          {publicKey, packType, turbo, transactionSignature, nonce}  →  {memo}

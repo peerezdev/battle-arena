@@ -1299,7 +1299,8 @@ def create_app(session_factory, chain: ChainSource,
 
         # El nonce se pide ANTES de firmar porque tiene que ir dentro de la transacción: CC lo
         # comprueba en el cuerpo y en la firma, y caduca en minutos, así que se pide aquí y no
-        # antes de las comprobaciones de puntos.
+        # antes de las comprobaciones de puntos. `None` = esta red todavía no lo pide (devnet),
+        # y entonces la prueba es el memo de siempre.
         try:
             nonce = await svc.generate_free_pack(player_address=wallet, pack_type=body.pack_type)
         except GachaDisabled:
@@ -1308,8 +1309,9 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(502, str(e) or "gacha upstream unavailable")
 
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
-        firmada = await privy_signer.sign_solana(
-            wallet_id, build_free_pack_proof_tx(wallet, blockhash, nonce))
+        prueba = (build_free_pack_proof_tx(wallet, blockhash, nonce) if nonce
+                  else build_memo_tx(wallet, blockhash))
+        firmada = await privy_signer.sign_solana(wallet_id, prueba)
         try:
             out = await svc.free_pack(player_address=wallet, pack_type=body.pack_type,
                                       signed_transaction=firmada, nonce=nonce)

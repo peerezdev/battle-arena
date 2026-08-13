@@ -1022,6 +1022,56 @@ def test_free_pack_pide_el_nonce_y_lo_manda_firmado_dentro_de_la_transaccion():
 
 
 @respx.mock
+def test_free_pack_sigue_funcionando_donde_no_existe_el_nonce():
+    """El nonce lo estrenó MAINNET; devnet sigue con el contrato viejo.
+
+    Los hosts de CC no van a la par, así que exigir el nonce en todas las redes dejaba devnet con
+    un 502 y ninguna tirada gratis: `/api/generateFreePack` allí devuelve 404. Cuando el endpoint
+    no existe se canjea como antes, con el memo de siempre y sin `nonce` en el cuerpo.
+    """
+    c, priv, firmante, sf = _client_con_firmante()
+    _maquinas(respx)
+    _rpc(respx)
+    _spins(respx)
+    # 404 = "esta red todavía no pide nonce", que NO es lo mismo que "CC está caído".
+    respx.post(f"{BASE}/api/generateFreePack").mock(return_value=Response(404, text="Not Found"))
+    ruta = respx.post(f"{BASE}/api/freePack").mock(
+        return_value=Response(200, json={"success": True, "memo": "cc-viejo-1",
+                                         "remainingPoints": 10}))
+
+    r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},
+               headers=_hdrs_con_id(priv, WALLET_REAL))
+    assert r.status_code == 200, r.text
+    assert r.json()["memo"] == "cc-viejo-1"
+
+    # Sin nonce en el cuerpo: mandarlo vacío o nulo sería inventarse un contrato que allí no existe.
+    enviado = json.loads(ruta.calls[0].request.content)
+    assert "nonce" not in enviado
+    assert enviado["transactionSignature"] == "FIRMADA"
+
+
+@respx.mock
+def test_free_pack_no_se_traga_una_caida_de_cc_como_si_fuera_la_red_vieja():
+    """Un fallo de verdad de CC no puede confundirse con "esta red no pide nonce".
+
+    Si se tratara igual, en mainnet se acabaría mandando el formato viejo y el jugador vería
+    "Missing or invalid nonce", que no explica nada. Solo el 404 significa "no existe aquí".
+    """
+    c, priv, _, _ = _client_con_firmante()
+    _maquinas(respx)
+    _rpc(respx)
+    _spins(respx)
+    respx.post(f"{BASE}/api/generateFreePack").mock(
+        return_value=Response(500, json={"error": "boom"}))
+    libre = respx.post(f"{BASE}/api/freePack")
+
+    r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},
+               headers=_hdrs_con_id(priv, WALLET_REAL))
+    assert r.status_code == 502, r.text
+    assert not libre.called       # no se intenta el canje a ciegas
+
+
+@respx.mock
 def test_free_pack_canjea_y_deja_el_sobre_listo_para_abrir():
     c, priv, firmante, sf = _client_con_firmante()
     _maquinas(respx)
