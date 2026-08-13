@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
+import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
 import { fetchFreeSpins, GachaHttpError, GachaDisabledError, type FreeSpins } from '../../../onchain/gachaClient'
 
 /** Por qué no hay puntos que enseñar. `null` = no ha fallado nada. */
-export type FreeSpinsError = 'sesion' | 'no_disponible' | 'fallo'
+export type FreeSpinsError = 'sesion' | 'sin_wallet' | 'no_disponible' | 'fallo'
 
 /**
  * Tiradas gratis del jugador, según Collector Crypt.
@@ -18,6 +19,12 @@ export type FreeSpinsError = 'sesion' | 'no_disponible' | 'fallo'
  */
 export function useFreeSpins() {
   const { identityToken } = useIdentityToken()
+  // El backend deriva el jugador de la wallet EMBEBIDA del token, con este mismo criterio
+  // (`privy.py::_embedded_solana_account`). Si la sesión se inició con una wallet externa
+  // —Phantom, Solflare…— el token es válido pero no lleva embebida, y el backend responde 401.
+  // Volver a entrar de la misma forma no lo arregla nunca, así que se distingue de una sesión
+  // caducada: son dos problemas con dos soluciones distintas.
+  const embedded = useEmbeddedSolanaAddress()
   const [datos, setDatos] = useState<FreeSpins | null>(null)
   const [error, setError] = useState<FreeSpinsError | null>(null)
 
@@ -28,12 +35,14 @@ export function useFreeSpins() {
       .catch((e: unknown) => {
         setDatos(null)
         if (e instanceof GachaDisabledError) setError('no_disponible')
-        // 401/403: el token de identidad no vale o ya no está. Se le pide volver a entrar, que es
-        // lo único que lo arregla; reintentar solo repetiría el mismo 401.
-        else if (e instanceof GachaHttpError && (e.status === 401 || e.status === 403)) setError('sesion')
+        // 401/403: el token no vale PARA ESTE BACKEND. Dos causas muy distintas, y la diferencia
+        // importa: sin wallet embebida en la sesión, volver a entrar igual no arregla nada.
+        else if (e instanceof GachaHttpError && (e.status === 401 || e.status === 403)) {
+          setError(embedded ? 'sesion' : 'sin_wallet')
+        }
         else setError('fallo')
       })
-  }, [identityToken])
+  }, [identityToken, embedded])
 
   useEffect(() => { refrescar() }, [refrescar])
 

@@ -143,6 +143,14 @@ describe('MachineDetailPanel · tirada gratis', () => {
     expect(screen.getByText(/Could not load your points/i)).toBeTruthy()
   })
 
+  it('sin wallet embebida NO dice "vuelve a entrar", que es lo que no lo arregla', () => {
+    // El backend deriva el jugador de la wallet embebida del token. Con una sesión de wallet
+    // externa el token es válido pero no la lleva, así que volver a entrar igual repite el 401.
+    pintar(maq(50, true), { freeSpins: null, freeSpinsError: 'sin_wallet', onFreePack: vi.fn() })
+    expect(screen.getByText(/no in-app wallet/i)).toBeTruthy()
+    expect(screen.queryByText(/Log in again to see/i)).toBeNull()
+  })
+
   it('el aviso de fallo NO sale en máquinas que no dan tiradas gratis', () => {
     // Ahí no hay nada que prometer, así que un aviso solo sería ruido.
     pintar(maq(50, false), { freeSpins: null, freeSpinsError: 'sesion', onFreePack: vi.fn() })

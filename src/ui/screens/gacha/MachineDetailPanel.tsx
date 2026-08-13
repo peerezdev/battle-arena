@@ -21,14 +21,16 @@ interface Props {
   freeSpins?: { points_available: number } | null
   /** Por qué no hay puntos, si es que han fallado. Sin esto, un fallo se ve igual que "esta
    *  máquina no da tiradas gratis": la pantalla vacía y el jugador sin saber qué hacer. */
-  freeSpinsError?: 'sesion' | 'no_disponible' | 'fallo' | null
+  freeSpinsError?: 'sesion' | 'sin_wallet' | 'no_disponible' | 'fallo' | null
   onFreePack?: () => void
 }
 
 /** Qué se le dice al jugador cuando no se han podido leer sus puntos. Cada uno dice qué pasa Y qué
- *  hacer: el único que se arregla reintentando es el último. */
-const FREE_SPINS_ERROR_MSG: Record<'sesion' | 'no_disponible' | 'fallo', string> = {
+ *  hacer, porque cada uno se arregla de una forma distinta: volver a entrar solo sirve para el
+ *  primero, y para el segundo es justo lo que NO funciona. */
+const FREE_SPINS_ERROR_MSG: Record<'sesion' | 'sin_wallet' | 'no_disponible' | 'fallo', string> = {
   sesion: 'Log in again to see your free spins.',
+  sin_wallet: 'This session has no in-app wallet, so free spins are not available. Log in with email or a social account instead of an external wallet.',
   no_disponible: 'Free spins are unavailable right now.',
   fallo: 'Could not load your points. Try again in a moment.',
 }
