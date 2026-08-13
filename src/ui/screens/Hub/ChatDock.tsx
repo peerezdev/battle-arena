@@ -34,7 +34,9 @@ function Autor({
   onTip: (to: { wallet: string; alias?: string | null }) => void
 }) {
   if (!msg.wallet) return <span style={style}>{msg.user}</span>
-  const canTip = msg.wallet !== ownWallet && msg.kind !== 'system'
+  // La bandera va la primera: con las propinas apagadas no se ofrece nada, ni siquiera a quien
+  // cumpliría el resto de condiciones. Ver `featureFlags.ts`.
+  const canTip = TIPS_ENABLED && msg.wallet !== ownWallet && msg.kind !== 'system'
   return (
     <>
       <Link to={`/profile/${encodeURIComponent(msg.wallet)}`} title={`View ${msg.user}'s profile`}
@@ -82,6 +84,7 @@ import { useReducedMotion } from '../../useReducedMotion'
 import { showToast } from '../../toastBus'
 import { UsernameModal } from '../../components/UsernameModal'
 import { TipModal } from '../../components/TipModal'
+import { TIPS_ENABLED } from '../../../featureFlags'
 import type { LiveDrop } from '../../drops/dropsStore'
 
 // Opener label for a drop row: username if known, else a short wallet.

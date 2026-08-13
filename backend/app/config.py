@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     # min_withdraw_usdc, y por el mismo motivo: por debajo de 1 USDC sale barato hacer gastar SOL
     # al operador a costa de destinatarios nuevos. El rate-limit es contra el spam social, sobre
     # todo desde el chat.
+    # Interruptor de las propinas. APAGADO por defecto: la funcionalidad está entera y probada,
+    # pero mueve dinero de verdad entre jugadores y todavía no la ha usado ninguno. Se enciende a
+    # propósito con TIPS_ENABLED=true, no por descuido al desplegar. Apagarlo NO borra nada: el
+    # endpoint responde 503 y el frontend esconde los accesos, y el historial de `tips` sigue ahí.
+    tips_enabled: bool = False            # env: TIPS_ENABLED
     min_tip_usdc: float = 1.0             # propina mínima (USDC); env: MIN_TIP_USDC
     tip_rate_limit: int = 10              # nº máx. de tips por wallet y ventana
     tip_rate_window_s: float = 60.0       # ventana del rate-limit de tips (segundos)

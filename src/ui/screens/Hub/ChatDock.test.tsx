@@ -20,6 +20,8 @@ const { chatState, tipModalCalls } = vi.hoisted(() => ({
   chatState: { messages: [] as any[], ownWallet: null as string | null },
   tipModalCalls: [] as CapturedTipModalProps[],
 }))
+// Igual que en el perfil: aquí se prueba la pantalla con las propinas encendidas.
+vi.mock('../../../featureFlags', () => ({ TIPS_ENABLED: true }))
 vi.mock('../../../hooks/useChat', () => ({
   useChat: () => ({ messages: chatState.messages, send: vi.fn(), canPost: false, online: 0 }),
 }))

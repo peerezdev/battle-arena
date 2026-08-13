@@ -53,10 +53,14 @@ def _build_client(**overrides):
     sf = make_session_factory(engine)
     priv = ec.generate_private_key(ec.SECP256R1())
     privy = PrivyVerifier(app_id=APP_ID, key_resolver=lambda kid: priv.public_key())
+    # `tips_enabled` va explícito: el valor por defecto es False (la funcionalidad se despliega
+    # apagada), así que estos tests la encienden a propósito para poder ejercitarla. El caso
+    # apagado tiene su propio test, más abajo.
     kwargs = dict(gacha=GachaService(base_url="https://dev-gacha.example.com", api_key=""),
                   privy=privy, privy_signer=FakeSigner(), solana_rpc_url=DUMMY_RPC,
                   cc_usdc_mint=DUMMY_MINT, privy_operator_wallet_id="op-wallet-id",
-                  privy_operator_address="So1anaOPERATOR1111111111111111111111111111")
+                  privy_operator_address="So1anaOPERATOR1111111111111111111111111111",
+                  tips_enabled=True)
     kwargs.update(overrides)
     app = create_app(sf, MockChainSource(), **kwargs)
     client = TestClient(app, raise_server_exceptions=True)
@@ -285,3 +289,40 @@ def test_tip_without_signer_is_unavailable(monkeypatch):
     resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.5},
                        headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
     assert resp.status_code == 503
+
+
+def test_tip_apagado_responde_503_y_no_toca_nada(monkeypatch):
+    """Interruptor cerrado: ni dinero, ni fila, ni consultas.
+
+    Es lo primero que mira el endpoint a propósito. Apagarlo NO borra nada: el historial de `tips`
+    sigue en su sitio y encender `tips_enabled` lo devuelve todo tal cual estaba.
+    """
+    client, priv = _build_client(tips_enabled=False)
+    sent = _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+
+    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 5.0},
+                       headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+
+    assert resp.status_code == 503
+    assert resp.json()["detail"] == "tips_disabled"
+    assert sent == []                                    # no se movió un centavo
+    s = client.session_factory()
+    assert s.query(Tip).count() == 0                     # ni se registró nada
+
+
+def test_tip_apagado_ni_siquiera_mira_si_el_destinatario_existe():
+    """El interruptor va ANTES que cualquier validación: apagado, la respuesta es siempre la misma.
+
+    Si el 404 de destinatario se evaluara primero, el endpoint seguiría diciendo qué wallets tienen
+    cuenta con la funcionalidad supuestamente apagada.
+    """
+    client, priv = _build_client(tips_enabled=False)
+    _register(client, WALLET_A)          # WALLET_B NO está registrado
+
+    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 5.0},
+                       headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+
+    assert resp.status_code == 503
+    assert resp.json()["detail"] == "tips_disabled"

@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 const params: { wallet?: string } = {}
+// Las propinas se despliegan APAGADAS (ver featureFlags.ts). Estos tests cubren la pantalla con
+// la funcionalidad encendida; que apagada no se ofrezca nada tiene su propio test al final.
+vi.mock('../../../featureFlags', () => ({ TIPS_ENABLED: true }))
 vi.mock('react-router-dom', () => ({
   useParams: () => params,
   useSearchParams: () => [new URLSearchParams(), () => {}],

@@ -9,6 +9,7 @@ import { InventoryTab } from './InventoryTab'
 import { HistoryTab } from './HistoryTab'
 import { SettingsTab } from './SettingsTab'
 import { TipModal } from '../../components/TipModal'
+import { TIPS_ENABLED } from '../../../featureFlags'
 
 type Tab = 'overview' | 'inventory' | 'history' | 'settings'
 
@@ -77,7 +78,7 @@ export function ProfilePage() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                 </button>
               )}
-              {!isSelf && wallet && (
+              {TIPS_ENABLED && !isSelf && wallet && (
                 <button onClick={() => setTipOpen(true)}
                   style={{ padding: '7px 16px', borderRadius: 10, border: 'none', background: GRADIENT, color: '#06120c', fontWeight: 800, fontSize: 13, fontFamily: FONTS.display, cursor: 'pointer' }}>
                   Send tip
@@ -118,7 +119,7 @@ export function ProfilePage() {
       {tab === 'history' && <HistoryTab wallet={target} />}
       {tab === 'settings' && isSelf && <SettingsTab />}
 
-      {!isSelf && wallet && (
+      {TIPS_ENABLED && !isSelf && wallet && (
         <TipModal open={tipOpen} to={{ wallet, alias: username }} source="profile" onClose={() => setTipOpen(false)} />
       )}
     </div>

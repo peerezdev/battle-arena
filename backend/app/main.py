@@ -213,6 +213,7 @@ def create_app(session_factory, chain: ChainSource,
                escrow_seed_lamports: int = 10_000_000,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
+               tips_enabled: bool = False,
                min_tip_usdc: float = 1.0,
                tip_rate_limit: int = 10,
                tip_rate_window_s: float = 60.0,
@@ -1419,6 +1420,10 @@ def create_app(session_factory, chain: ChainSource,
         terminar una partida, que es cuando apetece, sin tocar el dinero que una royale en marcha
         necesita para tirar.
         """
+        # Interruptor, y va LO PRIMERO: apagado no se mira nada más, ni se consulta la base, ni se
+        # toca la cadena. No borra nada, solo cierra la puerta (ver `tips_enabled` en config.py).
+        if not tips_enabled:
+            raise HTTPException(503, "tips_disabled")
         if privy_signer is None or not (privy_operator_wallet_id and privy_operator_address):
             raise HTTPException(503, "tips_unavailable")
         dest = (body.to or "").strip()
@@ -2216,6 +2221,7 @@ def build_default_app() -> FastAPI:
                       dev_endpoints_enabled=s.dev_endpoints_enabled,
                       gacha_rate_limit=s.gacha_rate_limit,
                       min_withdraw_usdc=s.min_withdraw_usdc,
+                      tips_enabled=s.tips_enabled,
                       min_tip_usdc=s.min_tip_usdc,
                       tip_rate_limit=s.tip_rate_limit,
                       tip_rate_window_s=s.tip_rate_window_s,
