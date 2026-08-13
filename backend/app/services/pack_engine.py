@@ -50,6 +50,32 @@ async def _wait_in_escrow(confirm_in_escrow, escrow_address, nft_address, sleep_
     raise RuntimeError(f"nft {nft_address} not confirmed in escrow")
 
 
+async def confirmar_salida_del_escrow(confirm_in_escrow, escrow_address, nft_address,
+                                      sleep_fn, max_attempts, delay) -> bool:
+    """True cuando la carta ya NO está en el escrow, o sea: el traspaso se ejecutó de verdad.
+
+    POR QUÉ HACE FALTA. `submit_tx` es `sendTransaction`: devuelve una firma en cuanto el RPC
+    ACEPTA la transacción, no cuando se ejecuta. Entre una cosa y otra caben dos finales malos —
+    que el bloque la descarte por blockhash caducado, o que aterrice y falle. En ambos la firma
+    ya se devolvió, así que el código de arriba daba la carta por entregada.
+
+    Medido en mainnet el 11/08 (batalla efbb7a40, Charizard de 93 $): el primer intento falló en
+    simulación con el error 0x1a del programa Core; el segundo se envió, devolvió firma y NUNCA
+    llegó a la cadena. La carta quedó dentro del escrow con `transferred=1` en la base.
+
+    Y eso es peor que perder el traspaso, porque el flag falso APAGA la red de seguridad:
+    `sweep_stranded_cards` busca justo por `transferred == 0`, así que decía "no hay cartas
+    pendientes" teniendo una dentro. Lo único que lo delató fue la retención del escrow, que sí
+    mira la cadena. Por eso aquí se comprueba el EFECTO y no la firma: preguntar "¿se fue la
+    carta?" cubre los dos finales malos de una vez.
+    """
+    for _ in range(max_attempts):
+        if not await confirm_in_escrow(escrow_address, nft_address):
+            return True
+        await sleep_fn(delay)
+    return False
+
+
 async def _sweep_escrow_usdc(escrow_address, winner, *, build_usdc_sweep_tx, signer,
                              escrow_wallet_id, submit_tx, sleep_fn, wait_delay, max_attempts,
                              battle_id, operator_wallet_id) -> None:
@@ -118,6 +144,13 @@ async def settle_cards_to_winner(session, battle, *, escrow_wallet_id, escrow_ad
                     # la quinta en adelante se quedaban dentro del escrow en silencio.
                     signed = await signer.sign_solana(operator_wallet_id, signed)
                 await submit_tx(signed)
+                # Enviada != ejecutada. Sin esto, una transacción aceptada por el RPC que luego no
+                # aterriza marcaba la carta como entregada y la dejaba dentro del escrow.
+                if not await confirmar_salida_del_escrow(confirm_in_escrow, escrow_address,
+                                                         p.nft_address, sleep_fn,
+                                                         wait_max_attempts, wait_delay):
+                    raise RuntimeError(
+                        f"traspaso de {p.nft_address} enviado pero la carta sigue en el escrow")
                 p.transferred = True
                 break
             except UnsupportedNftStandard as exc:

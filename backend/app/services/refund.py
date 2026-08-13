@@ -5,7 +5,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from app.services.pack_engine import _wait_in_escrow
+from app.services.pack_engine import _wait_in_escrow, confirmar_salida_del_escrow
 from app.services.nft_transfer import UnsupportedNftStandard
 from app.services.onchain_policy import CONFIRM_POLLS, CONFIRM_DELAY
 
@@ -13,11 +13,19 @@ logger = logging.getLogger(__name__)
 
 
 async def _sign_submit_retry(build_tx, *, signer, escrow_wallet_id, submit_tx,
-                             sleep_fn, wait_delay, max_attempts, ctx, operator_wallet_id=None) -> bool:
+                             sleep_fn, wait_delay, max_attempts, ctx, operator_wallet_id=None,
+                             verificar=None) -> bool:
     """build_tx() → sign(escrow [+ operator fee-payer]) → submit, with bounded retries.
     When operator_wallet_id is set the operator co-signs as fee-payer (the tx must be built with
     fee_payer=operator), so the escrow never needs SOL. UnsupportedNftStandard → give up (no
-    retry). Never raises. Returns True on success."""
+    retry). Never raises. Returns True on success.
+
+    `verificar` es un callable opcional que comprueba EN LA CADENA que la transacción hizo algo,
+    porque `submit_tx` solo dice que el RPC la aceptó: una transacción aceptada puede caducar sin
+    llegar a ejecutarse, y entonces esto devolvía True y el reembolso se daba por hecho. Si
+    devuelve False se cuenta como intento fallido y se reintenta. Quien no lo pase se comporta
+    como antes — el envío de USDC no lo usa porque su verificación es el saldo, que ya se
+    re-consulta en la pasada siguiente."""
     for _ in range(max_attempts):
         try:
             tx = await build_tx()
@@ -25,6 +33,8 @@ async def _sign_submit_retry(build_tx, *, signer, escrow_wallet_id, submit_tx,
             if operator_wallet_id:
                 signed = await signer.sign_solana(operator_wallet_id, signed)  # operator pays the fee
             await submit_tx(signed)
+            if verificar is not None and not await verificar():
+                raise RuntimeError(f"{ctx}: enviada pero sin efecto en la cadena")
             return True
         except UnsupportedNftStandard as exc:
             logger.warning("%s: unsupported — flagging: %s", ctx, exc)
@@ -83,7 +93,10 @@ async def refund_pack_void(session, battle, *, escrow_wallet_id, escrow_address,
                 _build, signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
                 ctx=f"pack void card {p.nft_address} in {battle.id}",
-                operator_wallet_id=operator_wallet_id)
+                operator_wallet_id=operator_wallet_id,
+                verificar=lambda p=p: confirmar_salida_del_escrow(
+                    confirm_in_escrow, escrow_address, p.nft_address, sleep_fn,
+                    wait_max_attempts, wait_delay))
         else:
             continue   # memo sin resolver: lo cubre la reconciliación, no hay nada que devolver aún
         if ok:
@@ -144,7 +157,10 @@ async def refund_royale_void(session, battle, *, escrow_wallet_id, escrow_addres
                 _build, signer=signer, escrow_wallet_id=escrow_wallet_id, submit_tx=submit_tx,
                 sleep_fn=sleep_fn, wait_delay=wait_delay, max_attempts=max_attempts,
                 ctx=f"royale void card {p.nft_address} in {battle.id}",
-                operator_wallet_id=operator_wallet_id)
+                operator_wallet_id=operator_wallet_id,
+                verificar=lambda p=p: confirmar_salida_del_escrow(
+                    confirm_in_escrow, escrow_address, p.nft_address, sleep_fn,
+                    wait_max_attempts, wait_delay))
         else:
             continue   # memo sin resolver: lo cubre la reconciliación, no hay nada que devolver aún
         if ok:

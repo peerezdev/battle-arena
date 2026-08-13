@@ -1,4 +1,6 @@
 import pytest
+
+from tests.conftest import escrow_que_entrega
 from app.db import Base, make_engine, make_session_factory, init_db
 from app.services.pack_engine import determine_winner, run_battle, PullOutcome
 from app.models import PackBattle, BattlePlayer, BattlePull
@@ -78,7 +80,7 @@ class _Signer:
 # Module-level async fakes reused by multiple tests
 async def _btx(esc, dest, mint): return f"xfer-{mint}->{dest}"
 async def _sub(signed): return "ccsig"
-async def _ce(esc, nft): return True
+def _ce_factory(): return escrow_que_entrega()
 async def _noop(): return "ok"
 async def _noslp(_): return None
 
@@ -98,7 +100,7 @@ async def test_run_battle_settles_to_winner(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     seeded = []
     async def prepare_escrow(addr): seeded.append(addr)
     out = await run_battle(session, b, gacha=gacha, signer=signer,
@@ -137,7 +139,7 @@ async def test_run_battle_settles_with_async_transfer(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     seeded = []
     async def prepare_escrow(addr): seeded.append(addr)
     out = await run_battle(session, b, gacha=gacha, signer=signer,
@@ -162,7 +164,7 @@ async def test_run_battle_settles_despite_unsupported_standard(session):
     signer = _Signer()
     async def build_transfer_tx(esc, dest, mint): raise UnsupportedNftStandard("cnft")
     async def submit_tx(signed): return "x"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     seeded = []
     async def prepare_escrow(addr): seeded.append(addr)
     out = await run_battle(session, b, gacha=gacha, signer=signer,
@@ -192,7 +194,7 @@ async def test_run_battle_sponsor_flag_propagates(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     seeded = []
     async def prepare_escrow(addr): seeded.append(addr)
     out = await run_battle(session, b, gacha=gacha, signer=signer,
@@ -219,7 +221,7 @@ async def test_run_battle_voids_when_player_cannot_play(session):
     signer = _Signer()
     async def build_transfer_tx(esc, dest, mint): return "x"
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     seeded = []
     async def prepare_escrow(addr): seeded.append(addr)
     out = await run_battle(session, b, gacha=gacha, signer=signer,
@@ -252,7 +254,7 @@ async def test_void_por_preflight_deja_escrito_quien_y_por_que(session, caplog):
 
     async def build_transfer_tx(esc, dest, mint): return "x"
     async def submit_tx(signed): return "sig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     async def prepare_escrow(addr): pass
 
     with caplog.at_level(logging.WARNING, logger="app.services.pack_engine"):
@@ -296,7 +298,7 @@ async def test_run_battle_polls_open_pack_while_pending(session):
         built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed):
         submits.append(signed); return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     seeded = []
     async def prepare_escrow(addr): seeded.append(addr)
     out = await run_battle(session, b, gacha=gacha, signer=signer,
@@ -326,7 +328,7 @@ async def test_run_battle_voids_if_open_pack_never_resolves(session):
     async def no_sleep(d): pass
     async def build_transfer_tx(esc, dest, mint): return "x"
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     seeded = []
     async def prepare_escrow(addr): seeded.append(addr)
     out = await run_battle(session, b, gacha=gacha, signer=signer,
@@ -356,8 +358,10 @@ async def test_run_battle_waits_for_nft_in_escrow(session):
 
     poll_count = {"n": 0}
     async def confirm_in_escrow(esc, nft):
+        """False, False, True — y a partir de ahí False: la carta llega tarde al escrow, se
+        traspasa, y en la comprobación de salida ya no está."""
         poll_count["n"] += 1
-        return poll_count["n"] >= 3  # False, False, True
+        return poll_count["n"] == 3
 
     slept = []
     async def no_sleep(d): slept.append(d)
@@ -373,7 +377,10 @@ async def test_run_battle_waits_for_nft_in_escrow(session):
                            can_play=lambda w: True, now_fn=lambda: __import__("datetime").datetime(2026, 6, 21),
                            sleep_fn=no_sleep)
     assert out == "settled"
-    assert poll_count["n"] == 3       # polled 3 times (2 False + 1 True)
+    # 4 sondeos: los 3 de esperar a que la carta LLEGUE (False, False, True) y uno más
+    # para comprobar que se FUE tras el traspaso. Ese cuarto es el precio de no dar por
+    # entregada una carta solo porque el RPC aceptó la transacción.
+    assert poll_count["n"] == 4
     assert len(slept) == 2            # slept between polls (2 failures before success)
 
 
@@ -416,7 +423,7 @@ async def test_run_battle_voids_if_escrow_seed_fails(session):
     signer = _Signer()
     async def prepare_escrow(addr): raise RuntimeError("seed failed")
     out = await run_battle(session, b, gacha=gacha, signer=signer, resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce_factory(),
                            prepare_escrow=prepare_escrow, can_play=lambda w: True,
                            now_fn=lambda: __import__("datetime").datetime(2026, 6, 21))
     assert out == "voided"
@@ -463,7 +470,7 @@ async def test_run_battle_multipack_winner_by_total(session):
     async def build_transfer_tx(esc, dest, mint):
         built.append((dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     async def prepare_escrow(addr): return None
     out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
                            resolve_wallet_id=lambda w: f"{w}-id",
@@ -501,7 +508,7 @@ async def test_run_battle_turbo_autosold_common_not_transferred(session):
 
     out = await run_battle(session, b, gacha=gacha, signer=signer,
         resolve_wallet_id=lambda w: f"id-{w}", build_transfer_tx=btx, submit_tx=_sub,
-        prepare_escrow=lambda a: _noop(), confirm_in_escrow=_ce, can_play=lambda w: True,
+        prepare_escrow=lambda a: _noop(), confirm_in_escrow=_ce_factory(), can_play=lambda w: True,
         now_fn=lambda: __import__("datetime").datetime.now(),
         build_usdc_sweep_tx=sweep, sleep_fn=_noslp)
 
@@ -537,7 +544,7 @@ async def test_run_battle_invokes_fee_collection_on_settle(session, monkeypatch)
     signer = _Signer()
     async def build_transfer_tx(esc, dest, mint): return f"xfer-{mint}->{dest}"
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     async def prepare_escrow(addr): pass
     async def usdc_balance(addr): return 0
     async def build_usdc_transfer_tx(src, dest, amount): return "tx"
@@ -573,7 +580,7 @@ async def test_run_battle_no_fee_deps_no_fee_call(session, monkeypatch):
     signer = _Signer()
     async def build_transfer_tx(esc, dest, mint): return f"xfer-{mint}->{dest}"
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     async def prepare_escrow(addr): pass
     out = await run_battle(session, b, gacha=gacha, signer=signer,
                            resolve_wallet_id=lambda w: f"{w}-id",
@@ -606,7 +613,7 @@ async def test_resume_pack_battle_settles_complete_without_repulling(session):
     built = []
     async def build_transfer_tx(esc, dest, mint): built.append((esc, dest, mint)); return f"xfer-{mint}->{dest}"
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     out = await resume_pack_battle(session, b, gacha=gacha, signer=signer, resolve_wallet_id=lambda w: f"{w}-id",
                                    build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
                                    confirm_in_escrow=confirm_in_escrow,
@@ -631,7 +638,7 @@ async def test_resume_pack_battle_voids_when_pulls_incomplete(session):
     gacha = _Gacha({})
     async def build_transfer_tx(esc, dest, mint): return "x"
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     out = await resume_pack_battle(session, b, gacha=gacha, signer=_Signer(), resolve_wallet_id=lambda w: f"{w}-id",
                                    build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
                                    confirm_in_escrow=confirm_in_escrow,
@@ -658,7 +665,7 @@ async def test_finalize_logs_undelivered_card_loudly(session, caplog):
     session.commit()
     async def build_transfer_tx(esc, dest, mint): raise UnsupportedNftStandard("standard='cnft' is not supported")
     async def submit_tx(signed): return "ccsig"
-    async def confirm_in_escrow(esc, nft): return True
+    confirm_in_escrow = escrow_que_entrega()
     with caplog.at_level(_logging.ERROR, logger="app.services.pack_engine"):
         out = await resume_pack_battle(session, b, gacha=_Gacha({}), signer=_Signer(), resolve_wallet_id=lambda w: f"{w}-id",
                                        build_transfer_tx=build_transfer_tx, submit_tx=submit_tx,
@@ -687,7 +694,7 @@ async def test_settle_salta_cartas_ya_transferidas(session):
     async def btx(esc, dest, nft): built.append(nft); return f"x-{nft}"
     await settle_cards_to_winner(session, b, escrow_wallet_id="eid", escrow_address="ESC",
                                  winner="B", build_transfer_tx=btx, submit_tx=_sub,
-                                 signer=_Signer(), confirm_in_escrow=_ce,
+                                 signer=_Signer(), confirm_in_escrow=_ce_factory(),
                                  build_usdc_sweep_tx=None, sleep_fn=_noslp,
                                  wait_max_attempts=1, wait_delay=0)
     assert built == ["nB"]
@@ -707,7 +714,7 @@ async def test_run_battle_empate_sin_server_seed_hace_void(session):
     async def prep(addr): pass
     out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce_factory(),
                            prepare_escrow=prep, can_play=lambda w: True,
                            now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
                            sleep_fn=_noslp)
@@ -733,7 +740,7 @@ async def test_run_battle_todo_autosold_settlea_sin_transferir_cartas(session):
     async def prep(addr): pass
     out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           build_transfer_tx=btx, submit_tx=_sub, confirm_in_escrow=_ce_factory(),
                            prepare_escrow=prep, can_play=lambda w: True,
                            now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
                            sleep_fn=_noslp, build_usdc_sweep_tx=sweep)
@@ -756,7 +763,7 @@ async def test_resume_pack_sin_escrow_hace_void_sin_crash(session):
     session.commit()
     out = await resume_pack_battle(session, b, gacha=object(), signer=_Signer(),
                                    resolve_wallet_id=lambda w: None, build_transfer_tx=_btx,
-                                   submit_tx=_sub, confirm_in_escrow=_ce,
+                                   submit_tx=_sub, confirm_in_escrow=_ce_factory(),
                                    now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
                                    sleep_fn=_noslp)
     assert out == "voided" and b.status == "voided"
@@ -792,7 +799,7 @@ async def test_void_a_mitad_de_bundle_y_refund_devuelve_lo_ya_sacado(session):
     async def prep(addr): pass
     out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce_factory(),
                            prepare_escrow=prep, can_play=lambda w: True,
                            now_fn=lambda: __import__("datetime").datetime(2026, 7, 6),
                            sleep_fn=_noslp, open_max_attempts=1, open_delay=0)
@@ -804,7 +811,7 @@ async def test_void_a_mitad_de_bundle_y_refund_devuelve_lo_ya_sacado(session):
     await refund_pack_void(session, b, escrow_wallet_id=b.escrow_wallet_id,
                            escrow_address=b.escrow_address, build_transfer_tx=btx,
                            submit_tx=_sub, signer=_Signer(), build_usdc_transfer_tx=utx,
-                           confirm_in_escrow=_ce, sleep_fn=_noslp)
+                           confirm_in_escrow=_ce_factory(), sleep_fn=_noslp)
     # Nota: _Gacha usa memo "m-{wallet}", así que la pull de la caja 2 de A comparte memo con
     # la de la caja 1; lo relevante: cada carta RESUELTA vuelve a su dueño y nada más.
     resolved = [(p.player_wallet, p.nft_address) for p in
@@ -868,7 +875,7 @@ async def test_available_never_dips_while_the_bundle_is_being_paid(session):
     async def prep(addr): pass
     out = await run_battle(session, b, gacha=gacha, signer=_Signer(),
                            resolve_wallet_id=lambda w: f"{w}-id",
-                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce,
+                           build_transfer_tx=_btx, submit_tx=_sub, confirm_in_escrow=_ce_factory(),
                            prepare_escrow=prep, can_play=lambda w: True,
                            now_fn=lambda: __import__("datetime").datetime(2026, 8, 2),
                            sleep_fn=_noslp)

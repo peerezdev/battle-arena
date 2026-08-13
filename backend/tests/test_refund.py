@@ -20,6 +20,31 @@ async def _noslp(_): return None
 async def _ce(esc, nft): return True
 
 
+class _Escrow:
+    """`confirm_in_escrow` y `submit_tx` acoplados, como en la cadena: la carta sigue DENTRO hasta
+    que su traspaso se envía de verdad. Un `confirm_in_escrow` que dice True para siempre describe
+    un escrow imposible, y es lo que dejó pasar el fallo de mainnet del 11/08."""
+
+    def __init__(self, *dentro):
+        self.dentro = set(dentro)
+        self.enviadas = []
+
+    async def confirmar(self, esc, nft):
+        return nft in self.dentro
+
+    async def enviar(self, signed):
+        self.enviadas.append(signed)
+        for nft in list(self.dentro):
+            if nft in signed:
+                self.dentro.discard(nft)
+        return "sig"
+
+    async def enviar_al_vacio(self, signed):
+        """Aceptada por el RPC, nunca ejecutada: la carta se queda dentro."""
+        self.enviadas.append(signed)
+        return "firma-que-nunca-aterriza"
+
+
 def _battle(session, pulls):
     b = PackBattle(id="b1", mode="pack", machine_code="m", price=50, max_players=4, status="voided")
     session.add(b)
@@ -35,12 +60,12 @@ async def test_refund_pack_void_returns_cards_and_usdc_to_pullers(session):
     # A: non-common card → returned to A. B: auto-sold common → 42 USDC to B. C: no pull → nothing.
     b = _battle(session, [("A", "nftA", False, None), ("B", "nftB", True, 42_000_000), ("C", None, False, None)])
     cards, usdc = [], []
+    escrow = _Escrow("nftA", "nftB")
     async def btx(esc, dest, nft): cards.append((dest, nft)); return f"tx-{nft}"
     async def usdctx(src, dest, amt): usdc.append((dest, amt)); return f"u-{dest}"
-    async def sub(signed): return "sig"
     await refund_pack_void(session, b, escrow_wallet_id="eid", escrow_address="ESC",
-        build_transfer_tx=btx, submit_tx=sub, signer=_Signer(), build_usdc_transfer_tx=usdctx,
-        confirm_in_escrow=_ce, sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0)
+        build_transfer_tx=btx, submit_tx=escrow.enviar, signer=_Signer(), build_usdc_transfer_tx=usdctx,
+        confirm_in_escrow=escrow.confirmar, sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0)
     assert cards == [("A", "nftA")]
     assert usdc == [("B", 42_000_000)]
 
@@ -110,15 +135,15 @@ async def test_refund_royale_void_alive_get_pulls_eliminated_bought_back_leftove
     session.commit()
 
     cards, usdc, bought = [], [], []
+    escrow = _Escrow("nftA1", "nftB1", "nftC1")
     async def btx(esc, dest, nft): cards.append((dest, nft)); return f"tx-{nft}"
     async def usdctx(src, dest, amt): usdc.append((dest, amt)); return f"u-{dest}-{amt}"
-    async def sub(signed): return "sig"
     async def buyback(nft): bought.append(nft)
     async def esc_bal(esc): return 300_000_000  # leftover after alive refunds + buybacks (mocked)
 
     await refund_royale_void(session, b, escrow_wallet_id="eid", escrow_address="ESC",
-        build_transfer_tx=btx, submit_tx=sub, signer=_Signer(), build_usdc_transfer_tx=usdctx,
-        buyback_to_escrow=buyback, escrow_usdc_balance=esc_bal, confirm_in_escrow=_ce,
+        build_transfer_tx=btx, submit_tx=escrow.enviar, signer=_Signer(), build_usdc_transfer_tx=usdctx,
+        buyback_to_escrow=buyback, escrow_usdc_balance=esc_bal, confirm_in_escrow=escrow.confirmar,
         sleep_fn=_noslp, wait_max_attempts=1, wait_delay=0)
 
     # Alive cards returned to their owners (A's nftA1, B's nftB1); C's card NOT returned to C.
@@ -162,10 +187,10 @@ async def test_refund_pack_void_marks_refunded_and_second_call_is_noop(session):
     from app.services.refund import refund_pack_void
     b = _mk_pack_void(session)
     built, usdc = [], []
+    escrow = _Escrow("nftA")
     async def btx(esc, dest, nft): built.append((dest, nft)); return f"x-{nft}"
     async def utx(src, dest, amt): usdc.append((dest, amt)); return "u-tx"
-    async def sub(s): return "sig"
-    async def ce(esc, nft): return True
+    sub, ce = escrow.enviar, escrow.confirmar
 
     await refund_pack_void(session, b, escrow_wallet_id="eid", escrow_address="ESC",
                            build_transfer_tx=btx, submit_tx=sub, signer=_Signer(),
@@ -244,10 +269,10 @@ async def test_refund_royale_void_marca_refunded_y_es_reentrante(session):
     session.commit()
     b = session.get(PackBattle, "rv1")
     built, usdc, buybacks = [], [], []
+    escrow = _Escrow("nftA", "nftE")
     async def btx(esc, dest, nft): built.append((dest, nft)); return f"x-{nft}"
     async def utx(src, dest, amt): usdc.append((dest, amt)); return "u"
-    async def sub(s): return "sig"
-    async def ce(esc, nft): return True
+    sub, ce = escrow.enviar, escrow.confirmar
     async def bb(nft): buybacks.append(nft)
     async def bal(esc): return 0   # sin sobrante → sin split
 

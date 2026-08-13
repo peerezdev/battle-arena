@@ -66,16 +66,26 @@ async def test_una_carta_que_no_confirma_gasta_como_mucho_el_techo_por_intento()
 
 @pytest.mark.asyncio
 async def test_si_confirma_a_la_primera_no_se_gastan_sondeos_de_mas():
-    """Lo importante del cambio: el camino bueno cuesta lo mismo con 7 que con 20."""
+    """Lo importante del cambio: el camino bueno cuesta lo mismo con 7 que con 20.
+
+    Son DOS sondeos, no uno: "¿ha llegado la carta al escrow?" antes de mover, y "¿se ha ido?"
+    después de enviar. El segundo es el precio de no mentir — sin él, una transacción aceptada por
+    el RPC que nunca aterriza marcaba la carta como entregada (mainnet, 11/08). Una llamada por
+    carta a cambio de que `transferred` signifique algo.
+    """
     sondeos = 0
+    dentro = True
 
     async def confirm_in_escrow(esc, mint):
         nonlocal sondeos
         sondeos += 1
-        return True                       # confirma ya
+        return dentro                     # dentro hasta que el traspaso se ejecuta
 
     async def build_transfer_tx(*a): return "tx"
-    async def submit_tx(_): pass
+
+    async def submit_tx(_):
+        nonlocal dentro
+        dentro = False                    # el traspaso surte efecto de verdad
 
     pull = _Pull(0)
     await settle_cards_to_winner(
@@ -86,7 +96,7 @@ async def test_si_confirma_a_la_primera_no_se_gastan_sondeos_de_mas():
         wait_max_attempts=CONFIRM_POLLS, wait_delay=CONFIRM_DELAY,
     )
 
-    assert sondeos == 1
+    assert sondeos == 2
     assert pull.transferred is True
 
 

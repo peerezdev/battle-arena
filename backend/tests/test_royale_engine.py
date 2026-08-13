@@ -9,6 +9,8 @@ Fake design:
           state outside the fake.
 """
 import pytest
+
+from tests.conftest import escrow_que_entrega
 from app.db import make_engine, make_session_factory, init_db
 from app.models import PackBattle, BattlePlayer, BattlePull, BattleRound
 from app.services.royale_engine import run_royale
@@ -99,8 +101,7 @@ def _std_fakes():
     async def confirm_usdc(p, m):
         return True
 
-    async def confirm_in_escrow(esc, nft):
-        return True
+    confirm_in_escrow = escrow_que_entrega()
 
     async def build_transfer_tx(esc, dest, nft):
         built.append((dest, nft))
@@ -470,7 +471,7 @@ async def test_run_royale_turbo_persists_rarity_and_resilient_settle(session):
     async def sweep(esc, winner): sweeps.append(winner); return "sweep-tx"
     async def distribute(esc, w, amt): return "dsig"
     async def confirm_usdc(w, amt): return True
-    async def ce(esc, nft): return True
+    ce = escrow_que_entrega()
     async def prep(esc): return "ok"
     async def noslp(_): return None
 
@@ -526,7 +527,7 @@ async def test_run_royale_invokes_fee_collection_on_settle(session, monkeypatch)
     async def sweep(esc, winner): return "sweep-tx"
     async def distribute(esc, w, amt): return "dsig"
     async def confirm_usdc(w, amt): return True
-    async def ce(esc, nft): return True
+    ce = escrow_que_entrega()
     async def prep(esc): return "ok"
     async def noslp(_): return None
     async def usdc_balance(addr): return 0
@@ -571,7 +572,7 @@ async def test_run_royale_no_fee_deps_no_fee_call(session, monkeypatch):
     async def sweep(esc, winner): return "sweep-tx"
     async def distribute(esc, w, amt): return "dsig"
     async def confirm_usdc(w, amt): return True
-    async def ce(esc, nft): return True
+    ce = escrow_que_entrega()
     async def prep(esc): return "ok"
     async def noslp(_): return None
 

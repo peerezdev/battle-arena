@@ -5,6 +5,13 @@ escrow más tarde que esa ventana, el bucle se rinde, deja `transferred=0` y sig
 cierra y nadie se entera de que faltan cartas. Se midió que esas cartas SÍ estaban en el escrow
 al consultarlas después — no se pierden, quedan pendientes.
 
+Hubo un segundo camino, peor, tapado el 11/08: el settle daba la carta por entregada en cuanto el
+RPC aceptaba la transacción, sin comprobar que llegara a ejecutarse. Una que se envió y nunca
+aterrizó dejó la carta dentro del escrow con `transferred=1`, y como este barrido busca justo por
+`transferred == 0`, decía "no hay cartas pendientes" teniendo una de 93 $ atrapada. Lo único que
+lo delató fue la retención del escrow, que sí mira la cadena. Ahora tanto el settle como este
+script confirman el EFECTO antes de marcar nada.
+
 Esto las termina de entregar. Recorre TODAS las batallas cerradas con ganador (no una fija),
 comprueba on-chain dónde está cada carta y actúa según lo que encuentre:
 
@@ -33,6 +40,7 @@ from app.db import make_engine, make_session_factory
 from app.models import BattlePull, PackBattle
 from app.services.nft_transfer import (UnsupportedNftStandard, build_transfer, nft_in_owner,
                                        submit_signed_tx)
+from app.services.onchain_policy import CONFIRM_POLLS, CONFIRM_DELAY
 from app.services.pack_orchestration import fetch_latest_blockhash, sol_balance
 from app.services.privy_signer import PrivySigner
 from scripts._destino import anunciar
@@ -73,6 +81,16 @@ def _pendientes(s, only: str | None):
     return q.all()
 
 
+async def _confirmar_llegada(rpc_url: str, winner: str, mint: str) -> bool:
+    """True cuando la carta ya está en la wallet del ganador. Sondea porque la confirmación tarda:
+    preguntar una sola vez justo después de enviar daría False casi siempre."""
+    for _ in range(CONFIRM_POLLS):
+        if await nft_in_owner(rpc_url, winner, mint):
+            return True
+        await asyncio.sleep(CONFIRM_DELAY)
+    return False
+
+
 async def _entregar(s, st, signer, pull, battle) -> str:
     """Devuelve qué se hizo con esta carta: 'entregada' | 'ya-estaba' | 'fuera' | 'error'."""
     mint, esc, winner = pull.nft_address, battle.escrow_address, battle.winner
@@ -97,6 +115,14 @@ async def _entregar(s, st, signer, pull, battle) -> str:
         signed = await signer.sign_solana(battle.escrow_wallet_id, tx)      # dueño de la carta
         signed = await signer.sign_solana(st.privy_operator_wallet_id, signed)  # paga rent y fee
         await submit_signed_tx(st.solana_rpc_url, signed)
+        # Enviada NO es ejecutada: `submit_signed_tx` devuelve firma en cuanto el RPC acepta la
+        # transacción, y desde ahí todavía puede caducar sin llegar a la cadena. Marcar la entrega
+        # sin mirar es lo que produjo el caso que este script existe para reparar — y aquí duele
+        # doble, porque un `transferred=1` falso hace que la carta deje de salir en el propio
+        # barrido: la red de seguridad se cegaría a sí misma.
+        if not await _confirmar_llegada(st.solana_rpc_url, winner, mint):
+            _log("      enviada pero la carta no ha llegado al ganador: se deja pendiente")
+            return "error"
         pull.transferred = True
         s.commit()               # por carta: un fallo más adelante no pierde lo ya hecho
         return "entregada"

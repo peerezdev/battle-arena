@@ -260,7 +260,15 @@ async def test_run_pack_battle_live_happy_path(session, monkeypatch):
         calls["submit"].append(signed)
         return "sig"
 
+    # Con estado: la carta está en el escrow cuando se pregunta antes de moverla, y ya no está
+    # cuando se comprueba si el traspaso surtió efecto. Un `return True` fijo describe una carta
+    # entregada y dentro a la vez, y con ese doble en verde se coló a producción el fallo del 11/08.
+    _preguntadas: set = set()
+
     async def fake_nft_in_owner(rpc, owner, mint):
+        if mint in _preguntadas:
+            return False
+        _preguntadas.add(mint)
         return True
 
     async def fake_seed_escrow(rpc_url, signer, operator_wallet_id, operator_address,
@@ -368,7 +376,15 @@ async def test_un_escrow_reutilizado_no_se_vuelve_a_sembrar(session, monkeypatch
     async def fake_submit(rpc, signed):
         return "sig"
 
+    # Con estado: la carta está en el escrow cuando se pregunta antes de moverla, y ya no está
+    # cuando se comprueba si el traspaso surtió efecto. Un `return True` fijo describe una carta
+    # entregada y dentro a la vez, y con ese doble en verde se coló a producción el fallo del 11/08.
+    _preguntadas: set = set()
+
     async def fake_nft_in_owner(rpc, owner, mint):
+        if mint in _preguntadas:
+            return False
+        _preguntadas.add(mint)
         return True
 
     async def fake_seed_escrow(rpc_url, signer, operator_wallet_id, operator_address,
