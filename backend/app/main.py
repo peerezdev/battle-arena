@@ -277,8 +277,13 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(401, "missing token")
         try:
             return privy.embedded_solana_wallet(authorization[len("Bearer "):])
-        except PrivyAuthError:
-            raise HTTPException(401, "invalid identity token")
+        except PrivyAuthError as e:
+            # El MOTIVO viaja en el detalle, y no es un descuido de seguridad: "el token no
+            # verifica" y "el token verifica pero no trae wallet embebida" son dos problemas con
+            # dos soluciones distintas, y sin distinguirlos el jugador solo ve "vuelve a entrar",
+            # que en el segundo caso no arregla nada. Ninguno de los motivos revela nada del token.
+            logger.warning("auth rechazada (%s): %s", type(e).__name__, e)
+            raise HTTPException(401, f"invalid identity token: {e}")
 
     @app.get("/health")
     async def health():

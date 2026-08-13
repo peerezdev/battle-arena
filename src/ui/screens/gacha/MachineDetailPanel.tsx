@@ -22,6 +22,9 @@ interface Props {
   /** Por qué no hay puntos, si es que han fallado. Sin esto, un fallo se ve igual que "esta
    *  máquina no da tiradas gratis": la pantalla vacía y el jugador sin saber qué hacer. */
   freeSpinsError?: 'sesion' | 'sin_wallet' | 'no_disponible' | 'fallo' | null
+  /** Motivo exacto del backend, si lo dio. Se enseña debajo del mensaje: sin él, dos fallos que se
+   *  arreglan de formas distintas se ven idénticos. */
+  freeSpinsDetalle?: string | null
   onFreePack?: () => void
 }
 
@@ -45,7 +48,7 @@ const RARITY_COLOR: Record<string, string> = {
 
 const TURBO_ON_MSG = 'Turbo activated — Commons will be auto-sold'
 
-export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, freeSpinsError, onFreePack }: Props) {
+export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, freeSpinsError, freeSpinsDetalle, onFreePack }: Props) {
   const reduced = useReducedMotion()
   // Lo que dan esos puntos EN ESTA máquina. Cambia con el precio, así que se recalcula por máquina
   // y no se puede leer de la respuesta de CC, que viene siempre en la escala de la de 50 $.
@@ -301,6 +304,9 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, f
           {onFreePack && !freeSpins && freeSpinsError && machine.freeSpins && (
             <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
               {FREE_SPINS_ERROR_MSG[freeSpinsError]}
+              {freeSpinsDetalle && (
+                <div style={{ marginTop: 3, fontSize: 10, opacity: 0.7 }}>{freeSpinsDetalle}</div>
+              )}
             </div>
           )}
 

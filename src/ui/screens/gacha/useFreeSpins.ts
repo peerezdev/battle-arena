@@ -27,13 +27,18 @@ export function useFreeSpins() {
   const embedded = useEmbeddedSolanaAddress()
   const [datos, setDatos] = useState<FreeSpins | null>(null)
   const [error, setError] = useState<FreeSpinsError | null>(null)
+  // El motivo EXACTO que da el backend cuando rechaza la sesión. Se enseña tal cual porque
+  // "no verifica" y "verifica pero no trae wallet embebida" se arreglan de formas distintas, y
+  // adivinar cuál es desde el navegador ya costó una mañana.
+  const [detalle, setDetalle] = useState<string | null>(null)
 
   const refrescar = useCallback(() => {
     if (!identityToken) return
     fetchFreeSpins(identityToken)
-      .then((d) => { setDatos(d); setError(null) })
+      .then((d) => { setDatos(d); setError(null); setDetalle(null) })
       .catch((e: unknown) => {
         setDatos(null)
+        setDetalle(e instanceof GachaHttpError ? e.message : null)
         if (e instanceof GachaDisabledError) setError('no_disponible')
         // 401/403: el token no vale PARA ESTE BACKEND. Dos causas muy distintas, y la diferencia
         // importa: sin wallet embebida en la sesión, volver a entrar igual no arregla nada.
@@ -51,6 +56,7 @@ export function useFreeSpins() {
   return {
     freeSpins: identityToken ? datos : null,
     freeSpinsError: identityToken ? error : null,
+    freeSpinsDetalle: identityToken ? detalle : null,
     refrescarFreeSpins: refrescar,
   }
 }
