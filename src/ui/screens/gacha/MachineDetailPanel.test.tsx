@@ -132,6 +132,23 @@ describe('MachineDetailPanel · tirada gratis', () => {
     expect(screen.getByText(/200,000 points to a free pack here/i)).toBeTruthy()   // 500.000 − 300.000
   })
 
+  it('cuando los puntos NO se pudieron leer lo dice, en vez de dejar el hueco vacío', () => {
+    // El fallo que costó una tarde: con los puntos a null la pantalla escondía a la vez el saldo y
+    // el botón, así que una sesión caducada se veía idéntica a "esta máquina no da tiradas gratis".
+    const { unmount } = pintar(maq(50, true), { freeSpins: null, freeSpinsError: 'sesion', onFreePack: vi.fn() })
+    expect(screen.getByText(/Log in again to see your free spins/i)).toBeTruthy()
+    unmount()
+
+    pintar(maq(50, true), { freeSpins: null, freeSpinsError: 'fallo', onFreePack: vi.fn() })
+    expect(screen.getByText(/Could not load your points/i)).toBeTruthy()
+  })
+
+  it('el aviso de fallo NO sale en máquinas que no dan tiradas gratis', () => {
+    // Ahí no hay nada que prometer, así que un aviso solo sería ruido.
+    pintar(maq(50, false), { freeSpins: null, freeSpinsError: 'sesion', onFreePack: vi.fn() })
+    expect(screen.queryByText(/Log in again/i)).toBeNull()
+  })
+
   it('sin tiradas NO deja un botón apagado: dice cuánto falta', () => {
     // Un botón deshabilitado invita a mirar los puntos; una línea de texto informa y no estorba.
     pintar(maq(50, true), { freeSpins: { points_available: 92_389 }, onFreePack: vi.fn() })

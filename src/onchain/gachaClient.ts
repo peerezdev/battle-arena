@@ -57,6 +57,19 @@ export class GachaDisabledError extends Error {
   constructor() { super('gacha_disabled') }
 }
 
+/** Error del backend que CONSERVA el código HTTP.
+ *
+ *  Sin él, quien llama solo tiene un texto, y "no has iniciado sesión" acaba tratándose igual que
+ *  "Collector Crypt está caído". Eso fue justo lo que dejó la pantalla del gacha sin puntos y sin
+ *  botón de tirada gratis, sin decir por qué: ver `useFreeSpins`. */
+export class GachaHttpError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function gachaFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(`${config.backendUrl}${path}`, {
     ...options,
@@ -66,7 +79,7 @@ async function gachaFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (!resp.ok) {
     let detail: string | undefined
     try { detail = (await resp.json())?.detail } catch { /* ignore */ }
-    throw new Error(detail || `Gacha error ${resp.status}`)
+    throw new GachaHttpError(resp.status, detail || `Gacha error ${resp.status}`)
   }
   return resp.json() as Promise<T>
 }

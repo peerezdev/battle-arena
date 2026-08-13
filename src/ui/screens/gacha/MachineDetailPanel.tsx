@@ -19,7 +19,18 @@ interface Props {
   /** Puntos de CC del jugador. Solo eso: cuántas tiradas dan depende del precio de ESTA máquina,
    *  y se calcula aquí. Sin él no se pinta el botón: es un extra, no una pieza del flujo. */
   freeSpins?: { points_available: number } | null
+  /** Por qué no hay puntos, si es que han fallado. Sin esto, un fallo se ve igual que "esta
+   *  máquina no da tiradas gratis": la pantalla vacía y el jugador sin saber qué hacer. */
+  freeSpinsError?: 'sesion' | 'no_disponible' | 'fallo' | null
   onFreePack?: () => void
+}
+
+/** Qué se le dice al jugador cuando no se han podido leer sus puntos. Cada uno dice qué pasa Y qué
+ *  hacer: el único que se arregla reintentando es el último. */
+const FREE_SPINS_ERROR_MSG: Record<'sesion' | 'no_disponible' | 'fallo', string> = {
+  sesion: 'Log in again to see your free spins.',
+  no_disponible: 'Free spins are unavailable right now.',
+  fallo: 'Could not load your points. Try again in a moment.',
 }
 
 const RARITY_ORDER = ['epic', 'rare', 'uncommon', 'common'] as const
@@ -32,7 +43,7 @@ const RARITY_COLOR: Record<string, string> = {
 
 const TURBO_ON_MSG = 'Turbo activated — Commons will be auto-sold'
 
-export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, onFreePack }: Props) {
+export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, freeSpinsError, onFreePack }: Props) {
   const reduced = useReducedMotion()
   // Lo que dan esos puntos EN ESTA máquina. Cambia con el precio, así que se recalcula por máquina
   // y no se puede leer de la respuesta de CC, que viene siempre en la escala de la de 50 $.
@@ -282,6 +293,15 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, o
 
               Cuando no llega se dice en texto en vez de un botón apagado: un botón que no se puede
               pulsar invita a mirar los puntos, no a jugar. */}
+          {/* Si los puntos NO se pudieron leer, se dice. Callarlo era el bug: la máquina ofrece
+              tiradas gratis, el jugador tiene puntos, y la pantalla no enseñaba ni una cosa ni la
+              otra porque el dato venía nulo. */}
+          {onFreePack && !freeSpins && freeSpinsError && machine.freeSpins && (
+            <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
+              {FREE_SPINS_ERROR_MSG[freeSpinsError]}
+            </div>
+          )}
+
           {onFreePack && freeSpins && machine.freeSpins && (
             gratis.count > 0 ? (
               <button

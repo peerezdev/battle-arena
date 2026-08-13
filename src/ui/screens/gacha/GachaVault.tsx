@@ -315,7 +315,7 @@ export default function GachaVault() {
     }
   }
 
-  const { freeSpins, refrescarFreeSpins } = useFreeSpins()
+  const { freeSpins, freeSpinsError, refrescarFreeSpins } = useFreeSpins()
 
   /** Canjea una tirada gratis y la revela por el MISMO camino que una de pago.
    *
@@ -659,6 +659,7 @@ export default function GachaVault() {
               usdc={usdc}
               onYolo={(c, t) => setConfirm({ count: c, turbo: t })}
               freeSpins={freeSpins}
+              freeSpinsError={freeSpinsError}
               onFreePack={() => void handleFreePack()}
             />
           </div>
