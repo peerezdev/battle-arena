@@ -30,6 +30,7 @@ import {
   type YoloPacksResponse,
   replayPull,
 } from '../../../onchain/gachaClient'
+import { mensajeDeCanje } from './freePackErrors'
 import { COLORS, FONTS, RARITY, SHADOW, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 import { HoloCard } from '../../components/HoloCard'
@@ -329,7 +330,7 @@ export default function GachaVault() {
     try {
       memo = (await freePack(identityToken, selected.code)).memo
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not claim your free pack', 'error')
+      showToast(mensajeDeCanje(e), 'error')
       setPhase({ kind: 'machines' })
       return
     }

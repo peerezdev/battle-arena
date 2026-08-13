@@ -80,6 +80,32 @@ async def test_machines_free_spins_combina_maquina_e_interruptor_global():
     assert await codes({"gachas": []}) == {"con": True, "sin": False}
 
 
+@respx.mock
+@pytest.mark.asyncio
+async def test_machines_distingue_cerradas_de_no_ofrecidas():
+    """`freeSpinsClosed` es lo que permite decirle al jugador POR QUÉ no hay botón.
+
+    Con una sola bandera combinada, "CC las ha cerrado un rato" y "esta máquina no las da nunca" se
+    veían igual: la pantalla vacía. Quien tenía puntos de sobra no sabía si el problema era suyo.
+    """
+    from app.services.gacha import GachaService
+
+    async def flags(status_json):
+        respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+            {"code": "con", "name": "Con", "price": 50, "freeSpins": True},
+            {"code": "sin", "name": "Sin", "price": 50, "freeSpins": False},
+        ]}))
+        respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json=status_json))
+        out = await GachaService(base_url=BASE, api_key="k", now_fn=lambda: 1000.0).machines()
+        return {m["code"]: m["freeSpinsClosed"] for m in out}
+
+    # Cerradas: solo la que LAS OFRECE está "cerrada". La otra no las da y punto.
+    assert await flags({"gachas": [], "freePacksStatus": "closed"}) == {"con": True, "sin": False}
+    # Abiertas: nadie está cerrado.
+    respx.reset()
+    assert await flags({"gachas": [], "freePacksStatus": "open"}) == {"con": False, "sin": False}
+
+
 def test_settings_gacha_defaults():
     s = Settings(_env_file=None)
     assert s.gacha_base_url == "https://dev-gacha.collectorcrypt.com"
@@ -137,6 +163,8 @@ async def test_machines_maps_and_caches():
         "available": True,
         # La máquina de prueba no trae `freeSpins`, y ausente significa que no las da.
         "freeSpins": False,
+        # Y por tanto tampoco están "cerradas": esa bandera es solo para las que SÍ las ofrecen.
+        "freeSpinsClosed": False,
     }]
     assert out[0]["tierRanges"] == {"common": {"start": 150, "end": 250}}
     assert "extra_ignored" not in out[0]

@@ -22,6 +22,10 @@ export interface GachaMachine {
   /** Si esta máquina admite tiradas gratis AHORA. No todas las ofrecen, y CC además puede
    *  cerrarlas globalmente; el backend ya combina las dos cosas en esta bandera. */
   freeSpins?: boolean | null
+  /** La máquina SÍ las ofrece, pero CC las tiene cerradas ahora mismo. Existe porque la bandera de
+   *  arriba, al combinar las dos condiciones, hacía que un cierre temporal se viera exactamente
+   *  igual que una máquina que no las da nunca: sin nada en pantalla. */
+  freeSpinsClosed?: boolean | null
 }
 
 export interface GeneratePackResponse {

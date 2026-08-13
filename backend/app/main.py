@@ -1294,13 +1294,16 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream unavailable")
+            logger.warning("free-pack: no se pudieron leer los puntos de CC: %s", e)
+            raise HTTPException(502, "upstream_error")
         # Contra el precio de ESTA máquina: los mismos puntos dan tirada en la de 50 $ y no llegan
         # ni de lejos en la de 5.000 $. `_machine_price` da unidades base, la fórmula usa dólares.
         cuenta = tiradas_gratis(precio_base_units / 1_000_000, estado["points_available"])
         if cuenta["count"] <= 0:
-            raise HTTPException(409, f"te faltan {cuenta['until_next']} puntos para una tirada "
-                                     f"gratis en esta máquina")
+            # CÓDIGO, no prosa: el texto que lee el jugador se escribe en el frontend, como en el
+            # modal de propinas. El número viaja detrás de los dos puntos porque el mensaje bueno
+            # dice cuántos puntos faltan, y esa cifra solo la sabe el servidor.
+            raise HTTPException(409, f"not_enough_points:{cuenta['until_next']}")
 
         # El nonce se pide ANTES de firmar porque tiene que ir dentro de la transacción: CC lo
         # comprueba en el cuerpo y en la firma, y caduca en minutos, así que se pide aquí y no
@@ -1311,7 +1314,8 @@ def create_app(session_factory, chain: ChainSource,
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
-            raise HTTPException(502, str(e) or "gacha upstream unavailable")
+            logger.warning("free-pack: CC no dio nonce para %s: %s", body.pack_type, e)
+            raise HTTPException(502, "upstream_error")
 
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         prueba = (build_free_pack_proof_tx(wallet, blockhash, nonce) if nonce
@@ -1324,15 +1328,20 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             # CC distingue "esta máquina no da sobres gratis" de "no queda stock", y las dos son
-            # cosas que el jugador puede entender; se dejan pasar tal cual en vez de un 502 mudo.
+            # cosas que el jugador puede entender; se traducen a un código en vez de a un 502 mudo.
             msg = str(e) or "gacha upstream unavailable"
             if "pack type" in msg.lower():
-                raise HTTPException(409, "esta máquina no ofrece tiradas gratis")
+                raise HTTPException(409, "machine_no_free_spins")
             if "low" in msg.lower():
-                raise HTTPException(409, "esta máquina se ha quedado sin cartas")
-            raise HTTPException(502, msg)
+                raise HTTPException(409, "machine_out_of_cards")
+            # El texto de CC se QUEDA EN EL LOG. Reenviarlo al navegador es cómo un jugador acabó
+            # leyendo "Missing or invalid nonce" cuando CC cambió su contrato: su vocabulario no es
+            # el nuestro, está en inglés y describe su implementación, no lo que le pasa a él.
+            logger.warning("free-pack: CC rechazó el canje de %s: %s", body.pack_type, msg)
+            raise HTTPException(502, "upstream_error")
         if not out.get("memo"):
-            raise HTTPException(502, "gacha upstream unavailable")
+            logger.warning("free-pack: CC respondió sin memo para %s", body.pack_type)
+            raise HTTPException(502, "upstream_error")
         if s.get(GachaPack, out["memo"]) is None:
             s.add(GachaPack(memo=out["memo"], wallet=wallet, pack_type=body.pack_type,
                             price=0, submitted_at=datetime.now(timezone.utc)))

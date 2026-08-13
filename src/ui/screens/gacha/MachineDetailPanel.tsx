@@ -304,9 +304,21 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, f
           {onFreePack && !freeSpins && freeSpinsError && machine.freeSpins && (
             <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
               {FREE_SPINS_ERROR_MSG[freeSpinsError]}
-              {freeSpinsDetalle && (
+              {/* El motivo crudo del backend es para quien desarrolla, no para el jugador: dice
+                  cosas como "ImmatureSignatureError". En producción sobra. */}
+              {freeSpinsDetalle && import.meta.env.DEV && (
                 <div style={{ marginTop: 3, fontSize: 10, opacity: 0.7 }}>{freeSpinsDetalle}</div>
               )}
+            </div>
+          )}
+
+          {/* Cerradas por Collector Crypt, no por esta máquina. Sin este aviso el jugador con
+              puntos de sobra veía el hueco vacío y no sabía si era él, la máquina o nosotros: la
+              bandera combinada `freeSpins` hacía que un cierre temporal se viera igual que una
+              máquina que no las ofrece nunca. */}
+          {onFreePack && machine.freeSpinsClosed && (
+            <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
+              Free packs are paused right now. Your points are safe.
             </div>
           )}
 

@@ -1137,9 +1137,10 @@ def test_free_pack_mide_los_puntos_contra_el_precio_de_esa_maquina():
 @respx.mock
 def test_free_pack_traduce_los_rechazos_de_cc():
     # CC distingue "esta máquina no da gratis" de "sin stock"; las dos son cosas que el jugador
-    # entiende, así que no se esconden detrás de un 502 mudo.
-    for detalle, espera in [("Invalid pack type", "no ofrece tiradas gratis"),
-                            ("Machine is low", "sin cartas")]:
+    # entiende, así que no se esconden detrás de un 502 mudo. Se devuelven como CÓDIGO: el texto
+    # que lee el jugador lo escribe el frontend (ver `freePackErrors.ts`).
+    for detalle, espera in [("Invalid pack type", "machine_no_free_spins"),
+                            ("Machine is low", "machine_out_of_cards")]:
         c, priv, _, _ = _client_con_firmante()
         _maquinas(respx)
         _rpc(respx)

@@ -158,7 +158,14 @@ class GachaService:
             # No todas las máquinas dan tiradas gratis, y encima CC puede cerrarlas de golpe. Se
             # combinan aquí en una sola respuesta a "¿puedo pedir una gratis en esta, ahora?", que
             # es lo único que necesita saber quien pinta el botón.
-            mach["freeSpins"] = bool(mach.get("freeSpins")) and gratis_abiertas
+            las_ofrece = bool(mach.get("freeSpins"))
+            mach["freeSpins"] = las_ofrece and gratis_abiertas
+            # …pero combinarlas escondía un caso: la máquina SÍ las ofrece y CC las tiene cerradas.
+            # Con una sola bandera eso se veía igual que "esta máquina nunca las da", o sea la
+            # pantalla vacía, y un jugador con puntos de sobra no entendía por qué. Esta segunda
+            # bandera es lo que permite decírselo; es un cierre temporal, no una propiedad de la
+            # máquina.
+            mach["freeSpinsClosed"] = las_ofrece and not gratis_abiertas
         self._machines_cache = (now, out)
         return out
 

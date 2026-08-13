@@ -151,6 +151,16 @@ describe('MachineDetailPanel · tirada gratis', () => {
     expect(screen.queryByText(/Log in again to see/i)).toBeNull()
   })
 
+  it('avisa cuando CC tiene las tiradas gratis cerradas, en vez de no enseñar nada', () => {
+    // La bandera combinada hacía que un cierre temporal se viera igual que una máquina que no las
+    // da nunca: hueco vacío. El jugador con puntos no sabía si era él, la máquina o nosotros.
+    const m = { ...machine, price: 50, freeSpins: false, freeSpinsClosed: true } as unknown as GachaMachine
+    render(<MachineDetailPanel machine={m} authed usdc={500} onYolo={vi.fn()}
+                               freeSpins={{ points_available: 300_000 }} onFreePack={vi.fn()} />)
+    expect(screen.getByText(/paused right now/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Free pack/i })).toBeNull()
+  })
+
   it('el aviso de fallo NO sale en máquinas que no dan tiradas gratis', () => {
     // Ahí no hay nada que prometer, así que un aviso solo sería ruido.
     pintar(maq(50, false), { freeSpins: null, freeSpinsError: 'sesion', onFreePack: vi.fn() })
