@@ -179,20 +179,39 @@ class GachaService:
             "spins_left_today": raw.get("freeSpinsLeftToday") or 0,
         }
 
+    async def generate_free_pack(self, player_address: str, pack_type: str) -> str:
+        """Nonce para canjear una tirada gratis. Endpoint NO documentado.
+
+        Primer paso de un canje: CC devuelve un `nonce` con caducidad de minutos que hay que
+        meter DENTRO de la transacción de prueba (ver `build_free_pack_proof_tx`) y repetir en el
+        cuerpo de `free_pack`. Antes no existía; se añadió cuando CC endureció el canje.
+        """
+        raw = await self._request("POST", "/api/generateFreePack", json={
+            "publicKey": player_address, "packType": pack_type,
+        })
+        nonce = raw.get("nonce")
+        if not nonce:
+            raise GachaUpstreamError("gacha upstream unavailable")
+        return nonce
+
     async def free_pack(self, player_address: str, pack_type: str, signed_transaction: str,
-                        turbo: bool = False) -> dict:
+                        nonce: str, turbo: bool = False) -> dict:
         """Canjea una tirada gratis. Endpoint NO documentado.
 
         `signedTransaction` es una transacción entera firmada por esa wallet, en base64; sirve de
-        prueba de propiedad y NO se envía a la cadena — medido: acepta un memo cualquiera. Devuelve
-        el `memo` del sobre, que se abre después con el mismo `open_pack` que uno de pago.
+        prueba de propiedad y NO se envía a la cadena. Devuelve el `memo` del sobre, que se abre
+        después con el mismo `open_pack` que uno de pago.
+
+        OJO con el `nonce`, que es lo que rompió este canje una vez: va por DOS vías a la vez, en
+        el cuerpo y dentro de la transacción firmada, y CC comprueba las dos. Aquí ya no vale
+        cualquier transacción firmada, que es lo que aceptaba antes.
 
         La carta va SIEMPRE a `player_address`: `altPlayerAddress` se acepta en el cuerpo pero se
         ignora (comprobado on-chain). No sirve para entregarla a un tercero.
         """
         raw = await self._request("POST", "/api/freePack", json={
             "publicKey": player_address, "packType": pack_type,
-            "turbo": turbo, "transactionSignature": signed_transaction,
+            "turbo": turbo, "transactionSignature": signed_transaction, "nonce": nonce,
         })
         return {"memo": raw.get("memo"), "remaining_points": raw.get("remainingPoints")}
 

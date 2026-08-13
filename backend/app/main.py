@@ -47,7 +47,7 @@ from .services.pack_orchestration import (
     usdc_balance_base_units, fetch_latest_blockhash,
     reconcile_voided_battle_live,
 )
-from .services.solana_tx import build_memo_tx
+from .services.solana_tx import build_memo_tx, build_free_pack_proof_tx
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
 from .services.reservations import (reserve, reserved_total, royale_locked_total,
@@ -1297,11 +1297,22 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(409, f"te faltan {cuenta['until_next']} puntos para una tirada "
                                      f"gratis en esta máquina")
 
+        # El nonce se pide ANTES de firmar porque tiene que ir dentro de la transacción: CC lo
+        # comprueba en el cuerpo y en la firma, y caduca en minutos, así que se pide aquí y no
+        # antes de las comprobaciones de puntos.
+        try:
+            nonce = await svc.generate_free_pack(player_address=wallet, pack_type=body.pack_type)
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
+
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
-        firmada = await privy_signer.sign_solana(wallet_id, build_memo_tx(wallet, blockhash))
+        firmada = await privy_signer.sign_solana(
+            wallet_id, build_free_pack_proof_tx(wallet, blockhash, nonce))
         try:
             out = await svc.free_pack(player_address=wallet, pack_type=body.pack_type,
-                                      signed_transaction=firmada)
+                                      signed_transaction=firmada, nonce=nonce)
         except GachaDisabled:
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:

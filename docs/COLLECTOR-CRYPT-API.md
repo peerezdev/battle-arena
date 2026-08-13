@@ -136,21 +136,37 @@ Dos condiciones, y ninguna es del jugador:
 - **`freePacksStatus`**, en `/api/status`. Interruptor **global** de CC: en `closed` no hay tiradas
   gratis en ninguna máquina.
 
-El orden de validación de `freePack`, medido: tipo de máquina → firma → puntos.
+El orden de validación de `freePack`, medido: **nonce** → tipo de máquina → firma → puntos.
 
-### `POST /api/freePack`
+### `POST /api/generateFreePack` + `POST /api/freePack`
 
-```json
-{"publicKey": "...", "packType": "...", "turbo": false, "transactionSignature": "<base64>"}
+**CC endureció este canje sin avisar, y nos lo rompió entero** (2026-08-13). Antes bastaba una
+transacción firmada cualquiera; ahora hay un reto de dos pasos. Con el formato viejo responde
+`400 {"error":"Missing or invalid nonce"}`, y ninguna tirada gratis se puede canjear.
+
+```
+POST /api/generateFreePack  {publicKey, packType}   →  {nonce, expiry}   (minutos)
+POST /api/freePack          {publicKey, packType, turbo, transactionSignature, nonce}  →  {memo}
 ```
 
-Canjea una tirada gratis y devuelve un `memo`, que se abre con el mismo `openPack` que uno de pago.
+El `nonce` viaja por **dos vías a la vez**, y CC comprueba las dos:
 
-Lo medido, que conviene saber:
+1. En el cuerpo de `/api/freePack`.
+2. **Dentro de la transacción firmada**, como contenido de una instrucción memo que además lleva
+   la wallet en sus cuentas **marcada como firmante**. Esa marca es lo que ata el nonce a la
+   wallet: sin ella el memo sería un texto que podría haber escrito cualquiera.
 
-- **`transactionSignature` no se envía a la cadena.** Vale cualquier transacción firmada por esa
-  wallet en base64 — le pasamos un memo vacío y lo acepta. Actúa como prueba de propiedad de la
-  wallet, no como pago. No hay reto ni caducidad.
+La transacción replica la de su web: transferencia de 0 lamports de la wallet a sí misma, más el
+memo con el nonce. Lo construye `build_free_pack_proof_tx` en `app/services/solana_tx.py`;
+`build_memo_tx`, con su texto fijo, **ya no sirve para esto**.
+
+El orden de validación, medido: **el nonce se comprueba antes que la firma** (con una firma basura
+y sin nonce, el error es el del nonce).
+
+Lo demás sigue igual:
+
+- **`transactionSignature` no se envía a la cadena.** Actúa como prueba de propiedad, no como
+  pago.
 - **`altPlayerAddress` se acepta en el cuerpo pero se ignora.** La carta va **siempre** a
   `publicKey`. Comprobado on-chain. Por eso los puntos del escrow no se pueden convertir en cartas
   para un jugador: el sobre gratis lo recibe el escrow.
@@ -229,8 +245,10 @@ firmar un memo con la wallet            →  prueba de propiedad
 transferBonusPoints(… nonce, signedTransaction)  →  {transferred, newBonusPoints, newPointsRemaining}
 ```
 
-El `signedTransaction` es **la misma prueba de propiedad del `freePack`**: un memo firmado que no
-se envía a la cadena. Sirve el mismo `build_memo_tx` + `sign_solana`.
+El `signedTransaction` es un memo firmado que no se envía a la cadena, con el `build_memo_tx` de
+toda la vida y su texto fijo. **Ojo, que aquí las dos pruebas de propiedad ya NO son la misma**:
+`freePack` pasó a exigir el nonce dentro del memo (ver su sección) y esta no. Comprobado el
+2026-08-13: el envío de puntos sigue aceptando el memo simple.
 
 #### La bolsa "bonus" es un CUPO, y es lo que limita cuánto se puede enviar
 

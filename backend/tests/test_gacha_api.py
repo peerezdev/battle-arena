@@ -980,12 +980,54 @@ def test_free_spins_descuenta_los_puntos_ya_gastados():
     assert r.json()["points_available"] == 160000
 
 
+def _nonce(mock, valor="nonce-abc-123"):
+    """El nonce del canje, que CC empezó a exigir. Ver `test_free_pack_pide_el_nonce…`."""
+    return mock.post(f"{BASE}/api/generateFreePack").mock(
+        return_value=Response(200, json={"success": True, "nonce": valor,
+                                         "expiry": "2030-01-01T00:00:00.000Z"}))
+
+
+@respx.mock
+def test_free_pack_pide_el_nonce_y_lo_manda_firmado_dentro_de_la_transaccion():
+    """CC endureció el canje: la prueba de propiedad ya no es una transacción cualquiera.
+
+    Ahora hay que pedir un `nonce` a `/api/generateFreePack` y devolverlo por DOS vías a la vez:
+    en el cuerpo de `/api/freePack` y, sobre todo, DENTRO de la transacción firmada, como
+    contenido de la instrucción memo. Mandar el formato viejo responde
+    `400 {"error":"Missing or invalid nonce"}` y ninguna tirada gratis se puede canjear.
+    """
+    c, priv, firmante, sf = _client_con_firmante()
+    _maquinas(respx)
+    _rpc(respx)
+    _spins(respx)
+    gen = _nonce(respx)
+    ruta = respx.post(f"{BASE}/api/freePack").mock(
+        return_value=Response(200, json={"success": True, "memo": "cc-libre-9",
+                                         "remainingPoints": 0}))
+
+    r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},
+               headers=_hdrs_con_id(priv, WALLET_REAL))
+    assert r.status_code == 200, r.text
+
+    # El nonce se pide para ESTA wallet y ESTA máquina.
+    assert json.loads(gen.calls[0].request.content) == {
+        "publicKey": WALLET_REAL, "packType": "pokemon_50"}
+
+    # Y viaja por las dos vías: en el cuerpo…
+    assert json.loads(ruta.calls[0].request.content)["nonce"] == "nonce-abc-123"
+    # …y dentro de la transacción que se firmó, que es la que CC comprueba de verdad.
+    import base64 as _b64
+    _, tx_sin_firmar = firmante.visto[0]
+    assert b"nonce-abc-123" in _b64.b64decode(tx_sin_firmar)
+
+
 @respx.mock
 def test_free_pack_canjea_y_deja_el_sobre_listo_para_abrir():
     c, priv, firmante, sf = _client_con_firmante()
     _maquinas(respx)
     _rpc(respx)
     _spins(respx)
+    _nonce(respx)
     ruta = respx.post(f"{BASE}/api/freePack").mock(
         return_value=Response(200, json={"success": True, "memo": "cc-libre-1",
                                          "remainingPoints": 150000}))
@@ -1052,6 +1094,7 @@ def test_free_pack_traduce_los_rechazos_de_cc():
         _maquinas(respx)
         _rpc(respx)
         _spins(respx)
+        _nonce(respx)
         respx.post(f"{BASE}/api/freePack").mock(
             return_value=Response(400, json={"error": detalle}))
         r = c.post("/gacha/free-pack", json={"pack_type": "pokemon_50"},

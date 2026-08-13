@@ -16,6 +16,7 @@ from solders.instruction import Instruction, AccountMeta
 from solders.message import Message
 from solders.transaction import Transaction
 from solders.token.associated import get_associated_token_address
+from solders.system_program import transfer, TransferParams
 
 TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"   # classic SPL Token program
 ATA_PROGRAM   = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"   # associated-token-account program
@@ -36,6 +37,34 @@ def build_memo_tx(payer: str, recent_blockhash: str, texto: str = "collector-are
     payer_pk = Pubkey.from_string(payer)
     ix = Instruction(Pubkey.from_string(MEMO_PROGRAM), texto.encode(), [])
     msg = Message.new_with_blockhash([ix], payer_pk, Hash.from_string(recent_blockhash))
+    return base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
+
+
+def build_free_pack_proof_tx(payer: str, recent_blockhash: str, nonce: str) -> str:
+    """Prueba de propiedad para canjear una tirada gratis, en base64 y sin firmar.
+
+    NO vale `build_memo_tx` aquí, aunque se le parezca. Collector Crypt endureció `/api/freePack`:
+    la transacción ya no puede ser una cualquiera firmada por la wallet, tiene que llevar dentro
+    el `nonce` que devuelve `/api/generateFreePack`. Sin él responde
+    `400 {"error":"Missing or invalid nonce"}`, y lo comprueba ANTES que la firma.
+
+    Se replica lo que hace la web de CC, instrucción por instrucción:
+
+      1. Una transferencia de 0 lamports de la wallet a sí misma. No mueve nada; está para que la
+         transacción tenga una instrucción de sistema y la wallet quede como firmante natural.
+      2. Un memo cuyo CONTENIDO es el nonce, y que además lleva la wallet en sus cuentas marcada
+         como firmante. Esa marca es la parte que ata el nonce a la wallet: sin ella el memo sería
+         un texto que cualquiera podría haber escrito.
+
+    Sigue sin enviarse a la cadena, así que lo peor que pasa si algún día CC la enviara es un memo
+    y su fee.
+    """
+    payer_pk = Pubkey.from_string(payer)
+    ix_pago = transfer(TransferParams(from_pubkey=payer_pk, to_pubkey=payer_pk, lamports=0))
+    ix_memo = Instruction(Pubkey.from_string(MEMO_PROGRAM), nonce.encode(),
+                          [AccountMeta(pubkey=payer_pk, is_signer=True, is_writable=False)])
+    msg = Message.new_with_blockhash([ix_pago, ix_memo], payer_pk,
+                                     Hash.from_string(recent_blockhash))
     return base64.b64encode(bytes(Transaction.new_unsigned(msg))).decode()
 
 
