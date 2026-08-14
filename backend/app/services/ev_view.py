@@ -46,7 +46,11 @@ def fila_ev(session: Session, machine: str, *, precio: float, buyback_pct: Optio
         "realized_verdict": None, "pulls_to_conclude": None,
         # Las rachas van SIEMPRE, incluso sin veredicto: se miden sobre las tiradas observadas y no
         # dependen de que la ventana esté completa. Es información útil desde la primera hora.
-        "tiers": rachas_por_tier(session, machine, horas=horas, ahora=ahora),
+        #
+        # Y van SOBRE EL HISTÓRICO ENTERO, no sobre `horas`: una racha se cuenta en tiradas, no en
+        # tiempo, así que recortarla a la ventana del EV no la hace más actual, la deja ciega. En
+        # una máquina de tres tiradas al día, la ventana solo alcanzaba a decir "no he mirado".
+        "tiers": rachas_por_tier(session, machine, ahora=ahora),
     }
 
     if v["n"] < MINIMO:

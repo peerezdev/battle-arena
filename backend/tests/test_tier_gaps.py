@@ -15,6 +15,13 @@ def sembrar(s, tiers, machine="pokemon_50"):
                  "source": "live"} for i, t in enumerate(tiers)])
 
 
+def antiguo(s, tier, *, dias, machine="pokemon_50"):
+    """Una tirada de hace mucho, para comprobar que el histórico viejo SÍ cuenta para la racha."""
+    guardar(s, [{"nft_address": f"{machine}-viejo-{dias}", "machine": machine, "prize_tier": tier,
+                 "insured_value": 40.0, "weighted_insured_value": None, "memo": None,
+                 "winner": "W", "created_at": AHORA - timedelta(days=dias), "source": "live"}])
+
+
 def de(filas, nombre):
     return next(f for f in filas if f["tier"] == nombre)
 
@@ -86,10 +93,43 @@ def test_sin_datos_devuelve_las_cuatro_rarezas_vacias(Session):
         assert all(f["current"] is None for f in filas)
 
 
-def test_lo_de_fuera_de_la_ventana_no_cuenta(Session):
+def test_la_racha_MIRA_MAS_ALLA_de_la_ventana_del_ev(Session):
+    """Lo contrario que el EV, y a propósito.
+
+    Una racha se cuenta en TIRADAS, no en tiempo, así que recortarla a las 48 h del EV no la hace
+    más actual: la deja ciega. `comic_25` hace unas tres tiradas al día, y dentro de la ventana su
+    Epic salía como `current: None`, que se lee como "lleva un montón" cuando de verdad significaba
+    "no he mirado". Con el histórico entero se puede decir lo que importa: cuántas tiradas lleva.
+    """
     with Session() as s:
-        sembrar(s, [2])                                   # dentro
-        guardar(s, [{"nft_address": "viejo", "machine": "pokemon_50", "prize_tier": 1,
-                     "insured_value": 40.0, "weighted_insured_value": None, "memo": None,
-                     "winner": "W", "created_at": AHORA - timedelta(hours=60), "source": "live"}])
-        assert de(rachas_por_tier(s, "pokemon_50", ahora=AHORA), "Epic")["seen"] == 0
+        antiguo(s, 1, dias=30)                            # el Epic salió hace un mes...
+        sembrar(s, [4] * 190)                             # ...y desde entonces 190 tiradas
+        epic = de(rachas_por_tier(s, "pokemon_50", ahora=AHORA), "Epic")
+        assert epic["current"] == 190 and epic["seen"] == 1
+
+
+def test_la_racha_viene_con_los_dias_porque_sin_ellos_no_se_lee(Session):
+    """Un "190" son tres horas en una máquina caliente y un mes en una lenta, y esa diferencia
+    cambia por completo lo que significa."""
+    with Session() as s:
+        antiguo(s, 1, dias=30)
+        sembrar(s, [4] * 190)
+        assert de(rachas_por_tier(s, "pokemon_50", ahora=AHORA), "Epic")["days_since"] == 30.0
+        # La que acaba de salir no lleva días: se distingue de "no salió", que no tiene días.
+        assert de(rachas_por_tier(s, "pokemon_50", ahora=AHORA), "Common")["days_since"] == 0.0
+
+
+def test_sin_haber_salido_nunca_no_hay_dias_que_contar(Session):
+    with Session() as s:
+        sembrar(s, [4] * 10)
+        assert de(rachas_por_tier(s, "pokemon_50", ahora=AHORA), "Epic")["days_since"] is None
+
+
+def test_el_tope_acota_las_maquinas_calientes_sin_recortar_a_las_lentas(Session):
+    """El histórico de una máquina caliente crece sin parar; el tope lo acota. Lo que queda fuera
+    del tope se comporta como lo no medido: `None`, no un número redondeado a la muestra."""
+    with Session() as s:
+        antiguo(s, 1, dias=30)
+        sembrar(s, [4] * 50)
+        epic = de(rachas_por_tier(s, "pokemon_50", limite=10, ahora=AHORA), "Epic")
+        assert epic["current"] is None and epic["sample"] == 10

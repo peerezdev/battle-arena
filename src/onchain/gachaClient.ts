@@ -235,6 +235,9 @@ export interface EvRow {
 
 /** Racha de una rareza: cuántas tiradas lleva sin salir y cuánto suele tardar.
  *
+ *  Va sobre el HISTÓRICO ENTERO, no sobre la ventana del EV: una racha se cuenta en tiradas, no en
+ *  tiempo, y recortarla a 48 h no la hace más actual, la deja ciega en las máquinas lentas.
+ *
  *  NO es una predicción. El gacha usa VRF y cada tirada es independiente, así que una rareza que
  *  lleva 60 sin salir tiene la misma probabilidad en la 61. `cold` solo dice que va por encima de
  *  su propio ritmo. */
@@ -244,6 +247,7 @@ export interface EvTier {
   average: number | null
   seen: number
   sample: number
+  days_since: number | null   // cuánto tiempo es esa racha; sin esto el número no se puede leer
   cold: boolean
 }
 

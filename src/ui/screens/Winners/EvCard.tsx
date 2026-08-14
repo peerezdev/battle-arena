@@ -2,6 +2,7 @@ import { COLORS, FONTS } from '../../theme'
 import type { EvRow } from '../../../onchain/gachaClient'
 import { RATIO_MAX, RATIO_MIN, anguloAguja, esConcluyente, estadoDe, etiqueta, ratioDesdeEdge }
   from './evDial'
+import { desdeHace } from './tierGap'
 
 /**
  * Una máquina del gacha medida sobre el feed público de Collector Crypt.
@@ -77,7 +78,7 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONTS.mono, fontSize: 10 }}>
               <thead>
                 <tr>
-                  {['TIER', 'SEEN', 'SINCE', 'AVG'].map((h, i) => (
+                  {['TIER', 'SEEN', 'GAP', 'AGO', 'AVG'].map((h, i) => (
                     <th key={h} style={{
                       textAlign: i === 0 ? 'left' : 'right', fontWeight: 400, fontSize: 8.5,
                       letterSpacing: '.1em', color: '#5d6774', padding: '0 0 4px',
@@ -94,6 +95,11 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
                       textAlign: 'right', fontVariantNumeric: 'tabular-nums',
                       color: t.cold ? '#f5c542' : COLORS.text,
                     }}>{t.current == null ? `${t.sample}+` : t.current}</td>
+                    {/* Sin el tiempo, la racha no se puede leer: el mismo "190" son tres horas en
+                        una máquina caliente y un mes en una lenta. */}
+                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
+                      {desdeHace(t.days_since)}
+                    </td>
                     <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
                       {t.average == null ? '—' : t.average}
                     </td>

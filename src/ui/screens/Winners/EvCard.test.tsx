@@ -10,10 +10,10 @@ const fila = (over: Partial<EvRow> = {}): EvRow => ({
   gaps: [], realized_edge_pct: -6.21, realized_ci_lo_pct: -8.27, realized_ci_hi_pct: -4.24,
   realized_verdict: 'CONFIDENT -EV', pulls_to_conclude: null,
   tiers: [
-    { tier: 'Common', current: 0, average: 0.3, seen: 257, sample: 327, cold: false },
-    { tier: 'Uncommon', current: 2, average: 5.4, seen: 51, sample: 327, cold: false },
-    { tier: 'Rare', current: 61, average: 19.4, seen: 16, sample: 327, cold: true },
-    { tier: 'Epic', current: null, average: null, seen: 0, sample: 327, cold: false },
+    { tier: 'Common', current: 0, average: 0.3, seen: 257, sample: 327, days_since: 0, cold: false },
+    { tier: 'Uncommon', current: 2, average: 5.4, seen: 51, sample: 327, days_since: 0.1, cold: false },
+    { tier: 'Rare', current: 61, average: 19.4, seen: 16, sample: 327, days_since: 2.6, cold: true },
+    { tier: 'Epic', current: null, average: null, seen: 0, sample: 327, days_since: null, cold: false },
   ],
   ...over,
 })
@@ -91,6 +91,13 @@ describe('EvCard', () => {
     expect(screen.getByText('Rare')).toBeTruthy()
     expect(screen.getByText('61')).toBeTruthy()
     expect(screen.getByText('19.4')).toBeTruthy()
+  })
+
+  it('la racha viene con el tiempo que lleva, porque el número solo no se lee', () => {
+    // El mismo "61" son horas en una máquina caliente y semanas en una lenta. En `comic_25`, que
+    // hace tres tiradas al día, es la única forma de saber que la racha es de verdad larga.
+    render(<EvCard fila={fila()} />)
+    expect(screen.getByText('3d')).toBeTruthy()          // Rare: 2.6 días
   })
 
   it('una rareza que no salió dice "327+" y no "327"', () => {
