@@ -85,6 +85,7 @@ import { showToast } from '../../toastBus'
 import { UsernameModal } from '../../components/UsernameModal'
 import { TipModal } from '../../components/TipModal'
 import { TIPS_ENABLED } from '../../../featureFlags'
+import { useStickToBottom } from './useStickToBottom'
 import type { LiveDrop } from '../../drops/dropsStore'
 
 // Opener label for a drop row: username if known, else a short wallet.
@@ -151,6 +152,10 @@ export function ChatDock({
   // hacia arriba con el destinatario, y este estado decide si se muestra y sobre quién.
   const [tipTarget, setTipTarget] = useState<{ wallet: string; alias?: string | null } | null>(null)
   const promptedName = useRef(false)
+  // El chat se abre por el ÚLTIMO mensaje y sigue el ritmo sin arrastrar a quien lee.
+  const listaRef = useRef<HTMLDivElement>(null)
+  const { pegadoAlFondo, nuevosSinVer, bajarDelTodo, alHacerScroll } =
+    useStickToBottom(listaRef, messages.length)
 
   // First time the user focuses the chat with no username set, nudge them to pick one.
   function onChatFocus() {
@@ -592,8 +597,14 @@ export function ChatDock({
           )}
         </div>
 
-        {/* ── MESSAGES ── */}
+        {/* ── MESSAGES ──
+            El envoltorio relativo existe para poder colgar el aviso de "mensajes nuevos" sobre
+            la lista sin sacarlo del flujo de la columna. */}
+        <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
         <div
+          ref={listaRef}
+          onScroll={alHacerScroll}
+          data-testid="chat-messages"
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -719,6 +730,23 @@ export function ChatDock({
               </div>
             ))
           )}
+        </div>
+
+        {/* Solo cuando hay algo que anunciar Y el jugador no está abajo: si estuviera abajo ya
+            lo habría visto, y un aviso permanente sería ruido. */}
+        {!pegadoAlFondo && nuevosSinVer > 0 && (
+          <button
+            onClick={() => bajarDelTodo()}
+            style={{
+              position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
+              background: COLORS.panel2, border: `1px solid ${COLORS.border}`, borderRadius: 999,
+              padding: '5px 12px', color: COLORS.text, fontFamily: FONTS.mono, fontSize: 10.5,
+              cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 4px 14px #0008',
+            }}
+          >
+            {nuevosSinVer} new {nuevosSinVer === 1 ? 'message' : 'messages'} ↓
+          </button>
+        )}
         </div>
 
         {/* ── CHAT INPUT ── */}

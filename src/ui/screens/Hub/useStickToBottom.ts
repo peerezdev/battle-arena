@@ -50,7 +50,14 @@ export function useStickToBottom(
   const bajarDelTodo = useCallback((suave = true) => {
     const el = ref.current
     if (!el) return
-    el.scrollTo({ top: el.scrollHeight, behavior: suave ? 'smooth' : 'auto' })
+    // `scrollTo` con opciones no está en todas partes (Safari antiguo, y tampoco en jsdom, que es
+    // donde se prueba esto). Sin la alternativa, el chat REVIENTA al montar en vez de limitarse a
+    // no animar: asignar `scrollTop` hace lo mismo sin suavizado.
+    if (typeof el.scrollTo === 'function') {
+      el.scrollTo({ top: el.scrollHeight, behavior: suave ? 'smooth' : 'auto' })
+    } else {
+      el.scrollTop = el.scrollHeight
+    }
     marcarVisto()
     setPegadoAlFondo(true)
   }, [ref, marcarVisto])

@@ -86,3 +86,14 @@ describe('useStickToBottom', () => {
     expect(result.current.nuevosSinVer).toBe(1)       // solo el de verdad nuevo
   })
 })
+
+it('sin scrollTo en el entorno, baja igual asignando scrollTop', () => {
+  // jsdom no implementa scrollTo, y Safari antiguo tampoco lo acepta con opciones. Sin la
+  // alternativa, montar el chat reventaba con "el.scrollTo is not a function": 15 tests del
+  // ChatDock cayeron de golpe por esto.
+  const el = { scrollHeight: 1000, clientHeight: 200, scrollTop: 0 }
+  const ref = { current: el as unknown as HTMLElement }
+  const { rerender } = renderHook(({ n }) => useStickToBottom(ref, n), { initialProps: { n: 1 } })
+  rerender({ n: 2 })
+  expect(el.scrollTop).toBe(1000)
+})
