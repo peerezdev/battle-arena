@@ -86,6 +86,8 @@ import { UsernameModal } from '../../components/UsernameModal'
 import { TipModal } from '../../components/TipModal'
 import { TIPS_ENABLED } from '../../../featureFlags'
 import { useStickToBottom } from './useStickToBottom'
+import { MentionAutocomplete } from './MentionAutocomplete'
+import { buscarMencion, resolverMenciones } from './mentions'
 import type { LiveDrop } from '../../drops/dropsStore'
 
 // Opener label for a drop row: username if known, else a short wallet.
@@ -142,7 +144,7 @@ export function ChatDock({
 }) {
   const navigate = useNavigate()
   const drops = useDrops()
-  const { messages, send, canPost, online } = useChat()
+  const { messages, send, canPost, online, onlineUsers } = useChat()
   const { username } = useProfile()
   const ownWallet = useEmbeddedSolanaAddress()
   const reducedMotion = useReducedMotion()
@@ -153,6 +155,10 @@ export function ChatDock({
   const [tipTarget, setTipTarget] = useState<{ wallet: string; alias?: string | null } | null>(null)
   const promptedName = useRef(false)
   // El chat se abre por el ÚLTIMO mensaje y sigue el ritmo sin arrastrar a quien lee.
+  const inputRef = useRef<HTMLInputElement>(null)
+  // Posición del cursor: la mención que se está escribiendo depende de DÓNDE está el cursor, no
+  // del final del texto, para que escribir en medio de un mensaje ya escrito también la abra.
+  const [cursor, setCursor] = useState(0)
   const listaRef = useRef<HTMLDivElement>(null)
   const { pegadoAlFondo, nuevosSinVer, bajarDelTodo, alHacerScroll } =
     useStickToBottom(listaRef, messages.length)
@@ -196,14 +202,46 @@ export function ChatDock({
     dragRef.current = null
   }
 
+  // La mención que se está escribiendo y a quién ofrece. Se filtra por nombre Y por wallet: quien
+  // no tiene alias se identifica por su wallet, y es la única forma de encontrarlo.
+  const mencion = canPost ? buscarMencion(draft, cursor) : null
+  const candidatos = mencion
+    ? onlineUsers
+        .filter((u) => {
+          const q = mencion.consulta.toLowerCase()
+          return u.name.toLowerCase().includes(q) || u.wallet.toLowerCase().startsWith(q)
+        })
+        .slice(0, 6)
+    : []
+
+  function elegirMencion(u: { wallet: string; name: string }) {
+    if (!mencion) return
+    const antes = draft.slice(0, mencion.desde)
+    const despues = draft.slice(mencion.desde + 1 + mencion.consulta.length)
+    const nuevo = `${antes}@${u.name} ${despues.replace(/^\s+/, '')}`
+    setDraft(nuevo)
+    // El foco vuelve al campo y el cursor va detrás de la mención: seguir escribiendo tiene que
+    // ser lo natural, no tener que volver a pulsar en el input.
+    const pos = antes.length + u.name.length + 2
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.setSelectionRange(pos, pos)
+      setCursor(pos)
+    })
+  }
+
   function handleSend() {
     if (!draft.trim()) return
-    send(draft)
+    // Las etiquetas se resuelven contra los conectados AHORA: si el mencionado se fue mientras
+    // se escribía, el servidor la descartará igual.
+    send(draft, resolverMenciones(draft, onlineUsers))
     setDraft('')
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') handleSend()
+    // Con la lista de menciones abierta, Enter es para ELEGIR (lo maneja el autocompletado) y no
+    // para enviar: si no, se mandaría el mensaje a medio escribir.
+    if (e.key === 'Enter' && candidatos.length === 0) handleSend()
   }
 
   if (collapsed) {
@@ -756,14 +794,25 @@ export function ChatDock({
             borderTop: `1px solid ${COLORS.border}`,
             display: 'flex',
             gap: 8,
+            position: 'relative',   // la lista de menciones se cuelga de aquí
           }}
         >
+          <MentionAutocomplete
+            // Al cambiar la lista se remonta, y el resaltado vuelve al primero. Es lo que se
+            // espera al seguir escribiendo para filtrar.
+            key={candidatos.map((u) => u.wallet).join(',')}
+            candidatos={candidatos}
+            onElegir={elegirMencion}
+            onCerrar={() => setCursor(-1)}
+          />
           <input
+            ref={inputRef}
+            onSelect={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
             disabled={!canPost}
             placeholder={canPost ? 'Type a message…' : 'Log in to chat'}
             value={draft}
             onFocus={onChatFocus}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { setDraft(e.target.value); setCursor(e.target.selectionStart ?? 0) }}
             onKeyDown={handleKeyDown}
             style={{
               flex: 1,

@@ -17,13 +17,16 @@ interface CapturedTipModalProps {
 // `tipModalCalls` records every prop set ChatDock hands to <TipModal>, so wiring tests can
 // assert on WHO the modal was opened for, not just that a tip button exists somewhere.
 const { chatState, tipModalCalls } = vi.hoisted(() => ({
-  chatState: { messages: [] as any[], ownWallet: null as string | null },
+  chatState: { messages: [] as any[], ownWallet: null as string | null,
+               canPost: false, onlineUsers: [] as { wallet: string; name: string }[],
+               send: vi.fn() as ReturnType<typeof vi.fn> },
   tipModalCalls: [] as CapturedTipModalProps[],
 }))
 // Igual que en el perfil: aquí se prueba la pantalla con las propinas encendidas.
 vi.mock('../../../featureFlags', () => ({ TIPS_ENABLED: true }))
 vi.mock('../../../hooks/useChat', () => ({
-  useChat: () => ({ messages: chatState.messages, send: vi.fn(), canPost: false, online: 0 }),
+  useChat: () => ({ messages: chatState.messages, send: chatState.send, canPost: chatState.canPost,
+                    online: 0, onlineUsers: chatState.onlineUsers }),
 }))
 vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => chatState.ownWallet }))
 // TipModal is Task 5's own component, already tested there; ChatDock only needs to know it was
@@ -43,6 +46,9 @@ beforeEach(() => {
   localStorage.clear()
   chatState.messages = []
   chatState.ownWallet = null
+  chatState.canPost = false
+  chatState.onlineUsers = []
+  chatState.send = vi.fn()
   tipModalCalls.length = 0
 })
 
@@ -284,5 +290,66 @@ describe('ChatDock · propina desde el chat', () => {
     expect(lastCall.to.wallet).toBe('WalletBBB')
     expect(lastCall.to.alias).toBe('Bob')
     expect(lastCall.source).toBe('chat')
+  })
+})
+
+describe('ChatDock · menciones', () => {
+  const conectados = [
+    { wallet: 'WalletAAAA1111', name: 'ana' },
+    { wallet: 'WalletBBBB2222', name: 'Bea' },
+  ]
+
+  function escribir(texto: string) {
+    const campo = screen.getByPlaceholderText(/type a message/i)
+    fireEvent.change(campo, { target: { value: texto } })
+    return campo
+  }
+
+  it('escribir @ abre la lista de conectados', () => {
+    chatState.canPost = true
+    chatState.onlineUsers = conectados
+    renderDock()
+    escribir('hola @')
+    expect(screen.getByRole('listbox')).toBeTruthy()
+    expect(screen.getByText('ana')).toBeTruthy()
+  })
+
+  it('filtra según se escribe, por nombre', () => {
+    chatState.canPost = true
+    chatState.onlineUsers = conectados
+    renderDock()
+    escribir('hola @be')
+    expect(screen.getByText('Bea')).toBeTruthy()
+    expect(screen.queryByText('ana')).toBeNull()
+  })
+
+  it('sin sesión no ofrece mencionar a nadie', () => {
+    // El campo está deshabilitado, pero además no tiene sentido ofrecer algo que no se puede usar.
+    chatState.canPost = false
+    chatState.onlineUsers = conectados
+    renderDock()
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
+  it('al enviar, las menciones viajan resueltas a wallets', () => {
+    chatState.canPost = true
+    chatState.onlineUsers = conectados
+    renderDock()
+    // Con el espacio detrás la mención está CERRADA y la lista ya no está abierta, así que Enter
+    // envía. Escrita a medias, Enter elegiría: ese es el test siguiente.
+    const campo = escribir('gracias @ana ')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+    expect(chatState.send).toHaveBeenCalledWith('gracias @ana ',
+      [{ wallet: 'WalletAAAA1111', label: 'ana' }])
+  })
+
+  it('Enter con la lista abierta elige, NO envía', () => {
+    // Si enviara, el mensaje saldría a medio escribir y sin la mención puesta.
+    chatState.canPost = true
+    chatState.onlineUsers = conectados
+    renderDock()
+    const campo = escribir('hola @an')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+    expect(chatState.send).not.toHaveBeenCalled()
   })
 })
