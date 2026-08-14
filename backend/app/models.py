@@ -288,6 +288,10 @@ class ChatMessage(Base):
     amount_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # value styled in gold (hit pull / winner take)
     machine: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # gacha machine a hit came from (display name)
     mult: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # hit multiple (value ÷ pull cost), e.g. 10.0 → "(x10)"
+    # JSON con [{"wallet", "label"}]. Va APARTE del texto a propósito: guardar solo "@juan" dentro
+    # del mensaje haría que mintiera el día que Juan se cambie el alias, y volver a enlazarlo
+    # exigiría resolver nombre → wallet, que es la búsqueda que este diseño evita.
+    mentions: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class EscrowWallet(Base):

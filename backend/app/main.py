@@ -57,6 +57,33 @@ from .services.bots import load_bots, pick_bot
 
 logger = logging.getLogger(__name__)
 
+# Tope de menciones por mensaje. Con la lista de conectados en la mano, sin tope bastaría un
+# mensaje para avisar a toda la sala: un `@todos` que nadie ha decidido ofrecer.
+MAX_MENCIONES = 5
+
+
+def _menciones_validas(crudas, conectados) -> list[dict]:
+    """Menciones que el servidor acepta de un mensaje de chat.
+
+    Se filtran contra QUIÉN ESTÁ CONECTADO en este instante, porque esta lista la manda el
+    cliente: sin filtro, cualquiera podría mencionar a media base de usuarios a mano, o a gente
+    desconectada que no se enteraría. Lo que no pasa se descarta en silencio y el mensaje se envía
+    igual: una mención mal puesta no es motivo para tragarse lo que el jugador escribió.
+
+    Vive a nivel de módulo, fuera de `create_app`, para poder probarla sin montar la aplicación.
+    """
+    permitidas = {u["wallet"] for u in conectados}
+    out: list[dict] = []
+    for m in crudas or []:
+        if not isinstance(m, dict):
+            continue
+        w, label = m.get("wallet"), m.get("label")
+        if w in permitidas and isinstance(label, str) and label:
+            out.append({"wallet": w, "label": label[:40]})
+        if len(out) >= MAX_MENCIONES:
+            break
+    return out
+
 
 def _configure_app_logging() -> None:
     """Make app.* logs (INFO+) visible on stderr. Uvicorn configures only its own loggers, so
@@ -2079,9 +2106,15 @@ def create_app(session_factory, chain: ChainSource,
                     continue
                 # La wallet viaja junto al nombre para poder ir a su perfil desde el chat. Es
                 # la embebida con la que ya está autenticado, así que no se pide nada nuevo.
+                # El cliente manda a quién menciona; el servidor comprueba que sigan
+                # conectados y recorta. Ver `_menciones_validas`.
+                menciones = _menciones_validas(data.get("mentions"), _chat_mgr.online_users())
                 msg = {"user": display_name, "wallet": wallet, "text": text, "ts": int(_time.time())}
+                if menciones:
+                    msg["mentions"] = menciones
                 with session_factory() as s:
-                    save_chat_message(s, display_name, text, msg["ts"], wallet=wallet)
+                    save_chat_message(s, display_name, text, msg["ts"], wallet=wallet,
+                                      mentions=menciones or None)
                 await _chat_mgr.broadcast({"type": "message", **msg})
         except WebSocketDisconnect:
             _chat_mgr.disconnect(ws)

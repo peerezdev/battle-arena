@@ -247,3 +247,33 @@ def test_online_users_no_incluye_a_los_anonimos():
 
     assert m.online_count() == 2
     assert [u["wallet"] for u in m.online_users()] == ["WalletA"]
+
+
+def test_solo_se_aceptan_menciones_de_conectados_y_como_mucho_cinco():
+    """El cliente manda las menciones, así que el servidor no se fía.
+
+    Sin este filtro, cualquiera podría mandar a mano un mensaje mencionando a TODA la base de
+    usuarios, o a gente desconectada que nunca se enteraría.
+    """
+    from app.main import _menciones_validas
+
+    conectados = [{"wallet": f"W{i}", "name": f"n{i}"} for i in range(8)]
+    crudas = ([{"wallet": "DESCONECTADA", "label": "x"}]
+              + [{"wallet": f"W{i}", "label": f"n{i}"} for i in range(8)])
+
+    out = _menciones_validas(crudas, conectados)
+
+    assert len(out) == 5                                    # recortado
+    assert all(m["wallet"] != "DESCONECTADA" for m in out)  # filtrado
+
+
+def test_menciones_basura_no_tumban_el_mensaje():
+    """Un cliente puede mandar cualquier cosa; el mensaje se envía igual, sin esa mención."""
+    from app.main import _menciones_validas
+
+    conectados = [{"wallet": "W1", "name": "ana"}]
+    crudas = ["texto suelto", None, 42, {"sin": "wallet"},
+              {"wallet": "W1", "label": ""}, {"wallet": "W1", "label": "ana"}]
+
+    assert _menciones_validas(crudas, conectados) == [{"wallet": "W1", "label": "ana"}]
+    assert _menciones_validas(None, conectados) == []

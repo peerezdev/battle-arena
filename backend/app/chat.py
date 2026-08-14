@@ -19,7 +19,7 @@ def save_chat_message(session, author: str, text: str, ts: int, *, kind: str = "
                       action: Optional[dict] = None, event: Optional[str] = None,
                       amount_usd: Optional[float] = None, machine: Optional[str] = None,
                       mult: Optional[float] = None, wallet: Optional[str] = None,
-                      keep: int = CHAT_KEEP) -> None:
+                      mentions: Optional[list] = None, keep: int = CHAT_KEEP) -> None:
     """Persist one chat message and prune to the newest `keep` (so the table stays bounded).
     kind='system' + optional action={label, battleId, mode} for announcements with a button.
     event ('hit'|'winner'|…) + amount_usd (+ machine, the gacha machine a hit came from) let
@@ -27,6 +27,7 @@ def save_chat_message(session, author: str, text: str, ts: int, *, kind: str = "
     after a reconnect, not just as plain text."""
     from app.models import ChatMessage
     session.add(ChatMessage(author=author, text=text, ts=ts, kind=kind, wallet=wallet,
+                            mentions=json.dumps(mentions) if mentions else None,
                             action=json.dumps(action) if action else None,
                             event=event, amount_usd=amount_usd, machine=machine, mult=mult))
     session.commit()
@@ -50,6 +51,13 @@ def recent_chat_messages(session, limit: int = CHAT_KEEP) -> list[dict]:
         # `wallet: null` haría que el cliente pintase un enlace a /profile/null.
         if r.wallet:
             m["wallet"] = r.wallet
+        # Solo si las hay: los mensajes anteriores a esta columna no las tienen, y mandar
+        # `mentions: null` obligaría a cada consumidor a defenderse de un caso que no existe.
+        if r.mentions:
+            try:
+                m["mentions"] = json.loads(r.mentions)
+            except (ValueError, TypeError):
+                pass
         if (r.kind or "user") != "user":
             m["kind"] = r.kind
             if r.action:

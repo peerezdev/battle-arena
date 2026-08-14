@@ -91,3 +91,23 @@ def test_big_hit_multiple(value, cost_base, expected):
         assert got is None
     else:
         assert got == pytest.approx(expected)
+
+
+def test_las_menciones_sobreviven_al_historial(session):
+    """Se guardan APARTE del texto, con la etiqueta que se escribió.
+
+    Si solo se guardara `@juan` dentro del texto, el día que Juan cambie de alias el mensaje
+    mentiría, y volver a enlazarlo exigiría resolver nombre → wallet, que es justo la búsqueda que
+    este diseño evita para no repetir la ráfaga que tumbó producción.
+    """
+    save_chat_message(session, "Ana", "hola @juan", ts=1000, wallet="WalletA",
+                      mentions=[{"wallet": "WalletJ", "label": "juan"}])
+    out = recent_chat_messages(session)
+    assert out[-1]["mentions"] == [{"wallet": "WalletJ", "label": "juan"}]
+
+
+def test_un_mensaje_sin_menciones_no_lleva_el_campo(session):
+    """Los mensajes ya guardados no tienen la columna, y el cliente no puede recibir `null`:
+    pintaría un enlace a ninguna parte."""
+    save_chat_message(session, "Ana", "hola", ts=1000, wallet="WalletA")
+    assert "mentions" not in recent_chat_messages(session)[-1]
