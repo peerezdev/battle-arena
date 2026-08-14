@@ -5,6 +5,7 @@ import { useAliases } from '../../useAliases'
 import { fetchEvRows, fetchGachaWinners, fetchRarityGaps, type EvRow, type GachaWinner,
   type RarityGaps } from '../../../onchain/gachaClient'
 import { EvCard } from './EvCard'
+import { alternar, guardarOcultas, leerOcultas, visibles } from './hiddenMachines'
 
 /** Cuántos ganadores traer. El 200 es el techo de la API de Collector Crypt, no una elección
  *  nuestra: pedirle más devuelve 200 igual, así que ofrecer 500 sería prometer lo que no hay. */
@@ -242,6 +243,10 @@ export function WinnersPage() {
 function PanelEv() {
   const [filas, setFilas] = useState<EvRow[] | null>(null)
   const [fallo, setFallo] = useState(false)
+  // Se lee una vez al montar: la preferencia no cambia sola, y releerla en cada render obligaría a
+  // tocar localStorage constantemente.
+  const [ocultas, setOcultas] = useState<Set<string>>(() => leerOcultas())
+  const [eligiendo, setEligiendo] = useState(false)
 
   useEffect(() => {
     let cancelado = false
@@ -251,11 +256,18 @@ function PanelEv() {
     return () => { cancelado = true }
   }, [])
 
+  function cambiar(siguiente: Set<string>) {
+    setOcultas(siguiente)
+    guardarOcultas(siguiente)
+  }
+
   if (fallo) return null              // es un panel, no la página: si falla, el feed sigue
   if (filas == null) {
     return <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>Measuring…</div>
   }
   if (filas.length === 0) return null
+
+  const mostradas = visibles(filas, ocultas)
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -263,15 +275,72 @@ function PanelEv() {
         <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>
           RETURN PER DOLLAR · LAST 48H
         </span>
-        <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#5d6774' }}>
-          {filas.length} machines
-        </span>
+        <button
+          type="button"
+          onClick={() => setEligiendo((v) => !v)}
+          aria-expanded={eligiendo}
+          style={{
+            fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted, cursor: 'pointer',
+            background: 'transparent', border: `1px solid ${COLORS.border}`, borderRadius: 8,
+            padding: '3px 9px',
+          }}
+        >
+          {mostradas.length} of {filas.length} machines {eligiendo ? '▴' : '▾'}
+        </button>
       </div>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 12,
-      }}>
-        {filas.map((f) => <EvCard key={f.machine} fila={f} />)}
-      </div>
+
+      {eligiendo && (
+        <div style={{
+          border: `1px solid ${COLORS.border}`, borderRadius: 12, background: COLORS.panel,
+          padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={() => cambiar(new Set())} style={enlaceMini}>Show all</button>
+            <button type="button" onClick={() => cambiar(new Set(filas.map((f) => f.machine)))} style={enlaceMini}>Hide all</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 4 }}>
+            {filas.map((f) => {
+              const vista = !ocultas.has(f.machine)
+              return (
+                <label key={f.machine} style={{
+                  display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
+                  fontFamily: FONTS.mono, fontSize: 10.5, padding: '3px 4px',
+                  color: vista ? COLORS.text : COLORS.muted,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={vista}
+                    onChange={() => cambiar(alternar(ocultas, f.machine))}
+                    style={{ accentColor: COLORS.green, cursor: 'pointer' }}
+                  />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {f.name}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Con todo oculto la rejilla quedaría vacía y parecería que la página está rota. */}
+      {mostradas.length === 0 ? (
+        <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
+          All machines hidden. Open the selector above to bring some back.
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 12,
+        }}>
+          {mostradas.map((f) => <EvCard key={f.machine} fila={f} />)}
+        </div>
+      )}
     </section>
   )
+}
+
+const enlaceMini: React.CSSProperties = {
+  fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.06em', color: COLORS.muted,
+  background: 'transparent', border: `1px solid ${COLORS.border}`, borderRadius: 7,
+  padding: '3px 9px', cursor: 'pointer',
 }
