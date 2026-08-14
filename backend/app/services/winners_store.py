@@ -30,16 +30,27 @@ HOLGURA = timedelta(seconds=5)
 def guardar(session: Session, filas: Iterable[dict]) -> int:
     """Inserta las que no estén ya. Devuelve cuántas eran nuevas.
 
-    Se deduplica por `nft_address` porque una carta concreta se entrega una sola vez, y porque es
-    lo único único que traen las dos fuentes. La misma tirada puede llegar por el feed en vivo y
-    por el relleno REST; la primera gana y la segunda se ignora en silencio, que es lo correcto:
-    son el mismo hecho.
+    Se deduplica por (`nft_address`, `created_at`). La dirección SOLA no sirve: una misma carta se
+    entrega varias veces porque el buyback la devuelve al pool (medido en mainnet: 183 direcciones
+    distintas en 200 tiradas de `onepiece_50`). Contarla una vez descontaría tiradas reales y
+    sesgaría el EV a la baja.
+
+    Se deduplica DENTRO del lote además de contra la base: el feed devuelve la misma tirada
+    repetida en una sola respuesta, y sin esto la inserción entera reventaba por clave duplicada.
+
+    La misma tirada puede llegar por el feed en vivo y por el relleno REST; la primera gana y la
+    segunda se ignora, que es lo correcto: son el mismo hecho.
     """
     nuevas = 0
+    vistas = set()
     for f in filas:
         if f is None:
             continue
-        if session.get(GachaWinner, f["nft_address"]) is not None:
+        clave = (f["nft_address"], f["created_at"])
+        if clave in vistas:
+            continue
+        vistas.add(clave)
+        if session.get(GachaWinner, clave) is not None:
             continue
         session.add(GachaWinner(**f))
         nuevas += 1

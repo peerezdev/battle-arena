@@ -24,10 +24,27 @@ def test_guardar_cuenta_solo_las_nuevas(Session):
 def test_la_misma_tirada_por_las_dos_fuentes_no_se_duplica(Session):
     """Llega por el feed en vivo y otra vez por el relleno REST. Es el mismo hecho."""
     with Session() as s:
-        guardar(s, [fila("x", source="live")])
-        assert guardar(s, [fila("x", source="rest")]) == 0
+        guardar(s, [fila("x", minutos=5, source="live")])
+        assert guardar(s, [fila("x", minutos=5, source="rest")]) == 0
         assert s.query(GachaWinner).count() == 1
-        assert s.get(GachaWinner, "x").source == "live"   # gana la primera
+        assert s.query(GachaWinner).one().source == "live"   # gana la primera
+
+
+def test_la_MISMA_carta_en_dos_momentos_son_DOS_tiradas(Session):
+    """El buyback devuelve las cartas al pool, así que una carta se entrega varias veces. Medido en
+    mainnet: 183 direcciones distintas en 200 tiradas de onepiece_50. Contarla una sola vez
+    descontaría tiradas reales y sesgaría el EV a la baja sin que nada lo delatara."""
+    with Session() as s:
+        assert guardar(s, [fila("misma", minutos=10), fila("misma", minutos=40)]) == 2
+        assert s.query(GachaWinner).count() == 2
+
+
+def test_el_lote_puede_traer_la_misma_tirada_repetida(Session):
+    """El feed devuelve duplicados dentro de UNA sola respuesta. Sin deduplicar dentro del lote, la
+    inserción entera revienta por clave duplicada y no se guarda nada de esa máquina."""
+    with Session() as s:
+        assert guardar(s, [fila("a", minutos=5), fila("a", minutos=5), fila("b")]) == 2
+        assert s.query(GachaWinner).count() == 2
 
 
 def test_guardar_ignora_los_descartes_del_normalizador(Session):

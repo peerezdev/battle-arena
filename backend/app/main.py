@@ -2260,7 +2260,9 @@ def create_app(session_factory, chain: ChainSource,
             except asyncio.CancelledError:
                 raise
             except Exception:
-                logger.warning("EV tracker: la ingesta se cortó, se reintenta", exc_info=False)
+                # Con la traza: un aviso que dice "se cortó" y no dice por qué obliga a reproducir
+                # el fallo a mano, y eso ya costó una tarde con la clave duplicada de gacha_winners.
+                logger.warning("EV tracker: la ingesta se cortó, se reintenta", exc_info=True)
             await asyncio.sleep(_EV_REINTENTO_S)
 
     @app.on_event("startup")

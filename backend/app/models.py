@@ -343,9 +343,15 @@ class GachaWinner(Base):
     esas 200 en poco más de media hora. Sin acumular no hay ventana de 48 h que valga, así que la
     historia la construimos nosotros escuchando el feed en vivo.
 
-    LA CLAVE ES `nft_address`. Es lo único único en las DOS fuentes. Ojo con `memo_slug` del REST:
-    parece un identificador y es el prefijo del integrador (`cc`, `jupiter`), compartido por miles
-    de tiradas; usarlo de clave colapsaría la tabla entera en un puñado de filas.
+    LA CLAVE ES (`nft_address`, `created_at`), y la primera parte sola NO vale. Una misma carta se
+    entrega VARIAS veces: el jugador la revende a CC con el buyback y CC la devuelve al pool, donde
+    otro la saca. Medido el 2026-08-14 en mainnet: `onepiece_50` traía 183 direcciones distintas en
+    200 tiradas, con la misma carta reapareciendo en media hora. Usar solo la dirección reventaba
+    la inserción, y "arreglarlo" descartando repetidas habría descontado hasta un 8% de las
+    tiradas, sesgando el EV a la baja sin que nada lo delatara.
+
+    Ojo también con `memo_slug` del REST: parece un identificador y es el prefijo del integrador
+    (`cc`, `jupiter`), compartido por miles de tiradas.
     """
     __tablename__ = "gacha_winners"
     nft_address: Mapped[str] = mapped_column(String, primary_key=True)
@@ -357,7 +363,7 @@ class GachaWinner(Base):
     weighted_insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     memo: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # completo solo en vivo
     winner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True, index=True)
     source: Mapped[str] = mapped_column(String)                   # "live" | "rest"
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
