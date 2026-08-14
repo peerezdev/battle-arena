@@ -5,11 +5,13 @@ const mocks = vi.hoisted(() => ({
   fetchWinners: vi.fn().mockResolvedValue([]),
   fetchGaps: vi.fn().mockResolvedValue({ gaps: {}, sampled: 0 }),
   fetchEv: vi.fn(),
+  fetchEvLive: vi.fn().mockResolvedValue({ rows: [], updated_at: 0 }),
 }))
 vi.mock('../../../onchain/gachaClient', () => ({
   fetchGachaWinners: mocks.fetchWinners,
   fetchRarityGaps: mocks.fetchGaps,
   fetchEvRows: mocks.fetchEv,
+  fetchEvLive: mocks.fetchEvLive,
 }))
 vi.mock('../../useMachines', () => ({ useMachineList: () => ({ machines: [] }) }))
 vi.mock('../../useAliases', () => ({ useAliases: () => ({}) }))

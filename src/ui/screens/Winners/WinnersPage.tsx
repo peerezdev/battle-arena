@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
 import { useMachineList } from '../../useMachines'
 import { useAliases } from '../../useAliases'
-import { fetchEvRows, fetchGachaWinners, fetchRarityGaps, type EvRow, type GachaWinner,
-  type RarityGaps } from '../../../onchain/gachaClient'
+import { fetchEvLive, fetchEvRows, fetchGachaWinners, fetchRarityGaps, type EvRow,
+  type GachaWinner, type RarityGaps } from '../../../onchain/gachaClient'
 import { EvCard } from './EvCard'
 import { alternar, guardarOcultas, leerOcultas, visibles } from './hiddenMachines'
 import { enModo, guardarModo, leerModo, type Modo } from './evModo'
+import { LENTO_MS, RAPIDO_MS, aplicarVivo } from './evVivo'
 
 /** Cuántos ganadores traer. El 200 es el techo de la API de Collector Crypt, no una elección
  *  nuestra: pedirle más devuelve 200 igual, así que ofrecer 500 sería prometer lo que no hay. */
@@ -249,13 +250,46 @@ function PanelEv() {
   const [ocultas, setOcultas] = useState<Set<string>>(() => leerOcultas())
   const [eligiendo, setEligiendo] = useState(false)
   const [modo, setModo] = useState<Modo>(() => leerModo())
+  // Los sondeos se montan una sola vez y no pueden leer `filas` de su cierre, que se quedaría
+  // congelado en el primer valor. El ref les da el actual sin volver a montar los intervalos.
+  const filasRef = useRef<EvRow[] | null>(null)
+  filasRef.current = filas
 
+  // Dos carriles, porque la tarjeta mezcla dos cosas que se mueven a ritmos muy distintos: el
+  // intervalo cuesta 4.000 remuestreos por máquina y no se mueve, las rachas cambian con cada
+  // tirada y cuestan una consulta. Ver `evVivo`.
   useEffect(() => {
     let cancelado = false
-    fetchEvRows()
-      .then((d) => { if (!cancelado) setFilas(d.rows) })
-      .catch(() => { if (!cancelado) setFallo(true) })
-    return () => { cancelado = true }
+    const dormido = () => typeof document !== 'undefined' && document.visibilityState === 'hidden'
+
+    const lento = () => {
+      if (dormido()) return
+      fetchEvRows()
+        .then((d) => { if (!cancelado) { setFilas(d.rows); setFallo(false) } })
+        // Solo se da por fallida la PRIMERA carga: una vez hay tarjetas en pantalla, un sondeo que
+        // falle no debe borrarlas, porque lo de antes sigue siendo cierto y vaciar la pantalla por
+        // un fallo de red pasajero es peor que enseñarlo un minuto más viejo.
+        .catch(() => { if (!cancelado) setFallo((antes) => antes || filasRef.current == null) })
+    }
+    const rapido = () => {
+      if (dormido() || filasRef.current == null) return
+      fetchEvLive()
+        .then((d) => { if (!cancelado) setFilas((f) => (f ? aplicarVivo(f, d.rows) : f)) })
+        .catch(() => { /* el carril rápido es un extra: si falla, se sigue viendo lo del lento */ })
+    }
+
+    lento()
+    const a = setInterval(lento, LENTO_MS)
+    const b = setInterval(rapido, RAPIDO_MS)
+    // Al volver a la pestaña se pide ya, sin esperar al siguiente tic: si no, se vería un minuto de
+    // datos viejos justo cuando alguien acaba de mirar.
+    const despertar = () => { if (!dormido()) { lento(); rapido() } }
+    document.addEventListener('visibilitychange', despertar)
+    return () => {
+      cancelado = true
+      clearInterval(a); clearInterval(b)
+      document.removeEventListener('visibilitychange', despertar)
+    }
   }, [])
 
   function cambiar(siguiente: Set<string>) {

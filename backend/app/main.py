@@ -33,6 +33,7 @@ from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
 from .services import winners_ingest, winners_store
 from .services.ev_view import fila_ev
+from .services.tier_gaps import rachas_por_tier
 from .services.privy_signer import PrivySigner, PrivyNoVerificable
 from .services import escrow_pool, machine_visibility
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull, Tip, User
@@ -921,6 +922,36 @@ def create_app(session_factory, chain: ChainSource,
         filas.sort(key=lambda f: (f["realized_edge_pct"] is None, -(f["realized_edge_pct"] or 0)))
         if hours == 48:
             _ev_cache.update(t=ahora, filas=filas)
+        return {"rows": filas, "updated_at": int(ahora)}
+
+    # El carril rápido. Lleva SOLO las rachas, y esa frontera está puesta a conciencia: son las dos
+    # únicas cosas que cambian con cada tirada y a la vez cuestan una consulta, mientras que el
+    # intervalo cuesta 4.000 remuestreos por máquina (~9 s las 48) y no se mueve.
+    #
+    # Medido en mainnet: en diez segundos `pokemon_50` hace un par de tiradas y su edge se desplaza
+    # 0.027 pp, cuando la tarjeta lo enseña con una décima y el intervalo mide 2 pp de ancho. O sea
+    # que refrescarlo rápido no enseñaría un número nuevo, enseñaría el temblor del mismo.
+    #
+    # Aquí NO se llama a Collector Crypt: se leen las máquinas que ya tienen datos nuestros. Un
+    # sondeo cada diez segundos contra su API sería maleducado y además haría depender el refresco
+    # de que ellos respondan.
+    _ev_vivo_cache: dict = {"t": 0.0, "filas": []}
+    _EV_VIVO_TTL = 5.0
+
+    @app.get("/gacha/ev/live")
+    async def gacha_ev_live():
+        """Lo que cambia tirada a tirada: la racha de cada rareza por máquina.
+
+        Complementa a `/gacha/ev`, no lo sustituye. El edge, el intervalo y el veredicto siguen
+        viniendo de allí, porque son caros y lentos de mover.
+        """
+        ahora = _time.time()
+        if _ev_vivo_cache["filas"] and ahora - _ev_vivo_cache["t"] < _EV_VIVO_TTL:
+            return {"rows": _ev_vivo_cache["filas"], "updated_at": int(_ev_vivo_cache["t"])}
+        with session_factory() as s:
+            filas = [{"machine": code, "tiers": rachas_por_tier(s, code)}
+                     for code in winners_store.maquinas_con_datos(s)]
+        _ev_vivo_cache.update(t=ahora, filas=filas)
         return {"rows": filas, "updated_at": int(ahora)}
 
     @app.get("/gacha/replay/{memo}")

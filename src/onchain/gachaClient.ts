@@ -251,6 +251,17 @@ export interface EvTier {
   cold: boolean
 }
 
+/** Lo que cambia tirada a tirada. Complementa a `/gacha/ev`, no lo sustituye: el edge, el intervalo
+ *  y el veredicto siguen viniendo de allí, porque son caros y no se mueven. */
+export interface EvLive {
+  machine: string
+  tiers: EvTier[]
+}
+
+export function fetchEvLive(): Promise<{ rows: EvLive[]; updated_at: number }> {
+  return gachaFetch('/gacha/ev/live')
+}
+
 export function fetchEvRows(hours?: number): Promise<{ rows: EvRow[]; updated_at: number }> {
   const q = hours ? `?hours=${hours}` : ''
   return gachaFetch(`/gacha/ev${q}`)
