@@ -6,6 +6,7 @@ import { fetchEvRows, fetchGachaWinners, fetchRarityGaps, type EvRow, type Gacha
   type RarityGaps } from '../../../onchain/gachaClient'
 import { EvCard } from './EvCard'
 import { alternar, guardarOcultas, leerOcultas, visibles } from './hiddenMachines'
+import { enModo, guardarModo, leerModo, type Modo } from './evModo'
 
 /** Cuántos ganadores traer. El 200 es el techo de la API de Collector Crypt, no una elección
  *  nuestra: pedirle más devuelve 200 igual, así que ofrecer 500 sería prometer lo que no hay. */
@@ -247,6 +248,7 @@ function PanelEv() {
   // tocar localStorage constantemente.
   const [ocultas, setOcultas] = useState<Set<string>>(() => leerOcultas())
   const [eligiendo, setEligiendo] = useState(false)
+  const [modo, setModo] = useState<Modo>(() => leerModo())
 
   useEffect(() => {
     let cancelado = false
@@ -267,7 +269,9 @@ function PanelEv() {
   }
   if (filas.length === 0) return null
 
-  const mostradas = visibles(filas, ocultas)
+  // La conversión es una vista, no otra medición: el backend mide el valor de la carta y aquí se
+  // le aplica la recompra si el usuario quiere ver lo que recuperaría vendiendo.
+  const mostradas = visibles(filas, ocultas).map((f) => enModo(f, modo))
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -275,6 +279,27 @@ function PanelEv() {
         <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>
           RETURN PER DOLLAR · LAST 48H
         </span>
+        {/* Las dos lecturas de la MISMA medición. Se ofrece elegir porque las dos son ciertas: el
+            coleccionista se queda las cartas buenas y el que juega por valor las revende. Sin este
+            interruptor habría que decidir por él y esconder la mitad de la verdad. */}
+        <div style={{ display: 'flex', border: `1px solid ${COLORS.border}`, borderRadius: 8, overflow: 'hidden' }}>
+          {([['cashout', 'if you sell back'], ['keep', 'if you keep it']] as const).map(([m, etiqueta]) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={modo === m}
+              onClick={() => { setModo(m); guardarModo(m) }}
+              style={{
+                fontFamily: FONTS.mono, fontSize: 9.5, cursor: 'pointer', border: 0,
+                padding: '4px 10px',
+                background: modo === m ? '#ffffff12' : 'transparent',
+                color: modo === m ? COLORS.text : COLORS.muted,
+              }}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={() => setEligiendo((v) => !v)}
@@ -332,7 +357,10 @@ function PanelEv() {
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 12,
         }}>
-          {mostradas.map((f) => <EvCard key={f.machine} fila={f} />)}
+          {mostradas.map((f) => (
+            <EvCard key={f.machine} fila={f}
+              nota={modo === 'cashout' && f.buyback_pct ? 'AT BUYBACK' : 'AT CARD VALUE'} />
+          ))}
         </div>
       )}
     </section>

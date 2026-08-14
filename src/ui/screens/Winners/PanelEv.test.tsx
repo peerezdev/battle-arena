@@ -80,3 +80,47 @@ describe('PanelEv · elegir qué máquinas ver', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /2 of 2 machines/i })).toBeTruthy())
   })
 })
+
+describe('PanelEv · las dos lecturas de la misma medición', () => {
+  const conBuyback = () => ({
+    ...fila('pokemon_50', 'Elite Pokémon'),
+    buyback_pct: 0.85, realized_edge_pct: 11.5,
+    realized_ci_lo_pct: 8, realized_ci_hi_pct: 15, realized_verdict: 'CONFIDENT +EV',
+  })
+
+  it('por defecto mide a precio de recompra', async () => {
+    mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
+    render(<WinnersPage />)
+    // 0.85 × 1.115 − 1 = −5.2% → ratio 0.948
+    expect(await screen.findByText('0.948')).toBeTruthy()
+    expect(screen.getByText(/AT BUYBACK/)).toBeTruthy()
+  })
+
+  it('cambiar a "me la quedo" enseña el valor de la carta', async () => {
+    mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
+    render(<WinnersPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /if you keep it/i }))
+    await waitFor(() => expect(screen.getByText('1.115')).toBeTruthy())
+    expect(screen.getByText(/AT CARD VALUE/)).toBeTruthy()
+  })
+
+  it('el veredicto cambia con el modo, no solo el número', async () => {
+    // Es lo que hace honesto el interruptor: a valor de carta esta máquina paga, a precio de
+    // recompra no. Las dos cosas son ciertas y la conclusión tiene que seguir al número.
+    mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
+    render(<WinnersPage />)
+    expect(await screen.findByText('CONFIRMED −EV')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /if you keep it/i }))
+    await waitFor(() => expect(screen.getByText('CONFIRMED +EV')).toBeTruthy())
+  })
+
+  it('la elección se recuerda', async () => {
+    mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
+    const { unmount } = render(<WinnersPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /if you keep it/i }))
+    await waitFor(() => expect(screen.getByText('1.115')).toBeTruthy())
+    unmount()
+    render(<WinnersPage />)
+    expect(await screen.findByText('1.115')).toBeTruthy()
+  })
+})

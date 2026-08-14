@@ -16,7 +16,7 @@ import { RATIO_MAX, RATIO_MIN, anguloAguja, esConcluyente, estadoDe, etiqueta, r
  * muestra corta— el número se pinta en gris aunque sea malísimo. Un rojo fuerte sobre seis horas de
  * datos afirma algo que los datos no dicen.
  */
-export function EvCard({ fila }: { fila: EvRow }) {
+export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
   const estado = estadoDe(fila.realized_verdict)
   const concluyente = esConcluyente(estado)
   const ratio = ratioDesdeEdge(fila.realized_edge_pct)
@@ -112,6 +112,9 @@ export function EvCard({ fila }: { fila: EvRow }) {
         }}>
           <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, letterSpacing: '.14em', color: '#5d6774' }}>
             {fila.realized_window_hours}H · N={fila.realized_n_pulls.toLocaleString('en-US')}
+            {/* Sin esto el mismo 0.938 significaría dos cosas distintas según el interruptor, y
+                nadie sabría cuál está mirando. */}
+            {nota ? ` · ${nota}` : ''}
           </span>
           <span style={{ fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', color: tintaEtiqueta }}>
             {lab.texto}
