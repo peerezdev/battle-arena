@@ -1,7 +1,7 @@
 # Chat: empezar por lo último y mencionar a los conectados — design
 
 Date: 2026-08-13
-Status: approved-pending-review
+Status: implemented
 
 Dos cosas independientes del chat, que se entregan por separado. La primera es un defecto de
 comportamiento; la segunda, funcionalidad nueva.

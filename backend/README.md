@@ -38,6 +38,31 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 | GET | `/elo/compare?a=&b=` | — | comparación de ELO + `gap_label` |
 | GET | `/leaderboard?limit=` | — | top por ELO |
 
+### WebSocket `/ws/chat`
+
+El token va en la query (`?token=`). Marcos del servidor al cliente:
+
+| `type` | Contenido | Notas |
+|---|---|---|
+| `history` | `messages[]` | Los últimos 50, al conectar |
+| `message` | `{user, wallet?, text, ts, mentions?}` | Uno nuevo |
+| `presence` | `{online, users[]}` | Al entrar o salir cualquiera |
+| `drop`, `drops_history` | tiradas del gacha | |
+| `error` | `login_required`, `rate_limited` | |
+
+**`presence.users`** es `[{wallet, name}]` y es la lista de **mencionables**: sin duplicados (dos
+pestañas del mismo jugador son una entrada) y **sin anónimos**, porque a quien no ha iniciado
+sesión no hay forma de avisarle. `online` sí los cuenta: están mirando aunque no puedan hablar.
+
+**`mentions`** es `[{wallet, label}]` y viaja en los dos sentidos. Va **aparte del texto** a
+propósito: guardar solo `@juan` dentro del mensaje haría que mintiera el día que Juan se cambie el
+alias, y volver a enlazarlo exigiría resolver nombre → wallet, una búsqueda que no existe (y que no
+se quiere: una ráfaga de consultas por tecleo ya tumbó producción una vez).
+
+Del cliente al servidor: `{text, mentions?}`. **El servidor no se fía de `mentions`**: descarta las
+wallets que no estén conectadas en ese instante y recorta a 5 (`_menciones_validas`). Lo descartado
+se tira en silencio y el mensaje se envía igual.
+
 `GET /users` y `GET /elo/compare` son **lecturas puras**: no crean usuarios. Un usuario se persiste cuando actúa (registra partida, recibe rating, fija alias).
 
 ## Decisiones clave
