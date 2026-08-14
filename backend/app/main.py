@@ -31,6 +31,8 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
+from .services import winners_ingest, winners_store
+from .services.ev_view import fila_ev
 from .services.privy_signer import PrivySigner, PrivyNoVerificable
 from .services import escrow_pool, machine_visibility
 from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull, Tip, User
@@ -231,6 +233,9 @@ def create_app(session_factory, chain: ChainSource,
                cors_origins: list[str] | None = None,
                gacha: GachaService | None = None,
                gacha_rate_limit: int = 10,
+               # Apagado por defecto: los tests construyen la app con un gacha de mentira y no deben
+               # abrir un socket a producción. El arranque real lo enciende explícitamente.
+               ev_tracker_enabled: bool = False,
                privy: PrivyVerifier | None = None,
                privy_signer: PrivySigner | None = None,
                solana_rpc_url: str = "",
@@ -877,6 +882,46 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream unavailable")
+
+    # El bootstrap cuesta segundos por máquina, así que NO se calcula por petición: se cachea y se
+    # rehace como mucho una vez por minuto. Los datos entran de forma continua, pero un intervalo
+    # sobre 16.000 tiradas no se mueve de forma apreciable en sesenta segundos.
+    _ev_cache: dict = {"t": 0.0, "filas": []}
+    _EV_CACHE_TTL = 60.0
+
+    @app.get("/gacha/ev")
+    async def gacha_ev(hours: int = Query(default=48, ge=1, le=168)):
+        """Cuánto paga de verdad cada máquina del gacha, medido sobre el feed público de CC.
+
+        Público: no dice nada de ningún jugador nuestro, solo del mercado. Cada fila lleva por
+        delante el estado de su cobertura, y el veredicto se RETIRA si la ventana no está completa
+        o tiene huecos: ver `ev_view`.
+        """
+        svc = _gacha_or_503()
+        ahora = _time.time()
+        if _ev_cache["filas"] and ahora - _ev_cache["t"] < _EV_CACHE_TTL and hours == 48:
+            return {"rows": _ev_cache["filas"], "updated_at": int(_ev_cache["t"])}
+        try:
+            maquinas = await svc.machines()
+        except GachaDisabled:
+            raise HTTPException(503, "gacha_disabled")
+        except GachaUpstreamError as e:
+            raise HTTPException(502, str(e) or "gacha upstream unavailable")
+        filas = []
+        with session_factory() as s:
+            for m in maquinas:
+                code = m.get("code")
+                if not code or not m.get("price"):
+                    continue
+                f = fila_ev(s, code, precio=float(m["price"]),
+                            buyback_pct=(m.get("instantBuyback") or 0) / 100.0 or None,
+                            horas=hours)
+                f["name"] = m.get("name") or code
+                filas.append(f)
+        filas.sort(key=lambda f: (f["realized_edge_pct"] is None, -(f["realized_edge_pct"] or 0)))
+        if hours == 48:
+            _ev_cache.update(t=ahora, filas=filas)
+        return {"rows": filas, "updated_at": int(ahora)}
 
     @app.get("/gacha/replay/{memo}")
     async def gacha_replay(memo: str, request: Request):
@@ -2157,6 +2202,73 @@ def create_app(session_factory, chain: ChainSource,
                 # Nunca puede tumbar el proceso: es un extra, no parte de ninguna partida en curso.
                 logger.exception("auto-royale: no se pudo abrir el lobby; se reintenta luego")
 
+    # ── EV tracker: ingesta del feed de ganadores de Collector Crypt ─────────
+    #
+    # Se suscribe al feed en vivo de Ably (keyless) y guarda cada tirada. Antes de escuchar, y en
+    # cada reconexión, rellena por REST lo que se haya perdido y anota si quedó hueco: Ably solo
+    # entrega lo que ocurre mientras estás conectado, así que sin este paso una caída deja un
+    # agujero invisible dentro de la ventana.
+    _EV_REINTENTO_S = 20.0
+
+    async def _ev_rellenar(machine: str) -> None:
+        with session_factory() as s:
+            desde = winners_store.ultima_vista(s, machine)
+        filas = await winners_ingest.traer_rest(gacha, machine, desde=desde)
+        if not filas:
+            return
+        with session_factory() as s:
+            winners_store.guardar(s, filas)
+            winners_store.anotar_tramo(
+                s, machine, filas[0]["created_at"], filas[-1]["created_at"],
+                enlaza=not winners_ingest.hay_hueco(filas, desde))
+
+    async def _ev_loop():
+        while True:
+            try:
+                maquinas = [m["code"] for m in await gacha.machines() if m.get("code")]
+                if not maquinas:
+                    await asyncio.sleep(_EV_REINTENTO_S)
+                    continue
+                for m in maquinas:
+                    await _ev_rellenar(m)
+                token = await winners_ingest.token_ably(gacha)
+                if not token:
+                    await asyncio.sleep(_EV_REINTENTO_S)
+                    continue
+                # El feed llega más rápido de lo que conviene abrir sesiones, así que se acumula en
+                # memoria y se vuelca por lotes. Perder un lote en una caída no es grave: el relleno
+                # de la próxima reconexión lo recupera.
+                buzon: list = []
+                async def volcar():
+                    while True:
+                        await asyncio.sleep(5.0)
+                        if not buzon:
+                            continue
+                        lote, buzon[:] = list(buzon), []
+                        with session_factory() as s:
+                            winners_store.guardar(s, lote)
+                            for maq in {f["machine"] for f in lote}:
+                                suyas = [f for f in lote if f["machine"] == maq]
+                                winners_store.anotar_tramo(
+                                    s, maq, min(f["created_at"] for f in suyas),
+                                    max(f["created_at"] for f in suyas), enlaza=True)
+                tarea = asyncio.create_task(volcar())
+                try:
+                    await winners_ingest.escuchar(token, maquinas, buzon.append)
+                finally:
+                    tarea.cancel()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.warning("EV tracker: la ingesta se cortó, se reintenta", exc_info=False)
+            await asyncio.sleep(_EV_REINTENTO_S)
+
+    @app.on_event("startup")
+    async def _ev_start():
+        if gacha is None or not gacha.enabled or not ev_tracker_enabled:
+            return
+        _spawn(_ev_loop())
+
     @app.on_event("startup")
     async def _auto_royale_start():
         if privy_signer is None:
@@ -2258,6 +2370,7 @@ def build_default_app() -> FastAPI:
             "void at settle (escrow gas can't be funded). Set them in backend/.env."
         )
     return create_app(session_factory, chain, elo_start=s.elo_start, elo_k=s.elo_k,
+                      ev_tracker_enabled=True,
                       cors_origins=s.cors_origins, gacha=gacha, privy=privy,
                       privy_signer=privy_signer,
                       solana_rpc_url=s.solana_rpc_url, cc_usdc_mint=s.cc_usdc_mint,

@@ -179,6 +179,19 @@ class GachaService:
         raw = await self._request("POST", "/api/generatePack", json=body)
         return {"memo": raw.get("memo"), "transaction": raw.get("transaction")}
 
+    async def ably_token_request(self) -> dict:
+        """El `TokenRequest` de Ably para escuchar el feed de ganadores en vivo.
+
+        Su documentación dice que hace falta `x-api-key`; medido contra las dos redes, **no**: el
+        endpoint responde keyless y el token que da trae `subscribe` sobre todos los canales. Es la
+        misma puerta que usa su propia web.
+
+        Lo que devuelve NO es un token: es una petición firmada que hay que canjear en Ably. Ese
+        canje vive en el ingestor, porque es cosa de Ably y no de Collector Crypt.
+        """
+        raw = await self._request("GET", "/api/ably/token")
+        return raw if isinstance(raw, dict) else {}
+
     async def free_spins(self, wallet: str) -> dict:
         """Puntos de una wallet para tiradas gratis. Endpoint NO documentado.
 
@@ -413,6 +426,29 @@ class GachaService:
                 "slug": w.get("memo_slug"),
             })
         return out
+
+    #: Lo único que el EV tracker necesita de una tirada. Se mantiene la whitelist del módulo: no
+    #: se reenvía la respuesta cruda, solo se conservan los NOMBRES de CC para que el normalizador
+    #: pueda tratar esta fuente y la del feed en vivo con el mismo código.
+    _WINNER_RAW = ("nft_address", "pack_type", "prize_tier", "insuredValue", "created_at", "winner")
+
+    async def winners_raw(self, pack_type: str, count: int = 200,
+                          timestamp: Optional[str] = None) -> list[dict]:
+        """Ganadores con los nombres de campo de Collector Crypt, para el ingestor del EV tracker.
+
+        `timestamp` acota a lo posterior a ese instante (ISO 8601). Reduce el tamaño de la
+        respuesta, pero NO levanta el tope de 200: si en ese rato hubo más, se pierden las de en
+        medio, y eso lo detecta el ingestor.
+        """
+        self._check_enabled()
+        params: dict = {"count": max(1, min(int(count), 200)), "packType": pack_type}
+        if timestamp:
+            params["timestamp"] = timestamp
+        raw = await self._request("GET", "/api/getAllWinners", params=params)
+        items = raw.get("data") if isinstance(raw, dict) else raw
+        if not isinstance(items, list):
+            return []
+        return [{k: w.get(k) for k in self._WINNER_RAW} for w in items if isinstance(w, dict)]
 
     async def get_nfts(self, code: str, rarity: Optional[str] = None,
                        page: int = 1, limit: int = 20) -> list:
