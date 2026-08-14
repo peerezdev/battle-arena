@@ -45,22 +45,67 @@ que es justo como se desincronizan los mensajes.
 
 ### `GET /users/search?q=&limit=8`
 
-Sin autenticación, como el resto de lecturas de perfil.
+**Requiere sesión** (mismo token que el chat) y lleva throttle por wallet, como el de las propinas.
+No es coherente con `GET /users/{wallet}`, que es público, y es a propósito: aquella devuelve UNA
+fila que ya conoces; esta ejecuta una búsqueda, y dejarla abierta pone una consulta al alcance de
+cualquiera contra un backend de un solo proceso.
 
 - **`q` vacío** → primera página: **conectados primero** (los sabe `_chat_mgr.online_users()`),
-  después el resto por alias. Eso es el "enséñame el listado" de antes de escribir nada.
-- **`q` con letras** → filtra por alias que lo contenga (insensible a mayúsculas, apoyado en
-  `ux_users_alias_lower`) y por wallet que empiece por `q`.
-- **`limit` con tope duro de 8**, se pida lo que se pida. Un desplegable no puede enseñar miles, y
-  el tope es también lo que mantiene barata la consulta.
+  después el resto por alias.
+- **`q` con letras** → **búsqueda por PREFIJO**, con rango, en alias y en wallet.
+- **`limit` con tope duro de 8**, se pida lo que se pida. Un desplegable no puede enseñar miles.
 
-Responde `[{wallet, alias, online}]`. `online` viene de la presencia, no de la base.
+Responde `[{wallet, alias, online}]`. `online` sale de la presencia, no de la base.
 
-**Este endpoint es el punto delicado del diseño.** `src/ui/useAliases.ts` documenta que una ráfaga
-contra `/users/{wallet}` tumbó producción: el backend corre en UN proceso y consulta la base de
-forma síncrona. Lo que se hace aquí es distinto —**una** consulta indexada y acotada, no decenas en
-paralelo—, pero el cliente además la frena: mínimo de espera de **250 ms** tras dejar de teclear y
-caché por consulta. Sin ese freno esto es exactamente la misma forma de fallo.
+#### Por qué prefijo y con rango, y no `LIKE`
+
+Medido con `EXPLAIN QUERY PLAN` sobre la base real:
+
+| Consulta | Plan |
+|---|---|
+| `lower(alias) LIKE '%an%'` | `SCAN users` |
+| `lower(alias) LIKE 'an%'` | `SCAN users` |
+| `lower(alias) >= 'an' AND lower(alias) < 'ao'` | **`SEARCH users USING INDEX ux_users_alias_lower`** |
+
+O sea que `LIKE` **no usa el índice ni siquiera por prefijo**: SQLite no aplica esa optimización a
+un índice de expresión. Solo el rango lo aprovecha. Una versión anterior de este documento decía lo
+contrario, y era falso.
+
+Con 16 usuarios da igual; con 100.000, un escaneo por búsqueda deja al backend —un proceso, consultas
+síncronas— sin atender nada más mientras dura. Es la forma del incidente que documenta
+`src/ui/useAliases.ts`, entrando por otra puerta.
+
+El precio de buscar por prefijo: escribir `ana` encuentra a `anabel` pero **no** a `juanana`. Es lo
+que hace casi todo el mundo, y se acepta a cambio de que la consulta sea barata para siempre.
+
+El cliente además frena: espera de **250 ms** tras dejar de teclear y caché por consulta.
+
+#### Se declara `def`, no `async def`
+
+FastAPI ejecuta un endpoint **`def` en su pool de hilos** y uno **`async def` en el bucle de
+eventos**. Con la base de datos síncrona (SQLAlchemy clásico, sin `AsyncSession` ni `aiosqlite`),
+un `async def` que consulta la base **bloquea el bucle entero** mientras dura: el proceso deja de
+atender todo, incluido `/health`. Eso es literalmente lo que pasó a las 14:30.
+
+Medido en este repositorio: **62 endpoints `async def`, 0 síncronos**, y **28 de ellos no esperan
+nada** (`get_user` entre ellos, el del incidente). Quitarles el `async` es borrar una palabra y que
+FastAPI los mueva al pool, pero son 28 sitios y va aparte, con su propio ciclo. Lo que sí se aplica
+aquí es no añadir el número 63.
+
+Nota, porque es contraintuitivo: convertir la base a asíncrona **no** arreglaría esto. Con SQLite
+no hay espera que soltar —es un fichero, no un servidor—, y `aiosqlite` hace lo mismo en un hilo
+por debajo. La vía correcta con esta base es el pool de hilos, no `async`.
+
+### Lo que este diseño acepta a sabiendas
+
+- **La base de jugadores pasa a ser listable.** Con `q` vacío devolviendo a todos, cualquiera con
+  sesión puede paginar quién juega y con qué wallet. Hoy hay que conocer la wallet para consultar
+  a alguien. Las wallets ya son públicas en la cadena y el ranking enseña a los mejores, así que no
+  se revela un secreto, pero sí cambia de "consultable de uno en uno" a "descargable".
+- **El freno vive en el cliente.** Si alguien quita la espera o la caché en una refactorización, el
+  patrón malo vuelve sin que salte nada. El throttle del servidor es la red de debajo.
+- **Se puede pagar a quien no era**, con dos alias parecidos. Lo mitigan el modal, que pide
+  confirmar, y la wallet debajo del nombre en la lista. No desaparece.
 
 ## Frontend
 
