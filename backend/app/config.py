@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     cors_origins: List[str] = []
     gacha_base_url: str = "https://dev-gacha.collectorcrypt.com"  # vacío => gacha deshabilitado (kill-switch)
     gacha_api_key: str = ""  # opcional; devnet es keyless, solo necesario si el entorno lo exige (p.ej. mainnet)
+    # Interruptor del ingestor del EV tracker. Encendido por defecto, pero como en este proyecto
+    # subir a master ES desplegar, tiene que poder apagarse desde el .env del mini PC sin tocar
+    # código: es un proceso permanente contra un servicio de terceros.
+    ev_tracker_enabled: bool = True
     # Host público de metadata/imágenes de Collector Crypt por mint (keyless). Devnet por defecto;
     # en mainnet: https://nft.collectorcrypt.com. env: CC_NFT_BASE_URL
     cc_nft_base_url: str = "https://nft-dev.collectorcrypt.com"

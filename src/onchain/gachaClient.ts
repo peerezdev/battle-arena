@@ -208,6 +208,35 @@ export function withdrawNft(token: string, nftAddress: string, destAddress: stri
   })
 }
 
+/**
+ * Una máquina medida por el EV tracker: cuánto ha pagado de verdad en la ventana.
+ *
+ * Los campos del intervalo y el veredicto pueden venir a null cuando todavía no hay con qué
+ * medir. `realized_verdict` es lo que manda: si dice BUILDING o GAP IN WINDOW, el número existe
+ * pero NO se sostiene, y la pantalla no debe presentarlo como una conclusión.
+ */
+export interface EvRow {
+  machine: string
+  name: string
+  pack_price: number
+  buyback_pct: number | null
+  realized_n_pulls: number
+  realized_window_hours: number
+  window_complete: boolean
+  hours_covered: number
+  gaps: string[][]
+  realized_edge_pct: number | null
+  realized_ci_lo_pct: number | null
+  realized_ci_hi_pct: number | null
+  realized_verdict: string | null
+  pulls_to_conclude: number | null
+}
+
+export function fetchEvRows(hours?: number): Promise<{ rows: EvRow[]; updated_at: number }> {
+  const q = hours ? `?hours=${hours}` : ''
+  return gachaFetch(`/gacha/ev${q}`)
+}
+
 /** Tiradas gratis que Collector Crypt le debe a esta wallet por sus puntos. */
 /** Puntos de la wallet, NADA por máquina: cuántas tiradas dan depende del precio de cada una, y
  *  eso lo calcula `tiradasGratis()`. */

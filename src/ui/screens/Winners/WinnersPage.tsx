@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { COLORS, FONTS, RARITY, formatUsd } from '../../theme'
 import { useMachineList } from '../../useMachines'
 import { useAliases } from '../../useAliases'
-import { fetchGachaWinners, fetchRarityGaps, type GachaWinner, type RarityGaps }
-  from '../../../onchain/gachaClient'
+import { fetchEvRows, fetchGachaWinners, fetchRarityGaps, type EvRow, type GachaWinner,
+  type RarityGaps } from '../../../onchain/gachaClient'
+import { EvCard } from './EvCard'
 
 /** Cuántos ganadores traer. El 200 es el techo de la API de Collector Crypt, no una elección
  *  nuestra: pedirle más devuelve 200 igual, así que ofrecer 500 sería prometer lo que no hay. */
@@ -129,11 +130,13 @@ export function WinnersPage() {
   return (
     <div style={{ padding: '24px clamp(14px,2.4vw,28px) 44px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <h1 style={{ fontFamily: FONTS.display, fontSize: 26, fontWeight: 800, margin: 0 }}>Recent winners</h1>
+        <h1 style={{ fontFamily: FONTS.display, fontSize: 26, fontWeight: 800, margin: 0 }}>Machine tracker</h1>
         <p style={{ color: COLORS.muted, fontSize: 13.5, margin: '6px 0 0' }}>
-          Live pulls from every Collector Crypt machine — not just ours.
+          What every Collector Crypt machine is actually paying back, measured on the public feed.
         </p>
       </div>
+
+      <PanelEv />
 
       {maquina && <GapsPorRareza machine={maquina} />}
 
@@ -225,5 +228,50 @@ export function WinnersPage() {
         </div>
       )}
     </div>
+  )
+}
+
+
+/**
+ * Cuánto paga de verdad cada máquina, medido sobre el feed público de Collector Crypt.
+ *
+ * Las máquinas sin nada que decir todavía —ventana a medias, muestra corta— van AL FINAL y no se
+ * esconden: que una máquina lleve seis horas midiéndose es información, y ocultarla haría pensar
+ * que no existe.
+ */
+function PanelEv() {
+  const [filas, setFilas] = useState<EvRow[] | null>(null)
+  const [fallo, setFallo] = useState(false)
+
+  useEffect(() => {
+    let cancelado = false
+    fetchEvRows()
+      .then((d) => { if (!cancelado) setFilas(d.rows) })
+      .catch(() => { if (!cancelado) setFallo(true) })
+    return () => { cancelado = true }
+  }, [])
+
+  if (fallo) return null              // es un panel, no la página: si falla, el feed sigue
+  if (filas == null) {
+    return <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>Measuring…</div>
+  }
+  if (filas.length === 0) return null
+
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>
+          RETURN PER DOLLAR · LAST 48H
+        </span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#5d6774' }}>
+          {filas.length} machines
+        </span>
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 12,
+      }}>
+        {filas.map((f) => <EvCard key={f.machine} fila={f} />)}
+      </div>
+    </section>
   )
 }

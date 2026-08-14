@@ -2,10 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { GachaWinner } from '../../../onchain/gachaClient'
 
-const mocks = vi.hoisted(() => ({ fetchWinners: vi.fn(), fetchGaps: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  fetchWinners: vi.fn(), fetchGaps: vi.fn(),
+  fetchEv: vi.fn().mockResolvedValue({ rows: [], updated_at: 0 }),
+}))
 vi.mock('../../../onchain/gachaClient', () => ({
   fetchGachaWinners: mocks.fetchWinners,
   fetchRarityGaps: mocks.fetchGaps,
+  // El panel del EV tracker vive en esta misma pantalla. Aquí se dobla vacío a propósito: estos
+  // tests son del feed de ganadores, y el panel tiene los suyos en EvCard.test.tsx.
+  fetchEvRows: mocks.fetchEv,
 }))
 vi.mock('../../useMachines', () => ({
   useMachineList: () => ({ machines: [{ code: 'pokemon_50', name: 'Elite Pokémon', shortName: 'PKMN 50', price: 50 }] }),

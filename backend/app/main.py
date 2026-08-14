@@ -2370,7 +2370,7 @@ def build_default_app() -> FastAPI:
             "void at settle (escrow gas can't be funded). Set them in backend/.env."
         )
     return create_app(session_factory, chain, elo_start=s.elo_start, elo_k=s.elo_k,
-                      ev_tracker_enabled=True,
+                      ev_tracker_enabled=s.ev_tracker_enabled,
                       cors_origins=s.cors_origins, gacha=gacha, privy=privy,
                       privy_signer=privy_signer,
                       solana_rpc_url=s.solana_rpc_url, cc_usdc_mint=s.cc_usdc_mint,
