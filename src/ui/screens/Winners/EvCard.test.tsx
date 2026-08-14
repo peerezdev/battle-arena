@@ -8,7 +8,14 @@ const fila = (over: Partial<EvRow> = {}): EvRow => ({
   machine: 'pokemon_50', name: 'Elite Pokémon Gacha Pack', pack_price: 50, buyback_pct: 0.85,
   realized_n_pulls: 16157, realized_window_hours: 48, window_complete: true, hours_covered: 48,
   gaps: [], realized_edge_pct: -6.21, realized_ci_lo_pct: -8.27, realized_ci_hi_pct: -4.24,
-  realized_verdict: 'CONFIDENT -EV', pulls_to_conclude: null, ...over,
+  realized_verdict: 'CONFIDENT -EV', pulls_to_conclude: null,
+  tiers: [
+    { tier: 'Common', current: 0, average: 0.3, seen: 257, sample: 327, cold: false },
+    { tier: 'Uncommon', current: 2, average: 5.4, seen: 51, sample: 327, cold: false },
+    { tier: 'Rare', current: 61, average: 19.4, seen: 16, sample: 327, cold: true },
+    { tier: 'Epic', current: null, average: null, seen: 0, sample: 327, cold: false },
+  ],
+  ...over,
 })
 
 const agujas = (c: HTMLElement) => c.querySelectorAll('svg line').length
@@ -56,7 +63,8 @@ describe('EvCard', () => {
       realized_edge_pct: null, realized_ci_lo_pct: null, realized_ci_hi_pct: null,
       realized_verdict: 'NOT ENOUGH DATA', realized_n_pulls: 12,
     })} />)
-    expect(screen.getByText('—')).toBeTruthy()
+    // getAllByText: la tabla de tiers también usa "—" para una media que no se ha medido.
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
     expect(screen.getByText('NOT ENOUGH DATA')).toBeTruthy()
     expect(screen.getByText(/Only 12 pulls/)).toBeTruthy()
     expect(agujas(container)).toBe(1)     // solo la marca del 1.00, sin aguja
@@ -75,6 +83,27 @@ describe('EvCard', () => {
     expect(screen.getByText('CONFIRMED +EV')).toBeTruthy()
     expect(screen.getByText('1.042')).toBeTruthy()
     expect(container.innerHTML).toContain('#00ffc4')
+  })
+
+  it('enseña la racha de cada rareza y su media', () => {
+    // Lo que pedía el diseño: no basta con "61", hace falta saber que lo normal son 19.
+    render(<EvCard fila={fila()} />)
+    expect(screen.getByText('Rare')).toBeTruthy()
+    expect(screen.getByText('61')).toBeTruthy()
+    expect(screen.getByText('19.4')).toBeTruthy()
+  })
+
+  it('una rareza que no salió dice "327+" y no "327"', () => {
+    // La racha es MAYOR que la muestra; escribir el tamaño daría por medido lo que no se ha medido.
+    render(<EvCard fila={fila()} />)
+    expect(screen.getByText('327+')).toBeTruthy()
+  })
+
+  it('las rachas se enseñan aunque no haya veredicto', () => {
+    // Se miden sobre las tiradas observadas, así que son útiles desde la primera hora.
+    render(<EvCard fila={fila({ realized_verdict: 'BUILDING', window_complete: false, hours_covered: 3 })} />)
+    expect(screen.getByText('Rare')).toBeTruthy()
+    expect(screen.getByText('61')).toBeTruthy()
   })
 
   it('sin concluir ofrece cuánta muestra faltaría', () => {

@@ -65,6 +65,46 @@ export function EvCard({ fila }: { fila: EvRow }) {
         </div>
       </div>
 
+      {/* Rachas por rareza. Se enseñan SIEMPRE, también sin veredicto: se miden sobre las tiradas
+          observadas y no dependen de que la ventana esté completa.
+
+          Dice "cold", nunca "due". El gacha usa VRF y cada tirada es independiente: una rareza que
+          lleva 60 sin salir tiene la misma probabilidad en la 61. Presentarlo como que le toca
+          empujaría a la gente a perseguirlo, que es justo lo contrario de lo que hace esta página. */}
+      {fila.tiers?.length > 0 && (
+        <div style={{ padding: '0 15px 11px' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONTS.mono, fontSize: 10 }}>
+              <thead>
+                <tr>
+                  {['TIER', 'SEEN', 'SINCE', 'AVG'].map((h, i) => (
+                    <th key={h} style={{
+                      textAlign: i === 0 ? 'left' : 'right', fontWeight: 400, fontSize: 8.5,
+                      letterSpacing: '.1em', color: '#5d6774', padding: '0 0 4px',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {fila.tiers.map((t) => (
+                  <tr key={t.tier}>
+                    <td style={{ color: colorTier(t.tier), padding: '2px 0' }}>{t.tier}</td>
+                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>{t.seen}</td>
+                    <td style={{
+                      textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                      color: t.cold ? '#f5c542' : COLORS.text,
+                    }}>{t.current == null ? `${t.sample}+` : t.current}</td>
+                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
+                      {t.average == null ? '—' : t.average}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       <div style={{ padding: '0 15px 13px' }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
@@ -87,6 +127,12 @@ export function EvCard({ fila }: { fila: EvRow }) {
       </div>
     </article>
   )
+}
+
+/** Colores de rareza del tema, para que la tabla se lea igual que el resto de la app. */
+function colorTier(nombre: string): string {
+  return ({ Common: '#8b95a3', Uncommon: '#2fe28a', Rare: '#5ad1ff', Epic: '#a98bff' } as Record<string, string>)[nombre]
+    ?? COLORS.muted
 }
 
 /** El arco. Sin ratio no se dibuja aguja: una aguja en el centro se leería como "paga justo". */

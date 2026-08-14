@@ -16,6 +16,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .ev_stats import intervalo, tiradas_para_concluir, veredicto
+from .tier_gaps import rachas_por_tier
 from .winners_store import ventana
 
 #: Muestra por debajo de la cual ni se intenta: el intervalo saldría tan ancho que no diría nada, y
@@ -43,6 +44,9 @@ def fila_ev(session: Session, machine: str, *, precio: float, buyback_pct: Optio
         "gaps": v["huecos"],
         "realized_edge_pct": None, "realized_ci_lo_pct": None, "realized_ci_hi_pct": None,
         "realized_verdict": None, "pulls_to_conclude": None,
+        # Las rachas van SIEMPRE, incluso sin veredicto: se miden sobre las tiradas observadas y no
+        # dependen de que la ventana esté completa. Es información útil desde la primera hora.
+        "tiers": rachas_por_tier(session, machine, horas=horas, ahora=ahora),
     }
 
     if v["n"] < MINIMO:

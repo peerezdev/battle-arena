@@ -230,6 +230,21 @@ export interface EvRow {
   realized_ci_hi_pct: number | null
   realized_verdict: string | null
   pulls_to_conclude: number | null
+  tiers: EvTier[]
+}
+
+/** Racha de una rareza: cuántas tiradas lleva sin salir y cuánto suele tardar.
+ *
+ *  NO es una predicción. El gacha usa VRF y cada tirada es independiente, así que una rareza que
+ *  lleva 60 sin salir tiene la misma probabilidad en la 61. `cold` solo dice que va por encima de
+ *  su propio ritmo. */
+export interface EvTier {
+  tier: string
+  current: number | null      // null = no salió en la muestra, que NO es lo mismo que "n"
+  average: number | null
+  seen: number
+  sample: number
+  cold: boolean
 }
 
 export function fetchEvRows(hours?: number): Promise<{ rows: EvRow[]; updated_at: number }> {
