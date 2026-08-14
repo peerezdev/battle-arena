@@ -88,6 +88,7 @@ import { TIPS_ENABLED } from '../../../featureFlags'
 import { useStickToBottom } from './useStickToBottom'
 import { MentionAutocomplete } from './MentionAutocomplete'
 import { buscarMencion, resolverMenciones } from './mentions'
+import { MessageText } from './MessageText'
 import type { LiveDrop } from '../../drops/dropsStore'
 
 // Opener label for a drop row: username if known, else a short wallet.
@@ -173,6 +174,23 @@ export function ChatDock({
     }
   }
 
+  // Aviso cuando te mencionan y NO lo estás viendo: con el panel plegado o habiendo subido a
+  // leer. Si estás abajo y mirando, el mensaje ya se destaca solo y un toast encima sería ruido.
+  // Se recuerda el último avisado para no repetirlo en cada render.
+  const ultimoAvisado = useRef<number | null>(null)
+  useEffect(() => {
+    const ultimo = messages[messages.length - 1]
+    if (!ultimo || !ownWallet) return
+    const meNombra = ultimo.mentions?.some((m) => m.wallet === ownWallet)
+    if (!meNombra || ultimo.wallet === ownWallet) return
+    if (ultimoAvisado.current === ultimo.ts) return
+    if (!collapsed && pegadoAlFondo) return
+    ultimoAvisado.current = ultimo.ts
+    showToast(`${ultimo.user} mentioned you`, 'info', {
+      label: 'View', onClick: () => { onToggle?.(); bajarDelTodo() },
+    })
+  }, [messages, ownWallet, collapsed, pegadoAlFondo, onToggle, bajarDelTodo])
+
   const [, forceTick] = useReducer((x: number) => x + 1, 0)
   useEffect(() => {
     const id = setInterval(forceTick, 60_000)
@@ -228,6 +246,11 @@ export function ChatDock({
       inputRef.current?.setSelectionRange(pos, pos)
       setCursor(pos)
     })
+  }
+
+  /** ¿Este mensaje me nombra? Sin wallet propia (sesión cerrada) nunca. */
+  function meMenciona(msg: ChatLine): boolean {
+    return !!ownWallet && !!msg.mentions?.some((m) => m.wallet === ownWallet)
   }
 
   function handleSend() {
@@ -716,7 +739,15 @@ export function ChatDock({
                 )}
               </div>
             ) : (
-              <div key={`${msg.ts}-${idx}`}>
+              <div
+                key={`${msg.ts}-${idx}`}
+                style={meMenciona(msg) ? {
+                  // Un mensaje que te nombra tiene que saltar a la vista sin leerlo entero.
+                  background: `${COLORS.green}0f`,
+                  borderLeft: `2px solid ${COLORS.green}`,
+                  marginLeft: -16, marginRight: -16, padding: '4px 16px 4px 14px',
+                } : undefined}
+              >
                 {/* Row: avatar + name + timestamp */}
                 <div
                   style={{
@@ -763,7 +794,7 @@ export function ChatDock({
                     fontFamily: FONTS.body,
                   }}
                 >
-                  {msg.text}
+                  <MessageText text={msg.text} mentions={msg.mentions} />
                 </div>
               </div>
             ))

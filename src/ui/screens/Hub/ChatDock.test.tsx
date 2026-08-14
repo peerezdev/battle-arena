@@ -16,11 +16,12 @@ interface CapturedTipModalProps {
 // the useEmbeddedSolanaAddress mock below, so tip tests can set "who am I" per test.
 // `tipModalCalls` records every prop set ChatDock hands to <TipModal>, so wiring tests can
 // assert on WHO the modal was opened for, not just that a tip button exists somewhere.
-const { chatState, tipModalCalls } = vi.hoisted(() => ({
+const { chatState, tipModalCalls, toasts } = vi.hoisted(() => ({
   chatState: { messages: [] as any[], ownWallet: null as string | null,
                canPost: false, onlineUsers: [] as { wallet: string; name: string }[],
                send: vi.fn() as ReturnType<typeof vi.fn> },
   tipModalCalls: [] as CapturedTipModalProps[],
+  toasts: [] as string[],
 }))
 // Igual que en el perfil: aquí se prueba la pantalla con las propinas encendidas.
 vi.mock('../../../featureFlags', () => ({ TIPS_ENABLED: true }))
@@ -32,6 +33,9 @@ vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => cha
 // TipModal is Task 5's own component, already tested there; ChatDock only needs to know it was
 // opened for the right recipient, not TipModal's internals — so the mock records its props
 // (open/to/source) instead of rendering anything.
+// Los avisos se capturan en vez de pintarse: lo que se comprueba es SI se avisa y de qué,
+// no cómo se ve el toast, que tiene sus propios tests.
+vi.mock('../../toastBus', () => ({ showToast: (m: string) => { toasts.push(m) } }))
 vi.mock('../../components/TipModal', () => ({
   TipModal: (props: CapturedTipModalProps) => { tipModalCalls.push(props); return null },
 }))
@@ -50,6 +54,7 @@ beforeEach(() => {
   chatState.onlineUsers = []
   chatState.send = vi.fn()
   tipModalCalls.length = 0
+  toasts.length = 0
 })
 
 describe('ChatDock live drops', () => {
@@ -351,5 +356,33 @@ describe('ChatDock · menciones', () => {
     const campo = escribir('hola @an')
     fireEvent.keyDown(campo, { key: 'Enter' })
     expect(chatState.send).not.toHaveBeenCalled()
+  })
+})
+
+describe('ChatDock · aviso de mención', () => {
+  const mio = 'WalletMIA'
+
+  it('avisa si te mencionan con el panel plegado', () => {
+    chatState.ownWallet = mio
+    chatState.messages = [{ user: 'Ana', wallet: 'WalletA', text: 'hola @yo', ts: 5,
+                            mentions: [{ wallet: mio, label: 'yo' }] }]
+    render(<MemoryRouter><ChatDock collapsed onToggle={vi.fn()} /></MemoryRouter>)
+    expect(toasts.some((t) => /mentioned you/i.test(t))).toBe(true)
+  })
+
+  it('NO avisa si estás mirando el chat al final: el mensaje ya se destaca solo', () => {
+    chatState.ownWallet = mio
+    chatState.messages = [{ user: 'Ana', wallet: 'WalletA', text: 'hola @yo', ts: 5,
+                            mentions: [{ wallet: mio, label: 'yo' }] }]
+    renderDock()
+    expect(toasts.some((t) => /mentioned you/i.test(t))).toBe(false)
+  })
+
+  it('no te avisa de tus propias menciones', () => {
+    chatState.ownWallet = mio
+    chatState.messages = [{ user: 'Yo', wallet: mio, text: '@yo mismo', ts: 5,
+                            mentions: [{ wallet: mio, label: 'yo' }] }]
+    render(<MemoryRouter><ChatDock collapsed onToggle={vi.fn()} /></MemoryRouter>)
+    expect(toasts.some((t) => /mentioned you/i.test(t))).toBe(false)
   })
 })
