@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useIdentityToken } from '@privy-io/react-auth'
 import { fijarToken, suscribir, suscribirEstado, enviar } from './serverSocket'
 import { addDrop, seedDrops, type LiveDrop } from '../ui/drops/dropsStore'
+import type { Mention, OnlineUser } from '../ui/screens/Hub/mentions'
 
 export interface ChatAction { label: string; battleId: string; mode: string }
 export interface ChatLine {
@@ -18,6 +19,9 @@ export interface ChatLine {
   machine?: string           // gacha machine a hit came from (display name)
   mult?: number              // hit multiple (value ÷ cost), rendered as "(x10)"
   mode?: string              // 'pack' | 'royale'
+  /** A quién menciona el mensaje. Ausente en los anteriores a las menciones y en los que no
+   *  mencionan a nadie: el backend no manda la clave vacía. */
+  mentions?: Mention[]
 }
 
 // La URL y el socket ya no se construyen aquí: los tiene serverSocket.ts, uno por pestaña.
@@ -41,15 +45,18 @@ function dropFromMsg(msg: Record<string, unknown>): LiveDrop {
 
 export function useChat(enabled = true): {
   messages: ChatLine[]
-  send: (text: string) => void
+  send: (text: string, mentions?: Mention[]) => void
   connected: boolean
   canPost: boolean
   online: number
+  /** Quién está conectado AHORA: es la fuente del autocompletado de menciones. */
+  onlineUsers: OnlineUser[]
 } {
   const { identityToken } = useIdentityToken()
   const [messages, setMessages] = useState<ChatLine[]>([])
   const [connected, setConnected] = useState(false)
   const [online, setOnline] = useState(0)
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
 
   const canPost = !!identityToken
 
@@ -72,6 +79,7 @@ export function useChat(enabled = true): {
       mode: m.mode as string | undefined,
       machine: m.machine as string | undefined,
       mult: m.mult as number | undefined,
+      mentions: m.mentions as Mention[] | undefined,
     })
 
     const baja = suscribir((crudo) => {
@@ -83,6 +91,8 @@ export function useChat(enabled = true): {
         setMessages((prev) => [...prev, linea(msg)])
       } else if (msg.type === 'presence') {
         setOnline(msg.online as number)
+        // Puede faltar si el backend es viejo: entonces no hay a quién mencionar y ya está.
+        setOnlineUsers((msg.users as OnlineUser[]) ?? [])
       } else if (msg.type === 'drop') {
         // Global Live Drop broadcast by the backend (delayed ~30s so the opener
         // never sees their own drop spoil the reveal).
@@ -100,9 +110,12 @@ export function useChat(enabled = true): {
   }, [identityToken, enabled])
 
   // `enviar` devuelve false si el socket no está abierto; el texto vacío no se manda.
-  const send = useCallback((text: string) => {
-    if (text.trim()) enviar({ text: text.trim() })
+  const send = useCallback((text: string, mentions?: Mention[]) => {
+    if (!text.trim()) return
+    // Sin menciones no se manda la clave: el servidor no tiene que distinguir "ninguna" de
+    // "lista vacía", y los mensajes normales viajan igual que antes.
+    enviar(mentions?.length ? { text: text.trim(), mentions } : { text: text.trim() })
   }, [])
 
-  return { messages, send, connected, canPost, online }
+  return { messages, send, connected, canPost, online, onlineUsers }
 }
