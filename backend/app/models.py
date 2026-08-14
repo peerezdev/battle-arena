@@ -334,3 +334,46 @@ class Tip(Base):
     signature: Mapped[str] = mapped_column(String)        # la prueba: la firma de la transacción
     source: Mapped[str] = mapped_column(String)           # "profile" | "chat"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class GachaWinner(Base):
+    """Una tirada del gacha de Collector Crypt, de quien sea. Es la materia prima del EV tracker.
+
+    POR QUÉ SE GUARDA. CC sirve como mucho las 200 últimas por máquina, y la más movida renueva
+    esas 200 en poco más de media hora. Sin acumular no hay ventana de 48 h que valga, así que la
+    historia la construimos nosotros escuchando el feed en vivo.
+
+    LA CLAVE ES `nft_address`. Es lo único único en las DOS fuentes. Ojo con `memo_slug` del REST:
+    parece un identificador y es el prefijo del integrador (`cc`, `jupiter`), compartido por miles
+    de tiradas; usarlo de clave colapsaría la tabla entera en un puñado de filas.
+    """
+    __tablename__ = "gacha_winners"
+    nft_address: Mapped[str] = mapped_column(String, primary_key=True)
+    machine: Mapped[str] = mapped_column(String, index=True)      # `gachaCode` en vivo, `pack_type` en REST
+    prize_tier: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)   # 1=Epic … 4=Common
+    insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # Un número propio de CC que SOLO viaja en el feed en vivo y que no está documentado. Se guarda
+    # para poder estudiarlo; hoy no se usa para medir nada.
+    weighted_insured_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    memo: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # completo solo en vivo
+    winner: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    source: Mapped[str] = mapped_column(String)                   # "live" | "rest"
+    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class GachaCoverage(Base):
+    """Desde cuándo tenemos datos SIN HUECOS de una máquina, y qué tramos se perdieron.
+
+    Sin esto, una ventana con agujeros se calcularía igual y saldría un número limpio sobre una
+    muestra incompleta, que es peor que no dar número: nadie podría saber que le falta un trozo.
+    Con esto la tarjeta puede decir "llevamos 6 h de 48" o "falta de 02:10 a 03:35".
+    """
+    __tablename__ = "gacha_coverage"
+    machine: Mapped[str] = mapped_column(String, primary_key=True)
+    # Instante desde el que la serie es continua. Un hueco lo EMPUJA hacia delante: lo anterior al
+    # agujero existe, pero ya no sirve para una ventana que lo cruce.
+    continuous_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    gaps: Mapped[Optional[str]] = mapped_column(String, nullable=True)   # JSON [[desde, hasta], …]
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
