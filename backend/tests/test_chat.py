@@ -212,3 +212,38 @@ def test_los_mensajes_sin_dueño_no_traen_wallet():
         assert "wallet" not in recent_chat_messages(s)[0]
         save_chat_message(s, "Mauro", "hola", 2, wallet=WALLET)
         assert recent_chat_messages(s)[-1]["wallet"] == WALLET
+
+
+def test_online_users_no_repite_a_quien_tiene_dos_pestanas():
+    """Dos pestañas son dos sockets pero UN jugador.
+
+    `online_count` contaba sockets, así que quien abría dos pestañas inflaba el contador y
+    aparecería dos veces en el autocompletado de menciones.
+    """
+    from app.chat import ConnectionManager
+    m = ConnectionManager()
+    a1, a2, b = object(), object(), object()
+    for ws in (a1, a2, b):
+        m._active[ws] = None            # simula conexión sin pasar por el accept
+    m.identify(a1, "WalletA", "Ana")
+    m.identify(a2, "WalletA", "Ana")
+    m.identify(b, "WalletB", "Bea")
+
+    assert m.online_count() == 2
+    assert sorted(u["wallet"] for u in m.online_users()) == ["WalletA", "WalletB"]
+
+
+def test_online_users_no_incluye_a_los_anonimos():
+    """Sin sesión no hay a quién avisar, así que no se puede mencionar.
+
+    Siguen contando en `online`: están mirando, aunque no puedan hablar.
+    """
+    from app.chat import ConnectionManager
+    m = ConnectionManager()
+    con, sin = object(), object()
+    m._active[con] = None
+    m._active[sin] = None
+    m.identify(con, "WalletA", "Ana")
+
+    assert m.online_count() == 2
+    assert [u["wallet"] for u in m.online_users()] == ["WalletA"]

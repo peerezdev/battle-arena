@@ -2030,6 +2030,16 @@ def create_app(session_factory, chain: ChainSource,
         _chat_hits[wallet] = hits
         return True
 
+    def _presence() -> dict:
+        """El aviso de quién hay. Se emite al entrar y al salir de cualquiera.
+
+        `users` es la lista de mencionables (sin anónimos ni duplicados); `online` cuenta también
+        a los anónimos, porque están mirando aunque no puedan hablar. Iban en tres sitios idénticos
+        y ahora salen de aquí: al añadir `users` habría habido que acertar tres veces.
+        """
+        return {"type": "presence", "online": _chat_mgr.online_count(),
+                "users": _chat_mgr.online_users()}
+
     @app.websocket("/ws/chat")
     async def ws_chat(ws: WebSocket, token: Optional[str] = Query(None)):
         wallet = None
@@ -2047,11 +2057,14 @@ def create_app(session_factory, chain: ChainSource,
                 with session_factory() as s:
                     alias = read_user_view(s, wallet, elo_start).get("alias")
                 display_name = alias or abbreviate(wallet)
+                # Ata el socket a su jugador: es lo que permite ofrecer a quién mencionar y
+                # contar jugadores en vez de sockets. Los anónimos se quedan sin identificar.
+                _chat_mgr.identify(ws, wallet, display_name)
             with session_factory() as s:
                 chat_history = recent_chat_messages(s)
             await ws.send_json({"type": "history", "messages": chat_history})
             await ws.send_json({"type": "drops_history", "drops": _drops_buf.history()})
-            await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
+            await _chat_mgr.broadcast(_presence())
             while True:
                 data = await ws.receive_json()
                 text = (data.get("text") or "").strip()
@@ -2072,10 +2085,10 @@ def create_app(session_factory, chain: ChainSource,
                 await _chat_mgr.broadcast({"type": "message", **msg})
         except WebSocketDisconnect:
             _chat_mgr.disconnect(ws)
-            await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
+            await _chat_mgr.broadcast(_presence())
         except Exception:
             _chat_mgr.disconnect(ws)
-            await _chat_mgr.broadcast({"type": "presence", "online": _chat_mgr.online_count()})
+            await _chat_mgr.broadcast(_presence())
 
     # Cada cuánto se mira si hace falta abrir un lobby de la casa. No corre nada si el flag está
     # apagado, así que el coste en reposo es una consulta a SQLite cada medio minuto.

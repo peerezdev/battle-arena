@@ -93,21 +93,48 @@ class ChatBuffer:
 
 class ConnectionManager:
     def __init__(self):
-        self._active: set[WebSocket] = set()
+        # socket → {"wallet", "name"}, o None si es anónimo. Antes era un `set` de sockets: no se
+        # guardaba QUIÉN había detrás, y sin eso no se puede ofrecer a quién mencionar.
+        self._active: dict[WebSocket, Optional[dict]] = {}
 
     async def connect(self, ws: WebSocket) -> None:
         await ws.accept()
-        self._active.add(ws)
+        self._active[ws] = None
+
+    def identify(self, ws: WebSocket, wallet: str, name: str) -> None:
+        """Ata el socket a su jugador.
+
+        Se llama DESPUÉS de resolver el alias, no al aceptar la conexión: el nombre sale de la
+        base y no se sabe hasta entonces.
+        """
+        if ws in self._active:
+            self._active[ws] = {"wallet": wallet, "name": name}
 
     def disconnect(self, ws: WebSocket) -> None:
-        self._active.discard(ws)
+        self._active.pop(ws, None)
 
     def online_count(self) -> int:
-        return len(self._active)
+        """Jugadores, no sockets: dos pestañas del mismo son uno.
+
+        Los anónimos se cuentan sueltos porque no hay forma de saber si son la misma persona, y
+        no contarlos mentiría al revés: están mirando.
+        """
+        wallets = {u["wallet"] for u in self._active.values() if u}
+        anonimos = sum(1 for u in self._active.values() if not u)
+        return len(wallets) + anonimos
+
+    def online_users(self) -> list[dict]:
+        """A quién se puede mencionar.
+
+        Sin duplicados y ordenado por nombre, para que la lista del autocompletado no baile entre
+        una pulsación y la siguiente. Los anónimos NO salen: no hay a quién avisar.
+        """
+        por_wallet = {u["wallet"]: u for u in self._active.values() if u}
+        return sorted(por_wallet.values(), key=lambda u: u["name"].lower())
 
     async def broadcast(self, msg: dict) -> None:
         for ws in list(self._active):
             try:
                 await ws.send_json(msg)
             except Exception:
-                self._active.discard(ws)
+                self._active.pop(ws, None)
