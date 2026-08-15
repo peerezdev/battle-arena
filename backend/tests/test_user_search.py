@@ -90,15 +90,23 @@ def test_la_consulta_usa_el_indice(session):
 
     assert len(capturado) == 2, capturado
     cur = session.connection().connection.dbapi_connection.cursor()
-    for statement, parameters in capturado:
+    etiquetas = ["con prefijo", "sin consulta"]
+    for etiqueta, (statement, parameters) in zip(etiquetas, capturado):
         cur.execute(f"EXPLAIN QUERY PLAN {statement}", parameters)
-        plan = cur.fetchall()
+        detalles = [str(row) for row in cur.fetchall()]
         # "SCAN users" a secas (sin "USING INDEX"/"USING COVERING INDEX" detrás) es SQLite leyendo
         # la tabla entera fila a fila; "SCAN users USING INDEX ..." recorre el índice, no la tabla.
         escaneo_de_tabla = any(
-            "SCAN users" in str(row)
-            and "USING INDEX" not in str(row)
-            and "USING COVERING INDEX" not in str(row)
-            for row in plan
+            "SCAN users" in d and "USING INDEX" not in d and "USING COVERING INDEX" not in d
+            for d in detalles
         )
-        assert not escaneo_de_tabla, (statement, plan)
+        assert not escaneo_de_tabla, (etiqueta, statement, detalles)
+        if etiqueta == "sin consulta":
+            # No basta con "sin SCAN de tabla": un SCAN DE ÍNDICE completo también arranca por el
+            # PRINCIPIO, que es donde SQLite ordena los NULL — hay que pagar por cada usuario SIN
+            # alias antes de llegar a las 8 filas buenas. Solo un SEARCH acotado (la cota `> ""`)
+            # prueba que arranca ya después de los NULL. Si esto vuelve a `isnot(None)`, el plan
+            # sigue sin tener "SCAN users" pelado y el assert de arriba no lo pillaría — por eso
+            # hace falta este, más estricto.
+            assert any("SEARCH users USING INDEX ux_users_alias_lower" in d for d in detalles), \
+                (etiqueta, detalles)

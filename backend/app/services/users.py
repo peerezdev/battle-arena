@@ -47,7 +47,14 @@ def buscar_usuarios(session: Session, q: str, limit: int = MAX_BUSQUEDA) -> list
         )
         stmt = stmt.order_by(func.lower(User.alias).is_(None), func.lower(User.alias), User.wallet)
     else:
-        stmt = stmt.where(func.lower(User.alias).isnot(None))
+        # `isnot(None)` era correcto pero caro: el plan arranca por el PRINCIPIO del índice, que es
+        # justo donde SQLite ordena los NULL, así que para las primeras 8 filas CON alias tenía que
+        # pasar antes por cada fila SIN alias (medido: pasos en el orden de cuántos usuarios no
+        # tienen alias, no de cuántos hacen falta). `> ""` es una cota inferior real, no un rodeo:
+        # el alias se valida en el endpoint con min_length=3 (AliasBody, app/main.py), así que
+        # ningún alias es la cadena vacía y la cota no descarta ningún resultado válido. Con la cota
+        # el plan pasa a SEARCH (arranca ya después de los NULL) y el coste queda plano.
+        stmt = stmt.where(func.lower(User.alias) > "")
         stmt = stmt.order_by(func.lower(User.alias))
     return [{"wallet": u.wallet, "alias": u.alias} for u in session.scalars(stmt.limit(limit))]
 

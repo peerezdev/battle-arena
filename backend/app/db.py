@@ -67,6 +67,12 @@ _ENSURE_INDEXES = [
     # buscar_usuarios haría SCAN de la tabla entera.
     ("users", "ux_users_wallet_lower",
      "CREATE INDEX IF NOT EXISTS ux_users_wallet_lower ON users (lower(wallet))"),
+    # ux_users_alias_lower vive en __table_args__ del modelo, pero create_all() NUNCA toca una
+    # tabla que ya existe: en una base creada antes de que ese índice existiera, no aparece solo.
+    # Todo buscar_usuarios depende de él (los dos caminos vuelven a SCAN sin él) — mismo motivo que
+    # el de wallet, así que va aquí también. Único, igual que en el modelo.
+    ("users", "ux_users_alias_lower",
+     "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_alias_lower ON users (lower(alias))"),
 ]
 
 
