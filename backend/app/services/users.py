@@ -10,6 +10,39 @@ class AliasTakenError(Exception):
     """Otro usuario ya tiene ese username (case-insensitive)."""
 
 
+# Tope duro de resultados. Un desplegable no puede enseñar miles, y el tope es también lo que
+# mantiene barata la consulta pase lo que pase por el parámetro.
+MAX_BUSQUEDA = 8
+
+
+def _rango_prefijo(q: str) -> tuple[str, str]:
+    """(desde, hasta) para buscar por prefijo con un RANGO, que es lo único que usa el índice.
+
+    Medido con EXPLAIN QUERY PLAN: `lower(alias) LIKE 'an%'` hace SCAN de la tabla entera, porque
+    SQLite no aplica la optimización de LIKE a un índice de expresión como ux_users_alias_lower.
+    El rango sí: SEARCH users USING INDEX. Con 16 usuarios da igual; con 100.000, un escaneo por
+    pulsación deja al backend (un proceso, consultas síncronas) sin atender nada más.
+    """
+    return q, q + "￿"
+
+
+def buscar_usuarios(session: Session, q: str, limit: int = MAX_BUSQUEDA) -> list[dict]:
+    """Jugadores cuyo alias o wallet EMPIEZA por `q`. Sin `q`, los primeros por alias.
+
+    Devuelve [{wallet, alias}]; quién está conectado lo pone el endpoint, que es quien lo sabe.
+    """
+    limit = max(1, min(limit, MAX_BUSQUEDA))
+    stmt = select(User)
+    if q:
+        desde, hasta = _rango_prefijo(q.lower())
+        stmt = stmt.where(
+            (func.lower(User.alias) >= desde) & (func.lower(User.alias) < hasta)
+            | ((User.wallet >= q) & (User.wallet < q + "￿"))
+        )
+    stmt = stmt.order_by(func.lower(User.alias).is_(None), func.lower(User.alias), User.wallet)
+    return [{"wallet": u.wallet, "alias": u.alias} for u in session.scalars(stmt.limit(limit))]
+
+
 def read_user_view(session: Session, wallet: str, elo_start: int) -> dict:
     """Lectura sin efectos: devuelve el usuario si existe, o una vista por defecto (sin persistir)."""
     u = session.get(User, wallet)
