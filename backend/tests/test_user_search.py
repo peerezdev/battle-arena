@@ -18,8 +18,8 @@ def session():
 
 
 def test_busca_por_prefijo_sin_distinguir_mayusculas(session):
-    out = [u["alias"] for u in buscar_usuarios(session, "AN")]
-    assert sorted(out) == ["ana", "anabel"]
+    # Orden exacto, no sorted(): el orden lo da el índice y es parte de lo que se protege.
+    assert [u["alias"] for u in buscar_usuarios(session, "AN")] == ["ana", "anabel"]
 
 
 def test_el_prefijo_NO_encuentra_por_el_medio(session):
@@ -33,24 +33,72 @@ def test_el_prefijo_NO_encuentra_por_el_medio(session):
 
 
 def test_busca_tambien_por_principio_de_wallet(session):
-    """Quien no tiene alias solo se puede encontrar por su wallet."""
+    """Quien no tiene alias solo se puede encontrar por su wallet, y esa búsqueda tampoco
+    distingue mayúsculas: las wallets son base58 y nadie recuerda dónde iban."""
     assert [u["wallet"] for u in buscar_usuarios(session, "We")] == ["We5"]
+    assert [u["wallet"] for u in buscar_usuarios(session, "we")] == ["We5"]
 
 
 def test_sin_consulta_devuelve_a_todos_ordenados(session):
+    """Sin `q`, solo quien TIENE alias (a quien no lo tiene se le encuentra por wallet, no aquí),
+    en el orden real que da el índice — no solo la longitud."""
     out = buscar_usuarios(session, "")
-    assert len(out) == 5
+    assert [u["alias"] for u in out] == ["ana", "anabel", "Bea", "juanana"]
 
 
-def test_el_tope_se_respeta_aunque_se_pida_mas(session):
-    assert len(buscar_usuarios(session, "", limit=999)) <= 8
+def test_sin_consulta_no_incluye_a_quien_no_tiene_alias(session):
+    out = buscar_usuarios(session, "")
+    assert "We5" not in [u["wallet"] for u in out]
+
+
+def test_el_tope_se_respeta_aunque_se_pida_mas():
+    """La fixture compartida solo tiene 5 usuarios (todos caben en el tope), así que aquí se
+    monta una con más de 8 para que el recorte tenga algo real que recortar: sin él, limit=999
+    devolvería 999 y el test seguiría en verde por el motivo equivocado."""
+    engine = make_engine("sqlite:///:memory:")
+    init_db(engine)
+    Session = make_session_factory(engine)
+    with Session() as s:
+        for i in range(12):
+            s.add(User(wallet=f"W{i}", alias=f"user{i:02d}", elo=1200, games_played=0))
+        s.commit()
+        assert len(buscar_usuarios(s, "", limit=999)) == 8
 
 
 def test_la_consulta_usa_el_indice(session):
-    """Si esto falla, la búsqueda recorre la tabla entera y hay que arreglarlo ANTES de subir."""
-    from sqlalchemy import text
-    plan = session.execute(text(
-        "EXPLAIN QUERY PLAN SELECT wallet, alias FROM users "
-        "WHERE lower(alias) >= 'an' AND lower(alias) < 'ao' LIMIT 8"
-    )).all()
-    assert any("USING INDEX ux_users_alias_lower" in str(r) for r in plan), plan
+    """Si esto falla, la búsqueda recorre la tabla entera y hay que arreglarlo ANTES de subir.
+
+    Captura el SQL que EMITE `buscar_usuarios` de verdad (no uno parecido escrito a mano: eso
+    dejaba pasar mutaciones a LIKE o sin tope sin que ningún test se enterara) y le pide a SQLite
+    su plan real, para los dos caminos que existen: con prefijo y sin consulta.
+    """
+    from sqlalchemy import event
+
+    capturado = []
+
+    def _capturar(conn, cursor, statement, parameters, context, executemany):
+        if statement.strip().upper().startswith("SELECT"):
+            capturado.append((statement, parameters))
+
+    engine = session.get_bind()
+    event.listen(engine, "before_cursor_execute", _capturar)
+    try:
+        buscar_usuarios(session, "an")
+        buscar_usuarios(session, "")
+    finally:
+        event.remove(engine, "before_cursor_execute", _capturar)
+
+    assert len(capturado) == 2, capturado
+    cur = session.connection().connection.dbapi_connection.cursor()
+    for statement, parameters in capturado:
+        cur.execute(f"EXPLAIN QUERY PLAN {statement}", parameters)
+        plan = cur.fetchall()
+        # "SCAN users" a secas (sin "USING INDEX"/"USING COVERING INDEX" detrás) es SQLite leyendo
+        # la tabla entera fila a fila; "SCAN users USING INDEX ..." recorre el índice, no la tabla.
+        escaneo_de_tabla = any(
+            "SCAN users" in str(row)
+            and "USING INDEX" not in str(row)
+            and "USING COVERING INDEX" not in str(row)
+            for row in plan
+        )
+        assert not escaneo_de_tabla, (statement, plan)

@@ -62,6 +62,11 @@ _ENSURE_INDEXES = [
     ("referral_earnings", "uq_earning_battle_referred",
      "CREATE UNIQUE INDEX IF NOT EXISTS uq_earning_battle_referred "
      "ON referral_earnings (battle_id, referred_wallet)"),
+    # Buscar por wallet sin distinguir mayúsculas (base58: nadie recuerda dónde iban) necesita este
+    # índice de expresión — igual que ux_users_alias_lower, sin él la rama de wallet de
+    # buscar_usuarios haría SCAN de la tabla entera.
+    ("users", "ux_users_wallet_lower",
+     "CREATE INDEX IF NOT EXISTS ux_users_wallet_lower ON users (lower(wallet))"),
 ]
 
 

@@ -27,7 +27,13 @@ def _rango_prefijo(q: str) -> tuple[str, str]:
 
 
 def buscar_usuarios(session: Session, q: str, limit: int = MAX_BUSQUEDA) -> list[dict]:
-    """Jugadores cuyo alias o wallet EMPIEZA por `q`. Sin `q`, los primeros por alias.
+    """Jugadores cuyo alias o wallet EMPIEZA por `q` (sin distinguir mayúsculas en ninguno de los
+    dos: la wallet es base58 y nadie recuerda dónde iban las mayúsculas).
+
+    Sin `q`, los primeros CON alias, ordenados por él. A quien no tiene alias se le sigue
+    encontrando escribiendo su wallet (la rama de arriba); en una lista sin filtrar aparecería
+    como una dirección suelta que nadie reconoce, y el `IS NULL` que haría falta para mandarlos al
+    final es justo lo que le impide a esta rama usar el índice (ver test_la_consulta_usa_el_indice).
 
     Devuelve [{wallet, alias}]; quién está conectado lo pone el endpoint, que es quien lo sabe.
     """
@@ -37,9 +43,12 @@ def buscar_usuarios(session: Session, q: str, limit: int = MAX_BUSQUEDA) -> list
         desde, hasta = _rango_prefijo(q.lower())
         stmt = stmt.where(
             (func.lower(User.alias) >= desde) & (func.lower(User.alias) < hasta)
-            | ((User.wallet >= q) & (User.wallet < q + "￿"))
+            | ((func.lower(User.wallet) >= desde) & (func.lower(User.wallet) < hasta))
         )
-    stmt = stmt.order_by(func.lower(User.alias).is_(None), func.lower(User.alias), User.wallet)
+        stmt = stmt.order_by(func.lower(User.alias).is_(None), func.lower(User.alias), User.wallet)
+    else:
+        stmt = stmt.where(func.lower(User.alias).isnot(None))
+        stmt = stmt.order_by(func.lower(User.alias))
     return [{"wallet": u.wallet, "alias": u.alias} for u in session.scalars(stmt.limit(limit))]
 
 
