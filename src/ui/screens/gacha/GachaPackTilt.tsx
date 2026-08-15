@@ -57,6 +57,27 @@ export function priceFromCode(machineCode: string): number | null {
   return m ? Number(m[1]) : null
 }
 
+/**
+ * Lo que se lee mientras la tanda avanza.
+ *
+ * Cada fase dice lo suyo. Antes las tres compartían el texto "Generating pack… x/N", así que el
+ * contador subía hasta N, empezaba la fase siguiente y volvía a 1: el usuario veía la barra
+ * reiniciarse dos veces y no había forma de saber que eran pasos distintos.
+ *
+ * Ahora que las tres van en paralelo el contador ya no avanza de uno en uno, sino a saltos según
+ * van respondiendo, y por eso se escribe "N of M" y no "el número N": no es una posición en una
+ * cola, es cuántos van hechos.
+ */
+export function etiquetaTanda(step: 'firmando' | 'enviando' | 'abriendo' | undefined,
+                              done: number, total: number): string {
+  if (total <= 1) {
+    return step === 'abriendo' ? 'Revealing…' : 'Buying pack…'
+  }
+  const n = Math.min(done, total)
+  if (step === 'abriendo') return `Revealing… ${n}/${total}`
+  return `Buying packs… ${n}/${total}`
+}
+
 type Props = {
   machineCode: string
   price: number
@@ -66,11 +87,14 @@ type Props = {
   ready: boolean
   done: number
   total: number
+  /** En qué va la tanda. Sin esto las TRES fases se pintaban con el mismo texto, así que el
+   *  contador llegaba a 10, empezaba la siguiente y volvía a 1: parecía que se reiniciaba. */
+  step?: 'firmando' | 'enviando' | 'abriendo'
   onOpen: () => void
   reduced: boolean
 }
 
-export function GachaPackTilt({ machineCode, price, count, ready, done, total, onOpen, reduced }: Props) {
+export function GachaPackTilt({ machineCode, price, count, ready, done, total, step, onOpen, reduced }: Props) {
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, lx: 30, ly: 25, hovering: false })
   const [opening, setOpening] = useState(false)
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -215,7 +239,7 @@ export function GachaPackTilt({ machineCode, price, count, ready, done, total, o
           background: ready ? `linear-gradient(90deg,${pal.topGlow},${pal.bottomGlow})` : COLORS.panel2,
           color: ready ? '#08111d' : COLORS.muted,
         }}>
-        {opening ? 'Opening…' : ready ? 'Open pack' : `Generating pack… ${Math.min(done + 1, total)}/${total}`}
+        {opening ? 'Opening…' : ready ? 'Open pack' : etiquetaTanda(step, done, total)}
       </button>
     </div>
   )
