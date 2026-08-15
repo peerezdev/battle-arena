@@ -54,17 +54,24 @@ const aNeto = (pct: number, bb: number) => (bb * (1 + pct / 100) - 1) * 100
  */
 export function enModo(fila: EvRow, modo: Modo): EvRow {
   const bb = fila.buyback_pct
-  if (modo === 'keep' || !bb || fila.realized_edge_pct == null) return fila
+  if (modo === 'keep' || !bb) return fila
 
-  const edge = aNeto(fila.realized_edge_pct, bb)
+  const edge = fila.realized_edge_pct == null ? null : aNeto(fila.realized_edge_pct, bb)
   const lo = fila.realized_ci_lo_pct == null ? null : aNeto(fila.realized_ci_lo_pct, bb)
   const hi = fila.realized_ci_hi_pct == null ? null : aNeto(fila.realized_ci_hi_pct, bb)
+  // El modelo se convierte con la MISMA regla. Llega en valor de carta justo para esto: si viniera
+  // con la recompra ya puesta habría que hacerle algo distinto, y cualquier despiste ahí se vería
+  // como una diferencia entre lo esperado y lo medido que en realidad no existe.
+  const mEdge = fila.model_edge_pct == null ? null : aNeto(fila.model_edge_pct, bb)
 
   return {
     ...fila,
     realized_edge_pct: edge,
     realized_ci_lo_pct: lo,
     realized_ci_hi_pct: hi,
+    model_edge_pct: mEdge,
+    model_ratio: mEdge == null ? fila.model_ratio : 1 + mEdge / 100,
+    model_ev: fila.model_ev == null ? null : fila.model_ev * bb,
     realized_verdict:
       fila.realized_verdict && ESTADISTICOS.has(fila.realized_verdict) && lo != null && hi != null
         ? veredicto(lo, hi)

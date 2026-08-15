@@ -231,6 +231,16 @@ export interface EvRow {
   realized_verdict: string | null
   pulls_to_conclude: number | null
   tiers: EvTier[]
+  /** Lo que la máquina DEBERÍA pagar según sus cartas y las odds que publica CC.
+   *
+   *  Viene EN VALOR DE CARTA, la misma base que `realized_edge_pct`, para que las dos mitades sean
+   *  comparables tal y como llegan y el interruptor de valoración las convierta por igual.
+   *
+   *  `null` mientras no se haya barrido el pool de esa máquina. No es un cero: un ratio de 0
+   *  pintaría la aguja al fondo de la escala como si fuera un robo. */
+  model_ev: number | null
+  model_ratio: number | null
+  model_edge_pct: number | null
 }
 
 /** Racha de una rareza: cuántas tiradas lleva sin salir y cuánto suele tardar.
@@ -249,6 +259,13 @@ export interface EvTier {
   sample: number
   days_since: number | null   // cuánto tiempo es esa racha; sin esto el número no se puede leer
   cold: boolean
+  // ── lo esperado, del pool de cartas. Ausente mientras no se haya barrido esa máquina. ──
+  probability?: number | null   // la odd que publica CC
+  n_cards?: number              // cuántas cartas de esa rareza quedan en el bote
+  value?: number | null         // lo que valen de media
+  gross?: number | null         // probability × value: lo que esa rareza aporta al EV
+  min_value?: number | null
+  max_value?: number | null
 }
 
 /** Lo que cambia tirada a tirada. Complementa a `/gacha/ev`, no lo sustituye: el edge, el intervalo

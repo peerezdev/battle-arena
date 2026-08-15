@@ -1,4 +1,4 @@
-import { COLORS, FONTS } from '../../theme'
+import { COLORS, FONTS, formatUsd } from '../../theme'
 import type { EvRow } from '../../../onchain/gachaClient'
 import { RATIO_MAX, RATIO_MIN, anguloAguja, esConcluyente, estadoDe, etiqueta, ratioDesdeEdge }
   from './evDial'
@@ -10,8 +10,9 @@ import { desdeHace } from './tierGap'
  * El dial marca el ratio MEDIDO: cuánto devuelve el sobre por cada dólar que cuesta, con 1.00
  * justo arriba. Se eligió por ser comparable de un vistazo entre tarjetas sin leer una cifra.
  *
- * Cuando llegue el pool de cartas (fase 2), el ratio del MODELO entra como una marca fija en este
- * mismo arco, y la distancia entre marca y aguja responde a "¿se comporta como debería?".
+ * La marca blanca del arco es el ratio del MODELO, calculado sobre el pool de cartas y las odds
+ * que publica CC. La distancia entre marca y aguja es la pregunta que da sentido a la tarjeta:
+ * "¿se está comportando como debería?".
  *
  * Regla que manda sobre el color: si el veredicto no se sostiene —ventana a medias, hueco dentro,
  * muestra corta— el número se pinta en gris aunque sea malísimo. Un rojo fuerte sobre seis horas de
@@ -45,7 +46,7 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
       </header>
 
       <div style={{ padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <Dial ratio={ratio} tinta={tinta} />
+        <Dial ratio={ratio} tinta={tinta} modelo={fila.model_ratio} />
         <div style={{ minWidth: 0 }}>
           <div style={{
             fontFamily: FONTS.mono, fontSize: 25, fontWeight: 700, lineHeight: 1, color: tinta,
@@ -60,6 +61,18 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
                 {fila.realized_ci_lo_pct != null && (
                   <>95% CI {fila.realized_ci_lo_pct.toFixed(2)} … {fila.realized_ci_hi_pct?.toFixed(2)}</>
                 )}
+              </>
+            )}
+            {/* Lo esperado, del pool de cartas. Va debajo y en la misma línea visual que lo medido
+                porque la tarjeta entera existe para poder comparar los dos: "debería pagar 1.080 y
+                está pagando 0.938" dice mucho más que cualquiera de los dos números por separado. */}
+            {fila.model_ratio != null && (
+              <>
+                <br />
+                <span style={{ color: '#8b95a3' }}>
+                  model {fila.model_ratio.toFixed(3)}
+                  {fila.model_ev != null && ` · $${fila.model_ev.toFixed(2)}`}
+                </span>
               </>
             )}
           </div>
@@ -78,7 +91,10 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONTS.mono, fontSize: 10 }}>
               <thead>
                 <tr>
-                  {['TIER', 'SEEN', 'GAP', 'AGO', 'AVG'].map((h, i) => (
+                  {/* Izquierda lo ESPERADO (del pool de cartas), derecha lo OBSERVADO (del feed).
+                      Separadas para que no se lean como una sola cosa: P y VALUE son lo que CC
+                      declara, GAP y AGO son lo que ha pasado de verdad. */}
+                  {['TIER', 'P', 'VALUE', 'GROSS', 'GAP', 'AGO', 'AVG'].map((h, i) => (
                     <th key={h} style={{
                       textAlign: i === 0 ? 'left' : 'right', fontWeight: 400, fontSize: 8.5,
                       letterSpacing: '.1em', color: '#5d6774', padding: '0 0 4px',
@@ -90,7 +106,17 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
                 {fila.tiers.map((t) => (
                   <tr key={t.tier}>
                     <td style={{ color: colorTier(t.tier), padding: '2px 0' }}>{t.tier}</td>
-                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>{t.seen}</td>
+                    {/* Un guion mientras no se haya barrido el pool de esa máquina. Nunca un 0:
+                        diría que esa rareza no sale nunca o que no vale nada. */}
+                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
+                      {t.probability == null ? '—' : `${(t.probability * 100).toFixed(t.probability < 0.01 ? 1 : 0)}%`}
+                    </td>
+                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
+                      {t.value == null ? '—' : formatUsd(t.value)}
+                    </td>
+                    <td style={{ textAlign: 'right', color: COLORS.text, fontVariantNumeric: 'tabular-nums' }}>
+                      {t.gross == null ? '—' : formatUsd(t.gross)}
+                    </td>
                     <td style={{
                       textAlign: 'right', fontVariantNumeric: 'tabular-nums',
                       color: t.cold ? '#f5c542' : COLORS.text,
@@ -144,12 +170,26 @@ function colorTier(nombre: string): string {
     ?? COLORS.muted
 }
 
-/** El arco. Sin ratio no se dibuja aguja: una aguja en el centro se leería como "paga justo". */
-function Dial({ ratio, tinta }: { ratio: number | null; tinta: string }) {
+/** Un punto del arco, en coordenadas del SVG. `r` es la distancia desde el eje de la aguja. */
+function punto(ratio: number, r: number): [number, number] {
+  const rad = (anguloAguja(ratio) - 90) * (Math.PI / 180)
+  return [56 + r * Math.cos(rad), 60 + r * Math.sin(rad)]
+}
+
+/**
+ * El arco, con la aguja de lo MEDIDO y la marca de lo ESPERADO.
+ *
+ * Sin ratio no se dibuja aguja: una aguja en el centro se leería como "paga justo".
+ *
+ * La marca del modelo es lo que convierte el dial en una comparación en vez de un número suelto.
+ * La distancia entre marca y aguja responde a la única pregunta que importa aquí: ¿se está
+ * comportando como debería? Va en blanco y en trazo fino a propósito, para que se lea como
+ * referencia y no compita con la aguja, que es lo que de verdad hemos medido.
+ */
+function Dial({ ratio, tinta, modelo }: { ratio: number | null; tinta: string; modelo?: number | null }) {
   const ang = ratio == null ? null : anguloAguja(ratio)
-  const rad = ang == null ? 0 : (ang - 90) * (Math.PI / 180)
-  const x = 56 + 32 * Math.cos(rad)
-  const y = 60 + 32 * Math.sin(rad)
+  const [x, y] = ratio == null ? [56, 60] : punto(ratio, 32)
+  const marca = modelo == null ? null : [punto(modelo, 24), punto(modelo, 42)] as const
   return (
     <svg width="112" height="68" viewBox="0 0 112 68" style={{ flex: 'none' }} aria-hidden="true">
       <path d="M8 60 A48 48 0 0 1 104 60" fill="none" stroke="#ffffff14" strokeWidth="9" strokeLinecap="round" />
@@ -158,6 +198,10 @@ function Dial({ ratio, tinta }: { ratio: number | null; tinta: string }) {
       <text x="56" y="6" textAnchor="middle" fill="#5d6774" fontFamily="monospace" fontSize="7">1.00</text>
       <text x="8" y="68" textAnchor="start" fill="#5d6774" fontFamily="monospace" fontSize="6.5">{RATIO_MIN}</text>
       <text x="104" y="68" textAnchor="end" fill="#5d6774" fontFamily="monospace" fontSize="6.5">{RATIO_MAX}</text>
+      {marca && (
+        <line x1={marca[0][0]} y1={marca[0][1]} x2={marca[1][0]} y2={marca[1][1]}
+              stroke="#ffffffbb" strokeWidth="1.5" strokeLinecap="round" />
+      )}
       {ang != null && (
         <>
           <line x1="56" y1="60" x2={x} y2={y} stroke={tinta} strokeWidth="2.5" strokeLinecap="round" />

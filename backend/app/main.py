@@ -31,7 +31,7 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
-from .services import winners_ingest, winners_store
+from .services import pool_ingest, winners_ingest, winners_store
 from .services.ev_view import fila_ev
 from .services.tier_gaps import rachas_por_tier
 from .services.privy_signer import PrivySigner, PrivyNoVerificable
@@ -2296,11 +2296,59 @@ def create_app(session_factory, chain: ChainSource,
                 logger.warning("EV tracker: la ingesta se cortó, se reintenta", exc_info=True)
             await asyncio.sleep(_EV_REINTENTO_S)
 
+    # ── EV tracker: barrido del pool de cartas ───────────────────────────────
+    #
+    # La otra mitad del tracker. El feed dice lo que la máquina PAGÓ; el pool dice lo que debería
+    # pagar, y sin las dos la aguja del dial no tiene contra qué compararse.
+    #
+    # Va muy espaciado a propósito: son 106.251 cartas en las 48 máquinas, unas 1.100 peticiones
+    # por barrido. Y puede irlo: `pokemon_25` hace ~500 tiradas al día sobre 15.277 cartas, un 3%,
+    # y el buyback devuelve al bote buena parte de lo que sale, así que la media de un tier apenas
+    # se mueve en horas.
+    _POOL_CADA_S = 6 * 3600
+    _POOL_ESPERA_INICIAL_S = 90.0     # deja que el relleno del feed termine antes de empezar
+
+    async def _pool_barrer(machine: str, odds: dict, ev_publicado) -> None:
+        resumen = await pool_ingest.traer_pool(gacha, machine, odds)
+        with session_factory() as s:
+            pool_ingest.guardar_pool(s, machine, resumen)
+        # Collector Crypt publica su propio `ev`, y comprobamos que es exactamente la suma de
+        # probabilidad × valor medio (verificado en comic_25: 26.998 los dos). Que dejen de cuadrar
+        # significa que han cambiado las odds, ha cambiado el pool, o uno de los dos se equivoca.
+        # Es la única comprobación externa que tiene este cálculo, así que se avisa.
+        bruto = sum(r["probability"] * r["avg_value"] for r in resumen.values()
+                    if r.get("probability") and r.get("avg_value"))
+        d = pool_ingest.desfase(bruto, ev_publicado)
+        if d is not None and abs(d) > 0.02:
+            logger.warning("EV tracker: el pool de %s no cuadra con el ev de CC "
+                           "(nuestro %.2f, suyo %.2f, desfase %.1f%%)",
+                           machine, bruto, ev_publicado, d * 100)
+
+    async def _pool_loop():
+        await asyncio.sleep(_POOL_ESPERA_INICIAL_S)
+        while True:
+            try:
+                maquinas = await gacha.machines()
+                barridas = 0
+                for m in maquinas:
+                    code, odds = m.get("code"), m.get("odds")
+                    if not code or not odds:
+                        continue
+                    await _pool_barrer(code, odds, m.get("ev"))
+                    barridas += 1
+                logger.info("EV tracker: pool barrido en %d máquinas", barridas)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.warning("EV tracker: el barrido del pool falló, se reintenta", exc_info=True)
+            await asyncio.sleep(_POOL_CADA_S)
+
     @app.on_event("startup")
     async def _ev_start():
         if gacha is None or not gacha.enabled or not ev_tracker_enabled:
             return
         _spawn(_ev_loop())
+        _spawn(_pool_loop())
 
     @app.on_event("startup")
     async def _auto_royale_start():

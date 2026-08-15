@@ -16,6 +16,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .ev_stats import intervalo, tiradas_para_concluir, veredicto
+from .pool_model import modelo
 from .tier_gaps import rachas_por_tier
 from .winners_store import ventana
 
@@ -26,6 +27,18 @@ MINIMO = 30
 CONSTRUYENDO = "BUILDING"
 CON_HUECO = "GAP IN WINDOW"
 SIN_MUESTRA = "NOT ENOUGH DATA"
+
+
+def _fundir(rachas: list, del_modelo: list) -> list:
+    """Una fila por rareza con lo observado y lo esperado juntos.
+
+    Manda `rachas`: siempre trae las cuatro rarezas, mientras que el modelo puede faltar entero
+    (una máquina cuyo pool no se ha barrido todavía). Al revés se perdería la tabla de rachas, que
+    es útil desde la primera hora, esperando a un barrido que tarda.
+    """
+    por_nombre = {t["tier"]: t for t in del_modelo}
+    return [{**r, **{k: v for k, v in por_nombre.get(r["tier"], {}).items() if k != "tier"}}
+            for r in rachas]
 
 
 def fila_ev(session: Session, machine: str, *, precio: float, buyback_pct: Optional[float] = None,
@@ -50,8 +63,17 @@ def fila_ev(session: Session, machine: str, *, precio: float, buyback_pct: Optio
         # Y van SOBRE EL HISTÓRICO ENTERO, no sobre `horas`: una racha se cuenta en tiradas, no en
         # tiempo, así que recortarla a la ventana del EV no la hace más actual, la deja ciega. En
         # una máquina de tres tiradas al día, la ventana solo alcanzaba a decir "no he mirado".
-        "tiers": rachas_por_tier(session, machine, ahora=ahora),
+        "tiers": [],
     }
+    # Lo que la máquina DEBERÍA pagar, según sus cartas y las odds que publica CC.
+    #
+    # El EV del modelo va al nivel de la fila y NO se mezcla con lo realizado: son dos afirmaciones
+    # distintas, y el valor de la pantalla está justo en poder compararlas. El desglose por rareza
+    # sí se funde con las rachas, porque en la tarjeta es una sola tabla: "esta rareza sale un 4%
+    # de las veces, vale 70 de media, aporta 2.81 al EV, y lleva 8 tiradas sin salir".
+    m = modelo(session, machine, precio=precio)
+    base["tiers"] = _fundir(rachas_por_tier(session, machine, ahora=ahora), m.pop("model_tiers"))
+    base.update(m)
 
     if v["n"] < MINIMO:
         # Se distingue de "todavía llenándose": aquí la ventana puede estar completa y aun así no

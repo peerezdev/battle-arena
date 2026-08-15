@@ -368,6 +368,31 @@ class GachaWinner(Base):
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class GachaPoolTier(Base):
+    """El pool de cartas de una máquina, resumido por rareza.
+
+    Es la otra mitad del EV tracker. Lo que medimos del feed dice lo que la máquina PAGÓ; esto dice
+    lo que debería pagar según las cartas que tiene dentro y las odds que publica Collector Crypt.
+    Sin esta mitad, la aguja del dial no tiene contra qué compararse.
+
+    Se guarda el resumen y no las cartas: son 106.251 en las 48 máquinas, y de cada rareza solo hace
+    falta cuántas hay y cuánto valen de media. Guardarlas todas sería copiar su catálogo entero para
+    calcular cuatro medias.
+    """
+    __tablename__ = "gacha_pool_tiers"
+    machine: Mapped[str] = mapped_column(String, primary_key=True)
+    #: `common` | `uncommon` | `rare` | `epic`, tal y como los nombra CC en `odds`.
+    tier: Mapped[str] = mapped_column(String, primary_key=True)
+    #: La probabilidad publicada por CC. Se guarda con el resto porque es la que se usó para el
+    #: cálculo: si CC la cambia, un `gross` viejo deja de cuadrar y hay que poder verlo.
+    probability: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    n_cards: Mapped[int] = mapped_column(Integer, default=0)
+    avg_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    min_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    max_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class GachaCoverage(Base):
     """Desde cuándo tenemos datos SIN HUECOS de una máquina, y qué tramos se perdieron.
 

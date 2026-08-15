@@ -1,6 +1,8 @@
 """La fila que consume la pantalla, y sobre todo cuándo se NIEGA a dar un veredicto."""
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from app.services.ev_view import CONSTRUYENDO, CON_HUECO, SIN_MUESTRA, fila_ev
 from app.services.ev_stats import CONFIRMADO_NEG, SIN_CONCLUIR
 from app.services.winners_store import anotar_tramo, guardar
@@ -88,3 +90,65 @@ def test_el_intervalo_es_estable_entre_llamadas(Session):
         a = fila_ev(s, "pokemon_50", precio=50, remuestreos=500, ahora=AHORA)
         b = fila_ev(s, "pokemon_50", precio=50, remuestreos=500, ahora=AHORA)
         assert a == b
+
+
+# ── el modelo: lo que la máquina DEBERÍA pagar ────────────────────────────────
+
+def sembrar_rarezas(s, tiers, machine="pokemon_50"):
+    """`tiers` de MÁS ANTIGUA a más reciente. El `sembrar` de arriba pone siempre Common."""
+    guardar(s, [{"nft_address": f"{machine}-r{i}", "machine": machine, "prize_tier": t,
+                 "insured_value": 40.0, "weighted_insured_value": None, "memo": None,
+                 "winner": "W", "created_at": AHORA - timedelta(minutes=len(tiers) - i),
+                 "source": "live"} for i, t in enumerate(tiers)])
+
+
+def _pool(s, machine="pokemon_50"):
+    """Las odds y el pool de `comic_25`, que son los que cuadran con el `ev` publicado por CC."""
+    from app.models import GachaPoolTier
+    for tier, p, n, avg in (("common", 0.75, 12, 19.75), ("uncommon", 0.2, 27, 38.89),
+                            ("rare", 0.04, 231, 70.14), ("epic", 0.01, 211, 160.22)):
+        s.add(GachaPoolTier(machine=machine, tier=tier, probability=p, n_cards=n, avg_value=avg))
+    s.commit()
+
+
+def test_la_fila_trae_el_ev_del_modelo(Session):
+    with Session() as s:
+        _pool(s)
+        f = fila_ev(s, "pokemon_50", precio=25.0, buyback_pct=0.85)
+        # En valor de carta, igual que lo realizado: la recompra la aplica el interruptor.
+        assert f["model_ev"] == pytest.approx(26.998, abs=0.01)
+        assert f["model_edge_pct"] == pytest.approx(8.0, abs=0.1)
+
+
+def test_cada_rareza_junta_lo_observado_y_lo_esperado(Session):
+    """En la tarjeta es UNA tabla: "sale un 4% de las veces, vale 70 de media, aporta 2.81 al EV, y
+    lleva 8 tiradas sin salir"."""
+    with Session() as s:
+        _pool(s)
+        sembrar_rarezas(s, [2] + [4] * 9)             # Rare y luego 9 Commons
+        rare = next(t for t in fila_ev(s, "pokemon_50", precio=25.0)["tiers"] if t["tier"] == "Rare")
+        assert rare["current"] == 9                    # lo observado
+        assert rare["probability"] == 0.04             # lo esperado
+        assert rare["gross"] == pytest.approx(2.806, abs=0.001)
+
+
+def test_sin_pool_barrido_las_rachas_siguen_saliendo(Session):
+    """Manda la tabla de rachas: es útil desde la primera hora, y no puede quedarse esperando a un
+    barrido del pool que tarda."""
+    with Session() as s:
+        sembrar_rarezas(s, [4] * 10)
+        f = fila_ev(s, "pokemon_50", precio=25.0)
+        assert [t["tier"] for t in f["tiers"]] == ["Common", "Uncommon", "Rare", "Epic"]
+        assert f["model_ev"] is None
+        assert all("gross" not in t or t["gross"] is None for t in f["tiers"])
+
+
+def test_lo_realizado_y_lo_del_modelo_NO_se_mezclan(Session):
+    """Son dos afirmaciones distintas y el valor de la pantalla está en poder compararlas: si el
+    modelo pisara el edge realizado, la tarjeta diría haber medido lo que solo ha calculado."""
+    with Session() as s:
+        _pool(s)
+        sembrar(s, 40)
+        f = fila_ev(s, "pokemon_50", precio=25.0, buyback_pct=0.85)
+        assert f["model_edge_pct"] is not None and f["realized_edge_pct"] is not None
+        assert f["model_edge_pct"] != f["realized_edge_pct"]

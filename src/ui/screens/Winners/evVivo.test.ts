@@ -11,7 +11,8 @@ const fila = (machine: string, over: Partial<EvRow> = {}): EvRow => ({
   machine, name: machine, pack_price: 50, buyback_pct: 0.85,
   realized_n_pulls: 3068, realized_window_hours: 48, window_complete: true, hours_covered: 48,
   gaps: [], realized_edge_pct: 6.65, realized_ci_lo_pct: 3.29, realized_ci_hi_pct: 10.14,
-  realized_verdict: 'CONFIDENT +EV', pulls_to_conclude: null, tiers: [tier()], ...over,
+  realized_verdict: 'CONFIDENT +EV', pulls_to_conclude: null, tiers: [tier()],
+  model_ev: null, model_ratio: null, model_edge_pct: null, ...over,
 })
 
 describe('el carril rápido', () => {
