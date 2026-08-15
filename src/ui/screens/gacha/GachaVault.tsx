@@ -43,7 +43,7 @@ import { CardBadge } from '../../components/CardBadge'
 import { GachaCardReveal } from './GachaCardReveal'
 import { GachaPackTilt, packTitle, priceFromCode } from './GachaPackTilt'
 import { pendingPackToResult } from './pendingToResult'
-import { enTanda } from './tanda'
+import { enTanda } from '../../tanda'
 import { CardPoolGrid } from './CardPoolGrid'
 
 // Live Drops are no longer recorded locally on open — the backend broadcasts
@@ -1675,16 +1675,20 @@ export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose 
   async function claim() {
     if (!identityToken || claiming || pending.length === 0) return
     setClaiming(true)
-    for (const r of pending) {
+    // Todas a la vez, como la tirada. Ver `enTanda`: en devnet, 4 cartas pasan de 9.2 s a 2.3 s.
+    await enTanda(pending.length, async (i) => {
+      const r = pending[i]
       try {
         const res = await requestBuyback(identityToken, r.nft_address!)
         const signed = await signTransactionBase64(res.serialized_transaction)
         await submitTx(identityToken, signed)
         setStatus((s) => ({ ...s, [r.nft_address!]: 'sold' }))
+        return true
       } catch {
         setStatus((s) => ({ ...s, [r.nft_address!]: 'failed' }))
+        return null
       }
-    }
+    })
     setClaiming(false)
   }
 

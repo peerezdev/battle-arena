@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { enTanda } from './tanda'
-import { etiquetaTanda } from './GachaPackTilt'
+import { etiquetaTanda } from './screens/gacha/GachaPackTilt'
 
 /** Una tarea que no resuelve hasta que se le dice. Sirve para comprobar que EMPEZARON todas antes
  *  de que terminara ninguna, que es la diferencia entre paralelo y una fila rápida. */
