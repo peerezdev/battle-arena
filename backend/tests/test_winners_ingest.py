@@ -242,3 +242,34 @@ async def test_mientras_llegan_datos_no_se_corta(monkeypatch):
     recibidas = []
     await escuchar("tok", ["pokemon_50"], recibidas.append)
     assert len(recibidas) == 3
+
+
+# ── la red de seguridad: rellenar antes de que el tope de 200 se coma el hueco ──
+
+from app.services.winners_ingest import RELLENO_CADA_S, TIRADAS_HORA_MAXIMAS, TOPE_REST
+
+
+def test_el_relleno_llega_antes_de_que_se_acumulen_200_tiradas():
+    """La invariante que sostiene toda la defensa.
+
+    Un hueco mayor que 200 tiradas NO se puede recuperar: `getAllWinners` solo sirve las 200 más
+    recientes y su `timestamp` acota hacia delante, no alcanza hacia atrás (comprobado pidiendo
+    desde hace 5 h y desde hace 24 h: las mismas 200). Ably tampoco, su rewind llega a ~2 min.
+
+    Así que la única defensa es rellenar antes de llegar a 200. Si alguien sube el periodo por
+    encima de lo que tarda la máquina más rápida en producirlas, la red deja de serlo.
+    """
+    segundos_hasta_el_tope = TOPE_REST / TIRADAS_HORA_MAXIMAS * 3600
+    assert RELLENO_CADA_S < segundos_hasta_el_tope, (
+        f"con {TIRADAS_HORA_MAXIMAS:.0f} tiradas/h se llega a {TOPE_REST} en "
+        f"{segundos_hasta_el_tope/60:.0f} min, y se rellena cada {RELLENO_CADA_S/60:.0f} min"
+    )
+    # Y con holgura de sobra: al menos el doble de margen, para que una máquina nueva más rápida
+    # que las de hoy no deje la red inservible sin que nadie se entere.
+    assert RELLENO_CADA_S * 2 < segundos_hasta_el_tope
+
+
+def test_el_relleno_es_mas_frecuente_que_la_renovacion_de_la_conexion():
+    """Si solo se rellenara al renovar la conexión, un feed mudo se comería hasta 45 min de datos.
+    La red tiene que ir por delante de eso, no a su ritmo."""
+    assert RELLENO_CADA_S < VIDA_MAX_S

@@ -34,7 +34,29 @@ ABLY_REALTIME = "https://realtime.ably.io"
 #: Cuánto pasado se pide al reconectar. Cubre un reinicio o un corte breve sin tocar el REST.
 REWIND = "2m"
 #: Tope que sirve CC por máquina. No es configurable por nosotros: pedir más devuelve 200 igual.
+#: Comprobado a mano: `count=1000`, `page`, `offset`, `skip`, `before` y `until` devuelven todos
+#: exactamente las mismas 200 filas. Y `timestamp` ACOTA HACIA DELANTE PERO NO ALCANZA HACIA ATRÁS:
+#: pedir desde hace 5 h y desde hace 24 h da las mismas 200, las más recientes. O sea que no hay
+#: forma de recuperar un hueco más grande que eso, ni paginando ni por Ably (su `rewind` llega a
+#: ~2 min pidas lo que pidas, porque el canal no tiene persistencia).
 TOPE_REST = 200
+
+#: Cada cuánto se rellena por REST AUNQUE EL FEED EN VIVO PAREZCA SANO.
+#:
+#: Es la red de seguridad, y nace de que lo anterior no tiene remedio: si se pierde un tramo mayor
+#: que 200 tiradas, se pierde para siempre. La única defensa es no dejar que crezca tanto.
+#:
+#: El número sale de la máquina más rápida. `pokemon_50` hace unas 340 tiradas/hora, así que tarda
+#: ~35 min en generar 200. Rellenando cada 15 min, el relleno SIEMPRE llega a tiempo aunque el feed
+#: en vivo esté muerto, y da igual por qué lo esté: no hace falta detectarlo.
+#:
+#: Antes esto solo corría al reconectar, así que un feed que se quedaba mudo sin cerrar no lo
+#: disparaba nunca. Fue exactamente lo que costó cinco horas de datos.
+RELLENO_CADA_S = 15 * 60
+
+#: Ritmo de la máquina más rápida medido en mainnet, tiradas por hora. Solo se usa para justificar
+#: `RELLENO_CADA_S` y para que un test pueda avisar si alguien lo sube demasiado.
+TIRADAS_HORA_MAXIMAS = 340.0
 #: Margen para dar dos tramos por enlazados. Ver `winners_store.HOLGURA`.
 HOLGURA = timedelta(seconds=5)
 
