@@ -44,22 +44,25 @@ const pintar = (mode: 'all' | 'pack' | 'royale' | 'none' = 'royale') =>
 
 beforeEach(() => { mocks.battles = []; mocks.nav.mockReset(); mocks.wide = false })
 
-describe('Lobby · royale', () => {
-  it('sin partidas terminadas no enseña la sección Recent', () => {
-    mocks.battles = [battle({ id: 'viva', status: 'lobby' })]
-    pintar()
-    expect(screen.queryByText('RECENT')).toBeNull()
+/** Las terminadas viven bajo la pestaña "Recent" del segmentado de Live games. */
+const verRecent = () => fireEvent.click(screen.getByText('Recent'))
+
+describe('Lobby · las terminadas van en la pestaña Recent de Live games', () => {
+  it('por defecto NO se ven: la vista de entrada es la de partidas vivas', () => {
+    mocks.battles = [battle({ id: 'fin', machine_code: 'ya_jugada', settled_at: '2026-07-03T10:00:00Z' })]
+    const { container } = pintar()
+    expect(container.textContent).not.toContain('YA_JUGADA')
+    expect(screen.getByText('No live games right now.')).toBeTruthy()
   })
 
-  it('acumula las terminadas bajo los lobbies, de más nueva a más vieja', () => {
+  it('al pulsar Recent salen, de más nueva a más vieja', () => {
     mocks.battles = [
       battle({ id: '1', machine_code: 'vieja', settled_at: '2026-07-01T10:00:00Z' }),
       battle({ id: '2', machine_code: 'nueva', settled_at: '2026-07-03T10:00:00Z' }),
       battle({ id: '3', machine_code: 'media', settled_at: '2026-07-02T10:00:00Z' }),
     ]
     const { container } = pintar()
-    expect(screen.getByText('RECENT')).toBeTruthy()
-
+    verRecent()
     // El orden se comprueba por la posición en el DOM, que es lo que ve el jugador.
     const txt = container.textContent ?? ''
     expect(txt.indexOf('NUEVA')).toBeGreaterThan(-1)
@@ -67,39 +70,43 @@ describe('Lobby · royale', () => {
     expect(txt.indexOf('MEDIA')).toBeLessThan(txt.indexOf('VIEJA'))
   })
 
-  it('la sección Recent va DESPUÉS de los lobbies', () => {
-    mocks.battles = [
-      battle({ id: 'abierta', machine_code: 'lobby_viva', status: 'lobby' }),
-      battle({ id: 'fin', machine_code: 'ya_jugada', settled_at: '2026-07-03T10:00:00Z' }),
-    ]
+  it('NO hay una segunda lista de terminadas debajo', () => {
+    // Live games ya tiene su pestaña Recent, y de cualquier modo. Una sección propia debajo era la
+    // misma lista repetida dos veces en la misma pantalla, y obligaba a bajar para nada.
+    mocks.battles = [battle({ id: 'fin', machine_code: 'ya_jugada', settled_at: '2026-07-03T10:00:00Z' })]
     const { container } = pintar()
-    const txt = container.textContent ?? ''
-    expect(txt.indexOf('LOBBY_VIVA')).toBeLessThan(txt.indexOf('RECENT'))
-    expect(txt.indexOf('RECENT')).toBeLessThan(txt.indexOf('YA_JUGADA'))
+    verRecent()
+    expect((container.textContent ?? '').split('YA_JUGADA').length - 1).toBe(1)
   })
 
-  it('una partida terminada no aparece además como lobby', () => {
-    // Las dos listas se reparten por estado, así que no puede salir en ambas: sería la misma
-    // partida ofreciéndose para entrar y dándose por terminada a la vez.
+  it('una terminada no aparece además como lobby', () => {
+    // Las dos vistas se reparten por estado: sería la misma partida ofreciéndose para entrar y
+    // dándose por terminada a la vez.
     mocks.battles = [battle({ id: 'unica', machine_code: 'solo_una', settled_at: '2026-07-03T10:00:00Z' })]
     const { container } = pintar()
+    expect(container.textContent).not.toContain('SOLO_UNA')
+    verRecent()
     expect((container.textContent ?? '').split('SOLO_UNA').length - 1).toBe(1)
-    // El lobby queda sin partidas vivas; el aviso lo da ya Live games, que es quien pinta la lista.
-    expect(screen.getByText('No live games right now.')).toBeTruthy()
   })
 
-  it('en Pack Battle no hay sección Recent: esa pantalla usa Live Games', () => {
-    mocks.battles = [battle({ id: 'p', mode: 'pack' })]
-    pintar('pack')
-    expect(screen.queryByText('RECENT')).toBeNull()
+  it('las terminadas de los DOS modos caen en la misma pestaña', () => {
+    // Es lo que hace innecesaria la sección aparte: Recent nunca fue solo de royale.
+    mocks.battles = [
+      battle({ id: 'r', mode: 'royale', machine_code: 'royale_fin', settled_at: '2026-07-03T10:00:00Z' }),
+      battle({ id: 'p', mode: 'pack', machine_code: 'pack_fin', settled_at: '2026-07-02T10:00:00Z' }),
+    ]
+    const { container } = pintar('all')
+    verRecent()
+    expect(container.textContent).toContain('ROYALE_FIN')
+    expect(container.textContent).toContain('PACK_FIN')
   })
 })
-
 
 describe('Lobby · partidas terminadas: Result y Replay', () => {
   const terminada = () => {
     mocks.battles = [battle({ id: 'terminada', status: 'settled', winner: 'ME' } as Partial<OpenBattle>)]
     pintar()
+    verRecent()          // las terminadas viven en esa pestaña de Live games
   }
 
   it('Result entra por el marcador, no por la primera carta', () => {

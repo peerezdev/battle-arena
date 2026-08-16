@@ -1,14 +1,12 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { battleHref } from '../../battle/battleHref'
 import { useNavigate } from 'react-router-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
-import { COLORS, FONTS } from '../../theme'
 import type { LiveBattle } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
-import { LiveBattles, BattleCard } from './LiveBattles'
+import { LiveBattles } from './LiveBattles'
 import { RoyaleDemoNotice } from './RoyaleDemoNotice'
-import { settledRoyales } from './lastRoyale'
 import { showToast } from '../../toastBus'
 import { useBattles } from '../../../onchain/useBattles'
 import { openBattleToLive } from './openBattleToLive'
@@ -18,7 +16,7 @@ import { useDelegationGate } from '../../components/useDelegationGate'
 import { DelegationGate } from '../../components/DelegationGate'
 import { CreateBattleModal } from './CreateBattleModal'
 import { DemoPicker } from './DemoPicker'
-import { loadMachineList, useMachineList } from '../../useMachines'
+import { loadMachineList } from '../../useMachines'
 import { canCreateRoyale } from '../../../onchain/config'
 import { leerModos, paramModos } from './lobbyFilter'
 
@@ -40,7 +38,6 @@ export function LobbyPage() {
   const { identityToken } = useIdentityToken()
   const meWallet = useEmbeddedSolanaAddress()
   const { battles } = useBattles()
-  const { machines } = useMachineList()
   const gate = useDelegationGate()
   const [createOpen, setCreateOpen] = useState(false)
   const [demoOpen, setDemoOpen] = useState(false)
@@ -56,9 +53,6 @@ export function LobbyPage() {
   // terminadas sí se quedan fuera: para esas está la tarjeta de recap. La card ya distingue el
   // caso (`action: join | watch` y el estado "Live" en rojo).
 
-  // Royale terminadas, para la sección "Recent" bajo los lobbies. Solo en la página de royale.
-  const royaleRecent = modos.has('royale') ? settledRoyales(enLobby.filter((b) => b.mode === 'royale')) : []
-  const byCode = useMemo(() => new Map(machines.map((m) => [m.code, m])), [machines])
 
   // Los fallos de estas acciones van SIEMPRE por toast. El aviso nace de pulsar un botón de una
   // card, y un banner sobre la lista deja el mensaje lejos de lo que lo provocó — y encima
@@ -104,7 +98,11 @@ export function LobbyPage() {
           pintaba una rejilla uniforme que sirve para cualquier modo, y la propia tarjeta lleva su
           chapa de Pack Battle o Battle Royale, así que no hacía falta nada más. Sacar las royale
           a una tarjeta ancha aparte partía la lista en dos alturas y obligaba a bajar para ver la
-          otra mitad. */}
+          otra mitad.
+
+          Se le pasan TAMBIÉN las terminadas: su pestaña "Recent" ya las enseña, de cualquier modo
+          y ordenadas por cuándo se liquidaron. Tener además una sección "Recent" propia debajo era
+          repetir la misma lista dos veces en la misma pantalla. */}
       <LiveBattles
         battles={enLobby}
         meWallet={meWallet}
@@ -115,32 +113,6 @@ export function LobbyPage() {
         onReplay={onReplay}
         onOpen={(b) => navigate(battleHref(b.id, { status: b.battleStatus }))}
       />
-
-      {/* Royale terminadas, debajo y con la misma tarjeta compacta: son lo mismo enseñado en otro
-          sitio. Solo aparecen si se están mirando royale. */}
-      {royaleRecent.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h2 style={{ margin: 0, fontFamily: FONTS.mono, fontWeight: 400, fontSize: 11, letterSpacing: '.2em', color: COLORS.muted }}>
-              RECENT
-            </h2>
-            <span style={{ flex: 1, height: 1, background: COLORS.border }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
-            {royaleRecent.map((b) => (
-              <BattleCard
-                key={b.id}
-                battle={b}
-                byCode={byCode}
-                onAction={onBattleAction}
-                onCancel={onCancel}
-                onOpen={(x) => navigate(battleHref(x.id, { status: x.battleStatus }))}
-                onReplay={onReplay}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       <DelegationGate gate={gate} />
       {createOpen && (
