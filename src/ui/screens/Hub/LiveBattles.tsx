@@ -3,6 +3,8 @@ import { potShown, multLabel } from './battlePot'
 import { COLORS, FONTS, GRADIENT, formatUsd } from '../../theme'
 import { useIsWide } from '../../useIsWide'
 import { useMachineList } from '../../useMachines'
+import { ModeFilterMenu } from './ModeFilterMenu'
+import { MODOS, conModos, type Modo } from './lobbyFilter'
 import type { GachaMachine } from '../../../onchain/gachaClient'
 import type { LiveBattle, BattleMode } from './hubMockData'
 
@@ -114,18 +116,30 @@ interface Props {
   onOpen: (b: LiveBattle) => void
   /** Revivir el reveal de una partida ya terminada. Sin esto solo se ofrece el marcador. */
   onReplay?: (b: LiveBattle) => void
+  /** Los modos marcados. Los controla el Lobby porque los guarda en la URL, que es lo que permite
+   *  enlazar el filtro y que /play/royale siga funcionando redirigiendo con su casilla puesta. */
+  modos: Set<Modo>
+  onModos: (m: Set<Modo>) => void
 }
 
-export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel, onOpen, onReplay }: Props) {
+export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel, onOpen, onReplay,
+                              modos, onModos }: Props) {
   const [activeFilter, setActiveFilter] = useState(0)
   const { machines } = useMachineList()
   const byCode = useMemo(() => new Map(machines.map((m) => [m.code, m])), [machines])
+  // El filtro de modo se aplica ANTES del segmentado: son ortogonales, y el segmentado ("Joinable",
+  // "Mine"…) debe hablar de lo que el usuario ha decidido mirar, no de todo el lobby.
+  const delModo = useMemo(() => conModos(battles, modos), [battles, modos])
   const filtered = useMemo(
-    () => sortForFilter(activeFilter, battles.filter((b) => matchesFilter(b, activeFilter, meWallet))),
-    [battles, activeFilter, meWallet],
+    () => sortForFilter(activeFilter, delModo.filter((b) => matchesFilter(b, activeFilter, meWallet))),
+    [delModo, activeFilter, meWallet],
   )
+  const porModo = useMemo(() => ({
+    pack: battles.filter((b) => b.mode === 'pack').length,
+    royale: battles.filter((b) => b.mode === 'royale').length,
+  }), [battles])
   // Badge always reflects the count of active games (live or not started), not the current filter.
-  const liveCount = useMemo(() => battles.filter((b) => matchesFilter(b, 0, meWallet)).length, [battles, meWallet])
+  const liveCount = useMemo(() => delModo.filter((b) => matchesFilter(b, 0, meWallet)).length, [delModo, meWallet])
 
   return (
     <div>
@@ -164,18 +178,9 @@ export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel
           {liveCount} live
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <span
-            style={{
-              fontSize: 11,
-              color: COLORS.muted,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 9,
-              padding: '7px 12px',
-              cursor: 'pointer',
-            }}
-          >
-            All games ▾
-          </span>
+          {/* Antes esto era un `span` decorativo: flecha, cursor de mano y ningún manejador, o
+              sea un menú prometido que no existía. Ahora filtra de verdad. */}
+          <ModeFilterMenu modos={modos} onChange={onModos} cuenta={porModo} />
           <span
             style={{
               fontSize: 11,
@@ -235,7 +240,18 @@ export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel
       {/* (d) Battle cards — filtered by the segmented control */}
       {filtered.length === 0 ? (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, padding: '18px 4px' }}>
-          {emptyMessage(activeFilter, meWallet)}
+          {/* Apagar los dos modos se permite; lo que no vale es dejar la pantalla en blanco sin
+              decir por qué, que se leería como "no hay partidas" cuando sí las hay. */}
+          {modos.size === 0 ? (
+            <>
+              No modes selected.{' '}
+              <button type="button" onClick={() => onModos(new Set(MODOS.map((m) => m.id)))}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                         color: COLORS.green, font: 'inherit', textDecoration: 'underline' }}>
+                Show all games
+              </button>
+            </>
+          ) : emptyMessage(activeFilter, meWallet)}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>

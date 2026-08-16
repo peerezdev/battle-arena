@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Banner } from './Banner'
 import { NAV_ROUTES } from '../../layouts/navRoutes'
-import { hrefFiltro } from './lobbyFilter'
+
 import { loadMachineList } from '../../useMachines'
 
 /**
@@ -36,7 +36,7 @@ export function Hub() {
           body="If you've only been into TCGs for two days, this isn't for you."
           tail="This is gacha for the big boys."
           cta="See how it works →"
-          to={hrefFiltro('royale')}
+          to={'/play/lobby?mode=royale'}
           badge="● LIVE ROYALE"
           accent="#ff2e7e"
           poster="/01-hub.png"
@@ -57,7 +57,7 @@ export function Hub() {
             body="Anyone who's played a Pack Battle knows the feeling is completely different from opening packs alone. More pressure. More adrenaline. More at stake."
             tail="Think you can handle it?"
             cta="Enter the lobby →"
-            to={hrefFiltro('pack')}
+            to={'/play/lobby?mode=pack'}
             badge="WINNER TAKES ALL"
             accent="#3ce8a8"
             ctaTextColor="#06221a"

@@ -1,41 +1,69 @@
 import { describe, it, expect } from 'vitest'
-import { hrefFiltro, leerFiltro, muestra } from './lobbyFilter'
+import { alternar, conModos, etiquetaModos, leerModos, paramModos } from './lobbyFilter'
 
-describe('el filtro del Lobby', () => {
-  it('por defecto enseña TODO', () => {
-    // Es la decisión que da sentido a la fusión: si arrancara filtrado, seguiríamos partiendo la
-    // liquidez en dos y cada mitad parecería vacía.
-    expect(leerFiltro('')).toBe('all')
-    expect(leerFiltro('?otra=cosa')).toBe('all')
+const S = (...m: Array<'pack' | 'royale'>) => new Set(m)
+
+describe('los modos de Live games', () => {
+  it('por defecto están los DOS marcados', () => {
+    // Es lo que da sentido a juntarlas: si arrancara filtrado, seguiríamos partiendo la lista y
+    // cada mitad parecería un lobby vacío.
+    expect(leerModos('')).toEqual(S('pack', 'royale'))
   })
 
-  it('lee el modo de la URL', () => {
-    expect(leerFiltro('?mode=pack')).toBe('pack')
-    expect(leerFiltro('?mode=royale')).toBe('royale')
+  it('la URL puede traer uno solo', () => {
+    // Es lo que hace que /play/royale siga funcionando: redirige aquí con su casilla puesta.
+    expect(leerModos('?mode=royale')).toEqual(S('royale'))
+    expect(leerModos('?mode=pack')).toEqual(S('pack'))
   })
 
-  it('un modo inventado cae en "todo" y no rompe la pantalla', () => {
-    expect(leerFiltro('?mode=ajedrez')).toBe('all')
+  it('la URL puede traer los dos', () => {
+    expect(leerModos('?mode=pack,royale')).toEqual(S('pack', 'royale'))
   })
 
-  it('vive en la URL para poder enlazarlo y volver a él', () => {
-    // Sin esto, el botón de atrás perdería el filtro y no se podría compartir "mira las royale".
-    expect(hrefFiltro('royale')).toBe('/play/lobby?mode=royale')
-    expect(hrefFiltro('pack')).toBe('/play/lobby?mode=pack')
+  it('un modo inventado NO deja el lobby vacío', () => {
+    // Caer a "todos" es lo que menos daño hace: una URL mal copiada no puede hacer creer que no
+    // hay partidas.
+    expect(leerModos('?mode=ajedrez')).toEqual(S('pack', 'royale'))
   })
 
-  it('"todo" va sin parámetro, que es el estado limpio', () => {
-    expect(hrefFiltro('all')).toBe('/play/lobby')
+  it('con los dos marcados la URL va limpia', () => {
+    expect(paramModos(S('pack', 'royale'))).toEqual({})
   })
 
-  it('con "todo" se ven los dos modos', () => {
-    expect(muestra('all', 'pack')).toBe(true)
-    expect(muestra('all', 'royale')).toBe(true)
+  it('con uno marcado la URL lo dice, para poder enlazarlo', () => {
+    expect(paramModos(S('royale'))).toEqual({ mode: 'royale' })
   })
 
-  it('filtrado se ve solo el suyo', () => {
-    expect(muestra('pack', 'pack')).toBe(true)
-    expect(muestra('pack', 'royale')).toBe(false)
-    expect(muestra('royale', 'pack')).toBe(false)
+  it('sin ninguno la URL TAMBIÉN lo dice', () => {
+    // Si no, recargar devolvería los dos y el usuario vería reaparecer lo que acababa de apagar.
+    expect(paramModos(S())).toEqual({ mode: 'none' })
+    expect(leerModos('?mode=none').size).toBe(0)
+  })
+
+  it('alternar enciende, apaga y no toca el original', () => {
+    const a = S('pack')
+    expect(alternar(a, 'royale')).toEqual(S('pack', 'royale'))
+    expect(alternar(a, 'pack')).toEqual(S())
+    expect(a).toEqual(S('pack'))
+  })
+
+  it('se pueden apagar los DOS', () => {
+    // Bloquear la última casilla deja al usuario peleándose con un control que no le obedece. Lo
+    // que hay que hacer es explicar la lista vacía, no impedir llegar a ella.
+    expect(alternar(S('pack'), 'pack').size).toBe(0)
+  })
+
+  it('el botón dice "All games" con los dos, y el nombre con uno', () => {
+    expect(etiquetaModos(S('pack', 'royale'))).toBe('All games')
+    expect(etiquetaModos(S('royale'))).toBe('Battle Royale')
+    expect(etiquetaModos(S('pack'))).toBe('Pack Battle')
+    expect(etiquetaModos(S())).toBe('No modes')
+  })
+
+  it('filtra las partidas por modo', () => {
+    const filas = [{ mode: 'pack' as const }, { mode: 'royale' as const }, { mode: 'pack' as const }]
+    expect(conModos(filas, S('pack'))).toHaveLength(2)
+    expect(conModos(filas, S('pack', 'royale'))).toHaveLength(3)
+    expect(conModos(filas, S())).toHaveLength(0)
   })
 })

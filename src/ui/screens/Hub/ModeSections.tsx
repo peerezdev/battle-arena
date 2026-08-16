@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FONTS } from '../../theme'
 import { NAV_ROUTES } from '../../layouts/navRoutes'
-import { hrefFiltro } from './lobbyFilter'
+
 import { NAV_ICONS } from './LeftRail'
 import type { HubNav } from './hubMockData'
 
@@ -27,12 +27,12 @@ interface ModeSection {
 
 const SECTIONS: ModeSection[] = [
   {
-    n: '', nav: 'royale', name: 'The first Battle Royale with NFT cards in history is now available…', tag: '', to: hrefFiltro('royale'),
+    n: '', nav: 'royale', name: 'The first Battle Royale with NFT cards in history is now available…', tag: '', to: '/play/lobby?mode=royale',
     desc: '10 players… 9 rounds… 1 single winner…\n\nThe last one standing takes the ENTIRE pot that all 10 players build up during the 9 rounds, a total of 54 graded cards.\n\nDon’t worry if you still don’t get it, the best way for you to understand it is to see it for yourself, that’s why I’ve got a demo ready for you.\n\nThere’s only one game per day, don’t miss your spot… if there’s even a spot left by then, of course.',
     cta: 'Enter the Royale', rgb: '255,46,126', title: '#ff6ba4', ctaBg: '#ff2e7e', ctaHover: '#ff4d92', ctaText: '#fff',
   },
   {
-    n: '', nav: 'pack', name: 'Pack Battle', tag: '', to: hrefFiltro('pack'),
+    n: '', nav: 'pack', name: 'Pack Battle', tag: '', to: '/play/lobby?mode=pack',
     desc: 'Very simple, very easy, these are quick matches for 2 to 4 players.\n\nPlayers open one or more packs at the same time and whoever gets the highest accumulated value takes all the cards.\n\nBut that’s not all…\n\nYOU’VE GOT FUCKING EMOTES.\n\nYou pull a trash card? You don’t even have to cry yourself, Squirtle will do it for you.\n\nIf you’re not the crying type but you’re definitely the raging type, don’t worry, Charmander will rage for you.\n\nAnd there are a few more that are going to blow your mind… But careful, the only way to try them is by playing a match.',
     cta: 'I want to see those emotes', rgb: '60,232,168', title: '#3ce8a8', ctaBg: '#3ce8a8', ctaHover: '#5cf0bb', ctaText: '#06170f',
   },

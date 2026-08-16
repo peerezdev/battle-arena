@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { OpenBattle } from '../../../onchain/packBattleClient'
 
@@ -35,7 +35,7 @@ function battle(over: Partial<OpenBattle>): OpenBattle {
 }
 
 /** El modo ya no es un prop: viaja en la URL, que es lo que permite enlazarlo y volver a él. */
-const pintar = (mode: 'all' | 'pack' | 'royale' = 'royale') =>
+const pintar = (mode: 'all' | 'pack' | 'royale' | 'none' = 'royale') =>
   render(
     <MemoryRouter initialEntries={[mode === 'all' ? '/play/lobby' : `/play/lobby?mode=${mode}`]}>
       <LobbyPage />
@@ -84,7 +84,8 @@ describe('Lobby · royale', () => {
     mocks.battles = [battle({ id: 'unica', machine_code: 'solo_una', settled_at: '2026-07-03T10:00:00Z' })]
     const { container } = pintar()
     expect((container.textContent ?? '').split('SOLO_UNA').length - 1).toBe(1)
-    expect(screen.getByText('No open Battle Royale lobbies right now.')).toBeTruthy()
+    // El lobby queda sin partidas vivas; el aviso lo da ya Live games, que es quien pinta la lista.
+    expect(screen.getByText('No live games right now.')).toBeTruthy()
   })
 
   it('en Pack Battle no hay sección Recent: esa pantalla usa Live Games', () => {
@@ -203,56 +204,57 @@ describe('Lobby · lo que enseña la card de una partida terminada', () => {
 
 // ── el Lobby unificado ───────────────────────────────────────────────────────
 
-describe('Lobby · el modo como filtro', () => {
-  it('sin filtro se ven los DOS modos a la vez', () => {
-    // La razón de fusionar: con pocos jugadores, partir la lista hacía que cada mitad pareciera
-    // vacía y el juego muerto. Con las dos juntas se ve que hay actividad.
+describe('Lobby · los dos modos en la MISMA lista', () => {
+  const dos = () => {
     mocks.battles = [
-      battle({ id: 'r', mode: 'royale', status: 'lobby' }),
-      battle({ id: 'p', mode: 'pack', status: 'lobby', machine_code: 'maquina_p' }),
+      battle({ id: 'r', mode: 'royale', status: 'lobby', machine_code: 'maq_royale' }),
+      battle({ id: 'p', mode: 'pack', status: 'lobby', machine_code: 'maq_pack' }),
     ]
+  }
+
+  it('sin filtro salen las dos, con la misma tarjeta', () => {
+    // La razón de juntarlas: partir la lista en dos alturas obligaba a bajar para ver la otra
+    // mitad, y con pocos jugadores cada mitad parecía un lobby muerto.
+    dos()
+    const { container } = pintar('all')
+    expect(container.textContent).toContain('MAQ_ROYALE')
+    expect(container.textContent).toContain('MAQ_PACK')
+  })
+
+  it('el botón del desplegable dice qué se está mirando', () => {
+    dos()
     pintar('all')
-    // Por rol de encabezado y no por texto suelto: las tarjetas de Royale YA rotulan su modo, así
-    // que buscar el texto a secas encontraba también la card y el test pasaba por el motivo
-    // equivocado (o fallaba por encontrar dos).
-    expect(screen.getByRole('heading', { name: 'BATTLE ROYALE' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'PACK BATTLE' })).toBeTruthy()
-  })
-
-  it('filtrado a un modo, el otro no aparece', () => {
-    mocks.battles = [
-      battle({ id: 'r', mode: 'royale', status: 'lobby' }),
-      battle({ id: 'p', mode: 'pack', status: 'lobby', machine_code: 'maquina_p' }),
-    ]
-    pintar('pack')
-    expect(screen.queryByRole('heading', { name: 'BATTLE ROYALE' })).toBeNull()
-    // Y lo que importa de verdad: la partida del otro modo no está. Sin esto, el test pasaría
-    // igual con las dos listas pintadas y solo el encabezado escondido.
-    expect(screen.queryByText(/MAQUINA_A/i)).toBeNull()
-    expect(screen.getByText(/MAQUINA_P/i)).toBeTruthy()
-  })
-
-  it('los encabezados de modo SOLO salen cuando conviven las dos listas', () => {
-    // Filtrado a uno, decir de qué modo es cada tarjeta es ruido: ya lo dice el filtro.
-    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+    expect(screen.getByRole('button', { name: /All games/ })).toBeTruthy()
+    cleanup()
+    dos()
     pintar('royale')
-    expect(screen.queryByRole('heading', { name: 'BATTLE ROYALE' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Battle Royale/ })).toBeTruthy()
   })
 
-  it('el filtro lleva la cuenta de cada modo, también en cero', () => {
-    // Un cero explícito distingue "no hay nadie" de "todavía no ha cargado", y en un lobby vacío
-    // esa duda es justo lo que echa a la gente.
-    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+  it('el desplegable trae una casilla por modo, con su cuenta', () => {
+    dos()
     pintar('all')
-    const todos = screen.getByRole('tab', { name: /^All/ })
-    expect(todos.textContent).toContain('1')
-    expect(screen.getByRole('tab', { name: /^Pack Battle/ }).textContent).toContain('0')
+    fireEvent.click(screen.getByRole('button', { name: /All games/ }))
+    expect(screen.getByRole('checkbox', { name: /Pack Battle/ })).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: /Battle Royale/ })).toBeTruthy()
+    // La cuenta va también en cero: distingue "no hay nadie" de "no ha cargado". Se mira en el
+    // texto de la etiqueta y no en el nombre accesible, que no la incluye.
+    const fila = screen.getByRole('checkbox', { name: /Pack Battle/ }).closest('label')
+    expect(fila?.textContent).toContain('1')
   })
 
-  it('el filtro activo se anuncia, no solo se colorea', () => {
-    mocks.battles = []
-    pintar('royale')
-    expect(screen.getByRole('tab', { name: /Battle Royale/ }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByRole('tab', { name: /^All/ }).getAttribute('aria-selected')).toBe('false')
+  it('desmarcar un modo lo saca de la lista', () => {
+    dos()
+    const { container } = pintar('pack')
+    expect(container.textContent).toContain('MAQ_PACK')
+    expect(container.textContent).not.toContain('MAQ_ROYALE')
+  })
+
+  it('sin ningún modo se explica, en vez de dejar la pantalla en blanco', () => {
+    // Una lista vacía sin motivo se lee como "no hay partidas" cuando sí las hay.
+    dos()
+    pintar('none')
+    expect(screen.getByText(/No modes selected/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Show all games/ })).toBeTruthy()
   })
 })
