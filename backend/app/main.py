@@ -25,7 +25,7 @@ from .chain.mock import MockChainSource
 from .services.users import (
     read_unseen_battles, mark_battles_seen,
     get_or_create_user, read_user_view, read_user_stats, read_user_battles, set_alias,
-    set_withdraw_address, leaderboard, history, AliasTakenError,
+    set_withdraw_address, leaderboard, history, AliasTakenError, buscar_usuarios,
 )
 from .services.matches import register_match, list_open, sync_match, MatchError
 from .services.referrals import apply_referral_code, ReferralError
@@ -354,6 +354,28 @@ def create_app(session_factory, chain: ChainSource,
         # by /users/me/balance and subtracted client-side, matching the previous behavior.
         base_units = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
         return {"base_units": base_units, "usdc": base_units / 1e6}
+
+    @app.get("/users/search")
+    def users_search(q: str = "", limit: int = 8, wallet: str = Depends(current_user),
+                     s: Session = Depends(db)):
+        """Jugadores cuyo alias o wallet empieza por `q`, para el autocompletado de `/tip`.
+
+        `def` y NO `async def`: con la base síncrona, un `async def` que consulta bloquea el bucle
+        de eventos y deja el proceso sin atender nada, ni /health. Así FastAPI lo ejecuta en su
+        pool de hilos. Ver el spec.
+
+        Con sesión, a diferencia de `GET /users/{wallet}`: aquella devuelve UNA fila que ya
+        conoces, esta ejecuta una búsqueda, y abierta es una consulta al alcance de cualquiera.
+
+        Declarado ANTES que `/users/{wallet}`: si fuera después, FastAPI casaría "search" como si
+        fuera una wallet y este endpoint no se alcanzaría nunca.
+        """
+        _search_throttle(wallet)
+        conectados = {u["wallet"] for u in _chat_mgr.online_users()}
+        encontrados = buscar_usuarios(s, q.strip(), limit)
+        # Los conectados primero: son a quienes la propina llega con alguien delante.
+        encontrados.sort(key=lambda u: u["wallet"] not in conectados)
+        return [{**u, "online": u["wallet"] in conectados} for u in encontrados]
 
     @app.get("/users/{wallet}")
     async def get_user(wallet: str, s: Session = Depends(db)):
@@ -1368,6 +1390,24 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(429, "too many tips, try again later")
         hits.append(now)
         _tip_hits[wallet] = hits
+
+    # Contadores propios, por el mismo motivo que arriba: si compartiera los del tip, buscar a
+    # quién dar propina te dejaría sin poder dársela.
+    _search_hits: dict[str, list[float]] = {}
+
+    def _search_throttle(wallet: str) -> None:
+        """Freno de la búsqueda de usuarios.
+
+        Contadores propios: compartirlos con el tip haría que buscar a quién dar propina te dejara
+        sin poder dársela. El freno del cliente (espera + caché) es una convención del frontend;
+        este es la red de debajo, y es la que protege de un bucle hecho a mano.
+        """
+        now = _time.time()
+        hits = [t for t in _search_hits.get(wallet, []) if now - t < 60.0]
+        if len(hits) >= 20:
+            raise HTTPException(429, "too many searches")
+        hits.append(now)
+        _search_hits[wallet] = hits
 
     @app.post("/gacha/free-pack")
     async def gacha_free_pack(body: GeneratePackBody, wallet: str = Depends(current_user),
