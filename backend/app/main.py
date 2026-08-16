@@ -2304,6 +2304,9 @@ def create_app(session_factory, chain: ChainSource,
     # entrega lo que ocurre mientras estás conectado, así que sin este paso una caída deja un
     # agujero invisible dentro de la ventana.
     _EV_REINTENTO_S = 20.0
+    # Dos sitios rellenan por REST —la reconexión y la red de seguridad— y no deben pisarse: dos
+    # rellenos a la vez sobre la misma máquina se confundirían al decidir si un tramo enlaza.
+    _ev_relleno = asyncio.Lock()
 
     async def _ev_rellenar(machine: str) -> None:
         with session_factory() as s:
@@ -2317,6 +2320,45 @@ def create_app(session_factory, chain: ChainSource,
                 s, machine, filas[0]["created_at"], filas[-1]["created_at"],
                 enlaza=not winners_ingest.hay_hueco(filas, desde))
 
+    async def _ev_rellenar_todas(maquinas) -> int:
+        """Rellena por REST todas las máquinas. Devuelve cuántas dieron algún fallo."""
+        fallos = 0
+        async with _ev_relleno:
+            for m in maquinas:
+                try:
+                    await _ev_rellenar(m)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    # Una máquina que falla no puede dejar sin rellenar a las otras 38.
+                    fallos += 1
+        return fallos
+
+    async def _ev_red_seguridad():
+        """Rellena por REST cada cuarto de hora AUNQUE el feed en vivo parezca sano.
+
+        Es la defensa contra lo que no tiene remedio: un hueco mayor de 200 tiradas se pierde para
+        siempre, porque `getAllWinners` solo sirve las 200 más recientes y su `timestamp` acota
+        hacia delante pero no alcanza hacia atrás (comprobado a mano: pedir desde hace 5 h y desde
+        hace 24 h devuelve las mismas 200). Ably tampoco ayuda: su rewind llega a ~2 min.
+
+        Así que no se intenta DETECTAR que el feed está mudo, que es justo lo que falló: se rellena
+        y punto. La máquina más rápida tarda ~35 min en generar 200 tiradas, así que a este ritmo
+        el relleno siempre llega a tiempo, se haya enterado alguien o no de que algo iba mal.
+        """
+        while True:
+            await asyncio.sleep(winners_ingest.RELLENO_CADA_S)
+            try:
+                maquinas = [m["code"] for m in await gacha.machines() if m.get("code")]
+                fallos = await _ev_rellenar_todas(maquinas)
+                if fallos:
+                    logger.warning("EV tracker: red de seguridad, %d de %d máquinas fallaron",
+                                   fallos, len(maquinas))
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.warning("EV tracker: la red de seguridad falló, se reintenta", exc_info=True)
+
     async def _ev_loop():
         while True:
             try:
@@ -2324,8 +2366,7 @@ def create_app(session_factory, chain: ChainSource,
                 if not maquinas:
                     await asyncio.sleep(_EV_REINTENTO_S)
                     continue
-                for m in maquinas:
-                    await _ev_rellenar(m)
+                await _ev_rellenar_todas(maquinas)
                 token = await winners_ingest.token_ably(gacha)
                 if not token:
                     await asyncio.sleep(_EV_REINTENTO_S)
@@ -2412,6 +2453,7 @@ def create_app(session_factory, chain: ChainSource,
         if gacha is None or not gacha.enabled or not ev_tracker_enabled:
             return
         _spawn(_ev_loop())
+        _spawn(_ev_red_seguridad())
         _spawn(_pool_loop())
 
     @app.on_event("startup")
