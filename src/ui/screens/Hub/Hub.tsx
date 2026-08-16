@@ -1,10 +1,18 @@
 import { useEffect } from 'react'
 import { Banner } from './Banner'
 import { NAV_ROUTES } from '../../layouts/navRoutes'
+import { hrefFiltro } from './lobbyFilter'
 import { loadMachineList } from '../../useMachines'
 
 /**
- * Home — the overview landing. Quick Match + Live games live on the mode-specific pages
+ * La PORTADA, para quien todavía no ha entrado.
+ *
+ * Dejó de ser la parada del jugador que vuelve: eran tres banners, cero estado y ninguna acción
+ * propia, o sea un menú de pósters encima de la barra lateral, que ya es un menú. Con sesión se
+ * entra directo al Lobby (ver `Entrada` en App); esto es lo que ve quien llega de fuera y todavía
+ * no sabe qué es cada modo, que es justo para lo que sirve.
+ *
+ * Original: Home — the overview landing. Quick Match + Live games live on the mode-specific pages
  * (Pack Battle / Battle Royale); Home is a hero Banner (video + independent poster) plus the
  * stacked Pack Battle / Gacha banners below it.
  * NewsCarousel / BestHitCard / ModeSections / ModeGuide are kept for possible reuse but no longer rendered here.
@@ -28,7 +36,7 @@ export function Hub() {
           body="If you've only been into TCGs for two days, this isn't for you."
           tail="This is gacha for the big boys."
           cta="See how it works →"
-          to={NAV_ROUTES.royale}
+          to={hrefFiltro('royale')}
           badge="● LIVE ROYALE"
           accent="#ff2e7e"
           poster="/01-hub.png"
@@ -49,7 +57,7 @@ export function Hub() {
             body="Anyone who's played a Pack Battle knows the feeling is completely different from opening packs alone. More pressure. More adrenaline. More at stake."
             tail="Think you can handle it?"
             cta="Enter the lobby →"
-            to={NAV_ROUTES.pack}
+            to={hrefFiltro('pack')}
             badge="WINNER TAKES ALL"
             accent="#3ce8a8"
             ctaTextColor="#06221a"

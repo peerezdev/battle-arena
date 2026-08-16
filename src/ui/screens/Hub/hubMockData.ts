@@ -41,13 +41,26 @@ export const MOCK_CHAT: ChatMsg[] = [
 ]
 
 // ─── Barra inferior del MÓVIL ────────────────────────────────────────────────
-// Pese al nombre, el raíl de escritorio no sale de aquí: LeftRail tiene su propia lista. Esto lo
-// consume solo el BottomNav de AppShell.
+/**
+ * La navegación, ÚNICA para el rail de escritorio y la barra de móvil.
+ *
+ * Antes había dos listas —esta y la de `LeftRail`— y se habían desincronizado. Una sola evita que
+ * vuelva a pasar, y de paso obliga a que las etiquetas sean las mismas en los dos sitios.
+ *
+ * Cinco entradas, que es el tope que aguanta una barra inferior de móvil sin apelotonarse. Se
+ * llegó a cinco quitando dos cosas que no eran destinos:
+ *
+ *  · "Home" era un menú de pósters encima de este menú. Su contenido sigue vivo en `/home`, pero
+ *    ahora se lo enseñamos a quien todavía no ha entrado, que es a quien le sirve.
+ *  · "Pack" y "Royale" renderizaban la MISMA pantalla con un prop distinto: el modo es un filtro,
+ *    no un sitio al que ir. Y al partir la lista en dos, cada mitad parecía vacía.
+ *
+ * El hueco que dejan lo ocupa el tracker, que tenía ruta e icono pero no estaba en ninguna lista.
+ */
 export const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
-  { id: 'lobby',  icon: '⌂',  label: 'Home'  },
-  { id: 'pack',   icon: '⚔️', label: 'Pack'  },
-  { id: 'royale', icon: '👑', label: 'Royale'  },
-  { id: 'gacha',  icon: '🎰', label: 'Gacha'  },
-  { id: 'ranks',  icon: '🏆', label: 'Ranking'  },
-  { id: 'help',   icon: '?',  label: 'Help'  },
+  { id: 'lobby',   icon: '⌂',  label: 'Lobby'   },
+  { id: 'gacha',   icon: '🎰', label: 'Gacha'   },
+  { id: 'winners', icon: '★',  label: 'Tracker' },
+  { id: 'ranks',   icon: '🏆', label: 'Ranking' },
+  { id: 'help',    icon: '?',  label: 'Help'    },
 ]

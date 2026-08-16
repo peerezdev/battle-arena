@@ -71,7 +71,7 @@ export function BattleFlow() {
     if (!identityToken) { showToast('Sign in to join'); return }
     // Sin delegación el servidor no puede firmar la tirada, y eso NO falla para quien entra: falla
     // al arrancar y anula la partida para TODOS los de la sala. Pasó en mainnet con una de 250 $.
-    // ModeHub ya pedía la delegación antes de unirse; este camino —el de llegar a la sala por
+    // El Lobby ya pedía la delegación antes de unirse; este camino —el de llegar a la sala por
     // enlace o desde el lobby de la casa— se había quedado sin ella.
     gate.requireDelegation(() => {
       setJoiningSelf(true)

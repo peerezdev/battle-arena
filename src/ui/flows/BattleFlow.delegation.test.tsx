@@ -58,7 +58,7 @@ beforeEach(() => { mockJoin.mockClear(); estado.delegado = true })
 
 describe('BattleFlow · unirse exige delegación', () => {
   // Este camino —llegar a la sala por enlace o desde el lobby de la casa— NO tenía puerta, y
-  // ModeHub sí. Un jugador sin delegar entraba, la sala se llenaba y la partida se anulaba para
+  // El Lobby sí. Un jugador sin delegar entraba, la sala se llenaba y la partida se anulaba para
   // TODOS: pasó en mainnet con una de 250 $, porque el servidor no podía firmar su tirada.
   it.each(['pack', 'royale'] as const)('con delegación, %s se une', async (mode) => {
     mockUseBattle.mockReturnValue({ battle: lobby(mode), error: null })

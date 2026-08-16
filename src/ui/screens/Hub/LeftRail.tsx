@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { COLORS, FONTS } from '../../theme'
 import { NAV_ROUTES } from '../../layouts/navRoutes'
 import { config } from '../../../onchain/config'
-import type { HubNav } from './hubMockData'
+import { NAV_ITEMS, type HubNav } from './hubMockData'
 
 function Svg({ children }: { children: ReactNode }) {
   return (
@@ -25,14 +25,9 @@ export const NAV_ICONS: Record<HubNav, ReactNode> = {
   help: <Svg><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></Svg>,
 }
 
-const ITEMS: { id: HubNav; label: string }[] = [
-  { id: 'lobby', label: 'Home' },
-  { id: 'royale', label: 'Battle Royale' },
-  { id: 'pack', label: 'Pack Battle' },
-  { id: 'gacha', label: 'Gacha' },
-  { id: 'ranks', label: 'Ranking' },
-  { id: 'help', label: 'Help' },
-]
+// La lista vive en `hubMockData` y la comparten el rail y la barra de móvil: cuando estaban
+// duplicadas se desincronizaron.
+const ITEMS = NAV_ITEMS
 
 export function LeftRail({ active }: { active: HubNav }) {
   const [hovered, setHovered] = useState<HubNav | null>(null)

@@ -23,7 +23,7 @@ vi.mock('react-router-dom', async (orig) => ({
   useNavigate: () => mocks.nav,
 }))
 
-import { ModeHub } from './ModeHub'
+import { LobbyPage } from './LobbyPage'
 
 /** Sin catálogo de máquinas, la card titula con el código en mayúsculas: sirve de anclaje. */
 function battle(over: Partial<OpenBattle>): OpenBattle {
@@ -34,12 +34,17 @@ function battle(over: Partial<OpenBattle>): OpenBattle {
   } as unknown as OpenBattle
 }
 
-const pintar = (mode: 'pack' | 'royale' = 'royale') =>
-  render(<MemoryRouter><ModeHub mode={mode} /></MemoryRouter>)
+/** El modo ya no es un prop: viaja en la URL, que es lo que permite enlazarlo y volver a él. */
+const pintar = (mode: 'all' | 'pack' | 'royale' = 'royale') =>
+  render(
+    <MemoryRouter initialEntries={[mode === 'all' ? '/play/lobby' : `/play/lobby?mode=${mode}`]}>
+      <LobbyPage />
+    </MemoryRouter>,
+  )
 
 beforeEach(() => { mocks.battles = []; mocks.nav.mockReset(); mocks.wide = false })
 
-describe('ModeHub · royale', () => {
+describe('Lobby · royale', () => {
   it('sin partidas terminadas no enseña la sección Recent', () => {
     mocks.battles = [battle({ id: 'viva', status: 'lobby' })]
     pintar()
@@ -90,7 +95,7 @@ describe('ModeHub · royale', () => {
 })
 
 
-describe('ModeHub · partidas terminadas: Result y Replay', () => {
+describe('Lobby · partidas terminadas: Result y Replay', () => {
   const terminada = () => {
     mocks.battles = [battle({ id: 'terminada', status: 'settled', winner: 'ME' } as Partial<OpenBattle>)]
     pintar()
@@ -136,7 +141,7 @@ describe('ModeHub · partidas terminadas: Result y Replay', () => {
 })
 
 
-describe('ModeHub · lo que enseña la card de una partida terminada', () => {
+describe('Lobby · lo que enseña la card de una partida terminada', () => {
   const recientePack = (over: Partial<OpenBattle> = {}) => {
     // `players` es el número de apuntados; una partida terminada está llena.
     mocks.battles = [battle({ id: 'x', mode: 'pack', status: 'settled', winner: 'ME',
@@ -193,5 +198,61 @@ describe('ModeHub · lo que enseña la card de una partida terminada', () => {
     recientePack({ players: 4, max_players: 4, loot_usd: 40 } as unknown as Partial<OpenBattle>)
     expect(screen.getByText('4 players')).toBeTruthy()
     expect(screen.queryByText('4/4')).toBeNull()
+  })
+})
+
+// ── el Lobby unificado ───────────────────────────────────────────────────────
+
+describe('Lobby · el modo como filtro', () => {
+  it('sin filtro se ven los DOS modos a la vez', () => {
+    // La razón de fusionar: con pocos jugadores, partir la lista hacía que cada mitad pareciera
+    // vacía y el juego muerto. Con las dos juntas se ve que hay actividad.
+    mocks.battles = [
+      battle({ id: 'r', mode: 'royale', status: 'lobby' }),
+      battle({ id: 'p', mode: 'pack', status: 'lobby', machine_code: 'maquina_p' }),
+    ]
+    pintar('all')
+    // Por rol de encabezado y no por texto suelto: las tarjetas de Royale YA rotulan su modo, así
+    // que buscar el texto a secas encontraba también la card y el test pasaba por el motivo
+    // equivocado (o fallaba por encontrar dos).
+    expect(screen.getByRole('heading', { name: 'BATTLE ROYALE' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'PACK BATTLE' })).toBeTruthy()
+  })
+
+  it('filtrado a un modo, el otro no aparece', () => {
+    mocks.battles = [
+      battle({ id: 'r', mode: 'royale', status: 'lobby' }),
+      battle({ id: 'p', mode: 'pack', status: 'lobby', machine_code: 'maquina_p' }),
+    ]
+    pintar('pack')
+    expect(screen.queryByRole('heading', { name: 'BATTLE ROYALE' })).toBeNull()
+    // Y lo que importa de verdad: la partida del otro modo no está. Sin esto, el test pasaría
+    // igual con las dos listas pintadas y solo el encabezado escondido.
+    expect(screen.queryByText(/MAQUINA_A/i)).toBeNull()
+    expect(screen.getByText(/MAQUINA_P/i)).toBeTruthy()
+  })
+
+  it('los encabezados de modo SOLO salen cuando conviven las dos listas', () => {
+    // Filtrado a uno, decir de qué modo es cada tarjeta es ruido: ya lo dice el filtro.
+    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+    pintar('royale')
+    expect(screen.queryByRole('heading', { name: 'BATTLE ROYALE' })).toBeNull()
+  })
+
+  it('el filtro lleva la cuenta de cada modo, también en cero', () => {
+    // Un cero explícito distingue "no hay nadie" de "todavía no ha cargado", y en un lobby vacío
+    // esa duda es justo lo que echa a la gente.
+    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+    pintar('all')
+    const todos = screen.getByRole('tab', { name: /^All/ })
+    expect(todos.textContent).toContain('1')
+    expect(screen.getByRole('tab', { name: /^Pack Battle/ }).textContent).toContain('0')
+  })
+
+  it('el filtro activo se anuncia, no solo se colorea', () => {
+    mocks.battles = []
+    pintar('royale')
+    expect(screen.getByRole('tab', { name: /Battle Royale/ }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /^All/ }).getAttribute('aria-selected')).toBe('false')
   })
 })
