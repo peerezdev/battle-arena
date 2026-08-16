@@ -369,13 +369,37 @@ def create_app(session_factory, chain: ChainSource,
 
         Declarado ANTES que `/users/{wallet}`: si fuera después, FastAPI casaría "search" como si
         fuera una wallet y este endpoint no se alcanzaría nunca.
+
+        Los conectados van SIEMPRE primero y salen aunque no tengan alias: se filtran en memoria
+        contra `_chat_mgr.online_users()` ANTES de recortar a `limit`, no después. Ordenar
+        después del recorte no basta: si la página ya se llenó con `limit` alias que preceden al
+        conectado en el alfabeto, un `.sort()` posterior ya no tiene sitio donde meterlo y se
+        queda fuera. Tampoco cuesta consulta: la presencia ya está en memoria.
         """
         _search_throttle(wallet)
-        conectados = {u["wallet"] for u in _chat_mgr.online_users()}
-        encontrados = buscar_usuarios(s, q.strip(), limit)
-        # Los conectados primero: son a quienes la propina llega con alguien delante.
-        encontrados.sort(key=lambda u: u["wallet"] not in conectados)
-        return [{**u, "online": u["wallet"] in conectados} for u in encontrados]
+        limit = max(1, min(limit, 8))
+        q_norm = q.strip().lower()
+
+        conectados = [
+            u for u in _chat_mgr.online_users()
+            if not q_norm or u["wallet"].lower().startswith(q_norm)
+            or (u.get("name") or "").lower().startswith(q_norm)
+        ][:limit]
+        de_conectados = [{"wallet": u["wallet"], "alias": u.get("name"), "online": True}
+                         for u in conectados]
+        vistos = {u["wallet"] for u in de_conectados}
+
+        restantes = limit - len(de_conectados)
+        resto = []
+        if restantes > 0:
+            # `buscar_usuarios` excluye a quien no tiene alias cuando `q` está vacía (ver su
+            # docstring): no es un problema aquí porque a esos ya los hemos puesto arriba si
+            # estaban conectados, y si no lo están, no son un destino de propina alcanzable.
+            encontrados = buscar_usuarios(s, q.strip(), limit)
+            resto = [{**u, "online": False} for u in encontrados
+                     if u["wallet"] not in vistos][:restantes]
+
+        return de_conectados + resto
 
     @app.get("/users/{wallet}")
     async def get_user(wallet: str, s: Session = Depends(db)):
