@@ -149,6 +149,10 @@ def test_lo_realizado_y_lo_del_modelo_NO_se_mezclan(Session):
     with Session() as s:
         _pool(s)
         sembrar(s, 40)
-        f = fila_ev(s, "pokemon_50", precio=25.0, buyback_pct=0.85)
+        anotar_tramo(s, "pokemon_50", AHORA - timedelta(hours=60), AHORA, enlaza=True)
+        # `ahora=AHORA` es obligatorio: sin él la ventana de 48 h se mide contra el reloj REAL y
+        # las filas sembradas se salen de ella en cuanto pasan dos días. El test pasaba solo
+        # mientras la fecha del fixture estuviera cerca de hoy.
+        f = fila_ev(s, "pokemon_50", precio=25.0, buyback_pct=0.85, remuestreos=200, ahora=AHORA)
         assert f["model_edge_pct"] is not None and f["realized_edge_pct"] is not None
         assert f["model_edge_pct"] != f["realized_edge_pct"]

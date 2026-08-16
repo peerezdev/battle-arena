@@ -18,6 +18,7 @@ despliegue que corre en un mini PC. `httpx` ya está.
 from __future__ import annotations
 
 import json
+import time
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Iterable, Iterator, List, Optional, Sequence
@@ -109,23 +110,52 @@ async def token_ably(gacha, *, timeout: float = 20.0) -> Optional[str]:
         return None
 
 
+#: Silencio máximo tolerado antes de dar la conexión por muerta. Ably manda keepalives cada ~15 s:
+#: medido en mainnet sobre 47 canales, el mayor hueco entre bytes en dos minutos fue de 19.3 s. 90
+#: es casi cinco veces eso, así que no puede saltar por una racha tranquila.
+SILENCIO_MAX_S = 90.0
+
+#: Cuánto se deja vivir una conexión antes de rehacerla. EL TOKEN DE ABLY DURA 60 MINUTOS, y esto
+#: es lo que de verdad rompió la ingesta: al caducar, Ably DEJA DE ENTREGAR PERO NO CIERRA. La
+#: conexión sigue ESTABLISHED, nadie da error, y el tracker se queda cinco horas sin una sola
+#: tirada mientras aparenta estar bien. Reconectar antes de que caduque lo evita de raíz, y no
+#: cuesta nada: al reconectar se rellena por REST lo que se haya perdido.
+VIDA_MAX_S = 45 * 60
+
+
 async def escuchar(token: str, maquinas: Sequence[str], al_llegar: Callable[[dict], None],
-                   *, rewind: str = REWIND, timeout: float = 300.0) -> None:
+                   *, rewind: str = REWIND, timeout: float = 300.0,
+                   silencio_max_s: float = SILENCIO_MAX_S, vida_max_s: float = VIDA_MAX_S) -> None:
     """Escucha los canales de esas máquinas y llama `al_llegar` con cada tirada ya normalizada.
 
-    Un solo flujo para todas: Ably admite varios canales por conexión, así que 43 máquinas son una
-    conexión y no 43. Vuelve cuando el flujo se corta; reconectar es cosa de quien llama.
+    Un solo flujo para todas: Ably admite varios canales por conexión, así que 47 máquinas son una
+    conexión y no 47. Vuelve cuando el flujo se corta; reconectar es cosa de quien llama.
+
+    VUELVE SIEMPRE, aunque el otro lado no diga nada. Antes esperaba indefinidamente (`read=None`) y
+    un flujo que dejaba de entregar sin cerrarse dejaba la ingesta parada para siempre, sin un solo
+    aviso en el log. Ahora hay dos relojes: uno corta si no llega NADA en `silencio_max_s`, y otro
+    obliga a rehacer la conexión cada `vida_max_s` para que el token nunca llegue a caducar dentro.
     """
     canales = ",".join(f"recent-winners-{m}" for m in maquinas)
     url = f"{ABLY_REALTIME}/sse?v=1.2&channels={canales}&rewind={rewind}&accessToken={token}"
-    async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, read=None)) as c:
-        async with c.stream("GET", url, headers={"accept": "text/event-stream"}) as r:
-            r.raise_for_status()
-            async for linea in r.aiter_lines():
-                for crudo in eventos_sse([linea]):
-                    fila = normalizar_vivo(crudo)
-                    if fila is not None:
-                        al_llegar(fila)
+    limite = time.monotonic() + vida_max_s
+    tiempos = httpx.Timeout(timeout, read=silencio_max_s)
+    try:
+        async with httpx.AsyncClient(timeout=tiempos) as c:
+            async with c.stream("GET", url, headers={"accept": "text/event-stream"}) as r:
+                r.raise_for_status()
+                async for linea in r.aiter_lines():
+                    for crudo in eventos_sse([linea]):
+                        fila = normalizar_vivo(crudo)
+                        if fila is not None:
+                            al_llegar(fila)
+                    if time.monotonic() >= limite:
+                        logger.info("EV tracker: se renueva la conexión antes de que caduque el token")
+                        return
+    except httpx.ReadTimeout:
+        # No es un fallo del que haya que asustarse, es JUSTO lo que se quería detectar: el otro
+        # lado dejó de hablar sin cerrar. Se avisa y quien llama reconecta.
+        logger.warning("EV tracker: %.0f s sin recibir nada de Ably, se reconecta", silencio_max_s)
 
 
 async def traer_rest(gacha, machine: str, desde: Optional[datetime] = None) -> List[dict]:

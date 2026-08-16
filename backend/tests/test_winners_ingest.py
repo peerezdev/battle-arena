@@ -138,3 +138,107 @@ async def test_traer_rest_sin_desde_no_manda_timestamp():
     g = _GachaFalso(crudas=[])
     await traer_rest(g, "pokemon_50")
     assert g.ultimo_timestamp is None
+
+
+# ── que la escucha VUELVA siempre ────────────────────────────────────────────
+#
+# Es el fallo que dejó el tracker cinco horas sin una sola tirada: la conexión seguía
+# ESTABLISHED, Ably había dejado de entregar al caducar el token (dura 60 min) y no la cerró.
+# Con `read=None` esperábamos indefinidamente, así que el bucle de reintento no llegaba a
+# ejecutarse y no había ni un aviso en el log.
+
+import httpx
+import pytest
+
+from app.services.winners_ingest import SILENCIO_MAX_S, VIDA_MAX_S, escuchar
+
+
+class _Respuesta:
+    def __init__(self, lineas, reloj=None):
+        self._lineas, self._reloj = lineas, reloj
+        self.status_code = 200
+
+    def raise_for_status(self):
+        pass
+
+    async def aiter_lines(self):
+        for l in self._lineas:
+            if self._reloj is not None:
+                self._reloj[0] += 30      # cada línea "tarda" 30 s
+            yield l
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+
+def _cliente(monkeypatch, respuesta, capturar=None):
+    class Cli:
+        def __init__(self, **kw):
+            if capturar is not None:
+                capturar.update(kw)
+
+        def stream(self, *a, **k):
+            return respuesta
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+    monkeypatch.setattr(httpx, "AsyncClient", Cli)
+
+
+EVENTO = 'data: {"name":"new-winner","data":{"nft":{"address":"A"},"gachaCode":"pokemon_50",' \
+         '"insuredValue":40,"timestamp":"2026-08-16T10:00:00Z","memo":"m"}}'
+
+
+@pytest.mark.asyncio
+async def test_el_silencio_de_ably_no_deja_la_escucha_colgada(monkeypatch):
+    """Antes esto no volvía nunca y la ingesta se paraba en silencio."""
+    class Muda(_Respuesta):
+        async def aiter_lines(self):
+            raise httpx.ReadTimeout("sin datos")
+            yield  # pragma: no cover
+    _cliente(monkeypatch, Muda([]))
+    recibidas = []
+    await escuchar("tok", ["pokemon_50"], recibidas.append)   # no debe colgarse ni reventar
+    assert recibidas == []
+
+
+@pytest.mark.asyncio
+async def test_se_pide_un_tope_de_lectura_de_verdad(monkeypatch):
+    """`read=None` era la causa: sin tope, un flujo mudo se espera para siempre."""
+    kw = {}
+    _cliente(monkeypatch, _Respuesta([]), capturar=kw)
+    await escuchar("tok", ["pokemon_50"], lambda f: None)
+    assert kw["timeout"].read == SILENCIO_MAX_S
+    assert kw["timeout"].read is not None
+
+
+@pytest.mark.asyncio
+async def test_la_conexion_se_renueva_antes_de_que_caduque_el_token(monkeypatch):
+    """El token de Ably dura 60 minutos y al caducar deja de entregar SIN cerrar. Por eso la
+    conexión se rehace sola antes de llegar ahí."""
+    assert VIDA_MAX_S < 60 * 60
+    reloj = [0.0]
+    monkeypatch.setattr("app.services.winners_ingest.time.monotonic", lambda: reloj[0])
+    # Muchas líneas, cada una avanzando 30 s: la vida máxima se alcanza a mitad del flujo.
+    _cliente(monkeypatch, _Respuesta([EVENTO] * 200, reloj=reloj))
+    recibidas = []
+    await escuchar("tok", ["pokemon_50"], recibidas.append)
+    # Volvió sola, sin agotar las 200 líneas.
+    assert 0 < len(recibidas) < 200
+
+
+@pytest.mark.asyncio
+async def test_mientras_llegan_datos_no_se_corta(monkeypatch):
+    """El corte por vida no puede comerse las tiradas que sí están llegando."""
+    reloj = [0.0]
+    monkeypatch.setattr("app.services.winners_ingest.time.monotonic", lambda: reloj[0])
+    _cliente(monkeypatch, _Respuesta([EVENTO] * 3))     # sin avanzar el reloj
+    recibidas = []
+    await escuchar("tok", ["pokemon_50"], recibidas.append)
+    assert len(recibidas) == 3
