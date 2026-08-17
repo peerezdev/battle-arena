@@ -25,18 +25,25 @@ const miniBtn: CSSProperties = {
   cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
 }
 
-export function CreateBattleModal({ onClose, onCreated, lockedMode }: {
+export function CreateBattleModal({ onClose, onCreated, lockedMode, royaleDisponible = false }: {
   onClose: () => void; onCreated: (battleId: string) => void
   /** When set, the modal is fixed to this mode and the pack/royale toggle is hidden. */
   lockedMode?: BattleMode
+  /** Si se puede crear una Battle Royale. Por defecto NO: la opción sale con una etiqueta "Soon"
+   *  y no se puede pulsar. Sigue habiendo lista de permitidos (`canCreateRoyale`), así que quien
+   *  esté en ella la ve normal; para el resto todavía no está abierta. */
+  royaleDisponible?: boolean
 }) {
   const { identityToken } = useIdentityToken()
   const gate = useDelegationGate()
   const { machines, loading: machinesLoading } = useMachineList()   // shared/cached → instant on reopen
   const [machineCode, setMachineCode] = useState<string>('')   // royale single machine
   const [counts, setCounts] = useState<Record<string, number>>({})   // pack bundle
-  const [mode, setMode] = useState<BattleMode>(lockedMode ?? 'pack')
-  const [players, setPlayers] = useState<number>((lockedMode ?? 'pack') === 'royale' ? DEFAULT_PLAYERS.royale : DEFAULT_PLAYERS.pack)
+  // Si llega bloqueado a royale y no se puede crear, se cae a pack: es mejor abrir el modal en algo
+  // que sí se puede hacer que abrirlo en un callejón sin salida.
+  const modoInicial: BattleMode = lockedMode === 'royale' && !royaleDisponible ? 'pack' : (lockedMode ?? 'pack')
+  const [mode, setMode] = useState<BattleMode>(modoInicial)
+  const [players, setPlayers] = useState<number>(modoInicial === 'royale' ? DEFAULT_PLAYERS.royale : DEFAULT_PLAYERS.pack)
   const [sort, setSort] = useState<'low' | 'high'>('low')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -136,12 +143,29 @@ export function CreateBattleModal({ onClose, onCreated, lockedMode }: {
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', maxWidth: 480, margin: '0 auto 22px' }}>
             {([['pack', 'Pack', 'Winner takes all'], ['royale', 'Royale', 'Last one standing']] as const).map(([k, label, sub]) => {
               const on = mode === k
+              // Royale todavía no se puede crear: la opción se ve, para que se sepa que existe,
+              // pero no se puede pulsar y lleva su etiqueta. Enseñarla clicable y fallar después
+              // sería peor que decirlo antes.
+              const bloqueada = k === 'royale' && !royaleDisponible
               return (
-                <button key={k} onClick={() => setMode(k)}
-                  style={{ flex: 1, textAlign: 'center', padding: '13px 16px', borderRadius: 13, cursor: 'pointer', fontFamily: FONTS.body,
+                <button key={k} onClick={() => { if (!bloqueada) setMode(k) }}
+                  disabled={bloqueada}
+                  aria-disabled={bloqueada}
+                  style={{ flex: 1, textAlign: 'center', padding: '13px 16px', borderRadius: 13,
+                    cursor: bloqueada ? 'not-allowed' : 'pointer', fontFamily: FONTS.body,
+                    position: 'relative', opacity: bloqueada ? .55 : 1,
                     background: on ? 'linear-gradient(180deg,rgba(255,46,151,.22),rgba(255,46,151,.05))' : '#ffffff08',
                     border: `1px solid ${on ? 'rgba(255,46,151,.55)' : COLORS.border}` }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: on ? COLORS.text : '#cdd4dd' }}>{label}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: on ? COLORS.text : '#cdd4dd' }}>{label}</span>
+                    {bloqueada && (
+                      <span style={{ fontFamily: FONTS.mono, fontSize: 9, letterSpacing: '.1em',
+                        color: '#f5c542', border: '1px solid #f5c54259', background: '#f5c5421f',
+                        borderRadius: 99, padding: '2px 7px' }}>
+                        SOON
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 11.5, color: on ? '#b3a3e6' : COLORS.muted, marginTop: 3 }}>{sub}</div>
                 </button>
               )

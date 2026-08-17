@@ -95,10 +95,12 @@ export function LobbyPage() {
           esconde filtrando solo Pack Battle. */}
       <RoyaleDemoNotice />
 
+      {/* El botón sale siempre: Pack Battle se puede crear en cualquier caso, y Royale se enseña
+          dentro del modal con su etiqueta "Soon". Antes se ESCONDÍA el botón entero al filtrar
+          Royale sin permiso, así que desde ahí no había forma de crear ni una Pack. */}
       <QuickMatch
         onCreate={() => setCreateOpen(true)}
         onPlayDemo={modos.has('pack') ? () => setDemoOpen(true) : undefined}
-        canCreate={modos.size === 1 && modos.has('royale') ? canCreateRoyale(meWallet) : true}
       />
 
       {/* UNA sola lista con los dos modos mezclados y la MISMA tarjeta para ambos. LiveBattles ya
@@ -126,6 +128,7 @@ export function LobbyPage() {
         /* Solo se fija el modo si el usuario está mirando UNO. Con los dos marcados no ha dicho
            a qué quiere jugar, así que lo elige en el modal. */
         <CreateBattleModal
+          royaleDisponible={canCreateRoyale(meWallet)}
           lockedMode={modos.size === 1 ? [...modos][0] : undefined}
           onClose={() => setCreateOpen(false)}
           onCreated={(id) => { setCreateOpen(false); navigate('/play/battle/' + id) }}

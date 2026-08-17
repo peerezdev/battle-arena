@@ -47,3 +47,49 @@ describe('CreateBattleModal multi-pack', () => {
     expect(plusButtons().every((b) => (b as HTMLButtonElement).disabled)).toBe(true)
   })
 })
+
+// ── Battle Royale todavía no se puede crear ──────────────────────────────────
+
+describe('CreateBattleModal · la opción Royale', () => {
+  const abrir = (props = {}) =>
+    render(<CreateBattleModal onClose={() => {}} onCreated={() => {}} {...props} />)
+
+  it('sale con etiqueta SOON y no se puede pulsar', () => {
+    // Se enseña para que se sepa que el modo existe, pero deshabilitada: enseñarla clicable y
+    // fallar después es peor que decirlo antes.
+    abrir()
+    const royale = screen.getByRole('button', { name: /Royale/ })
+    expect(royale.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByText('SOON')).toBeTruthy()
+  })
+
+  it('pulsarla NO cambia el modo', () => {
+    abrir()
+    fireEvent.click(screen.getByRole('button', { name: /Royale/ }))
+    // Sigue en pack: los recuentos de jugadores de pack son 2, 3 y 4.
+    expect(screen.getByRole('button', { name: '4' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '10' })).toBeNull()
+  })
+
+  it('Pack sí se puede pulsar', () => {
+    abrir()
+    expect(screen.getByRole('button', { name: /Pack/ }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('con permiso, Royale se comporta normal y sin etiqueta', () => {
+    // La lista de permitidos (`canCreateRoyale`) sigue existiendo: quien está en ella la crea.
+    abrir({ royaleDisponible: true })
+    const royale = screen.getByRole('button', { name: /Royale/ })
+    expect(royale.hasAttribute('disabled')).toBe(false)
+    expect(screen.queryByText('SOON')).toBeNull()
+    fireEvent.click(royale)
+    expect(screen.getByRole('button', { name: '10' })).toBeTruthy()
+  })
+
+  it('si llega bloqueado a royale SIN permiso, abre en pack', () => {
+    // Abrir el modal en un callejón sin salida es peor que abrirlo en algo que sí se puede hacer.
+    abrir({ lockedMode: 'royale' })
+    expect(screen.getByRole('button', { name: '4' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '10' })).toBeNull()
+  })
+})
