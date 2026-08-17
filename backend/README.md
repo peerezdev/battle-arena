@@ -50,6 +50,7 @@ El token va en la query (`?token=`). Marcos del servidor al cliente:
 | `presence` | `{online, users[]}` | Al entrar o salir cualquiera |
 | `drop`, `drops_history` | tiradas del gacha | |
 | `error` | `login_required`, `rate_limited` | |
+| `tip` | `{from, fromName, amount}` | SOLO al destinatario (`send_to_wallet`), nunca broadcast: quién le da dinero a quién no se publica |
 
 **`presence.users`** es `[{wallet, name}]` y es la lista de **mencionables**: sin duplicados (dos
 pestañas del mismo jugador son una entrada) y **sin anónimos**, porque a quien no ha iniciado
