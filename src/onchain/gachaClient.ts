@@ -275,6 +275,25 @@ export interface EvLive {
   tiers: EvTier[]
 }
 
+/** Si quien pregunta puede ver el Machine Tracker, y cuánto le falta si no. */
+export interface TrackerAccess {
+  allowed: boolean
+  wagered_usd: number
+  required_usd: number
+  /** Ya redondeado HACIA ARRIBA al céntimo por el backend: decir "te faltan 0.00" cuando faltan
+   *  0.004 haría que el jugador apostara creyendo que ya está y siguiera fuera. */
+  missing_usd: number
+  window_days: number
+}
+
+/** Sin token también responde: quien no ha entrado recibe `allowed: false` y el aviso le explica
+ *  qué hace falta, en vez de un error que sugeriría que algo se ha roto. */
+export function fetchTrackerAccess(token?: string | null): Promise<TrackerAccess> {
+  return gachaFetch('/gacha/tracker-access', token
+    ? { headers: { Authorization: `Bearer ${token}` } }
+    : undefined)
+}
+
 export function fetchEvLive(): Promise<{ rows: EvLive[]; updated_at: number }> {
   return gachaFetch('/gacha/ev/live')
 }

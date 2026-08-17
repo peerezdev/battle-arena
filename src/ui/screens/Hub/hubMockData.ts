@@ -1,6 +1,6 @@
 // Datos de EJEMPLO para el Hub presentacional. NO son reales — se sustituirán
 // por backend (chat, drops, battles) cuando exista. No representan saldos reales.
-export type HubNav = 'lobby' | 'pack' | 'royale' | 'gacha' | 'winners' | 'mana' | 'ranks' | 'help'
+export type HubNav = 'lobby' | 'pack' | 'royale' | 'gacha' | 'tracker' | 'winners' | 'mana' | 'ranks' | 'help'
 export type BattleMode = 'pack' | 'royale' | 'mana'
 
 export interface DropItem { id: string; name: string; set: string; ago: string; valueUsd: number; emoji: string; accent: string }
@@ -55,12 +55,14 @@ export const MOCK_CHAT: ChatMsg[] = [
  *  · "Pack" y "Royale" renderizaban la MISMA pantalla con un prop distinto: el modo es un filtro,
  *    no un sitio al que ir. Y al partir la lista en dos, cada mitad parecía vacía.
  *
- * El hueco que dejan lo ocupa el tracker, que tenía ruta e icono pero no estaba en ninguna lista.
+ * El hueco que dejan lo ocupa el Machine Tracker, que ahora es su propia pantalla. Winners sale
+ * de la barra: el feed de ganadores recientes sigue en /winners, pero lo que la gente busca es lo
+ * que paga cada máquina, no la lista de lo que acaba de salir.
  */
 export const NAV_ITEMS: { id: HubNav; icon: string; label: string }[] = [
   { id: 'lobby',   icon: '⌂',  label: 'Lobby'   },
   { id: 'gacha',   icon: '🎰', label: 'Gacha'   },
-  { id: 'winners', icon: '★',  label: 'Tracker' },
+  { id: 'tracker', icon: '★',  label: 'Tracker' },
   { id: 'ranks',   icon: '🏆', label: 'Ranking' },
   { id: 'help',    icon: '?',  label: 'Help'    },
 ]

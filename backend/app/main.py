@@ -31,7 +31,7 @@ from .services.matches import register_match, list_open, sync_match, MatchError
 from .services.referrals import apply_referral_code, ReferralError
 from .elo import gap_label
 from .services.gacha import GachaService, GachaDisabled, GachaUpstreamError, tiradas_gratis
-from .services import pool_ingest, winners_ingest, winners_store
+from .services import pool_ingest, tracker_access, winners_ingest, winners_store
 from .services.ev_view import fila_ev
 from .services.tier_gaps import rachas_por_tier
 from .services.privy_signer import PrivySigner, PrivyNoVerificable
@@ -983,6 +983,29 @@ def create_app(session_factory, chain: ChainSource,
     # de que ellos respondan.
     _ev_vivo_cache: dict = {"t": 0.0, "filas": []}
     _EV_VIVO_TTL = 5.0
+
+    @app.get("/gacha/tracker-access")
+    async def gacha_tracker_access(authorization: Optional[str] = Header(None),
+                                   s: Session = Depends(db)):
+        """Si quien pregunta puede ver el Machine Tracker, y cuánto le falta si no.
+
+        La sesión es OPCIONAL a propósito: quien no ha entrado no recibe un 401 sino la misma
+        respuesta con `allowed: false`, que es lo que permite explicarle qué es esto y qué hace
+        falta. Un error le diría que algo se ha roto, y no se ha roto nada.
+
+        Solo se consulta el acceso; el tracker en sí (`/gacha/ev`) sigue siendo público, porque su
+        contenido ya es público en el feed de Collector Crypt y cerrarlo daría una falsa sensación
+        de exclusividad a cambio de romper los enlaces que se comparten.
+        """
+        wallet = None
+        if authorization and authorization.startswith("Bearer ") and privy is not None:
+            try:
+                wallet = privy.embedded_solana_wallet(authorization[len("Bearer "):])
+            except PrivyAuthError:
+                # Un token caducado no es un error de esta pantalla: se trata como "sin sesión" y
+                # el aviso le dirá que entre.
+                wallet = None
+        return tracker_access.acceso(s, wallet)
 
     @app.get("/gacha/ev/live")
     async def gacha_ev_live():

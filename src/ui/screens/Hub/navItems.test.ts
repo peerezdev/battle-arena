@@ -24,10 +24,13 @@ describe('la navegación', () => {
     expect(ids).toContain('lobby')
   })
 
-  it('lleva el tracker, que antes no estaba en ninguna lista', () => {
-    // Tenía ruta e icono dibujado desde hacía tiempo, pero no aparecía ni en el rail ni en la
-    // barra: solo se llegaba escribiendo /winners a mano.
-    expect(NAV_ITEMS.map((i) => i.id)).toContain('winners')
+  it('lleva el Machine Tracker y NO el feed de ganadores', () => {
+    // El tracker tenía ruta e icono desde hacía tiempo pero no estaba en ninguna lista. Ahora es
+    // su propia pantalla y ocupa el sitio; Winners sale de la barra, porque lo que la gente busca
+    // es cuánto paga cada máquina, no la lista de lo que acaba de salir.
+    const ids = NAV_ITEMS.map((i) => i.id)
+    expect(ids).toContain('tracker')
+    expect(ids).not.toContain('winners')
   })
 
   it('cada pestaña tiene a dónde ir', () => {
@@ -49,7 +52,9 @@ describe('la navegación', () => {
     expect(activeNavFromPath('/home')).toBeNull()
   })
 
-  it('el tracker se enciende en su ruta', () => {
-    expect(activeNavFromPath('/winners')).toBe('winners')
+  it('el tracker se enciende en su ruta, y Winners no enciende nada', () => {
+    expect(activeNavFromPath('/machine-tracker')).toBe('tracker')
+    // Sigue accesible por URL, pero ya no es una pestaña.
+    expect(activeNavFromPath('/winners')).toBeNull()
   })
 })

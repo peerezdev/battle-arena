@@ -6,17 +6,20 @@ const mocks = vi.hoisted(() => ({
   fetchGaps: vi.fn().mockResolvedValue({ gaps: {}, sampled: 0 }),
   fetchEv: vi.fn(),
   fetchEvLive: vi.fn(),
+  fetchAcceso: vi.fn().mockResolvedValue({ allowed: true, wagered_usd: 500, required_usd: 100, missing_usd: 0, window_days: 7 }),
 }))
 vi.mock('../../../onchain/gachaClient', () => ({
   fetchGachaWinners: mocks.fetchWinners,
   fetchRarityGaps: mocks.fetchGaps,
   fetchEvRows: mocks.fetchEv,
   fetchEvLive: mocks.fetchEvLive,
+  fetchTrackerAccess: mocks.fetchAcceso,
 }))
+vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 vi.mock('../../useMachines', () => ({ useMachineList: () => ({ machines: [] }) }))
 vi.mock('../../useAliases', () => ({ useAliases: () => ({}) }))
 
-import { WinnersPage } from './WinnersPage'
+import { MachineTrackerPage } from './MachineTrackerPage'
 
 const tier = (current: number) => ({
   tier: 'Epic', current, average: 165.7, seen: 12, sample: 2000, days_since: 0.1, cold: false,
@@ -62,7 +65,7 @@ describe('PanelEv · los dos carriles del refresco', () => {
   it('lo barato se pide seis veces por cada vez que lo caro', async () => {
     // Es la razón de separarlos: el bootstrap son ~9 s de CPU las 48 máquinas y no se mueve; las
     // rachas cuestan ~370 ms y cambian con cada tirada.
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await avanzar(0)
     expect(mocks.fetchEv).toHaveBeenCalledTimes(1)
     await avanzar(60_000)
@@ -71,7 +74,7 @@ describe('PanelEv · los dos carriles del refresco', () => {
   })
 
   it('la racha nueva llega a la pantalla sin esperar al carril lento', async () => {
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await avanzar(0)
     expect(screen.getByText('80')).toBeTruthy()
     mocks.fetchEvLive.mockResolvedValue({
@@ -84,7 +87,7 @@ describe('PanelEv · los dos carriles del refresco', () => {
 
   it('en segundo plano no se pide nada', async () => {
     // Una pestaña olvidada estaría sondeando toda la noche para que no la mire nadie.
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await avanzar(0)
     expect(mocks.fetchEv).toHaveBeenCalledTimes(1)
     ocultarPestaña(true)
@@ -95,7 +98,7 @@ describe('PanelEv · los dos carriles del refresco', () => {
 
   it('al volver a la pestaña se refresca ya, sin esperar al siguiente tic', async () => {
     // Si no, se vería hasta un minuto de datos viejos justo cuando alguien acaba de mirar.
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await avanzar(0)
     expect(mocks.fetchEv).toHaveBeenCalledTimes(1)
     ocultarPestaña(true)
@@ -108,7 +111,7 @@ describe('PanelEv · los dos carriles del refresco', () => {
 
   it('si falla el carril rápido, la tarjeta sigue con lo que tenía', async () => {
     // Es un extra: no puede tumbar lo que sí se ha medido.
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await avanzar(0)
     expect(screen.getByText('80')).toBeTruthy()
     mocks.fetchEvLive.mockRejectedValue(new Error('sin red'))
@@ -119,7 +122,7 @@ describe('PanelEv · los dos carriles del refresco', () => {
   it('si falla un sondeo del carril lento, no se borra la pantalla', async () => {
     // Lo de antes sigue siendo cierto; vaciarla por un fallo de red pasajero es peor que
     // enseñarla un minuto más vieja.
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await avanzar(0)
     expect(screen.getByText('Elite Pokémon')).toBeTruthy()
     mocks.fetchEv.mockRejectedValue(new Error('sin red'))

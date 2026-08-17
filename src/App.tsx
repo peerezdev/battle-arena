@@ -12,6 +12,7 @@ import { ProfilePage } from './ui/screens/Profile/ProfilePage'
 import { LeaderboardPage } from './ui/screens/Leaderboard/LeaderboardPage'
 import { HelpPage } from './ui/screens/Help/HelpPage'
 import { WinnersPage } from './ui/screens/Winners/WinnersPage'
+import { MachineTrackerPage } from './ui/screens/MachineTracker/MachineTrackerPage'
 import { usePrivy } from '@privy-io/react-auth'
 
 const GachaVault = lazy(() => import('./ui/screens/gacha/GachaVault'))
@@ -79,6 +80,8 @@ export default function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/profile/:wallet" element={<ProfilePage />} />
           <Route path="/ranking" element={<LeaderboardPage />} />
+          <Route path="/machine-tracker" element={<MachineTrackerPage />} />
+          {/* El feed de ganadores sigue accesible por URL, pero fuera de la barra. */}
           <Route path="/winners" element={<WinnersPage />} />
           <Route path="/help" element={<HelpPage />} />
         </Route>

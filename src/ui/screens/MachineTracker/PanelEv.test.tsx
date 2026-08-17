@@ -6,17 +6,20 @@ const mocks = vi.hoisted(() => ({
   fetchGaps: vi.fn().mockResolvedValue({ gaps: {}, sampled: 0 }),
   fetchEv: vi.fn(),
   fetchEvLive: vi.fn().mockResolvedValue({ rows: [], updated_at: 0 }),
+  fetchAcceso: vi.fn().mockResolvedValue({ allowed: true, wagered_usd: 500, required_usd: 100, missing_usd: 0, window_days: 7 }),
 }))
 vi.mock('../../../onchain/gachaClient', () => ({
   fetchGachaWinners: mocks.fetchWinners,
   fetchRarityGaps: mocks.fetchGaps,
   fetchEvRows: mocks.fetchEv,
   fetchEvLive: mocks.fetchEvLive,
+  fetchTrackerAccess: mocks.fetchAcceso,
 }))
+vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
 vi.mock('../../useMachines', () => ({ useMachineList: () => ({ machines: [] }) }))
 vi.mock('../../useAliases', () => ({ useAliases: () => ({}) }))
 
-import { WinnersPage } from './WinnersPage'
+import { MachineTrackerPage } from './MachineTrackerPage'
 
 const fila = (machine: string, name: string) => ({
   machine, name, pack_price: 50, buyback_pct: 0.85, realized_n_pulls: 300,
@@ -39,19 +42,19 @@ const abrirSelector = async () => {
 
 describe('PanelEv · elegir qué máquinas ver', () => {
   it('al entrar se ven todas', async () => {
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     expect(await screen.findByRole('button', { name: /2 of 2 machines/i })).toBeTruthy()
   })
 
   it('ocultar una la quita de la rejilla y lo recuerda', async () => {
-    const { unmount } = render(<WinnersPage />)
+    const { unmount } = render(<MachineTrackerPage />)
     await abrirSelector()
     fireEvent.click(screen.getByRole('checkbox', { name: /Anime Pop/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /1 of 2 machines/i })).toBeTruthy())
 
     // Y sobrevive a recargar: es el sentido de guardarla.
     unmount()
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     expect(await screen.findByRole('button', { name: /1 of 2 machines/i })).toBeTruthy()
   })
 
@@ -63,12 +66,12 @@ describe('PanelEv · elegir qué máquinas ver', () => {
              fila('nueva_500', 'Recién llegada')],
       updated_at: 0,
     })
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     expect(await screen.findByRole('button', { name: /2 of 3 machines/i })).toBeTruthy()
   })
 
   it('ocultarlas todas lo dice en vez de dejar el hueco vacío', async () => {
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await abrirSelector()
     fireEvent.click(screen.getByRole('button', { name: /Hide all/i }))
     expect(await screen.findByText(/All machines hidden/i)).toBeTruthy()
@@ -76,7 +79,7 @@ describe('PanelEv · elegir qué máquinas ver', () => {
 
   it('"Show all" las devuelve', async () => {
     localStorage.setItem('ba.evTracker.hiddenMachines', '["anime_75","pokemon_50"]')
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     await abrirSelector()
     fireEvent.click(screen.getByRole('button', { name: /Show all/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /2 of 2 machines/i })).toBeTruthy())
@@ -92,7 +95,7 @@ describe('PanelEv · las dos lecturas de la misma medición', () => {
 
   it('por defecto mide a precio de recompra', async () => {
     mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     // 0.85 × 1.115 − 1 = −5.2% → ratio 0.948
     expect(await screen.findByText('0.948')).toBeTruthy()
     expect(screen.getByText(/AT BUYBACK/)).toBeTruthy()
@@ -100,7 +103,7 @@ describe('PanelEv · las dos lecturas de la misma medición', () => {
 
   it('cambiar a "me la quedo" enseña el valor de la carta', async () => {
     mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     fireEvent.click(await screen.findByRole('button', { name: /if you keep it/i }))
     await waitFor(() => expect(screen.getByText('1.115')).toBeTruthy())
     expect(screen.getByText(/AT CARD VALUE/)).toBeTruthy()
@@ -110,7 +113,7 @@ describe('PanelEv · las dos lecturas de la misma medición', () => {
     // Es lo que hace honesto el interruptor: a valor de carta esta máquina paga, a precio de
     // recompra no. Las dos cosas son ciertas y la conclusión tiene que seguir al número.
     mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     expect(await screen.findByText('CONFIRMED −EV')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /if you keep it/i }))
     await waitFor(() => expect(screen.getByText('CONFIRMED +EV')).toBeTruthy())
@@ -118,11 +121,11 @@ describe('PanelEv · las dos lecturas de la misma medición', () => {
 
   it('la elección se recuerda', async () => {
     mocks.fetchEv.mockResolvedValue({ rows: [conBuyback()], updated_at: 0 })
-    const { unmount } = render(<WinnersPage />)
+    const { unmount } = render(<MachineTrackerPage />)
     fireEvent.click(await screen.findByRole('button', { name: /if you keep it/i }))
     await waitFor(() => expect(screen.getByText('1.115')).toBeTruthy())
     unmount()
-    render(<WinnersPage />)
+    render(<MachineTrackerPage />)
     expect(await screen.findByText('1.115')).toBeTruthy()
   })
 })

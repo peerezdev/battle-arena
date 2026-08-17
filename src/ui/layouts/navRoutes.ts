@@ -7,6 +7,7 @@ export const NAV_ROUTES: Record<HubNav, string> = {
   pack: '/play/arena',
   royale: '/play/royale',
   gacha: '/play/gacha',
+  tracker: '/machine-tracker',
   winners: '/winners',
   mana: '/play/mana',
   help: '/help',
@@ -21,7 +22,9 @@ export function activeNavFromPath(pathname: string): HubNav | null {
   if (pathname.startsWith('/play/royale')) return 'lobby'
   if (pathname.startsWith('/play/gacha')) return 'gacha'
   if (pathname.startsWith('/play/mana')) return 'mana'
-  if (pathname.startsWith('/winners')) return 'winners'
+  if (pathname.startsWith('/machine-tracker')) return 'tracker'
+  // Winners ya no está en la barra, así que su ruta no enciende nada.
+  if (pathname.startsWith('/winners')) return null
   if (pathname.startsWith('/ranking')) return 'ranks'
   // Home ya no está en la barra: es la portada de quien no ha entrado, así que no se marca nada.
   if (pathname === '/home' || pathname.startsWith('/home')) return null
