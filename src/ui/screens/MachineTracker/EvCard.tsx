@@ -48,9 +48,14 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
       <div style={{ padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 14 }}>
         <Dial ratio={ratio} tinta={tinta} modelo={fila.model_ratio} />
         <div style={{ minWidth: 0 }}>
+          {/* Etiquetado a propósito: sin la palabra, el número grande y el del modelo son dos
+              cifras parecidas sin nada que diga cuál es la medida y cuál lo esperado. */}
+          <div style={{ fontFamily: FONTS.mono, fontSize: 8, letterSpacing: '.18em', color: '#5d6774' }}>
+            MEASURED
+          </div>
           <div style={{
             fontFamily: FONTS.mono, fontSize: 25, fontWeight: 700, lineHeight: 1, color: tinta,
-            fontVariantNumeric: 'tabular-nums',
+            fontVariantNumeric: 'tabular-nums', marginTop: 2,
           }}>
             {ratio == null ? '—' : ratio.toFixed(3)}
           </div>
@@ -69,7 +74,10 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
             {fila.model_ratio != null && (
               <>
                 <br />
+                {/* El punto es el MISMO glifo que la marca del dial: es lo que ata el número a su
+                    marca sin gastar una leyenda aparte, que en 112 px no cabe. */}
                 <span style={{ color: '#8b95a3' }}>
+                  <span aria-hidden style={{ color: '#ffffffdd', fontSize: 9 }}>●</span>{' '}
                   model {fila.model_ratio.toFixed(3)}
                   {fila.model_ev != null && ` · $${fila.model_ev.toFixed(2)}`}
                 </span>
@@ -189,18 +197,30 @@ function punto(ratio: number, r: number): [number, number] {
 function Dial({ ratio, tinta, modelo }: { ratio: number | null; tinta: string; modelo?: number | null }) {
   const ang = ratio == null ? null : anguloAguja(ratio)
   const [x, y] = ratio == null ? [56, 60] : punto(ratio, 32)
-  const marca = modelo == null ? null : [punto(modelo, 24), punto(modelo, 42)] as const
+  // r=40: JUSTO POR DENTRO de la banda (que va de 43.5 a 52.5). Comprobado en todo el rango
+  // 0.75–1.25: así el punto nunca toca la etiqueta del 1.00, y queda a 8 px de la punta de la
+  // aguja, que solo coinciden cuando lo medido y lo esperado son lo mismo — y entonces se ven
+  // alineados, que es exactamente lo que ha pasado.
+  const [mx, my] = modelo == null ? [0, 0] : punto(modelo, 40)
   return (
-    <svg width="112" height="68" viewBox="0 0 112 68" style={{ flex: 'none' }} aria-hidden="true">
+    <svg width="112" height="70" viewBox="0 0 112 70" style={{ flex: 'none' }} aria-hidden="true">
       <path d="M8 60 A48 48 0 0 1 104 60" fill="none" stroke="#ffffff14" strokeWidth="9" strokeLinecap="round" />
-      {/* La marca del 1.00, que es lo que convierte el arco en una escala legible. */}
-      <line x1="56" y1="8" x2="56" y2="18" stroke="#ffffff40" strokeWidth="1.5" />
-      <text x="56" y="6" textAnchor="middle" fill="#5d6774" fontFamily="monospace" fontSize="7">1.00</text>
-      <text x="8" y="68" textAnchor="start" fill="#5d6774" fontFamily="monospace" fontSize="6.5">{RATIO_MIN}</text>
-      <text x="104" y="68" textAnchor="end" fill="#5d6774" fontFamily="monospace" fontSize="6.5">{RATIO_MAX}</text>
-      {marca && (
-        <line x1={marca[0][0]} y1={marca[0][1]} x2={marca[1][0]} y2={marca[1][1]}
-              stroke="#ffffffbb" strokeWidth="1.5" strokeLinecap="round" />
+      {/* Tres formas distintas y ni una repetida, que era el fallo: escala en TEXTO, modelo en
+          PUNTO sobre el arco, medida en AGUJA desde el centro.
+          Antes el modelo se dibujaba como una rayita idéntica a la marca de escala del 1.00, así
+          que con un modelo cerca de 1.00 —el caso normal— las dos se solapaban y parecían dos
+          agujas. La rayita se ha quitado: la etiqueta ya dice dónde está el 1.00, y el vértice del
+          arco es ese punto. */}
+      <text x="56" y="10" textAnchor="middle" fill="#5d6774" fontFamily="monospace" fontSize="7">1.00</text>
+      <text x="8" y="69" textAnchor="start" fill="#5d6774" fontFamily="monospace" fontSize="6.5">{RATIO_MIN}</text>
+      <text x="104" y="69" textAnchor="end" fill="#5d6774" fontFamily="monospace" fontSize="6.5">{RATIO_MAX}</text>
+      {modelo != null && (
+        <>
+          {/* El halo oscuro lo separa de la banda: sin él, un punto blanco sobre gris claro se
+              pierde justo en la zona donde más importa, alrededor de 1.00. */}
+          <circle cx={mx} cy={my} r="4.4" fill={COLORS.panel} />
+          <circle cx={mx} cy={my} r="2.8" fill="#ffffffdd" />
+        </>
       )}
       {ang != null && (
         <>

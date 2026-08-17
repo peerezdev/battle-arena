@@ -19,7 +19,10 @@ const fila = (over: Partial<EvRow> = {}): EvRow => ({
   ...over,
 })
 
+/** Ahora sí cuenta agujas: la única `line` del dial es la aguja. La marca de escala del 1.00 se
+ *  quitó —su etiqueta ya lo dice— justo porque era una rayita idéntica a la del modelo. */
 const agujas = (c: HTMLElement) => c.querySelectorAll('svg line').length
+const marcasModelo = (c: HTMLElement) => c.querySelectorAll('svg circle').length
 
 describe('EvCard', () => {
   it('enseña el ratio medido, no el edge, como número principal', () => {
@@ -68,12 +71,12 @@ describe('EvCard', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0)
     expect(screen.getByText('NOT ENOUGH DATA')).toBeTruthy()
     expect(screen.getByText(/Only 12 pulls/)).toBeTruthy()
-    expect(agujas(container)).toBe(1)     // solo la marca del 1.00, sin aguja
+    expect(agujas(container)).toBe(0)     // sin aguja: no hay nada medido que apuntar
   })
 
   it('con medición sí dibuja aguja', () => {
     const { container } = render(<EvCard fila={fila()} />)
-    expect(agujas(container)).toBe(2)     // la marca del 1.00 y la aguja
+    expect(agujas(container)).toBe(1)
   })
 
   it('una máquina que paga de más se pinta en verde', () => {
@@ -134,10 +137,27 @@ describe('EvCard', () => {
     expect(screen.getByText(/model 1.080/)).toBeTruthy()    // lo esperado
   })
 
-  it('el modelo entra como MARCA en el arco, no como otra aguja', () => {
-    // Es una referencia contra la que comparar; dibujarla igual que la aguja las confundiría.
+  it('el modelo NO se dibuja como una aguja', () => {
+    // Era el fallo: se dibujaba como una rayita igual a la de la escala del 1.00, así que con un
+    // modelo cerca de 1.00 las dos se solapaban y se leían como dos agujas.
     const { container } = render(<EvCard fila={conModelo()} />)
-    expect(agujas(container)).toBe(3)     // marca del 1.00, marca del modelo, y la aguja
+    // Una sola línea, la aguja de lo medido.
+    expect(agujas(container)).toBe(1)
+    // El modelo es un PUNTO sobre el arco: dos círculos, el halo y el punto. Más el eje de la
+    // aguja, que también es un círculo.
+    expect(marcasModelo(container)).toBe(3)
+  })
+
+  it('los dos números van etiquetados, para saber cuál es cuál', () => {
+    // Sin las palabras son dos cifras parecidas y nada dice qué es lo medido y qué lo esperado.
+    render(<EvCard fila={conModelo()} />)
+    expect(screen.getByText('MEASURED')).toBeTruthy()
+    expect(screen.getByText(/model 1.080/)).toBeTruthy()
+  })
+
+  it('sin modelo no hay punto: solo el eje de la aguja', () => {
+    const { container } = render(<EvCard fila={fila()} />)
+    expect(marcasModelo(container)).toBe(1)
   })
 
   it('desglosa cada rareza en probabilidad, valor y lo que aporta', () => {
@@ -158,7 +178,8 @@ describe('EvCard', () => {
     // afirmaciones, y lo cierto es que todavía no hemos mirado sus cartas.
     const { container } = render(<EvCard fila={fila()} />)     // el fixture base va sin modelo
     expect(screen.queryByText(/model /)).toBeNull()
-    expect(agujas(container)).toBe(2)                          // sin marca del modelo
+    expect(agujas(container)).toBe(1)                          // la aguja, sin punto del modelo
+    expect(marcasModelo(container)).toBe(1)                    // solo el eje de la aguja
     // Por texto exacto de celda y no buscando en el HTML: "0%" aparece dentro del width:100% de
     // la tabla, así que un `toContain` daba por bueno el test sin mirar una sola celda.
     expect(screen.queryByText('0%')).toBeNull()
