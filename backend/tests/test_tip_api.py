@@ -326,3 +326,78 @@ def test_tip_apagado_ni_siquiera_mira_si_el_destinatario_existe():
 
     assert resp.status_code == 503
     assert resp.json()["detail"] == "tips_disabled"
+
+
+def test_el_destinatario_recibe_el_aviso_con_quien_y_cuanto(monkeypatch):
+    """El aviso llega por el socket del que cobra, no por el chat."""
+    client, priv = _build_client()
+    _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+    # A tiene alias: el aviso tiene que decir el nombre, no la wallet.
+    s = client.session_factory()
+    s.get(User, WALLET_A).alias = "Ana"
+    s.commit(); s.close()
+
+    token_b = _auth_headers(priv, WALLET_B, "wallet-id-bbb")["Authorization"].removeprefix("Bearer ")
+    with client.websocket_connect(f"/ws/chat?token={token_b}") as ws:
+        ws.receive_json()   # history
+        ws.receive_json()   # drops_history
+        ws.receive_json()   # presence
+
+        resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.5},
+                           headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+        assert resp.status_code == 200, resp.text
+
+        aviso = ws.receive_json()
+
+    assert aviso == {"type": "tip", "from": WALLET_A, "fromName": "Ana", "amount": 1.5}
+
+
+def test_si_el_aviso_falla_la_propina_sigue_siendo_correcta(monkeypatch):
+    """El dinero ya se movió y no se deshace.
+
+    Devolver un error porque no se pudo avisar sería mentir sobre lo que ha pasado, y dejaría a
+    quien envió creyendo que puede repetirlo.
+    """
+    client, priv = _build_client()
+    sent = _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+
+    # OJO con el `self`: se reemplaza el método en la CLASE, así que la llamada
+    # `_chat_mgr.send_to_wallet(dest, msg)` pasa tres argumentos, no dos. Sin `self` en la firma
+    # esto reventaría con un TypeError, que el try/except también atrapa: el test pasaría, pero
+    # sin haber ejercitado nunca el fallo que dice probar.
+    async def _revienta(self, wallet, msg):
+        raise RuntimeError("el aviso ha fallado")
+    monkeypatch.setattr("app.chat.ConnectionManager.send_to_wallet", _revienta)
+
+    resp = client.post("/users/me/tip", json={"to": WALLET_B, "amount": 1.5},
+                       headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+
+    assert resp.status_code == 200, resp.text
+    assert sent == [{"from": WALLET_A, "to": WALLET_B, "amount": 1_500_000}]
+    s = client.session_factory()
+    assert s.query(Tip).count() == 1     # la fila sigue ahí
+    s.close()
+
+
+def test_sin_alias_el_aviso_lleva_la_wallet_abreviada(monkeypatch):
+    """La mayoría de jugadores no tiene alias; el aviso no puede quedarse sin decir de quién es."""
+    from app.chat import abbreviate
+    client, priv = _build_client()
+    _mock_money(monkeypatch)
+    _register(client, WALLET_A)
+    _register(client, WALLET_B)
+
+    token_b = _auth_headers(priv, WALLET_B, "wallet-id-bbb")["Authorization"].removeprefix("Bearer ")
+    with client.websocket_connect(f"/ws/chat?token={token_b}") as ws:
+        for _ in range(3):
+            ws.receive_json()
+        client.post("/users/me/tip", json={"to": WALLET_B, "amount": 2},
+                    headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
+        aviso = ws.receive_json()
+
+    assert aviso["fromName"] == abbreviate(WALLET_A)
+    assert aviso["fromName"] != WALLET_A     # abreviada de verdad, no la entera

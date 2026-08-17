@@ -1687,6 +1687,19 @@ def create_app(session_factory, chain: ChainSource,
         source = body.source if body.source in ("profile", "chat") else "profile"
         s.add(Tip(from_wallet=wallet, to_wallet=dest, amount=amount, signature=sig, source=source))
         s.commit()
+        # El aviso va al final y NO puede tumbar la propina: el dinero ya se movió y no se
+        # deshace, así que responder un error por no haber podido avisar sería mentir sobre lo
+        # que ha pasado. Va dirigido, nunca por broadcast: quién le da dinero a quién es asunto
+        # de los dos, y difundirlo publicaría justo lo que se decidió no publicar al dejar los
+        # `/tip` fuera del chat.
+        try:
+            alias = read_user_view(s, wallet, elo_start).get("alias")
+            await _chat_mgr.send_to_wallet(dest, {
+                "type": "tip", "from": wallet, "fromName": alias or abbreviate(wallet),
+                "amount": amount / 1_000_000,
+            })
+        except Exception:
+            logger.exception("propina %s -> %s hecha, pero no se pudo avisar", wallet, dest)
         return {"signature": sig, "amount": amount / 1_000_000, "to": dest}
 
     @app.post("/users/me/nft/withdraw")
