@@ -1,35 +1,77 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act, cleanup } from '@testing-library/react'
-import { TrackerGate } from './TrackerGate'
+import { render, screen, act, cleanup, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import type { TrackerAccess } from '../../../onchain/gachaClient'
+import type { OpenBattle } from '../../../onchain/packBattleClient'
+
+// La puerta consulta las salas abiertas para poder ofrecer a qué entrar, y navega al Lobby.
+const salas = vi.hoisted(() => ({ lista: [] as OpenBattle[], nav: vi.fn() }))
+vi.mock('../../../onchain/useOpenBattles', () => ({ useOpenBattles: () => ({ battles: salas.lista }) }))
+vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'ME' }))
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig<typeof import('react-router-dom')>()),
+  useNavigate: () => salas.nav,
+}))
+
+const { TrackerGate } = await import('./TrackerGate')
+
+const sala = (over: Partial<OpenBattle> = {}): OpenBattle => ({
+  id: 'b1', mode: 'pack', machine_code: 'pokemon_50', price: 50_000_000, buyin: 50_000_000,
+  max_players: 4, players: 1, creator_wallet: 'OTRO', player_wallets: ['OTRO'], ...over,
+} as OpenBattle)
+
+const pintar = (a: TrackerAccess) =>
+  render(<MemoryRouter><TrackerGate acceso={a} /></MemoryRouter>)
 
 const acceso = (over: Partial<TrackerAccess> = {}): TrackerAccess => ({
   allowed: false, wagered_usd: 60, required_usd: 100, missing_usd: 40, window_days: 7, ...over,
 })
 
 describe('el aviso del Machine Tracker', () => {
+  it('detrás del cristal NO hay datos reales', () => {
+    // Es lo que sostiene la puerta: difuminar las tarjetas de verdad sería una puerta de mentira,
+    // porque el blur es CSS y se quita desde el navegador, y los números viajarían igual.
+    const { container } = pintar(acceso())
+    // Los valores del fondo son inventados y están fijados en el módulo, no medidos.
+    expect(container.textContent).toContain('1.194')
+    // Y el fondo es inerte: ni se puede pulsar ni se puede seleccionar.
+    const fondo = container.querySelector('[aria-hidden][style*="blur"]') as HTMLElement
+    expect(fondo).toBeTruthy()
+    expect(fondo.getAttribute('style')).toContain('pointer-events: none')
+    expect(fondo.getAttribute('style')).toContain('user-select: none')
+  })
+
+  it('NO enseña lo que hay detrás del candado', () => {
+    // Se pidió expresamente que no saliera: enseñar "ahora mismo esta máquina paga 1.19" es
+    // regalar justo el dato por el que se pide el wager.
+    const { container } = pintar(acceso())
+    expect(container.textContent).not.toContain('Right now behind')
+  })
+
   it('lo primero que dice es cuánto falta', () => {
     // Es el número con el que el jugador decide. El motivo de la puerta va después: nadie lee la
     // justificación antes de saber si le afecta.
-    render(<TrackerGate acceso={acceso()} />)
+    pintar(acceso())
     expect(screen.getByText('$40 to go')).toBeTruthy()
   })
 
   it('dice sobre cuánto y en cuántos días', () => {
-    render(<TrackerGate acceso={acceso()} />)
-    expect(screen.getByText(/\$100 in Pack Battles or Battle Royale over the last 7 days/)).toBeTruthy()
+    // Por textContent: la cifra va en un <strong>, así que el texto está partido en varios nodos.
+    const { container } = pintar(acceso())
+    expect(container.textContent).toContain('$100')
+    expect(container.textContent).toMatch(/in\s+Pack Battles or Battle Royale over the last 7 days/)
   })
 
   it('dice explícitamente que el gacha NO cuenta', () => {
     // Sin esto, alguien abriría sobres esperando avanzar y no avanzaría.
-    render(<TrackerGate acceso={acceso()} />)
-    expect(screen.getByText(/Gacha pulls do not count/)).toBeTruthy()
+    const { container } = pintar(acceso())
+    expect(container.textContent).toContain("Gacha pulls don't count")
   })
 
   it('explica que la ventana es RODANTE', () => {
     // La alternativa —creer que es un acceso que se gana una vez— lleva a perderlo sin haber hecho
     // nada y no entender por qué.
-    render(<TrackerGate acceso={acceso()} />)
+    pintar(acceso())
     expect(screen.getByText(/Rolling 7-day window/)).toBeTruthy()
     expect(screen.getByText(/anything older drops off/)).toBeTruthy()
   })
@@ -37,31 +79,81 @@ describe('el aviso del Machine Tracker', () => {
   it('enseña lo que ya lleva apostado, no solo lo que falta', () => {
     // "Voy por 60 de 100" motiva; "te faltan 40" a secas no dice si estás cerca de empezar o de
     // terminar.
-    render(<TrackerGate acceso={acceso()} />)
+    pintar(acceso())
     expect(screen.getByText('$60 wagered')).toBeTruthy()
   })
 
   it('con cero apostado no revienta ni pinta una barra rara', () => {
-    const { container } = render(
-      <TrackerGate acceso={acceso({ wagered_usd: 0, missing_usd: 100 })} />)
+    const { container } = pintar(acceso({ wagered_usd: 0, missing_usd: 100 }))
     expect(screen.getByText('$100 to go')).toBeTruthy()
     expect(container.innerHTML).toContain('width: 0%')
   })
 
   it('la barra no se pasa del 100% si se apostó de más', () => {
-    const { container } = render(
-      <TrackerGate acceso={acceso({ wagered_usd: 250, missing_usd: 0 })} />)
+    const { container } = pintar(acceso({ wagered_usd: 250, missing_usd: 0 }))
     expect(container.innerHTML).toContain('width: 100%')
   })
 
   it('usa los valores que trae el backend, no constantes propias', () => {
     // Si el mínimo o la ventana cambian en el servidor, el aviso tiene que seguirlos sin tocar
     // esta pantalla; dos sitios con el mismo número se desincronizan.
-    render(<TrackerGate acceso={acceso({ required_usd: 250, window_days: 14, missing_usd: 190,
-                                        wagered_usd: 60 })} />)
-    expect(screen.getByText(/\$250 in Pack Battles/)).toBeTruthy()
+    const { container } = pintar(acceso({ required_usd: 250, window_days: 14, missing_usd: 190, wagered_usd: 60 }))
+    expect(container.textContent).toMatch(/\$250\s*in Pack Battles/)
     expect(screen.getByText(/Rolling 14-day window/)).toBeTruthy()
     expect(screen.getByText('$190 to go')).toBeTruthy()
+    // Las marcas de la barra también salen del mínimo del backend, no de constantes propias.
+    expect(screen.getByText('$125')).toBeTruthy()
+  })
+})
+
+// ── los atajos: a qué se puede entrar ────────────────────────────────────────
+
+describe('los atajos de la puerta', () => {
+  beforeEach(() => { salas.lista = []; salas.nav.mockClear() })
+
+  it('con una sala abierta enseña su entrada y las plazas libres', () => {
+    // La elige `siguienteLobby`, la misma que recomienda el resultado de una partida.
+    salas.lista = [sala({ players: 3, max_players: 4 })]
+    pintar(acceso())
+    expect(screen.getByText(/Pack Battle · \$50/)).toBeTruthy()
+    expect(screen.getByText(/1 seat left · view lobby/)).toBeTruthy()
+  })
+
+  it('no recomienda una sala en la que ya estoy sentado', () => {
+    salas.lista = [sala({ player_wallets: ['ME'], players: 1 })]
+    pintar(acceso())
+    expect(screen.getByText(/Create a Pack Battle/)).toBeTruthy()
+  })
+
+  it('lleva al LOBBY, no a la sala: entrar cuesta dinero', () => {
+    salas.lista = [sala()]
+    pintar(acceso())
+    fireEvent.click(screen.getByText(/Pack Battle · \$50/))
+    expect(salas.nav).toHaveBeenCalledWith('/play/lobby?mode=pack')
+  })
+
+  it('sin salas de pack, el atajo pasa a CREAR una', () => {
+    pintar(acceso())
+    fireEvent.click(screen.getByText(/Create a Pack Battle/))
+    expect(salas.nav).toHaveBeenCalledWith('/play/lobby?mode=pack&create=1')
+  })
+
+  it('sin salas de royale NO promete crear una: todavía no se puede', () => {
+    // El modal la tiene bloqueada con su etiqueta SOON, así que ofrecer crearla llevaría a un
+    // callejón. Se dice que no hay ninguna abierta y se lleva al Lobby.
+    pintar(acceso())
+    expect(screen.getByText(/No Battle Royale open/)).toBeTruthy()
+    fireEvent.click(screen.getByText(/No Battle Royale open/))
+    expect(salas.nav).toHaveBeenCalledWith('/play/lobby?mode=royale')
+  })
+
+  it('la royale que se enseña es la más cerca de empezar', () => {
+    salas.lista = [
+      sala({ id: 'lejos', mode: 'royale', players: 1, max_players: 10, buyin: 20_000_000 }),
+      sala({ id: 'cerca', mode: 'royale', players: 9, max_players: 10, buyin: 70_000_000 }),
+    ]
+    pintar(acceso())
+    expect(screen.getByText(/1 seat left · view lobby/)).toBeTruthy()
   })
 })
 
@@ -95,7 +187,7 @@ const dejarResolver = async () => {
   for (let i = 0; i < 3; i++) await act(async () => { await Promise.resolve() })
 }
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks() })
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); salas.lista = [] })
 
 describe('MachineTrackerPage', () => {
   it('con acceso enseña el panel y NO el aviso', async () => {

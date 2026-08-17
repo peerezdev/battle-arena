@@ -5,6 +5,7 @@ import { useMachines } from '../../useMachines'
 import { openBattleToLive } from '../Hub/openBattleToLive'
 import { tintFor } from './royaleShared'
 import type { BattleMode } from '../../../onchain/packBattleClient'
+import { siguienteLobby } from './siguienteLobby'
 
 const MAX_AVATARS = 5
 
@@ -25,15 +26,10 @@ export function NextBattlePanel({ mode, currentBattleId, meWallet, compact = fal
   const { battles } = useOpenBattles()
   const machines = useMachines()
 
-  // Same mode, not this battle, still has room, and not one I'm already sitting in.
-  const candidates = battles
-    .filter((b) => b.mode === mode && b.id !== currentBattleId && b.players < b.max_players)
-    .filter((b) => !meWallet || !(b.player_wallets ?? []).includes(meWallet))
-  // Closest to starting first; tie → the bigger lobby (more action).
-  const next = [...candidates].sort((a, b) => {
-    const freeA = a.max_players - a.players, freeB = b.max_players - b.players
-    return freeA - freeB || b.max_players - a.max_players
-  })[0]
+  // La selección vive en `siguienteLobby`, compartida con la puerta del Machine Tracker: las dos
+  // pantallas contestan lo mismo, "¿a qué puedo entrar ahora?", y con dos copias una habría
+  // empezado a recomendar salas donde el jugador ya está sentado.
+  const next = siguienteLobby(battles, { mode, excluirId: currentBattleId, meWallet })
 
   const base = mode === 'royale' ? 'NEXT ROYALE' : 'NEXT BATTLE'
   const title = compact ? `${base} FILLING` : base

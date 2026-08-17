@@ -302,6 +302,25 @@ describe('Lobby · el aviso de la demo', () => {
     expect(guia.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('`?create=1` abre el modal al llegar, y consume el parámetro', () => {
+    // Lo usa el atajo de la puerta del tracker cuando no hay ninguna sala: mandar al Lobby y que el
+    // jugador busque el botón sería perderlo justo cuando se le acaba de decir qué hacer.
+    // Y se consume: sin quitarlo, cerrar el modal y recargar lo volvería a abrir.
+    mocks.battles = []
+    render(
+      <MemoryRouter initialEntries={['/play/lobby?mode=pack&create=1']}>
+        <LobbyPage />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('heading', { name: 'Create battle' })).toBeTruthy()
+  })
+
+  it('sin `create=1` el modal NO se abre solo', () => {
+    mocks.battles = []
+    pintar('pack')
+    expect(screen.queryByRole('heading', { name: 'Create battle' })).toBeNull()
+  })
+
   it('sale incluso sin ninguna partida abierta', () => {
     // Es cuando más falta hace: no hay nada que mirar, así que el vídeo es lo único que explica a
     // qué se juega.
