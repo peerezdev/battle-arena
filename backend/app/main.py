@@ -1030,10 +1030,22 @@ def create_app(session_factory, chain: ChainSource,
         if authorization and authorization.startswith("Bearer ") and privy is not None:
             try:
                 wallet = privy.embedded_solana_wallet(authorization[len("Bearer "):])
-            except PrivyAuthError:
+            except PrivyAuthError as e:
                 # Un token caducado no es un error de esta pantalla: se trata como "sin sesión" y
                 # el aviso le dirá que entre.
+                #
+                # Pero SE ANOTA. Sin esta línea, "no manda token" y "manda uno que no verifica"
+                # producen la misma pantalla —"llevas 0 USDC apostados"— y desde el servidor no hay
+                # forma de distinguirlas. Pasó: un jugador con 525 USDC apostados veía 0 y hubo que
+                # descartar a mano el cálculo, la ventana y la base antes de mirar aquí. El motivo
+                # va en el log, no en la respuesta: al jugador no le sirve de nada.
+                logger.warning("tracker-access: token presente pero rechazado (%s): %s",
+                               type(e).__name__, e)
                 wallet = None
+        elif authorization:
+            # Cabecera que no es un Bearer: casi siempre un cliente mal montado, y en silencio se
+            # ve igual que no haber entrado.
+            logger.warning("tracker-access: Authorization presente pero no es 'Bearer …'")
         return tracker_access.acceso(s, wallet, lista_blanca=_tracker_allow)
 
     @app.get("/gacha/ev/live")
