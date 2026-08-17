@@ -22,7 +22,7 @@ export function LiveDropsStrip() {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, maxWidth: '100%', overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap' }}>
       {drops.length === 0 ? (
-        <span style={{ fontSize: 11, color: COLORS.muted }}>No drops yet — open a pack.</span>
+        <span style={{ fontSize: 11, color: COLORS.muted }}>No drops yet. Open a pack.</span>
       ) : (
         drops.map((d) => {
           const glow = rarityGlow(d.rarity)

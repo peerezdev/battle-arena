@@ -403,13 +403,13 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
         >
           <span>
             <span style={{ color: COLORS.green, fontWeight: 700 }}>A</span>
-            <span style={{ color: COLORS.muted }}> — rounds: </span>
+            <span style={{ color: COLORS.muted }}> · rounds: </span>
             <span style={{ color: COLORS.green, fontWeight: 800 }}>{winsA}</span>
           </span>
           <span style={{ color: COLORS.muted }}>vs</span>
           <span>
             <span style={{ color: COLORS.violet, fontWeight: 800 }}>{winsB}</span>
-            <span style={{ color: COLORS.muted }}> :rounds — </span>
+            <span style={{ color: COLORS.muted }}> :rounds · </span>
             <span style={{ color: COLORS.violet, fontWeight: 700 }}>B</span>
           </span>
         </div>
@@ -507,7 +507,7 @@ export function OnchainBattleScreen({ token, battle, onFinished }: Props) {
               marginBottom: '12px',
             }}
           >
-            Confirm & Commit — {total}/{availableEnergy} energy
+            Confirm & Commit · {total}/{availableEnergy} energy
             {remaining > 0 ? ` · ${remaining} banked` : ''}
           </motion.button>
         )}

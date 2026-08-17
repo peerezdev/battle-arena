@@ -14,7 +14,7 @@ export const HELP_MODES: HelpMode[] = [
     iconPaths: '<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>' },
   { id: 'gacha', name: 'Gacha', tag: 'SOLO · PULL → PLAY', accent: '#a98bff',
     desc: 'Open Collector Crypt packs on your own to build your collection. Every card you pull is a real graded NFT you own, and you can take it straight into a battle. No platform fee on solo pulls.',
-    steps: ['Choose a machine by set and price tier.', 'Pull your card — a provably-fair reveal.', 'Keep it, or jump straight into a battle.'],
+    steps: ['Choose a machine by set and price tier.', 'Pull your card, with a provably-fair reveal.', 'Keep it, or jump straight into a battle.'],
     iconPaths: '<rect x="3" y="3" width="12" height="17" rx="1.2"/><path d="M3 9h12M3 15h12M7 9v6M11 9v6"/><path d="M5.5 5.5h7M5.5 7h7"/><path d="M15 11h2v3h-2"/><circle cx="19.5" cy="6" r="2"/><path d="M19.5 8v3"/>' },
 ]
 

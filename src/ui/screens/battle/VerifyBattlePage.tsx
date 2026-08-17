@@ -144,12 +144,12 @@ export function VerifyBattlePage() {
       <p style={{ fontFamily: FONTS.body, fontSize: 13, lineHeight: 1.6, color: COLORS.muted, marginTop: 10 }}>
         Every pack opened in a battle leaves two public records. The <b>Collector Crypt VRF</b> shows
         what the pack contained and that the draw was fair. The <b>purchase transaction</b> shows who
-        paid for it — your own wallet signed it, and the memo below travels inside that same
+        paid for it, because your own wallet signed it, and the memo below travels inside that same
         transaction.
       </p>
       <p style={{ fontFamily: FONTS.body, fontSize: 13, lineHeight: 1.6, color: COLORS.muted, marginTop: 10 }}>
         You need both. Collector Crypt credits a battle pull to the wallet that holds the game's
-        cards, not to yours — so the VRF alone shows the pull but not the buyer. The transaction is
+        cards, not to yours, so the VRF alone shows the pull but not the buyer. The transaction is
         what ties it to you, and it can be checked without trusting us.
       </p>
 
@@ -163,7 +163,7 @@ export function VerifyBattlePage() {
       )}
       {battle && pulls.length === 0 && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, marginTop: 20 }}>
-          No pulls to verify yet — they appear once the battle ends.
+          No pulls to verify yet. They appear once the battle ends.
         </div>
       )}
 

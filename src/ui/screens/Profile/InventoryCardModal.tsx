@@ -184,7 +184,7 @@ export function InventoryCardModal({ card, onClose, onSold }: {
   } else if (bb.kind === 'sold') {
     actions = (
       <div>
-        <div style={{ fontSize: 13, color: COLORS.green, fontWeight: 700, marginBottom: 10 }}>Sold — {formatUsd(buybackUsd(bb.amount))} credited.</div>
+        <div style={{ fontSize: 13, color: COLORS.green, fontWeight: 700, marginBottom: 10 }}>Sold · {formatUsd(buybackUsd(bb.amount))} credited.</div>
         <button onClick={onClose} style={{ ...secondaryBtn, width: '100%', flex: 'none' }}>Done</button>
       </div>
     )

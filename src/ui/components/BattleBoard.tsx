@@ -736,7 +736,7 @@ function FrontColumn(props: FrontColumnProps) {
           fontSize: s(13, 20),
           letterSpacing: '.3em',
         }}
-        aria-label="Opponent zone — hidden"
+        aria-label="Opponent zone, hidden"
       >
         ···
       </div>
@@ -1061,7 +1061,7 @@ export function BattleBoard(props: BattleBoardProps) {
       const winnerSol = winner === 'a' ? solA : solB
       const loserSol = winner === 'a' ? solB : solA
       const winName = winner === 'a' ? nameA : nameB
-      return `Solidity tiebreak: ${winName} wins — Solidity ${winnerSol} vs ${loserSol}`
+      return `Solidity tiebreak: ${winName} wins · Solidity ${winnerSol} vs ${loserSol}`
     }
     return null
   }
@@ -1240,7 +1240,7 @@ export function BattleBoard(props: BattleBoardProps) {
               whiteSpace: 'nowrap',
             }}
           >
-            {oppCard.gradeCompany} {oppCard.grade} — {oppCard.name}
+            {oppCard.gradeCompany} {oppCard.grade} · {oppCard.name}
           </div>
           <OpponentReserve wide={wide} />
         </div>
@@ -1382,7 +1382,7 @@ export function BattleBoard(props: BattleBoardProps) {
                 whiteSpace: 'nowrap',
               }}
             >
-              {myCard.gradeCompany} {myCard.grade} — {myCard.name}
+              {myCard.gradeCompany} {myCard.grade} · {myCard.name}
             </div>
             {props.phase === 'allocate' && (
               <ManaCrystals

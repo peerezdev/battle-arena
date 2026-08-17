@@ -84,7 +84,7 @@ export function OverviewTab({ wallet, stats }: { wallet?: string; stats: UserSta
               </div>
             </div>
           ) : (
-            <div style={{ color: COLORS.muted, fontSize: 13, padding: '14px 0' }}>No cards pulled yet — open a pack to set your best hit.</div>
+            <div style={{ color: COLORS.muted, fontSize: 13, padding: '14px 0' }}>No cards pulled yet. Open a pack to set your best hit.</div>
           )}
         </section>
 
@@ -120,7 +120,7 @@ export function OverviewTab({ wallet, stats }: { wallet?: string; stats: UserSta
               </div>
             </div>
           ) : (
-            <div style={{ color: COLORS.muted, fontSize: 13, padding: '14px 0' }}>No wins yet — your biggest haul will show up here.</div>
+            <div style={{ color: COLORS.muted, fontSize: 13, padding: '14px 0' }}>No wins yet. Your biggest haul will show up here.</div>
           )}
         </section>
       </div>

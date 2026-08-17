@@ -236,7 +236,7 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
 
         {soldCount > 0 && (
           <div style={{ marginTop: 14, fontFamily: FONTS.mono, fontSize: 11, color: COLORS.green }}>
-            Sold {soldCount} card{soldCount > 1 ? 's' : ''} back for USDC — credited to your balance.
+            Sold {soldCount} card{soldCount > 1 ? 's' : ''} back for USDC. Credited to your balance.
           </div>
         )}
       </section>
@@ -370,7 +370,7 @@ export function WinningsBuyback({ cards, winnerWallet, lootTotal, reducedMotion 
 
       {soldCount > 0 && (
         <div style={{ margin: '12px 14px 0', fontFamily: FONTS.mono, fontSize: 10.5, color: COLORS.green }}>
-          Sold {soldCount} card{soldCount > 1 ? 's' : ''} back for USDC — credited to your balance.
+          Sold {soldCount} card{soldCount > 1 ? 's' : ''} back for USDC. Credited to your balance.
         </div>
       )}
     </section>

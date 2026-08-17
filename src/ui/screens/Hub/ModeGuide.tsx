@@ -7,11 +7,11 @@ const KEY = 'ba.lobbyGuideOpen'
 interface Mode { id: string; name: string; tag: string; accent: string; desc: string; icon: ReactNode }
 const S = (d: string) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: d }} />
 const MODES: Mode[] = [
-  // 2–4 y no "1V1": `PLAYER_COUNTS_BY_MODE` en CreateBattleModal permite 2, 3 o 4. El texto venía
-  // de cuando pack era solo un duelo, y la descripción arrastraba el mismo error hablando de "las
-  // dos cartas" — con cuatro jugadores hay cuatro.
-  { id: 'pack', name: 'Pack Battle', tag: '2–4 PLAYERS · WINNER TAKES ALL', accent: COLORS.green, desc: 'Everyone opens a pack at the same time. The highest pull takes every card on the table.', icon: S('<polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/>') },
-  { id: 'royale', name: 'Battle Royale', tag: '2–10 PLAYERS', accent: '#ff6bb5', desc: 'Up to 10 players open packs in rounds. The lowest value drops each round — last one standing takes the pot.', icon: S('<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>') },
+  // Los rangos salen de `PLAYER_COUNTS_BY_MODE` en CreateBattleModal: pack 2-4, royale 5-10. Los
+  // dos venían mal (pack decía "1V1", royale "2-10"), y para un recién llegado esto es lo primero
+  // que lee, así que un rango mal le manda a crear una partida que no puede.
+  { id: 'pack', name: 'Pack Battle', tag: '2-4 PLAYERS · WINNER TAKES ALL', accent: COLORS.green, desc: 'Everyone opens a pack at the same time. The highest pull takes every card on the table.', icon: S('<polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/>') },
+  { id: 'royale', name: 'Battle Royale', tag: '5-10 PLAYERS', accent: '#ff6bb5', desc: 'Five to ten players open packs in rounds. The lowest value drops out each round, and the last one standing takes the pot.', icon: S('<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>') },
   { id: 'gacha', name: 'Gacha', tag: 'PULL → PLAY', accent: '#a98bff', desc: 'Open Collector Crypt packs solo and jump straight into a battle with whatever card you pull.', icon: S('<rect x="3" y="3" width="12" height="17" rx="1.2"/><path d="M3 9h12M3 15h12M7 9v6M11 9v6"/><path d="M5.5 5.5h7M5.5 7h7"/><path d="M15 11h2v3h-2"/><circle cx="19.5" cy="6" r="2"/><path d="M19.5 8v3"/>') },
 ]
 
@@ -56,7 +56,7 @@ export function ModeGuide() {
           fontFamily: FONTS.mono, fontSize: 11, fontWeight: 400, letterSpacing: '.26em',
           color: COLORS.green,
         }}>
-          How each mode works
+          HOW EACH MODE WORKS
         </h3>
         <div style={{ flex: 'none', display: 'flex', gap: 10, marginLeft: 'auto' }}>
           <Link to="/help" style={{ ...pillBtn, display: 'inline-flex', alignItems: 'center', color: COLORS.green, borderColor: '#00ffc466', background: '#00ffc41a' }}>Open Help guide →</Link>

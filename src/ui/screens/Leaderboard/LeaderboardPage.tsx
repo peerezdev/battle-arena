@@ -87,7 +87,7 @@ export function LeaderboardPage() {
     try {
       const res = await applyReferralCode(identityToken, myWallet, codeInput.trim())
       setMyCode(res.code)
-      setApplyMsg({ ok: true, text: `Applied ${res.code} — +${Math.round(res.boost_pct * 100)}% boost` })
+      setApplyMsg({ ok: true, text: `Applied ${res.code} · +${Math.round(res.boost_pct * 100)}% boost` })
       setCodeInput('')
     } catch (e) {
       setApplyMsg({ ok: false, text: (e as Error).message })
@@ -147,7 +147,7 @@ export function LeaderboardPage() {
               Your stats are being tracked
             </h2>
             <p style={{ margin: '10px 0 0', maxWidth: 520, fontFamily: FONTS.body, fontSize: 14.5, lineHeight: 1.6, color: COLORS.muted }}>
-              Every battle, win and Gimmighoul you earn is already counting. We'll publish the ranking soon — keep playing so you land high when it goes live.
+              Every battle, win and Gimmighoul you earn is already counting. We'll publish the ranking soon, so keep playing to land high when it goes live.
             </p>
           </div>
 
@@ -285,7 +285,7 @@ function CreatorCodeCard({ myWallet, identityToken, myCode, codeInput, setCodeIn
       </div>
       {myCode ? (
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: COLORS.text }}>
-          Applied: <strong style={{ color: COLORS.green }}>{myCode}</strong> — boosting your Gimmighouls.
+          Applied: <strong style={{ color: COLORS.green }}>{myCode}</strong>, boosting your Gimmighouls.
         </p>
       ) : (
         <>

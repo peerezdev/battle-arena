@@ -6,12 +6,27 @@ import { ModeGuide } from './ModeGuide'
 beforeEach(() => localStorage.clear())
 
 describe('ModeGuide', () => {
-  it('Pack Battle son 2–4 jugadores, NO 1v1', () => {
+  it('Pack Battle son 2-4 jugadores, NO 1v1', () => {
     // Arrastraba "1V1" de cuando pack era solo un duelo. `PLAYER_COUNTS_BY_MODE` permite 2, 3 o 4,
     // y para un recién llegado esto es lo primero que lee: si dice 1v1, empieza equivocado.
     render(<MemoryRouter><ModeGuide /></MemoryRouter>)
-    expect(screen.getByText(/2–4 PLAYERS/)).toBeTruthy()
+    expect(screen.getByText(/2-4 PLAYERS/)).toBeTruthy()
     expect(screen.queryByText(/1V1/i)).toBeNull()
+  })
+
+  it('Battle Royale son de 5 a 10 jugadores, no "hasta 10"', () => {
+    // `PLAYER_COUNTS_BY_MODE` da royale [5..10]: no se puede crear una de dos, así que "2-10" o
+    // "up to 10" mandaban a intentar algo imposible.
+    render(<MemoryRouter><ModeGuide /></MemoryRouter>)
+    expect(screen.getByText(/5-10 PLAYERS/)).toBeTruthy()
+    expect(screen.getByText(/Five to ten players/)).toBeTruthy()
+    expect(screen.queryByText(/Up to 10 players/i)).toBeNull()
+  })
+
+  it('ninguna descripción usa guion largo', () => {
+    // Los guiones largos en copy se leen como texto hecho por una máquina.
+    const { container } = render(<MemoryRouter><ModeGuide /></MemoryRouter>)
+    expect(container.textContent).not.toContain('—')
   })
 
   it('la descripción de pack tampoco habla de "las dos cartas"', () => {
@@ -23,7 +38,8 @@ describe('ModeGuide', () => {
 
   it('el rótulo dice qué es la caja, y no "Get Started"', () => {
     render(<MemoryRouter><ModeGuide /></MemoryRouter>)
-    expect(screen.getByRole('heading', { name: 'How each mode works' })).toBeTruthy()
+    // En mayúsculas, como el resto de los rótulos de la app.
+    expect(screen.getByRole('heading', { name: 'HOW EACH MODE WORKS' })).toBeTruthy()
     expect(screen.queryByText(/get started/i)).toBeNull()
   })
 
@@ -39,7 +55,7 @@ describe('ModeGuide', () => {
     // "Got it" tiene que estar donde se mira al llegar, no al final de un bloque que ya se decidió
     // no leer.
     render(<MemoryRouter><ModeGuide /></MemoryRouter>)
-    const rotulo = screen.getByRole('heading', { name: 'How each mode works' })
+    const rotulo = screen.getByRole('heading', { name: 'HOW EACH MODE WORKS' })
     const gotIt = screen.getByRole('button', { name: /got it/i })
     const primeraTarjeta = screen.getByText('Pack Battle')
     // Por posición en el DOM: el botón va antes que las tarjetas.

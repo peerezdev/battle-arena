@@ -95,7 +95,7 @@ export function ManaDuelFlow() {
         <BattleBoard
           phase="allocate"
           playerKey="a"
-          playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Player A)` : `You — ${nameA}`}
+          playerLabel={setup!.opponent === 'hotseat' ? `${nameA} (Player A)` : `You · ${nameA}`}
           onCommit={commitA}
           state={state}
           timerSeconds={setup!.timerSeconds}

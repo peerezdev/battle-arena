@@ -96,7 +96,6 @@ export function LobbyPage() {
       <RoyaleDemoNotice />
 
       <QuickMatch
-        mode={modos.size === 1 ? [...modos][0] : 'pack'}
         onCreate={() => setCreateOpen(true)}
         onPlayDemo={modos.has('pack') ? () => setDemoOpen(true) : undefined}
         canCreate={modos.size === 1 && modos.has('royale') ? canCreateRoyale(meWallet) : true}

@@ -34,7 +34,7 @@ export const MOCK_DROPS: DropItem[] = [
 ]
 
 export const MOCK_CHAT: ChatMsg[] = [
-  { id: 'm1', user: 'mole', color: '#b78cff', ts: '15:49', text: 'smacking the bot lol — 3-0 in $250s' },
+  { id: 'm1', user: 'mole', color: '#b78cff', ts: '15:49', text: 'smacking the bot lol, 3-0 in $250s' },
   { id: 'm2', user: 'Netti', mod: true, color: '#00ffc4', ts: '15:50', text: 'double rare 👀 that\'s a big win' },
   { id: 'm3', user: 'shalev123', color: '#00ffc4', ts: '15:51', text: 'won a Charizard from a $50 pack 🔥' },
   { id: 'm4', user: 'kappa', color: '#b78cff', ts: '15:52', text: 'anyone up for a royale?' },

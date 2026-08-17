@@ -287,7 +287,7 @@ describe('Lobby · el aviso de la demo', () => {
     // Contesta "¿qué es esto?", y esa pregunta llega antes que "no pagues sin ver el vídeo".
     mocks.battles = []
     pintar('all')
-    const guia = screen.getByText(/How each mode works/)
+    const guia = screen.getByText(/How each mode works/i)
     const demo = screen.getByTestId('royale-demo')
     // Por posición en el DOM y no por índice en el texto: el aviso está doblado y no aporta texto,
     // así que comparar cadenas daba una aserción que se cumplía sola.

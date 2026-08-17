@@ -141,7 +141,7 @@ function PanelEv() {
     return (
       <Aviso>
         Couldn&apos;t load the tracker. It measures the live Collector Crypt feed, so this is
-        usually temporary — reload in a moment.
+        usually temporary. Reload in a moment.
       </Aviso>
     )
   }

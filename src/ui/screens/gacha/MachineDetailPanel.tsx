@@ -46,7 +46,7 @@ const RARITY_COLOR: Record<string, string> = {
   Common: RARITY.common, common: RARITY.common,
 }
 
-const TURBO_ON_MSG = 'Turbo activated — Commons will be auto-sold'
+const TURBO_ON_MSG = 'Turbo activated. Commons will be auto-sold'
 
 export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, freeSpinsError, freeSpinsDetalle, onFreePack }: Props) {
   const reduced = useReducedMotion()
@@ -245,7 +245,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, f
             color: COLORS.muted,
           }}
         >
-          ⚠ This machine is currently off — try another pack.
+          ⚠ This machine is currently off. Try another pack.
         </div>
       )}
 

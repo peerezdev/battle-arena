@@ -31,7 +31,7 @@ export function HelpPage() {
         <article style={{ flex: 1, minWidth: 0, width: '100%', alignSelf: 'stretch' }}>
           <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, letterSpacing: '.26em', color: COLORS.green, marginBottom: 14 }}>HELP CENTER</div>
           <h1 style={{ margin: '0 0 14px', fontFamily: FONTS.display, fontSize: 'clamp(30px,4.4vw,46px)', fontWeight: 700, lineHeight: 1.02, letterSpacing: '-.03em' }}>How Collector Arena works</h1>
-          <p style={{ margin: '0 0 34px', maxWidth: 620, fontSize: 16.5, lineHeight: 1.62, color: '#9aa4b2' }}>Every game uses your graded Collector Crypt NFTs as the playing piece. Card value can give an edge, but skill and luck decide the winner — and settlement is trustless on Solana.</p>
+          <p style={{ margin: '0 0 34px', maxWidth: 620, fontSize: 16.5, lineHeight: 1.62, color: '#9aa4b2' }}>Every game uses your graded Collector Crypt NFTs as the playing piece. Card value can give an edge, but skill and luck decide the winner, and settlement is trustless on Solana.</p>
 
           <h2 id="modes" style={{ ...h2, scrollMarginTop: 90 }}>Game modes</h2>
           <div style={hr} />

@@ -95,7 +95,7 @@ export function DemoPage() {
             {missing.length > 0 && (
               <div style={{ ...card, marginTop: 20, borderColor: `${POT_WARN}55`, background: 'rgba(245,197,66,.06)' }}>
                 <div style={{ fontFamily: FONTS.mono, fontSize: 11.5, color: POT_WARN }}>
-                  El pool muestreado no trae {missing.join(', ')} — esas tiradas caerán al sorteo normal.
+                  El pool muestreado no trae {missing.join(', ')}, así que esas tiradas caerán al sorteo normal.
                 </div>
               </div>
             )}

@@ -364,7 +364,7 @@ export default function GachaVault() {
     if (!selected || !identityToken) return
     const total = (selected.price ?? 0) * count
     if (usdc != null && usdc < total) {
-      showToast(`Insufficient USDC — ${count} pack${count === 1 ? '' : 's'} cost $${total}. Deposit and try again.`, 'error')
+      showToast(`Insufficient USDC. ${count} pack${count === 1 ? '' : 's'} cost $${total}. Deposit and try again.`, 'error')
       return
     }
     const submitted: string[] = []
@@ -532,7 +532,7 @@ export default function GachaVault() {
             marginTop: 6,
           }}
         >
-          Open packs solo — keep them or sell back.
+          Open packs solo, then keep them or sell back.
         </div>
       </div> */}
 
@@ -1771,7 +1771,7 @@ export function YoloSummaryOverlay({ results, machineCodes, buybackPct, onClose 
                           <span style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted }} title="Buyback value">↩ {formatUsd(buyback)}</span>
                         </div>
                       )}
-                      {st === 'failed' && <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.red, marginTop: 2 }}>Sell failed — kept</div>}
+                      {st === 'failed' && <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.red, marginTop: 2 }}>Sell failed, kept</div>}
                       {decidable && (
                         <div style={{ display: 'flex', marginTop: 7, borderRadius: 8, overflow: 'hidden', border: `1px solid ${COLORS.border}` }}>
                           <button onClick={() => mint && setSell((s) => ({ ...s, [mint]: false }))} disabled={claiming}

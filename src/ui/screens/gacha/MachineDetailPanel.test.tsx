@@ -40,7 +40,7 @@ describe('MachineDetailPanel · aviso del turbo en móvil', () => {
     mount()
     fireEvent.click(turboIcon())
     expect(showToast).toHaveBeenCalledTimes(1)
-    expect(showToast).toHaveBeenCalledWith('Turbo activated — Commons will be auto-sold', 'success')
+    expect(showToast).toHaveBeenCalledWith('Turbo activated. Commons will be auto-sold', 'success')
   })
 
   it('al apagarlo RETIRA el aviso en vez de sacar otro', () => {

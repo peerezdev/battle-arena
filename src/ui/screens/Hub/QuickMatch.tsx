@@ -1,31 +1,15 @@
 import { COLORS, GRADIENT, FONTS } from '../../theme'
 import { useReducedMotion } from '../../useReducedMotion'
 
-type QuickMode = 'pack' | 'royale'
-
-// `kicker` y `desc` son opcionales: en Battle Royale este bloque va justo DEBAJO de
-// RoyaleDemoNotice, que ya presenta el modo y pide ver la demo antes de pagar. Repetir aquí el
-// rótulo y la descripción era decir lo mismo dos veces en la misma pantalla, así que el royale se
-// queda solo con el titular.
-const MODE_COPY: Record<QuickMode, { name: string; lead: string; kicker?: string; desc?: string; cta: string }> = {
-  pack: {
-    name: 'Pack Battle',
-    lead: 'Jump into a',
-    kicker: 'Quick match',
-    desc: 'Two to four players open the same packs, one or more each. Every card adds to your total, and the highest total takes them all.',
-    cta: 'Create Pack Battle',
-  },
-  royale: {
-    name: 'Battle Royale',
-    // "the next" y no "a": aquí abajo están los lobbies abiertos, así que se entra al siguiente,
-    // no a uno cualquiera.
-    lead: 'Jump into the next',
-    cta: 'Create Battle Royale',
-  },
-}
+// Se queda SOLO en botones. Antes traía rótulo, titular y descripción, y los tres estaban de más
+// en el Lobby unificado: la guía de modos de arriba ya explica a qué se juega, y las tarjetas de
+// abajo ya dicen qué hay abierto. Lo único que faltaba aquí era la acción.
+//
+// Y el botón dice "Create Match" a secas: el modo se elige dentro del modal, así que prometer
+// "Create Pack Battle" con los dos modos a la vista sería mentir a medias.
+const CTA = 'Create Match'
 
 interface Props {
-  mode?: QuickMode
   onCreate: () => void
   /** When omitted, the free-demo link is hidden (e.g. Battle Royale has no demo). */
   onPlayDemo?: () => void
@@ -34,71 +18,13 @@ interface Props {
 }
 
 export function QuickMatch({
-  mode = 'pack',
   onCreate,
   onPlayDemo,
   canCreate = true,
 }: Props) {
   const reducedMotion = useReducedMotion()
-  const copy = MODE_COPY[mode]
   return (
     <div style={{ padding: 'clamp(6px,1vw,14px) 2px' }}>
-        {/* Kicker */}
-        {copy.kicker && (
-          <div
-            style={{
-              fontFamily: FONTS.mono,
-              fontSize: 10.5,
-              letterSpacing: '0.18em',
-              color: COLORS.violet,
-              textTransform: 'uppercase',
-              marginBottom: 10,
-            }}
-          >
-            {copy.kicker}
-          </div>
-        )}
-
-        {/* Heading */}
-        <h2
-          style={{
-            fontFamily: FONTS.display,
-            fontWeight: 800,
-            fontSize: 32,
-            letterSpacing: '-0.01em',
-            marginBottom: copy.desc ? 10 : 22,
-            color: COLORS.text,
-            maxWidth: 520,
-          }}
-        >
-          {copy.lead}{' '}
-          <span
-            style={{
-              background: GRADIENT,
-              WebkitBackgroundClip: 'text',
-              backgroundClip: 'text',
-              color: 'transparent',
-            }}
-          >
-            {copy.name}
-          </span>
-        </h2>
-
-        {/* Description */}
-        {copy.desc && (
-          <p
-            style={{
-              color: COLORS.muted,
-              fontSize: 13.5,
-              marginBottom: 22,
-              maxWidth: 460,
-            }}
-          >
-            {copy.desc}
-          </p>
-        )}
-
-        {/* CTA row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
           {canCreate && (
             <button
@@ -117,7 +43,7 @@ export function QuickMatch({
                 cursor: 'pointer',
               }}
             >
-              <span style={{ position: 'relative', zIndex: 1 }}>{copy.cta}</span>
+              <span style={{ position: 'relative', zIndex: 1 }}>{CTA}</span>
               <span
                 aria-hidden
                 style={{

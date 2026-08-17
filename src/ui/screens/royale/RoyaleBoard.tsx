@@ -171,7 +171,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
               letterSpacing: '.03em',
             }}
           >
-            You're out — watching the finish
+            You're out. Watching the finish
           </div>
         )}
 
@@ -401,7 +401,7 @@ export function RoyaleBoard({ state, onPlayRound, onFinish, reducedMotion }: Pro
                   marginBottom: '6px',
                 }}
               >
-                ROUND {last.round} — ELIMINATED
+                ROUND {last.round} · ELIMINATED
               </div>
               {(() => {
                 const eliminated = state.players.find((p) => p.id === last.eliminatedId)

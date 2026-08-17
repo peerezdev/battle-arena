@@ -177,7 +177,7 @@ export function WinnersPage() {
           eso pueden salir menos de los pedidos. Decirlo evita que parezca que faltan datos. */}
       {filas && rareza !== 'All' && rareza !== 'Epic' && filas.length < cantidad && (
         <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
-          Showing {filas.length} — Collector Crypt only filters Epic upstream, so the rest are
+          Showing {filas.length}. Collector Crypt only filters Epic upstream, so the rest are
           picked out of the last {cantidad} pulls.
         </div>
       )}

@@ -3,60 +3,45 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { QuickMatch } from './QuickMatch'
 
 describe('QuickMatch', () => {
-  it('fires create/demo handlers', () => {
+  it('dispara crear y demo', () => {
     const onCreate = vi.fn(), onPlayDemo = vi.fn()
     render(<QuickMatch onCreate={onCreate} onPlayDemo={onPlayDemo} />)
     fireEvent.click(screen.getByText(/create/i)); expect(onCreate).toHaveBeenCalled()
     fireEvent.click(screen.getByText(/demo/i)); expect(onPlayDemo).toHaveBeenCalled()
   })
 
-  it('adapts copy per mode and hides the demo when onPlayDemo is omitted (royale)', () => {
-    render(<QuickMatch mode="royale" onCreate={vi.fn()} />)
-    expect(screen.getByText('Battle Royale')).toBeTruthy()
-    expect(screen.getByText(/create battle royale/i)).toBeTruthy()
+  it('SOLO botones: ni rótulo, ni titular, ni descripción', () => {
+    // Los tres estaban de más en el Lobby unificado: la guía de modos de arriba ya explica a qué
+    // se juega y las tarjetas de abajo ya dicen qué hay abierto. Aquí solo faltaba la acción.
+    render(<QuickMatch onCreate={vi.fn()} onPlayDemo={vi.fn()} />)
+    expect(screen.queryByRole('heading')).toBeNull()
+    expect(screen.queryByText(/Quick match/i)).toBeNull()
+    expect(screen.queryByText(/Jump into/i)).toBeNull()
+    expect(screen.queryByText(/players open the same packs/i)).toBeNull()
+  })
+
+  it('el botón dice "Create Match", sin nombrar un modo', () => {
+    // El modo se elige DENTRO del modal, así que prometer "Create Pack Battle" con los dos modos a
+    // la vista sería mentir a medias.
+    render(<QuickMatch onCreate={vi.fn()} />)
+    expect(screen.getByText('Create Match')).toBeTruthy()
+    expect(screen.queryByText(/Create Pack Battle/i)).toBeNull()
+    expect(screen.queryByText(/Create Battle Royale/i)).toBeNull()
+  })
+
+  it('sin onPlayDemo no hay enlace de demo', () => {
+    render(<QuickMatch onCreate={vi.fn()} />)
     expect(screen.queryByText(/demo/i)).toBeNull()
   })
-})
 
-describe('QuickMatch royale create gate', () => {
-  it('shows the create CTA by default', () => {
-    render(<QuickMatch mode="royale" onCreate={() => {}} />)
-    expect(screen.queryByText(/create battle royale/i)).not.toBeNull()
+  it('con canCreate en false se esconde el botón de crear', () => {
+    render(<QuickMatch onCreate={() => {}} canCreate={false} />)
+    expect(screen.queryByText('Create Match')).toBeNull()
   })
 
-  it('hides the create CTA when canCreate is false', () => {
-    render(<QuickMatch mode="royale" onCreate={() => {}} canCreate={false} />)
-    expect(screen.queryByText(/create battle royale/i)).toBeNull()
-  })
-})
-
-
-describe('QuickMatch · qué texto lleva cada modo', () => {
-  it('royale: solo el titular, y dice "the next"', () => {
-    // Encima de este bloque va RoyaleDemoNotice, que ya presenta el modo entero. El rótulo
-    // "Quick match" y la descripción repetían lo mismo en la misma pantalla.
-    render(<QuickMatch mode="royale" onCreate={vi.fn()} />)
-    expect(screen.getByRole('heading').textContent).toBe('Jump into the next Battle Royale')
-    expect(screen.queryByText('Quick match')).toBeNull()
-    expect(screen.queryByText(/lowest value drops each round/i)).toBeNull()
-  })
-
-  it('pack conserva rótulo, titular y descripción', () => {
-    // Ahí no hay nada encima que lo explique, así que el texto sigue haciendo falta.
-    render(<QuickMatch mode="pack" onCreate={vi.fn()} />)
-    expect(screen.getByRole('heading').textContent).toBe('Jump into a Pack Battle')
-    expect(screen.getByText('Quick match')).toBeTruthy()
-    expect(screen.getByText(/highest total takes them all/i)).toBeTruthy()
-  })
-
-  it('la descripción de pack no lo llama 1v1', () => {
-    // Una Pack Battle admite de 2 a 4 jugadores. Llamarla 1v1 describía mal el modo y hacía
-    // pensar que solo se juega en pareja.
-    render(<QuickMatch mode="pack" onCreate={vi.fn()} />)
-    const desc = screen.getByText(/highest total takes them all/i).textContent ?? ''
-    expect(desc).not.toMatch(/1v1|head-to-head/i)
-    expect(desc).toMatch(/two to four/i)     // cuántos caben
-    expect(desc).toMatch(/one or more/i)     // uno o varios sobres
-    expect(desc).toMatch(/adds to your total/i)   // se acumula, no es una sola carta
+  it('el enlace de la demo se queda aunque no se pueda crear', () => {
+    // Son cosas distintas: que no puedas crear una partida no te impide ver cómo se juega.
+    render(<QuickMatch onCreate={() => {}} onPlayDemo={vi.fn()} canCreate={false} />)
+    expect(screen.getByText(/free demo/i)).toBeTruthy()
   })
 })

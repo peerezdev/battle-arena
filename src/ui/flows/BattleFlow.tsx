@@ -150,7 +150,7 @@ export function BattleFlow() {
   if (battle.status === 'voided' || battle.status === 'cancelled') {
     return <Centered>
       <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 18 }}>
-        {battle.status === 'voided' ? 'Battle voided — refunded' : 'Lobby cancelled'}
+        {battle.status === 'voided' ? 'Battle voided · refunded' : 'Lobby cancelled'}
       </div>
       <button onClick={exit} style={backBtn}>Back</button>
     </Centered>
@@ -172,7 +172,7 @@ export function BattleFlow() {
         border: `2.5px solid ${COLORS.border}`, borderTopColor: COLORS.green }} />
       <div style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 16 }}>Finalizing results…</div>
       <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.muted, maxWidth: 320 }}>
-        Settling the winnings on-chain. This can take a moment — you can wait here or come back to it.
+        Settling the winnings on-chain. This can take a moment. You can wait here or come back to it.
       </div>
       <button onClick={exit} style={backBtn}>Back to home</button>
     </Centered>

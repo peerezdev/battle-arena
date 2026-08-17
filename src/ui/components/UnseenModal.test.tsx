@@ -23,9 +23,9 @@ function renderModal(over: Partial<Parameters<typeof UnseenModal>[0]> = {}) {
 }
 
 describe('UnseenModal · batallas', () => {
-  it('una batalla jugada NO destripa el resultado: dice "Finished — result unseen"', () => {
+  it('una batalla jugada NO destripa el resultado: dice "Finished · result unseen"', () => {
     renderModal({ battles: [battle({ won: true, amount_usd: 160 })] })
-    expect(screen.getByText(/Finished — result unseen/)).toBeTruthy()
+    expect(screen.getByText(/Finished · result unseen/)).toBeTruthy()
     expect(screen.queryByText(/You won|\+\$160/)).toBeNull()
   })
 

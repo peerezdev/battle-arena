@@ -60,8 +60,8 @@ export function TrackerHelp() {
 
           <Bloque titulo="The table" acento={COLORS.violet}>
             <Mono>P</Mono> is how often that rarity drops. <Mono>VALUE</Mono> is what its cards are
-            worth on average. <Mono>GROSS</Mono> is what it contributes to the pack —
-            <Mono>P × VALUE</Mono> — and the four add up to the model.
+            worth on average. <Mono>GROSS</Mono> is what it contributes to the pack, which is{' '}
+            <Mono>P × VALUE</Mono>. The four add up to the model.
           </Bloque>
 
           <Bloque titulo="GAP is not a countdown" acento={ACENTO.malo}>

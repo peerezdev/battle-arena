@@ -249,7 +249,7 @@ export function RoyaleSetupScreen({ onStart, onBack }: Props) {
             Estimated pot: <strong style={{ color: COLORS.text }}>
               {numPlayers} × {tier.price} USDC in cards per round
             </strong>{' '}
-            — winner takes all.
+            and the winner takes all.
           </div>
 
           {/* Start button */}

@@ -100,7 +100,7 @@ export function CollectionScreen({ onBack, onSelectCard, onOpenGacha }: Props) {
                 borderRadius: '6px',
               }}
             >
-              🎰 Gacha — open a pack
+              🎰 Gacha · open a pack
             </button>
           )}
         </div>

@@ -126,7 +126,7 @@ export function UnseenModal({
                       boxShadow: '0 0 6px #f5c542', animation: 'ba-pulse 1.6s infinite' }} />}
                     {refunded
                       ? (b.status === 'cancelled' ? 'Cancelled · refunded' : 'Voided · refunded')
-                      : 'Finished — result unseen'}
+                      : 'Finished · result unseen'}
                   </span>
                 </span>
               </div>

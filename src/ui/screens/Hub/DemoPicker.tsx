@@ -33,7 +33,7 @@ export function DemoPicker({ onClose, onPick }: { onClose: () => void; onPick: (
           <h2 style={{ margin: 0, fontFamily: FONTS.display, fontWeight: 700, fontSize: 20, letterSpacing: '-.01em' }}>Play a demo</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 10, border: `1px solid ${COLORS.border}`, background: 'rgba(255,255,255,.04)', color: COLORS.muted, cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ fontSize: 13, color: COLORS.muted, marginBottom: 18 }}>Try a battle with simulated pulls — no funds spent.</div>
+        <div style={{ fontSize: 13, color: COLORS.muted, marginBottom: 18 }}>Try a battle with simulated pulls. No funds spent.</div>
         <div style={{ display: 'flex', gap: 12 }}>
           <DemoCard icon={SWORDS} name="Pack Battle" sub="2-4 players" accent={COLORS.green} onClick={() => onPick('pack')} />
           <DemoCard icon={CROWN} name="Battle Royale" sub="5-10 players" accent={COLORS.violet} onClick={() => onPick('royale')} />
