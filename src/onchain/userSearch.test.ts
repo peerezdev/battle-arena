@@ -92,6 +92,48 @@ describe('useUserSearch', () => {
     expect(result.current.resultados).toEqual(usuarios)
   })
 
+  it('una respuesta que NO es correcta no se queda cacheada', async () => {
+    // Un 429 (el freno del servidor) o un corte devuelven lista vacía. Si esa lista vacía se
+    // guardara, un jugador que SÍ existe seguiría contestando "no existe" el resto de la sesión,
+    // y en el chat eso se lee como "esa persona no está".
+    const f = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) })
+      .mockResolvedValueOnce(respuesta([{ wallet: 'W1', alias: 'ana', online: true }]))
+    vi.stubGlobal('fetch', f)
+
+    const primera = renderHook(() => useUserSearch('tok', 'ana', true))
+    await act(async () => { await vi.advanceTimersByTimeAsync(ESPERA_MS + 10) })
+    expect(primera.result.current.resultados).toEqual([])
+
+    // Otra vez con la MISMA consulta: si el fallo se hubiera cacheado, ni se preguntaría.
+    const segunda = renderHook(() => useUserSearch('tok', 'ana', true))
+    await act(async () => { await vi.advanceTimersByTimeAsync(ESPERA_MS + 10) })
+
+    expect(f).toHaveBeenCalledTimes(2)
+    expect(segunda.result.current.resultados).toHaveLength(1)
+  })
+
+  it('mientras no hay respuesta para la consulta, dice que está cargando', () => {
+    // No es "hay un fetch en vuelo": incluye la espera de 250 ms. Quien pega `/tip ana 5` y pulsa
+    // Enter sin pausa tiene que poder distinguir "aún no lo sé" de "ese jugador no existe".
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respuesta([])))
+    const { result } = renderHook(() => useUserSearch('tok', 'ana', true))
+    expect(result.current.cargando).toBe(true)
+  })
+
+  it('sin buscar nada no está cargando', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respuesta([])))
+    expect(renderHook(() => useUserSearch('tok', 'ana', false)).result.current.cargando).toBe(false)
+    expect(renderHook(() => useUserSearch(null, 'ana', true)).result.current.cargando).toBe(false)
+  })
+
+  it('con la respuesta ya dada deja de estar cargando', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respuesta([])))
+    const { result } = renderHook(() => useUserSearch('tok', 'ana', true))
+    await act(async () => { await vi.advanceTimersByTimeAsync(ESPERA_MS + 10) })
+    expect(result.current.cargando).toBe(false)
+  })
+
   it('un fallo del servidor deja la lista vacía en vez de reventar', async () => {
     // El autocompletado es un extra: si falla, se escribe el nombre a mano y ya está.
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))

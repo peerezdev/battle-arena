@@ -34,7 +34,6 @@ export function useUserSearch(token: string | null, consulta: string, activo: bo
   // los resultados de la anterior hasta que llegara la nueva: nombres que ya no corresponden a lo
   // que hay escrito, en una lista de la que se elige a quién mandar dinero.
   const [traido, setTraido] = useState<{ q: string; datos: UsuarioEncontrado[] } | null>(null)
-  const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
     if (!activo || !token) return
@@ -42,19 +41,20 @@ export function useUserSearch(token: string | null, consulta: string, activo: bo
 
     let vivo = true
     const id = setTimeout(() => {
-      setCargando(true)
       fetch(`${config.backendUrl}/users/search?q=${encodeURIComponent(consulta)}`, {
         headers: { Authorization: `Bearer ${token}`, 'ngrok-skip-browser-warning': 'true' },
       })
-        .then((r) => (r.ok ? r.json() : []))
-        .then((datos: UsuarioEncontrado[]) => {
-          cache.set(consulta, datos)
+        .then(async (r) => {
+          const datos: UsuarioEncontrado[] = r.ok ? await r.json() : []
+          // Se guarda SOLO lo que vino bien. Cachear la lista vacía de un 429 o de un corte de red
+          // deja a un jugador que SÍ existe contestando "no existe" el resto de la sesión, y en el
+          // chat eso se lee como "esa persona no está", que es mentira.
+          if (r.ok) cache.set(consulta, datos)
           if (vivo) setTraido({ q: consulta, datos })
         })
         // El autocompletado es un extra: si falla, se escribe el nombre a mano. Lo que no puede es
         // reventar el chat entero, ni dejar resultados viejos de otra consulta.
         .catch(() => { if (vivo) setTraido({ q: consulta, datos: [] }) })
-        .finally(() => { if (vivo) setCargando(false) })
     }, ESPERA_MS)
 
     // Cada pulsación cancela la espera anterior: por eso escribir "ana" del tirón es UNA petición
@@ -64,9 +64,16 @@ export function useUserSearch(token: string | null, consulta: string, activo: bo
 
   // Se DERIVA al pintar en vez de guardarse con un setState desde el efecto, que encadena renders
   // y además lo prohíbe el linter (react-hooks/set-state-in-effect).
+  const respondida = cache.has(consulta) || traido?.q === consulta
   const resultados = !activo || !token
     ? []
     : cache.get(consulta) ?? (traido?.q === consulta ? traido.datos : [])
+
+  // `cargando` NO es "hay un fetch en vuelo", es "todavía no sé nada de ESTA consulta", e incluye
+  // la espera de 250 ms de antes de preguntar. Es la diferencia entre "ese jugador no existe" y
+  // "aún no lo sé" para quien pega `/tip ana 5` y pulsa Enter sin pausa: con el otro criterio,
+  // durante la espera `cargando` sería false y se le acusaría de escribir un nombre inventado.
+  const cargando = activo && !!token && !respondida
 
   return { resultados, cargando }
 }

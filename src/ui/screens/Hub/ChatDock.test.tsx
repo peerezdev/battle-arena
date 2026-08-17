@@ -25,6 +25,7 @@ const { chatState, tipModalCalls, toasts, flags, busqueda } = vi.hoisted(() => (
   toasts: [] as string[],
   flags: { tips: true },
   busqueda: { resultados: [] as { wallet: string; alias: string | null; online: boolean }[],
+              cargando: false,
               llamadas: [] as { consulta: string; activo: boolean }[] },
 }))
 // Igual que en el perfil: aquí se prueba la pantalla con las propinas encendidas. Es un GETTER y
@@ -38,7 +39,7 @@ vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToke
 vi.mock('../../../onchain/userSearch', () => ({
   useUserSearch: (_token: string | null, consulta: string, activo: boolean) => {
     busqueda.llamadas.push({ consulta, activo })
-    return { resultados: activo ? busqueda.resultados : [], cargando: false }
+    return { resultados: activo ? busqueda.resultados : [], cargando: activo && busqueda.cargando }
   },
 }))
 vi.mock('../../../hooks/useChat', () => ({
@@ -73,6 +74,7 @@ beforeEach(() => {
   toasts.length = 0
   flags.tips = true
   busqueda.resultados = []
+  busqueda.cargando = false
   busqueda.llamadas.length = 0
 })
 
@@ -381,6 +383,10 @@ describe('ChatDock · menciones', () => {
 describe('ChatDock · comandos', () => {
   const ana = { wallet: 'WalletANA1111', alias: 'ana', online: true }
   const bea = { wallet: 'WalletBEA2222', alias: 'bea', online: false }
+  // `anabel` existe para que el test dorado distinga "exacto" de "por prefijo": es el fallo
+  // realista (buscar "ana" y quedarse con el primero que EMPIECE por "ana"), y con una lista de
+  // nombres que no se parecen entre sí no se nota.
+  const anabel = { wallet: 'WalletANABEL33', alias: 'anabel', online: true }
 
   function escribir(texto: string) {
     const campo = screen.getByPlaceholderText(/type a message/i) as HTMLInputElement
@@ -475,9 +481,11 @@ describe('ChatDock · comandos', () => {
   })
 
   it('/tip ana 5 abre el modal con destinatario e importe', () => {
-    // `bea` va la PRIMERA a propósito: un cableado que coja `resultados[0]` mandaría el dinero a
-    // otra persona y pasaría igual un test que solo comprobara "se abrió el modal".
-    busqueda.resultados = [bea, ana]
+    // La lista está montada para que solo pase la coincidencia EXACTA. `bea` va la primera, así
+    // que un cableado que coja `resultados[0]` manda el dinero a quien no es; y `anabel` va antes
+    // que `ana`, así que resolver "por prefijo" (el fallo realista) también manda el dinero a
+    // quien no es. Con nombres que no se parecen, las dos versiones rotas pasarían el test.
+    busqueda.resultados = [bea, anabel, ana]
     chatState.canPost = true
     renderDock()
     const campo = escribir('/tip ana 5')
@@ -493,7 +501,40 @@ describe('ChatDock · comandos', () => {
     expect(campo.value).toBe('')
   })
 
-  it('/tip con un usuario que no existe lo dice y no abre el modal', () => {
+  it('un espacio delante NO convierte el comando en un mensaje público', () => {
+    // " /tip ana 5" no empieza por barra, así que sin recortar se iría publicado en la sala
+    // contando a quién y cuánto le da dinero este jugador. Está a un carácter: pegar el comando,
+    // o el teclado del móvil.
+    busqueda.resultados = [ana]
+    chatState.canPost = true
+    renderDock()
+    const campo = escribir('  /tip ana 5')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+
+    expect(chatState.send).not.toHaveBeenCalled()
+    expect(tipModalCalls[tipModalCalls.length - 1].to.wallet).toBe(ana.wallet)
+  })
+
+  it('con un espacio delante, la lista de comandos también se abre', () => {
+    chatState.canPost = true
+    renderDock()
+    escribir(' /')
+    expect(screen.getByRole('listbox')).toBeTruthy()
+    expect(screen.getByText('/tip')).toBeTruthy()
+  })
+
+  it('con las propinas ENCENDIDAS, un comando que no existe lo dice mientras se escribe', () => {
+    // Mismo callejón que motivó la tarjeta de "no hay comandos": una lista vacía mientras escribes
+    // no se distingue de que el autocompletado esté roto.
+    chatState.canPost = true
+    renderDock()
+    escribir('/xyz')
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.getByText(/no command matches "\/xyz"/i)).toBeTruthy()
+    expect(screen.getByText(/\/tip/)).toBeTruthy()          // y dice cuál sí hay
+  })
+
+  it('/tip con un usuario que no existe lo dice, no abre el modal y CONSERVA lo escrito', () => {
     busqueda.resultados = [bea]
     chatState.canPost = true
     renderDock()
@@ -503,6 +544,27 @@ describe('ChatDock · comandos', () => {
     expect(tipModalCalls).toHaveLength(0)
     expect(screen.getByText(/no player found for "fantasma"/i)).toBeTruthy()
     expect(chatState.send).not.toHaveBeenCalled()
+    // Un comando que falla casi siempre se arregla cambiando una palabra: borrarlo obliga a
+    // reescribirlo entero.
+    expect(campo.value).toBe('/tip fantasma 5')
+  })
+
+  it('si la búsqueda aún no ha contestado, no acusa al jugador de inventarse el nombre', () => {
+    // El caso real: pegar `/tip ana 5` y pulsar Enter sin pausa. La búsqueda espera 250 ms, así
+    // que todavía no hay resultados y el jugador no ha hecho nada mal. Además, repetir el Enter es
+    // LO ÚNICO que lo arregla (a la segunda contesta la caché), así que el texto no puede
+    // borrarse.
+    busqueda.resultados = []
+    busqueda.cargando = true
+    chatState.canPost = true
+    renderDock()
+    const campo = escribir('/tip ana 5')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+
+    expect(tipModalCalls).toHaveLength(0)
+    expect(screen.queryByText(/no player found/i)).toBeNull()
+    expect(screen.getByText(/still looking for "ana"/i)).toBeTruthy()
+    expect(campo.value).toBe('/tip ana 5')
   })
 
   it('/tip con una cantidad que no es un número no abre el modal y lo dice', () => {

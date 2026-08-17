@@ -239,10 +239,22 @@ export function ChatDock({
     dragRef.current = null
   }
 
+  // Un espacio de más por delante NO puede cambiar lo que es el mensaje: " /tip ana 5" no empieza
+  // por barra, así que se iría PUBLICADO en la sala contando a quién y cuánto da dinero este
+  // jugador. Y está a un carácter de distancia: pegar el comando o el teclado del móvil ya lo
+  // meten. Se descuenta lo que sobra por delante y el cursor se mueve con él.
+  //
+  // Por detrás no se recorta: "/tip ana " con el espacio final significa que el cursor está en el
+  // importe, y quitarlo devolvería la lista de destinatarios encima de lo ya escrito.
+  const textoComando = draft.trimStart()
+  const sobraDelante = draft.length - textoComando.length
+
   // El comando que se está escribiendo. Comando y mención son EXCLUYENTES y manda el comando,
   // porque la barra abre el mensaje: dentro de "/tip @ana", la arroba es parte de un argumento
   // suyo, no una mención a medias.
-  const comando = canPost ? parseComando(draft, cursor) : null
+  const comando = canPost
+    ? parseComando(textoComando, Math.max(0, cursor - sobraDelante))
+    : null
   const defComando = comando ? buscarComando(comando.nombre) : undefined
   // Un comando apagado por bandera no existe para el jugador: ni se ofrece, ni busca a nadie, ni
   // se ejecuta. Ver `featureFlags.ts`.
@@ -258,7 +270,8 @@ export function ChatDock({
   // sobre el destinatario: al pasar al importe hay que seguir sabiendo a quién resolvía "ana", y
   // como la consulta no cambia, responde la caché sin una petición nueva. Con `activo` en false
   // (cualquier otro texto) el hook no pide nada: ese es su freno.
-  const { resultados } = useUserSearch(identityToken ?? null, consultaUsuario, idxUsuario >= 0)
+  const { resultados, cargando } =
+    useUserSearch(identityToken ?? null, consultaUsuario, idxUsuario >= 0)
 
   // La mención que se está escribiendo y a quién ofrece. Se filtra por nombre Y por wallet: quien
   // no tiene alias se identifica por su wallet, y es la única forma de encontrarlo.
@@ -290,10 +303,17 @@ export function ChatDock({
   }
   const candidatos = candidatosLista()
 
-  // `/tip` es hoy el único comando y está apagado por defecto, así que la lista sale VACÍA, que
-  // es indistinguible de "los comandos están rotos". Cuando no hay ninguno, se dice.
-  const sinComandos = !!comando && comando.argActivo === -1 && cerradaEn !== draft
-    && comandosDisponibles().length === 0
+  // Escribiendo el NOMBRE de un comando, una lista vacía no dice nada: se lee igual que "esto está
+  // roto". Pasa en dos sitios distintos y hay que distinguirlos, porque la salida no es la misma:
+  // sin ningún comando disponible (hoy, con las propinas apagadas, `/tip` es el único) no hay nada
+  // que probar; con comandos pero sin coincidencia, lo que falla es lo tecleado y se enseña qué
+  // hay.
+  const avisoComandos = comando && comando.argActivo === -1 && cerradaEn !== draft
+      && candidatos.length === 0
+    ? (comandosDisponibles().length === 0
+        ? 'No commands are available right now.'
+        : `No command matches "/${comando.nombre}". ${textoComandos()}`)
+    : null
 
   /** Deja el foco en el campo con el cursor en `pos`: seguir escribiendo tras elegir de la lista
    *  tiene que ser lo natural, no tener que volver a pulsar en el input. */
@@ -317,7 +337,7 @@ export function ChatDock({
    *  tocar lo que venga detrás. Los espacios de más se normalizan a uno: quien elige de la lista
    *  espera "/tip ana ", no "/tip   ana". */
   function ponerTrozo(n: number, valor: string) {
-    const trozos = draft.slice(1).split(/\s+/)
+    const trozos = textoComando.slice(1).split(/\s+/)
     while (trozos.length <= n) trozos.push('')
     trozos[n] = valor
     const antes = `/${trozos.slice(0, n + 1).join(' ')} `
@@ -354,18 +374,31 @@ export function ChatDock({
       : 'No commands are available right now.'
   }
 
-  /** Abre el modal de propina con el destinatario y el importe que traía el comando. */
-  function ejecutarTip(args: string[]) {
+  /**
+   * Abre el modal de propina con el destinatario y el importe que traía el comando.
+   *
+   * Devuelve si el comando se COMPLETÓ: lo que falla deja lo escrito en el campo, porque casi
+   * siempre se arregla cambiando una palabra y reescribirlo entero es peor.
+   */
+  function ejecutarTip(args: string[]): boolean {
     const [aQuien, cuanto] = args
-    if (!aQuien) { responder('Usage: /tip <player> <amount>, for example /tip ana 5'); return }
-    // Por nombre o wallet EXACTOS, nunca "el primero de la lista": ahí se decide a quién se le
-    // manda dinero, y un parecido no basta.
+    if (!aQuien) {
+      responder('Usage: /tip <player> <amount>, for example /tip ana 5')
+      return false
+    }
+    // Por nombre o wallet EXACTOS, nunca por parecido ni "el primero de la lista": ahí se decide a
+    // quién se le manda dinero, y "ana" no puede acabar en manos de "anabel".
     const q = aQuien.toLowerCase()
     const destino: UsuarioEncontrado | undefined = resultados.find(
       (u) => (u.alias ?? '').toLowerCase() === q || u.wallet.toLowerCase() === q)
     if (!destino) {
-      responder(`No player found for "${aQuien}". Pick one from the list while you type the name.`)
-      return
+      // La búsqueda tiene 250 ms de espera, así que quien pega el comando entero y pulsa Enter sin
+      // pausa llega ANTES que la respuesta. Ahí no ha hecho nada mal: decirle que ese jugador no
+      // existe es acusarle de un fallo nuestro, y encima mandarle a hacer lo que ya hizo.
+      responder(cargando
+        ? `Still looking for "${aQuien}". Try again in a moment.`
+        : `No player found for "${aQuien}". Pick one from the list while you type the name.`)
+      return false
     }
     // El importe puede faltar, y entonces lo pide el modal, que es su trabajo. Lo que no vale es
     // uno ESCRITO que no sea un número mayor que 0: abrir el modal con "mucho" dentro dejaría al
@@ -374,10 +407,11 @@ export function ChatDock({
       const n = Number(cuanto)
       if (!Number.isFinite(n) || n <= 0) {
         responder(`"${cuanto}" is not a valid amount. Use a number greater than 0, like /tip ${aQuien} 5`)
-        return
+        return false
       }
     }
     setTipTarget({ wallet: destino.wallet, alias: destino.alias, amount: cuanto })
+    return true
   }
 
   /** Ejecuta el comando escrito. Nada de esto viaja al servidor. */
@@ -385,13 +419,13 @@ export function ChatDock({
     const def = buscarComando(cmd.nombre)
     // Un comando apagado se contesta igual que uno inexistente: para el jugador no existe, y
     // decirle "está apagado" solo le hablaría de una función que no puede usar.
-    if (!def?.disponible()) responder(`Unknown command "/${cmd.nombre}". ${textoComandos()}`)
-    else if (def.nombre === 'tip') ejecutarTip(cmd.args)
+    if (!def?.disponible()) { responder(`Unknown command "/${cmd.nombre}". ${textoComandos()}`); return }
+    // Solo se limpia el campo cuando el comando SALIÓ. Tras un error, lo escrito se queda: se
+    // corrige una palabra, o se vuelve a pulsar Enter cuando la búsqueda ya ha contestado, que es
+    // justo lo que arregla el caso de pegar el comando y no esperar.
+    if (def.nombre === 'tip') { if (ejecutarTip(cmd.args)) setDraft(''); return }
     // Un comando registrado que nadie ejecuta es un fallo nuestro, no del jugador.
-    else responder(`/${def.nombre} is not available yet.`)
-    // El campo se limpia siempre, también tras un error: el comando ya está contestado en el
-    // chat, con su ejemplo, y dejarlo escrito invita a pulsar Enter otra vez para el mismo error.
-    setDraft('')
+    responder(`/${def.nombre} is not available yet.`)
   }
 
   function handleSend() {
@@ -399,7 +433,7 @@ export function ChatDock({
     // Un texto que empieza por barra es un comando: se EJECUTA y no se envía, exista o no. Si se
     // enviara, "/tip ana 5" saldría publicado en la sala, contando a quién y cuánto da dinero
     // este jugador, y encima sin hacer lo que pedía.
-    const cmd = parseComando(draft, draft.length)
+    const cmd = parseComando(textoComando, textoComando.length)
     if (cmd) { ejecutarComando(cmd); return }
     // Las etiquetas se resuelven contra los conectados AHORA: si el mencionado se fue mientras
     // se escribía, el servidor la descartará igual.
@@ -982,9 +1016,9 @@ export function ChatDock({
             onElegir={elegirCandidato}
             onCerrar={() => setCerradaEn(draft)}
           />
-          {/* Sin comandos disponibles no hay lista que enseñar, y una lista vacía se lee como
-              "esto está roto". Se dice con todas las letras. */}
-          {sinComandos && (
+          {/* Un comando a medias que no ofrece nada se lee como "esto está roto". Se dice con
+              todas las letras, tanto si no hay ninguno como si lo tecleado no existe. */}
+          {avisoComandos && (
             <div
               role="status"
               style={{
@@ -994,7 +1028,7 @@ export function ChatDock({
                 fontFamily: FONTS.body, fontSize: 11.5, color: COLORS.muted,
               }}
             >
-              No commands are available right now.
+              {avisoComandos}
             </div>
           )}
           <input
