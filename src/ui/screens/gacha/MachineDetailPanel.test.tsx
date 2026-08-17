@@ -180,3 +180,72 @@ describe('MachineDetailPanel · tirada gratis', () => {
     expect(screen.queryByText(/points to a free pack/i)).toBeNull()
   })
 })
+
+// ── Tiradas gratis en MÓVIL ──────────────────────────────────────────────────
+//
+// No existían: el bloque estaba escrito dentro de la maqueta de escritorio, y la de móvil usa una
+// barra fija abajo con el contador y el Open. Un jugador de móvil no tenía forma de saber que tenía
+// tiradas gratis, ni de gastarlas.
+
+const conGratis = (props: Record<string, unknown> = {}) =>
+  render(<MachineDetailPanel machine={{ ...machine, freeSpins: true } as GachaMachine}
+    authed usdc={500} onYolo={vi.fn()} onFreePack={vi.fn()} {...props} />)
+
+describe('MachineDetailPanel · tiradas gratis en móvil', () => {
+  beforeEach(() => viewport(false))
+
+  it('con puntos de sobra sale el botón', () => {
+    // 25 $ pide 50.000 puntos (100.000 × 25/50): con 120.000 hay para dos.
+    conGratis({ freeSpins: { points_available: 120_000 } })
+    expect(screen.getByText(/Free pack · 2 left/)).toBeTruthy()
+  })
+
+  it('sin puntos suficientes dice CUÁNTO falta, no un botón apagado', () => {
+    // Un botón que no se puede pulsar invita a mirar los puntos, no a jugar.
+    conGratis({ freeSpins: { points_available: 10_000 } })
+    expect(screen.getByText(/40,000 points to a free pack here/)).toBeTruthy()
+    expect(screen.queryByText(/Free pack ·/)).toBeNull()
+  })
+
+  it('va ENCIMA del botón de Open, no debajo', () => {
+    // Es una alternativa a pagar, así que tiene que llegar antes que el botón que cobra.
+    conGratis({ freeSpins: { points_available: 120_000 } })
+    const gratis = screen.getByText(/Free pack · 2 left/)
+    const open = screen.getAllByText(/^Open/).slice(-1)[0]
+    expect(gratis.compareDocumentPosition(open) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('pulsarlo llama a onFreePack', () => {
+    const onFreePack = vi.fn()
+    conGratis({ freeSpins: { points_available: 120_000 }, onFreePack })
+    fireEvent.click(screen.getByText(/Free pack · 2 left/))
+    expect(onFreePack).toHaveBeenCalled()
+  })
+
+  it('si CC las tiene pausadas lo dice, y que los puntos están a salvo', () => {
+    // Sin esto, un cierre temporal se veía igual que una máquina que no las ofrece nunca.
+    render(<MachineDetailPanel machine={{ ...machine, freeSpins: false, freeSpinsClosed: true } as GachaMachine}
+      authed usdc={500} onYolo={vi.fn()} onFreePack={vi.fn()} />)
+    expect(screen.getByText(/Free packs are paused right now/)).toBeTruthy()
+  })
+
+  it('si los puntos no se pudieron leer, se dice en vez de callarlo', () => {
+    // Callarlo ERA el bug: la máquina las ofrecía, el jugador tenía puntos, y no salía nada.
+    conGratis({ freeSpins: null, freeSpinsError: 'sesion' })
+    expect(screen.getByText(/Log in again to see your free spins/)).toBeTruthy()
+  })
+
+  it('una máquina que no las ofrece no enseña nada', () => {
+    render(<MachineDetailPanel machine={machine} authed usdc={500} onYolo={vi.fn()}
+      onFreePack={vi.fn()} freeSpins={{ points_available: 999_999 }} />)
+    expect(screen.queryByText(/Free pack/i)).toBeNull()
+    expect(screen.queryByText(/points to a free pack/)).toBeNull()
+  })
+
+  it('en ESCRITORIO sigue estando, con la misma lógica', () => {
+    // El bloque es compartido: si una maqueta se queda atrás, es porque se duplicó.
+    viewport(true)
+    conGratis({ freeSpins: { points_available: 120_000 } })
+    expect(screen.getByText(/Free pack · 2 left/)).toBeTruthy()
+  })
+})

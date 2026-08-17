@@ -6,7 +6,7 @@ import { useIsWide } from '../../useIsWide'
 import type { GachaMachine } from '../../../onchain/gachaClient'
 import { yoloTotalCost, clampCount } from '../../../onchain/gachaClient'
 import { showToast, dismissToast, setToastInset } from '../../toastBus'
-import { tiradasGratis } from './freeSpins'
+import { FreePackAction } from './FreePackAction'
 
 interface Props {
   machine: GachaMachine
@@ -28,15 +28,6 @@ interface Props {
   onFreePack?: () => void
 }
 
-/** Qué se le dice al jugador cuando no se han podido leer sus puntos. Cada uno dice qué pasa Y qué
- *  hacer, porque cada uno se arregla de una forma distinta: volver a entrar solo sirve para el
- *  primero, y para el segundo es justo lo que NO funciona. */
-const FREE_SPINS_ERROR_MSG: Record<'sesion' | 'sin_wallet' | 'no_disponible' | 'fallo', string> = {
-  sesion: 'Log in again to see your free spins.',
-  sin_wallet: 'This session has no in-app wallet, so free spins are not available. Log in with email or a social account instead of an external wallet.',
-  no_disponible: 'Free spins are unavailable right now.',
-  fallo: 'Could not load your points. Try again in a moment.',
-}
 
 const RARITY_ORDER = ['epic', 'rare', 'uncommon', 'common'] as const
 const RARITY_COLOR: Record<string, string> = {
@@ -50,9 +41,6 @@ const TURBO_ON_MSG = 'Turbo activated. Commons will be auto-sold'
 
 export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, freeSpinsError, freeSpinsDetalle, onFreePack }: Props) {
   const reduced = useReducedMotion()
-  // Lo que dan esos puntos EN ESTA máquina. Cambia con el precio, así que se recalcula por máquina
-  // y no se puede leer de la respuesta de CC, que viene siempre en la escala de la de 50 $.
-  const gratis = tiradasGratis(machine.price, freeSpins?.points_available ?? 0)
   const mobile = !useIsWide('(min-width: 760px)')   // bottom nav shows below 760 → use a sticky bar
 
   const [yoloCount, setYoloCount] = useState(1)
@@ -291,52 +279,11 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, f
             {openLabel}
           </motion.button>
 
-          {/* Tirada gratis. Dos condiciones, y las dos son de la MÁQUINA, no del jugador: que esta
-              la ofrezca (`machine.freeSpins` — muchas no) y que sus puntos lleguen a lo que cuesta
-              AQUÍ, que sube con el precio. Con puntos de sobra para la de 50 $ puede no haber ni
-              para una en la de 250 $.
-
-              Cuando no llega se dice en texto en vez de un botón apagado: un botón que no se puede
-              pulsar invita a mirar los puntos, no a jugar. */}
-          {/* Si los puntos NO se pudieron leer, se dice. Callarlo era el bug: la máquina ofrece
-              tiradas gratis, el jugador tiene puntos, y la pantalla no enseñaba ni una cosa ni la
-              otra porque el dato venía nulo. */}
-          {onFreePack && !freeSpins && freeSpinsError && machine.freeSpins && (
-            <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
-              {FREE_SPINS_ERROR_MSG[freeSpinsError]}
-              {/* El motivo crudo del backend es para quien desarrolla, no para el jugador: dice
-                  cosas como "ImmatureSignatureError". En producción sobra. */}
-              {freeSpinsDetalle && import.meta.env.DEV && (
-                <div style={{ marginTop: 3, fontSize: 10, opacity: 0.7 }}>{freeSpinsDetalle}</div>
-              )}
-            </div>
-          )}
-
-          {/* Cerradas por Collector Crypt, no por esta máquina. Sin este aviso el jugador con
-              puntos de sobra veía el hueco vacío y no sabía si era él, la máquina o nosotros: la
-              bandera combinada `freeSpins` hacía que un cierre temporal se viera igual que una
-              máquina que no las ofrece nunca. */}
-          {onFreePack && machine.freeSpinsClosed && (
-            <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
-              Free packs are paused right now. Your points are safe.
-            </div>
-          )}
-
-          {onFreePack && freeSpins && machine.freeSpins && (
-            gratis.count > 0 ? (
-              <button
-                onClick={onFreePack}
-                style={{ width: '100%', marginTop: 10, borderRadius: 12, padding: '11px 18px',
-                  fontSize: 13.5, fontWeight: 800, fontFamily: FONTS.display, cursor: 'pointer',
-                  border: `1px solid ${COLORS.green}66`, background: `${COLORS.green}14`, color: COLORS.green }}>
-                ★ Free pack · {gratis.count} left
-              </button>
-            ) : (
-              <div style={{ marginTop: 10, textAlign: 'center', fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted }}>
-                {gratis.untilNext.toLocaleString('en-US')} points to a free pack here
-              </div>
-            )
-          )}
+          {/* La tirada gratis vive en `FreePackAction`, compartida con la barra de móvil: son
+              cuatro casos y tres de ellos son avisos que costaron un fallo cada uno, así que
+              duplicarlos era garantizar que una de las dos maquetas se quedara atrás. */}
+          <FreePackAction machine={machine} freeSpins={freeSpins} freeSpinsError={freeSpinsError}
+            freeSpinsDetalle={freeSpinsDetalle} onFreePack={onFreePack} />
         </div>
       )}
 
@@ -344,9 +291,16 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, f
       {onYolo && mobile && (
           <div ref={barRef} style={{
             position: 'fixed', left: 0, right: 0, bottom: 60, zIndex: 90,
-            display: 'flex', alignItems: 'center', gap: 9, padding: '10px 14px calc(10px + env(safe-area-inset-bottom,0px))',
+            display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 14px calc(10px + env(safe-area-inset-bottom,0px))',
             background: 'rgba(10,13,20,.96)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderTop: `1px solid ${COLORS.border}`,
           }}>
+            {/* ENCIMA del Open, no debajo: es una alternativa a pagar, así que tiene que llegar
+                antes que el botón que cobra. La barra la mide un ResizeObserver, así que crecer no
+                le tapa contenido ni descoloca los toasts. */}
+            <FreePackAction machine={machine} freeSpins={freeSpins} freeSpinsError={freeSpinsError}
+              freeSpinsDetalle={freeSpinsDetalle} onFreePack={onFreePack} compacto />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             {/* counter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, borderRadius: 11, background: COLORS.panel2, border: `1px solid ${COLORS.border}`, flexShrink: 0 }}>
               <button onClick={() => setYoloCount((n) => clampCount(n - 1))} aria-label="Less"
@@ -382,6 +336,7 @@ export function MachineDetailPanel({ machine, authed, usdc, onYolo, freeSpins, f
                 border: yoloBlocked ? `1px solid ${COLORS.border}` : 'none', background: yoloBlocked ? COLORS.panel2 : GRADIENT, color: yoloBlocked ? COLORS.muted : '#06120c', whiteSpace: 'nowrap' }}>
               {openLabel}
             </motion.button>
+            </div>
           </div>
       )}
 
