@@ -29,6 +29,7 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 | GET | `/health` | — | ping |
 | GET | `/auth/privy/me` | ✓ (Bearer identity token) | sub del usuario de Privy |
 | POST | `/users/me/alias {alias}` | ✓ | fija alias |
+| GET | `/users/search?q=&limit=` | ✓ | jugadores cuyo alias o wallet EMPIEZA por `q`; con `q` vacía, los conectados primero y luego los que tienen alias. Tope duro de 8 y throttle propio. Alimenta el autocompletado de `/tip` en el chat |
 | POST | `/users/me/tip` | ✓ | propina en USDC a otro jugador registrado, mínimo MIN_TIP_USDC, limitada por TIP_RATE_LIMIT, respeta saldo reservado, bloqueada mientras juegas una royale, sin comisión |
 | GET | `/users/{wallet}` | — | perfil (lectura pura; default 1200 si no existe) |
 | GET | `/users/{wallet}/history` | — | historial de rating |
@@ -108,5 +109,16 @@ backend/app/
 - **Lector Solana real esqueletado**: decodificar la cuenta Anchor `Battle` en Python debe validarse contra una batalla real en devnet; el MVP usa `MockChainSource`. Riesgo aislado tras la interfaz `ChainSource`.
 - **Límite de ELO no es garantía on-chain** (documentado arriba).
 - **Token de sesión** opaco en memoria para el MVP; producción querrá JWT firmado + rotación, y persistencia/expiración robusta.
+- **28 endpoints son `async def` y no esperan nada** (entre ellos `get_user`, el del incidente del
+  14:30). Con la base de datos síncrona, un `async def` que consulta **bloquea el bucle de eventos**
+  y deja el proceso sin atender nada, ni `/health`; declarados `def`, FastAPI los ejecuta en su pool
+  de hilos. Quitarles el `async` es borrar una palabra en cada uno, pero hay que comprobar
+  endpoint a endpoint que de verdad no esperan nada. Ojo con la intuición: pasar la base a
+  asíncrona NO lo arregla — con SQLite no hay espera que soltar y `aiosqlite` hace lo mismo en un
+  hilo por debajo. `GET /users/search` ya se declaró `def` a propósito.
+- **La búsqueda de usuarios va por PREFIJO con RANGO, nunca con `LIKE`.** Medido con
+  `EXPLAIN QUERY PLAN`: `LIKE` hace `SCAN` de la tabla entera **incluso por prefijo**, porque SQLite
+  no aplica esa optimización a un índice de expresión; solo el rango usa `ux_users_alias_lower`.
+  Hay un test que comprueba el plan de la consulta: si alguien la cambia, se pone rojo.
 - **Anti-colusión / win-trading** (cuentas que se enfrentan solo entre sí para mover ELO) fuera del MVP; el ELO trustless on-chain evita resultados falsos, no la colusión.
 - **Postgres**: la capa es SQLAlchemy; en prod cambiar `DATABASE_URL` y verificar las columnas `DateTime(timezone=True)`.

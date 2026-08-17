@@ -1,7 +1,7 @@
 # Comandos de chat, empezando por `/tip` — design
 
 Date: 2026-08-14
-Status: approved-pending-review
+Status: implemented
 
 ## Objetivo
 
@@ -16,8 +16,9 @@ La pieza de comandos se construye como **registro**, no como un `if` para `/tip`
 - **La propina ya existe entera**: `POST /users/me/tip` y `TipModal`
   (`src/ui/components/TipModal.tsx`), con su validación de mínimo, saldo reservado, royale en
   juego y throttle. Este comando **no reimplementa nada de eso**: es un atajo para llegar al modal.
-- **Están APAGADAS** por el interruptor de ayer: `tips_enabled` en el backend y `TIPS_ENABLED`
-  (`src/featureFlags.ts`) en el frontend, los dos en false.
+- **Están detrás de un interruptor**, apagado por defecto: `tips_enabled` en el backend y
+  `TIPS_ENABLED` (`src/featureFlags.ts`) en el frontend. Que estén encendidas o no depende del
+  entorno, así que `/tip` solo se ofrece cuando lo están.
 - **El autocompletado de menciones** ya existe (`MentionAutocomplete.tsx`, `mentions.ts`) y se
   reutiliza: misma lista, mismo teclado.
 - **La presencia** da los conectados por WebSocket (`presence.users`).
