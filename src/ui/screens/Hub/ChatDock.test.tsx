@@ -256,66 +256,23 @@ describe('ChatDock · perfiles clicables', () => {
   })
 })
 
-describe('ChatDock · propina desde el chat', () => {
-  it('ofrece dar propina a quien habla, pero no a los avisos de la casa sin wallet', () => {
+describe('ChatDock · el nombre de quien habla', () => {
+  it('ya NO ofrece un botón de propina al lado de cada nombre', () => {
+    // Se quitó por ruidoso: repetido en cada mensaje, en la parte de la pantalla donde menos
+    // sitio sobra. La vía desde el chat es el comando `/tip`, que tiene sus propios tests.
     chatState.messages = [
       { user: 'Rival', wallet: 'WalletB', text: 'hola', ts: 1 },
-      { user: 'House', wallet: undefined, text: 'aviso', ts: 2, kind: 'system' },
+      { user: 'Otro', wallet: 'WalletC', text: 'ey', ts: 2 },
     ]
     renderDock()
-    expect(screen.getAllByRole('button', { name: /tip/i })).toHaveLength(1)
-  })
-
-  it('no ofrece propina en un aviso de la casa aunque nombre a un jugador con wallet', () => {
-    // Un evento estructurado (created/hit/winner) también pasa por `Autor` y puede traer
-    // wallet real (p.ej. "Neo won a Pack Battle") — pero sigue siendo un aviso de la casa,
-    // no un mensaje de Neo, así que no debe ofrecer propina.
-    chatState.messages = [{
-      user: 'Neo', wallet: 'WalletC', text: 'won a Pack Battle', ts: 1,
-      kind: 'system', event: 'winner', amountUsd: 500,
-    }]
-    renderDock()
     expect(screen.queryByRole('button', { name: /tip/i })).toBeNull()
   })
 
-  it('no ofrece dar propina a uno mismo', () => {
-    chatState.ownWallet = 'WalletA'
-    chatState.messages = [{ user: 'Yo', wallet: 'WalletA', text: 'hola', ts: 1 }]
-    renderDock()
-    expect(screen.queryByRole('button', { name: /tip/i })).toBeNull()
-  })
-
-  it('el botón TIP mide al menos 24px de alto (WCAG 2.2 AA, criterio 2.5.8)', () => {
-    // jsdom no hace layout real (getBoundingClientRect siempre da 0 ahí), así que se mide la
-    // caja a partir de los estilos EN LÍNEA que React aplicó de verdad (no una estimación): con
-    // box-sizing por defecto (content-box), alto de caja = lineHeight + paddingTop + paddingBottom.
+  it('el nombre sigue enlazando al perfil', () => {
+    // Lo que NO se quitó al quitar el botón: el enlace era lo otro que colgaba de `Autor`.
     chatState.messages = [{ user: 'Rival', wallet: 'WalletB', text: 'hola', ts: 1 }]
     renderDock()
-    const btn = screen.getByRole('button', { name: /tip rival/i })
-    const contentHeight = parseFloat(btn.style.lineHeight)
-    const paddingTop = parseFloat(btn.style.paddingTop)
-    const paddingBottom = parseFloat(btn.style.paddingBottom)
-    const boxHeight = contentHeight + paddingTop + paddingBottom
-    expect(boxHeight).toBeGreaterThanOrEqual(24)
-  })
-
-  it('pulsar el botón de UN autor concreto (no el primero) abre el modal con SU wallet y alias', () => {
-    // Regresión contra un cableado que siempre coja el primer mensaje de la lista: con un solo
-    // modal para toda la lista (decisión de Task 7), un `onTip` que ignore qué botón se pulsó
-    // pasaría cualquier test que solo cuente botones. Aquí se pulsa el de en medio (Bob) y se
-    // exige que el modal reciba EXACTAMENTE su wallet/alias, no los de Ana ni los de Cid.
-    chatState.messages = [
-      { user: 'Ana', wallet: 'WalletAAA', text: 'hola', ts: 1 },
-      { user: 'Bob', wallet: 'WalletBBB', text: 'qué tal', ts: 2 },
-      { user: 'Cid', wallet: 'WalletCCC', text: 'ey', ts: 3 },
-    ]
-    renderDock()
-    fireEvent.click(screen.getByRole('button', { name: /tip bob/i }))
-    expect(tipModalCalls.length).toBeGreaterThan(0)
-    const lastCall = tipModalCalls[tipModalCalls.length - 1]
-    expect(lastCall.to.wallet).toBe('WalletBBB')
-    expect(lastCall.to.alias).toBe('Bob')
-    expect(lastCall.source).toBe('chat')
+    expect(screen.getByRole('link', { name: 'Rival' }).getAttribute('href')).toBe('/profile/WalletB')
   })
 })
 

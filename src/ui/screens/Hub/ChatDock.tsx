@@ -17,75 +17,23 @@ import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
  * El aspecto es el mismo en los dos casos a propósito: el nombre ya va coloreado por usuario, y
  * subrayar solo unos pocos convertiría una lista de nombres en un mosaico.
  *
- * La propina hereda esa misma condición (sin wallet no hay a quién dársela) y suma dos más: no es
- * la wallet propia (nadie se da propina a sí mismo) y el mensaje no es un aviso de la casa —
- * incluye los eventos estructurados (created/hit/winner), que nombran a un jugador real pero
- * siguen siendo un anuncio, no algo que "dijo" esa persona. El estado del modal vive en `ChatDock`
- * (un modal por lista, no uno por mensaje): este componente solo avisa hacia arriba con `onTip`.
+ * Aquí NO se ofrece dar propina. Hubo un botón TIP al lado de cada nombre y se quitó: repetido en
+ * cada mensaje era ruido constante, y la lista de nombres es justo donde menos sitio sobra. La
+ * forma de dar propina desde el chat es el comando `/tip`, que llega al mismo modal.
  */
-function Autor({
-  msg,
-  style,
-  ownWallet,
-  onTip,
-}: {
-  msg: ChatLine
-  style: React.CSSProperties
-  ownWallet: string | null
-  onTip: (to: { wallet: string; alias?: string | null }) => void
-}) {
+function Autor({ msg, style }: { msg: ChatLine; style: React.CSSProperties }) {
   if (!msg.wallet) return <span style={style}>{msg.user}</span>
-  // La bandera va la primera: con las propinas apagadas no se ofrece nada, ni siquiera a quien
-  // cumpliría el resto de condiciones. Ver `featureFlags.ts`.
-  const canTip = TIPS_ENABLED && msg.wallet !== ownWallet && msg.kind !== 'system'
   return (
-    <>
-      <Link to={`/profile/${encodeURIComponent(msg.wallet)}`} title={`View ${msg.user}'s profile`}
-        style={{ ...style, textDecoration: 'none' }}>
-        {msg.user}
-      </Link>
-      {canTip && (
-        <button
-          onClick={() => onTip({ wallet: msg.wallet as string, alias: msg.user })}
-          aria-label={`Tip ${msg.user}`}
-          title={`Tip ${msg.user}`}
-          style={{
-            marginLeft: 5,
-            // Área de toque de al menos 24x24 (WCAG 2.2 AA, criterio 2.5.8: no aplica ninguna
-            // excepción aquí, ni está en un bloque de prosa ni hay 24px de separación con el
-            // enlace del perfil, a solo 5px). `lineHeight` fijo evita depender del alto de línea
-            // 'normal' del navegador (variable según fuente): con 11px de contenido y 7px de
-            // padding arriba y abajo, la caja mide 11+7+7=25px. El margen negativo de la misma
-            // magnitud retrae esa altura del cálculo de "cuánto ocupa este elemento en el flujo"
-            // (un ítem flex contribuye a la altura de la fila por su caja de MARGEN, no la de
-            // contenido) — el padding agranda solo la caja de clic/visible, la fila del mensaje
-            // sigue dominada por el avatar de 21px, sin ensancharse.
-            marginTop: -7,
-            marginBottom: -7,
-            background: 'transparent',
-            border: 'none',
-            padding: '7px 5px',
-            color: COLORS.muted,
-            fontFamily: FONTS.mono,
-            fontSize: 9,
-            lineHeight: '11px',
-            fontWeight: 700,
-            letterSpacing: '.04em',
-            cursor: 'pointer',
-            verticalAlign: 'middle',
-          }}
-        >
-          TIP
-        </button>
-      )}
-    </>
+    <Link to={`/profile/${encodeURIComponent(msg.wallet)}`} title={`View ${msg.user}'s profile`}
+      style={{ ...style, textDecoration: 'none' }}>
+      {msg.user}
+    </Link>
   )
 }
 import { useReducedMotion } from '../../useReducedMotion'
 import { showToast } from '../../toastBus'
 import { UsernameModal } from '../../components/UsernameModal'
 import { TipModal } from '../../components/TipModal'
-import { TIPS_ENABLED } from '../../../featureFlags'
 import { useStickToBottom } from './useStickToBottom'
 import { MentionAutocomplete, type CandidatoLista } from './MentionAutocomplete'
 import { buscarMencion, resolverMenciones } from './mentions'
@@ -155,10 +103,9 @@ export function ChatDock({
   const reducedMotion = useReducedMotion()
   const [draft, setDraft] = useState('')
   const [nameModal, setNameModal] = useState(false)
-  // Un solo modal de propina para toda la lista (no uno por mensaje): `Autor` solo avisa
-  // hacia arriba con el destinatario, y este estado decide si se muestra y sobre quién.
-  // `amount` solo lo pone el comando `/tip ana 5`, que llega con la cantidad escrita; el botón TIP
-  // de cada mensaje no lo manda y el modal abre vacío.
+  // A quién se le va a dar propina, y cuánto. Hoy solo lo pone el comando `/tip ana 5`: el botón
+  // que había al lado de cada nombre se quitó por ruidoso. `amount` llega ya escrito desde el
+  // comando, así que el modal abre relleno y solo queda confirmar.
   const [tipTarget, setTipTarget] =
     useState<{ wallet: string; alias?: string | null; amount?: string } | null>(null)
   // Las respuestas a los comandos (errores y avisos) se guardan APARTE de `messages`: no pasan por
@@ -882,8 +829,7 @@ export function ChatDock({
                   </span>
                 )}
                 <span style={{ flex: 1, fontSize: 12, fontFamily: FONTS.body, lineHeight: 1.35 }}>
-                  <Autor msg={msg} style={{ color: userColor(msg.user), fontWeight: 700 }}
-                    ownWallet={ownWallet} onTip={setTipTarget} />
+                  <Autor msg={msg} style={{ color: userColor(msg.user), fontWeight: 700 }} />
                   <span style={{ color: COLORS.muted }}> {msg.text} </span>
                   {msg.amountUsd != null && (
                     <span style={{ color: '#f5c542', fontWeight: 800 }}>{formatUsd(msg.amountUsd)}</span>
@@ -956,8 +902,6 @@ export function ChatDock({
                       color: userColor(msg.user),
                       fontFamily: FONTS.body,
                     }}
-                    ownWallet={ownWallet}
-                    onTip={setTipTarget}
                   />
                   {/* Timestamp */}
                   <span style={{ fontSize: 9, color: COLORS.muted, marginLeft: 'auto' }}>
