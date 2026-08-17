@@ -75,6 +75,73 @@ describe('los dos modos', () => {
     expect(r.model_ratio).toBeNull()
   })
 
+  // ── la tabla tiene que sumar lo que dice la cabecera ──────────────────────
+
+  /** Los tiers reales de `starter_pokemon_25`, tal y como los enseñaba la tarjeta. */
+  const TIERS = [
+    { tier: 'Common', current: 0, average: 0.3, seen: 50, sample: 68, days_since: 0.08,
+      cold: false, probability: 0.75, n_cards: 12, value: 20.58, gross: 15.43,
+      min_value: 13, max_value: 25 },
+    { tier: 'Uncommon', current: 10, average: 4, seen: 14, sample: 68, days_since: 0.08,
+      cold: false, probability: 0.2, n_cards: 27, value: 41.77, gross: 8.35,
+      min_value: 30, max_value: 55 },
+    { tier: 'Rare', current: 27, average: 28.7, seen: 3, sample: 68, days_since: 0.08,
+      cold: false, probability: 0.04, n_cards: 231, value: 86.93, gross: 3.48,
+      min_value: 55, max_value: 125 },
+    { tier: 'Epic', current: 171, average: 132.5, seen: 1, sample: 68, days_since: 5,
+      cold: true, probability: 0.01, n_cards: 211, value: 274.35, gross: 2.74,
+      min_value: 125, max_value: 500 },
+  ]
+
+  it('la columna GROSS suma EXACTAMENTE el model_ev de la cabecera', () => {
+    // Era el fallo, y se veía con una calculadora: la cabecera decía "model $25.51" y los cuatro
+    // GROSS sumaban 30.00, porque el interruptor convertía el número de arriba y no la tabla.
+    const f = fila({ tiers: TIERS, model_ev: 30.0, model_ratio: 1.2, model_edge_pct: 20, pack_price: 25 })
+    const r = enModo(f, 'cashout')
+    const suma = r.tiers.reduce((s, t) => s + (t.gross ?? 0), 0)
+    expect(suma).toBeCloseTo(r.model_ev!, 2)
+    expect(r.model_ev).toBeCloseTo(25.5, 2)
+  })
+
+  it('en modo "me la quedo" también suma, porque no se convierte nada', () => {
+    const f = fila({ tiers: TIERS, model_ev: 30.0 })
+    const r = enModo(f, 'keep')
+    expect(r.tiers.reduce((s, t) => s + (t.gross ?? 0), 0)).toBeCloseTo(30.0, 2)
+  })
+
+  it('VALUE y GROSS se multiplican por la recompra, no se pasan por la fórmula del edge', () => {
+    // Son dólares, no porcentajes sobre el precio del sobre: `aNeto` con ellos daría un absurdo.
+    const r = enModo(fila({ tiers: TIERS }), 'cashout')
+    const epic = r.tiers.find((t) => t.tier === 'Epic')!
+    expect(epic.value).toBeCloseTo(274.35 * 0.85, 2)
+    expect(epic.gross).toBeCloseTo(2.74 * 0.85, 2)
+    expect(epic.min_value).toBeCloseTo(125 * 0.85, 2)
+  })
+
+  it('la probabilidad y el número de cartas NO se tocan', () => {
+    // Vender la carta no cambia lo a menudo que sale ni cuántas hay en el bote.
+    const r = enModo(fila({ tiers: TIERS }), 'cashout')
+    const epic = r.tiers.find((t) => t.tier === 'Epic')!
+    expect(epic.probability).toBe(0.01)
+    expect(epic.n_cards).toBe(211)
+  })
+
+  it('las rachas tampoco: son tiradas, no dinero', () => {
+    const r = enModo(fila({ tiers: TIERS }), 'cashout')
+    const epic = r.tiers.find((t) => t.tier === 'Epic')!
+    expect(epic.current).toBe(171)
+    expect(epic.average).toBe(132.5)
+    expect(epic.days_since).toBe(5)
+  })
+
+  it('una rareza sin pool barrido sigue sin datos, no pasa a valer 0', () => {
+    const sinPool = [{ tier: 'Epic', current: null, average: null, seen: 0, sample: 68,
+                       days_since: null, cold: false }]
+    const r = enModo(fila({ tiers: sinPool }), 'cashout')
+    expect(r.tiers[0].value == null).toBe(true)
+    expect(r.tiers[0].gross == null).toBe(true)
+  })
+
   it('sin buyback conocido no se convierte nada', () => {
     // Inventar un 85% daría un número con pinta de medido que no lo es.
     const f = fila({ buyback_pct: null })

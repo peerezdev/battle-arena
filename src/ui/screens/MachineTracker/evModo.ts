@@ -72,12 +72,30 @@ export function enModo(fila: EvRow, modo: Modo): EvRow {
     model_edge_pct: mEdge,
     model_ratio: mEdge == null ? fila.model_ratio : 1 + mEdge / 100,
     model_ev: fila.model_ev == null ? null : fila.model_ev * bb,
+    // La tabla se convierte TAMBIÉN, o no suma lo que dice la cabecera. Faltaba, y se veía con una
+    // calculadora: los cuatro GROSS sumaban 30.00 mientras arriba decía `model $25.51`, o sea dos
+    // cifras distintas para la misma cosa en la misma tarjeta.
+    //
+    // Aquí la conversión es una MULTIPLICACIÓN y no la del edge: `value` y `gross` son dólares, no
+    // porcentajes sobre el precio del sobre. Pasarlos por `aNeto` daría un número sin sentido.
+    tiers: fila.tiers.map((t) => ({
+      ...t,
+      value: aDolares(t.value, bb),
+      gross: aDolares(t.gross, bb),
+      min_value: aDolares(t.min_value, bb),
+      max_value: aDolares(t.max_value, bb),
+    })),
     realized_verdict:
       fila.realized_verdict && ESTADISTICOS.has(fila.realized_verdict) && lo != null && hi != null
         ? veredicto(lo, hi)
         : fila.realized_verdict,
   }
 }
+
+/** Un importe en dólares a lo que se recupera vendiéndolo. `null` se conserva tal cual: sin dato no
+ *  hay nada que convertir, y un 0 se leería como "no vale nada". */
+const aDolares = (v: number | null | undefined, bb: number): number | null =>
+  v == null ? null : v * bb
 
 /** Si esa máquina se puede mirar en modo recompra. Sin buyback conocido, no. */
 export function convertible(fila: EvRow): boolean {
