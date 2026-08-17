@@ -101,9 +101,20 @@ class Settings(BaseSettings):
     # env: ROYALE_CREATOR_ALLOWLIST
     royale_creator_allowlist: str = ""
 
+    # Wallets con acceso PERMANENTE al Machine Tracker, sin tener que apostar los 100 USDC de la
+    # ventana rodante (Privy embedded Solana, base58, coma-separadas). Para las cuentas de la casa:
+    # probar el tracker en producción no puede exigir apostar de verdad cada semana. Vacío = la
+    # puerta normal para todos. Vive AQUÍ y no en la base a propósito: así solo se toca desplegando,
+    # y no hay ninguna vía por la que un jugador se añada solo. env: TRACKER_ACCESS_ALLOWLIST
+    tracker_access_allowlist: str = ""
+
     @property
     def royale_creator_allowlist_set(self) -> set[str]:
         return {w.strip() for w in self.royale_creator_allowlist.split(",") if w.strip()}
+
+    @property
+    def tracker_access_allowlist_set(self) -> set[str]:
+        return {w.strip() for w in self.tracker_access_allowlist.split(",") if w.strip()}
 
 
 def get_settings() -> Settings:

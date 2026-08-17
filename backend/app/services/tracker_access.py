@@ -75,7 +75,8 @@ def wager_reciente_usd(session: Session, wallet: str, *, dias: int = VENTANA_DIA
 
 
 def acceso(session: Session, wallet: Optional[str], *, minimo_usd: float = MINIMO_USD,
-           dias: int = VENTANA_DIAS, ahora: Optional[datetime] = None) -> dict:
+           dias: int = VENTANA_DIAS, ahora: Optional[datetime] = None,
+           lista_blanca: Optional[set[str]] = None) -> dict:
     """Si esa wallet puede ver el tracker, y cuánto le falta si no.
 
     Sin wallet no hay acceso, pero tampoco es un error: es alguien que no ha entrado, y lo que
@@ -83,11 +84,31 @@ def acceso(session: Session, wallet: Optional[str], *, minimo_usd: float = MINIM
 
     `missing_usd` se redondea hacia ARRIBA al céntimo. Si faltan 0.004, decir "te faltan 0.00" es
     una trampa: el jugador apostaría creyendo que ya está y seguiría fuera.
+
+    `lista_blanca` son wallets con acceso permanente, para las cuentas de la casa: probar el
+    tracker en producción no puede exigir apostar 100 USDC de verdad cada semana. Tres cosas la
+    hacen segura, y las tres importan:
+
+      · La fija el DESPLIEGUE (variable de entorno), no la base ni el cliente. No hay ninguna vía
+        por la que un jugador se añada, ni pidiéndolo ni escribiendo en la base.
+      · La wallet que se compara sale del token de Privy ya verificado (firma ES256 contra su
+        JWKS), no de un parámetro. Suplantarla es falsificar ese token, o sea el mismo listón que
+        entrar en la cuenta.
+      · Se compara la cadena ENTERA. Nada de minúsculas ni de prefijos: base58 distingue
+        mayúsculas, y una comparación laxa dejaría entrar wallets que solo se PARECEN a la de
+        la casa.
+
+    Estar en la lista abre la puerta pero NO falsea `wagered_usd`: se sigue diciendo lo que de
+    verdad se ha apostado, porque esa cifra también se enseña y mentirla haría mentirosa a la
+    pantalla entera.
     """
     apostado = wager_reciente_usd(session, wallet, dias=dias, ahora=ahora) if wallet else 0.0
-    falta = max(0.0, minimo_usd - apostado)
+    # `wallet and` va delante a propósito: sin sesión no se compara contra la lista. Sin esa
+    # guarda, un None convertiría la lista de la casa en el acceso de cualquiera.
+    invitada = bool(wallet and lista_blanca and wallet in lista_blanca)
+    falta = 0.0 if invitada else max(0.0, minimo_usd - apostado)
     return {
-        "allowed": apostado >= minimo_usd,
+        "allowed": invitada or apostado >= minimo_usd,
         "wagered_usd": round(apostado, 2),
         "required_usd": minimo_usd,
         "missing_usd": math.ceil(falta * 100) / 100,

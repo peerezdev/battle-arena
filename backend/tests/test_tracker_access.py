@@ -134,3 +134,63 @@ class TestLoQueSeDice:
         with Session() as s:
             r = acceso(s, YO, ahora=AHORA)
             assert r["window_days"] == 7 and r["required_usd"] == 100.0
+
+
+class TestListaBlanca:
+    """Wallets con acceso permanente, sin apostar.
+
+    Existe para las cuentas de la casa: probar el tracker en producción no puede exigir apostar
+    100 USDC de verdad cada semana. La lista la fija el DESPLIEGUE (una variable de entorno), no
+    la base ni el cliente, así que no hay ningún camino por el que un jugador se añada solo.
+    """
+
+    def test_la_wallet_de_la_lista_entra_sin_haber_apostado_nada(self, Session):
+        with Session() as s:
+            r = acceso(s, YO, ahora=AHORA, lista_blanca={YO})
+            assert r["allowed"] is True
+            assert r["missing_usd"] == 0.0
+
+    def test_a_los_demas_la_lista_no_les_regala_nada(self, Session):
+        """Lo que de verdad importa: que estar la lista no ablande la puerta para el resto."""
+        with Session() as s:
+            r = acceso(s, OTRO, ahora=AHORA, lista_blanca={YO})
+            assert r["allowed"] is False
+            assert r["missing_usd"] == MINIMO_USD
+
+    def test_sin_sesion_no_se_hereda_el_acceso_de_nadie(self, Session):
+        """Sin wallet no hay a quién comparar, y una lista no vacía no puede abrir la puerta sola.
+
+        Es el caso que convertiría la lista en un agujero: si un `None` colara, cualquiera sin
+        entrar tendría el acceso de la casa.
+        """
+        with Session() as s:
+            r = acceso(s, None, ahora=AHORA, lista_blanca={YO})
+            assert r["allowed"] is False
+
+    def test_se_compara_la_wallet_ENTERA_y_distinguiendo_mayusculas(self, Session):
+        """Base58 distingue mayúsculas y no admite prefijos: parecerse no es ser.
+
+        Sin esto, comparar en minúsculas o por prefijo dejaría entrar a wallets distintas de la
+        de la casa, que es justo la suplantación que la lista no puede permitir.
+        """
+        with Session() as s:
+            assert acceso(s, YO.lower(), ahora=AHORA, lista_blanca={YO})["allowed"] is False
+            assert acceso(s, YO[:-1], ahora=AHORA, lista_blanca={YO})["allowed"] is False
+            assert acceso(s, YO + "x", ahora=AHORA, lista_blanca={YO})["allowed"] is False
+
+    def test_la_lista_vacia_deja_la_puerta_como_estaba(self, Session):
+        with Session() as s:
+            assert acceso(s, YO, ahora=AHORA, lista_blanca=set())["allowed"] is False
+            assert acceso(s, YO, ahora=AHORA)["allowed"] is False
+
+    def test_lo_apostado_se_sigue_diciendo_de_verdad(self, Session):
+        """La lista abre la puerta; no falsea la cifra.
+
+        Enseñar 100 apostados a quien no ha apostado nada convertiría la pantalla en mentirosa, y
+        es la misma cifra que se usa para explicar cuánto falta cuando la lista no está.
+        """
+        with Session() as s:
+            apostar(s, 30, hace_dias=1)
+            r = acceso(s, YO, ahora=AHORA, lista_blanca={YO})
+            assert r["allowed"] is True
+            assert r["wagered_usd"] == 30.0

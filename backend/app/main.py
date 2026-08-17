@@ -257,6 +257,7 @@ def create_app(session_factory, chain: ChainSource,
                hit_announce_mult: float = 3.0,
                winner_announce_mult: float = 4.0,
                royale_creator_allowlist: set[str] | None = None,
+               tracker_access_allowlist: set[str] | None = None,
                referral_payout_wallet_id: str = "",
                referral_payout_address: str = "",
                referral_claim_min_base_units: int = 5_000_000) -> FastAPI:
@@ -287,6 +288,9 @@ def create_app(session_factory, chain: ChainSource,
     # Wallets allowed to CREATE Battle Royale (empty = open to all). Captured by the
     # /pack-battles handler below. See docs/superpowers/specs/2026-07-17-royale-create-allowlist-design.md.
     _royale_allow: set[str] = set(royale_creator_allowlist or ())
+    # Copia propia, como la de arriba: quien construye la app no puede cambiar la lista después
+    # pasándole otro conjunto por referencia.
+    _tracker_allow: set[str] = set(tracker_access_allowlist or ())
 
     if cors_origins:
         app.add_middleware(
@@ -1015,7 +1019,7 @@ def create_app(session_factory, chain: ChainSource,
                 # Un token caducado no es un error de esta pantalla: se trata como "sin sesión" y
                 # el aviso le dirá que entre.
                 wallet = None
-        return tracker_access.acceso(s, wallet)
+        return tracker_access.acceso(s, wallet, lista_blanca=_tracker_allow)
 
     @app.get("/gacha/ev/live")
     async def gacha_ev_live():
@@ -2651,7 +2655,8 @@ def build_default_app() -> FastAPI:
                       fee_wallet_address=s.fee_wallet_address,
                       hit_announce_mult=s.hit_announce_mult,
                       winner_announce_mult=s.winner_announce_mult,
-                      royale_creator_allowlist=s.royale_creator_allowlist_set)
+                      royale_creator_allowlist=s.royale_creator_allowlist_set,
+                      tracker_access_allowlist=s.tracker_access_allowlist_set)
 
 
 app = build_default_app()
