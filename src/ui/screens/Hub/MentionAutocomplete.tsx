@@ -9,7 +9,21 @@ function corta(w: string): string {
 }
 
 /**
- * La lista que se abre al escribir `@` en el chat.
+ * Un elemento de la lista.
+ *
+ * Las menciones siguen pasando `OnlineUser` tal cual, así que no cambian: los dos campos nuevos
+ * son opcionales y quien no los manda ve exactamente lo de antes. Los usa el autocompletado de
+ * comandos (`detalle` = la descripción del comando, que no es una wallet) y la búsqueda de
+ * jugadores de `/tip` (`online` = está conectado ahora, que en las menciones lo están TODOS y por
+ * eso allí no se pinta).
+ */
+export interface CandidatoLista extends OnlineUser {
+  online?: boolean
+  detalle?: string
+}
+
+/**
+ * La lista que se abre al escribir `@` en el chat (y la de comandos al escribir `/`).
  *
  * Se apodera de cuatro teclas mientras está abierta (flechas, Enter y Escape) y les hace
  * `preventDefault`. Sin eso, Enter enviaría el mensaje a medio escribir en lugar de elegir a quien
@@ -22,8 +36,8 @@ export function MentionAutocomplete({
   onElegir,
   onCerrar,
 }: {
-  candidatos: OnlineUser[]
-  onElegir: (u: OnlineUser) => void
+  candidatos: CandidatoLista[]
+  onElegir: (u: CandidatoLista) => void
   onCerrar: () => void
 }) {
   const [i, setI] = useState(0)
@@ -80,9 +94,25 @@ export function MentionAutocomplete({
             background: n === sel ? '#ffffff10' : 'transparent',
           }}
         >
-          <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.text }}>{u.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Punto de conectado. Lleva `role="img"` con etiqueta en vez de ser decorativo
+                porque no repite nada de lo que ya diga la fila: quien no ve el color se
+                quedaría sin el dato. */}
+            {u.online && (
+              <span
+                role="img"
+                aria-label="Online now"
+                title="Online now"
+                style={{
+                  width: 6, height: 6, borderRadius: '50%', background: COLORS.green,
+                  boxShadow: `0 0 6px ${COLORS.green}`, flexShrink: 0,
+                }}
+              />
+            )}
+            <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.text }}>{u.name}</div>
+          </div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted }}>
-            {corta(u.wallet)}
+            {u.detalle ?? corta(u.wallet)}
           </div>
         </div>
       ))}

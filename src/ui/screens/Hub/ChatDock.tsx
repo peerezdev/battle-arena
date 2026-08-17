@@ -1,5 +1,6 @@
 import { useState, useRef, useReducer, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useIdentityToken } from '@privy-io/react-auth'
 import { COLORS, FONTS, GRADIENT, formatUsd, rarityGlow } from '../../theme'
 import { useChat, type ChatLine } from '../../../hooks/useChat'
 import { useDrops } from '../../drops/useDrops'
@@ -86,8 +87,10 @@ import { UsernameModal } from '../../components/UsernameModal'
 import { TipModal } from '../../components/TipModal'
 import { TIPS_ENABLED } from '../../../featureFlags'
 import { useStickToBottom } from './useStickToBottom'
-import { MentionAutocomplete } from './MentionAutocomplete'
+import { MentionAutocomplete, type CandidatoLista } from './MentionAutocomplete'
 import { buscarMencion, resolverMenciones } from './mentions'
+import { parseComando, comandosDisponibles, buscarComando, type ComandoEscrito } from './commands'
+import { useUserSearch, type UsuarioEncontrado } from '../../../onchain/userSearch'
 import { MessageText } from './MessageText'
 import type { LiveDrop } from '../../drops/dropsStore'
 
@@ -146,6 +149,7 @@ export function ChatDock({
   const navigate = useNavigate()
   const drops = useDrops()
   const { messages, send, canPost, online, onlineUsers } = useChat()
+  const { identityToken } = useIdentityToken()
   const { username } = useProfile()
   const ownWallet = useEmbeddedSolanaAddress()
   const reducedMotion = useReducedMotion()
@@ -153,7 +157,17 @@ export function ChatDock({
   const [nameModal, setNameModal] = useState(false)
   // Un solo modal de propina para toda la lista (no uno por mensaje): `Autor` solo avisa
   // hacia arriba con el destinatario, y este estado decide si se muestra y sobre quién.
-  const [tipTarget, setTipTarget] = useState<{ wallet: string; alias?: string | null } | null>(null)
+  // `amount` solo lo pone el comando `/tip ana 5`, que llega con la cantidad escrita; el botón TIP
+  // de cada mensaje no lo manda y el modal abre vacío.
+  const [tipTarget, setTipTarget] =
+    useState<{ wallet: string; alias?: string | null; amount?: string } | null>(null)
+  // Las respuestas a los comandos (errores y avisos) se guardan APARTE de `messages`: no pasan por
+  // el servidor, no las ve nadie más, y `messages` es lo que llega del socket.
+  const [respuestas, setRespuestas] = useState<ChatLine[]>([])
+  // Escape cierra la lista del autocompletado sin borrar lo escrito. Se recuerda CON QUÉ TEXTO se
+  // cerró, y no la posición del cursor: el comando se detecta por el principio del mensaje, así
+  // que mover el cursor no lo cierra, pero escribir cualquier otra cosa sí lo reabre.
+  const [cerradaEn, setCerradaEn] = useState<string | null>(null)
   const promptedName = useRef(false)
   // El chat se abre por el ÚLTIMO mensaje y sigue el ritmo sin arrastrar a quien lee.
   const inputRef = useRef<HTMLInputElement>(null)
@@ -161,8 +175,13 @@ export function ChatDock({
   // del final del texto, para que escribir en medio de un mensaje ya escrito también la abra.
   const [cursor, setCursor] = useState(0)
   const listaRef = useRef<HTMLDivElement>(null)
+  // Lo que se pinta: lo que llegó del servidor MÁS las respuestas locales a los comandos, siempre
+  // al final. Son contestaciones a lo que acabas de escribir, así que su sitio es el último, y
+  // ordenar por `ts` solo serviría para que una respuesta se colara por encima si el reloj del
+  // servidor va adelantado.
+  const lineas = respuestas.length === 0 ? messages : [...messages, ...respuestas]
   const { pegadoAlFondo, nuevosSinVer, bajarDelTodo, alHacerScroll } =
-    useStickToBottom(listaRef, messages.length)
+    useStickToBottom(listaRef, lineas.length)
 
   // First time the user focuses the chat with no username set, nudge them to pick one.
   function onChatFocus() {
@@ -220,27 +239,65 @@ export function ChatDock({
     dragRef.current = null
   }
 
+  // El comando que se está escribiendo. Comando y mención son EXCLUYENTES y manda el comando,
+  // porque la barra abre el mensaje: dentro de "/tip @ana", la arroba es parte de un argumento
+  // suyo, no una mención a medias.
+  const comando = canPost ? parseComando(draft, cursor) : null
+  const defComando = comando ? buscarComando(comando.nombre) : undefined
+  // Un comando apagado por bandera no existe para el jugador: ni se ofrece, ni busca a nadie, ni
+  // se ejecuta. Ver `featureFlags.ts`.
+  const comandoVivo = defComando?.disponible() ? defComando : undefined
+
+  // Qué argumento pide un jugador (el destinatario de `/tip`). Se le pregunta al REGISTRO en vez
+  // de mirar si el comando se llama "tip": añadir otro comando con destinatario no debe obligar a
+  // tocar el ChatDock.
+  const idxUsuario = comandoVivo ? comandoVivo.args.findIndex((a) => a.tipo === 'usuario') : -1
+  const enArgUsuario = !!comando && idxUsuario >= 0 && comando.argActivo === idxUsuario
+  const consultaUsuario = comando && idxUsuario >= 0 ? (comando.args[idxUsuario] ?? '') : ''
+  // La búsqueda sigue viva mientras se escriba el comando ENTERO, no solo mientras el cursor está
+  // sobre el destinatario: al pasar al importe hay que seguir sabiendo a quién resolvía "ana", y
+  // como la consulta no cambia, responde la caché sin una petición nueva. Con `activo` en false
+  // (cualquier otro texto) el hook no pide nada: ese es su freno.
+  const { resultados } = useUserSearch(identityToken ?? null, consultaUsuario, idxUsuario >= 0)
+
   // La mención que se está escribiendo y a quién ofrece. Se filtra por nombre Y por wallet: quien
   // no tiene alias se identifica por su wallet, y es la única forma de encontrarlo.
-  const mencion = canPost ? buscarMencion(draft, cursor) : null
-  const candidatos = mencion
-    ? onlineUsers
-        .filter((u) => {
-          const q = mencion.consulta.toLowerCase()
-          return u.name.toLowerCase().includes(q) || u.wallet.toLowerCase().startsWith(q)
-        })
-        .slice(0, 6)
-    : []
+  const mencion = canPost && !comando ? buscarMencion(draft, cursor) : null
 
-  function elegirMencion(u: { wallet: string; name: string }) {
-    if (!mencion) return
-    const antes = draft.slice(0, mencion.desde)
-    const despues = draft.slice(mencion.desde + 1 + mencion.consulta.length)
-    const nuevo = `${antes}@${u.name} ${despues.replace(/^\s+/, '')}`
-    setDraft(nuevo)
-    // El foco vuelve al campo y el cursor va detrás de la mención: seguir escribiendo tiene que
-    // ser lo natural, no tener que volver a pulsar en el input.
-    const pos = antes.length + u.name.length + 2
+  /** Lo que enseña la lista: comandos, jugadores o menciones, según lo que se esté escribiendo. */
+  function candidatosLista(): CandidatoLista[] {
+    if (cerradaEn === draft) return []              // cerrada con Escape hasta escribir otra cosa
+    if (comando) {
+      // En el NOMBRE del comando (argActivo -1), los comandos que empiezan por lo tecleado.
+      if (comando.argActivo === -1) {
+        return comandosDisponibles()
+          .filter((c) => c.nombre.startsWith(comando.nombre))
+          .map((c) => ({ wallet: `/${c.nombre}`, name: `/${c.nombre}`, detalle: c.descripcion }))
+      }
+      // En el argumento de destinatario, lo que devuelva la búsqueda. Quien no tiene alias se
+      // identifica por su wallet, que es además lo que hay que escribir para elegirlo.
+      if (enArgUsuario) {
+        return resultados.slice(0, 6)
+          .map((u) => ({ wallet: u.wallet, name: u.alias ?? u.wallet, online: u.online }))
+      }
+      return []
+    }
+    if (!mencion) return []
+    const q = mencion.consulta.toLowerCase()
+    return onlineUsers
+      .filter((u) => u.name.toLowerCase().includes(q) || u.wallet.toLowerCase().startsWith(q))
+      .slice(0, 6)
+  }
+  const candidatos = candidatosLista()
+
+  // `/tip` es hoy el único comando y está apagado por defecto, así que la lista sale VACÍA, que
+  // es indistinguible de "los comandos están rotos". Cuando no hay ninguno, se dice.
+  const sinComandos = !!comando && comando.argActivo === -1 && cerradaEn !== draft
+    && comandosDisponibles().length === 0
+
+  /** Deja el foco en el campo con el cursor en `pos`: seguir escribiendo tras elegir de la lista
+   *  tiene que ser lo natural, no tener que volver a pulsar en el input. */
+  function ponerCursor(pos: number) {
     requestAnimationFrame(() => {
       inputRef.current?.focus()
       inputRef.current?.setSelectionRange(pos, pos)
@@ -248,13 +305,102 @@ export function ChatDock({
     })
   }
 
+  function elegirMencion(u: { wallet: string; name: string }) {
+    if (!mencion) return
+    const antes = draft.slice(0, mencion.desde)
+    const despues = draft.slice(mencion.desde + 1 + mencion.consulta.length)
+    setDraft(`${antes}@${u.name} ${despues.replace(/^\s+/, '')}`)
+    ponerCursor(antes.length + u.name.length + 2)
+  }
+
+  /** Sustituye el trozo `n` del comando (0 = su nombre, 1 = el primer argumento) por `valor`, sin
+   *  tocar lo que venga detrás. Los espacios de más se normalizan a uno: quien elige de la lista
+   *  espera "/tip ana ", no "/tip   ana". */
+  function ponerTrozo(n: number, valor: string) {
+    const trozos = draft.slice(1).split(/\s+/)
+    while (trozos.length <= n) trozos.push('')
+    trozos[n] = valor
+    const antes = `/${trozos.slice(0, n + 1).join(' ')} `
+    setDraft(antes + trozos.slice(n + 1).filter((t) => t !== '').join(' '))
+    ponerCursor(antes.length)
+  }
+
+  function elegirCandidato(item: CandidatoLista) {
+    if (!comando) { elegirMencion(item); return }
+    // El nombre del comando llega con barra ("/tip") porque es como se lee en la lista; en el
+    // texto la barra ya está puesta.
+    if (comando.argActivo === -1) ponerTrozo(0, item.name.replace(/^\//, ''))
+    else ponerTrozo(comando.argActivo + 1, item.name)
+  }
+
   /** ¿Este mensaje me nombra? Sin wallet propia (sesión cerrada) nunca. */
   function meMenciona(msg: ChatLine): boolean {
     return !!ownWallet && !!msg.mentions?.some((m) => m.wallet === ownWallet)
   }
 
+  /** Contesta en el chat sin pasar por el servidor: es una respuesta a lo que TÚ acabas de
+   *  escribir, y no tiene por qué verla la sala entera. */
+  function responder(texto: string) {
+    setRespuestas((prev) => [...prev,
+      { user: 'Battle Arena', text: texto, ts: Date.now(), kind: 'system' }])
+  }
+
+  /** Qué comandos hay, para las respuestas de error. Sin ninguno se DICE, en vez de dejar una
+   *  frase que enumera una lista vacía. */
+  function textoComandos(): string {
+    const vivos = comandosDisponibles()
+    return vivos.length
+      ? `Available commands: ${vivos.map((c) => `/${c.nombre}`).join(', ')}`
+      : 'No commands are available right now.'
+  }
+
+  /** Abre el modal de propina con el destinatario y el importe que traía el comando. */
+  function ejecutarTip(args: string[]) {
+    const [aQuien, cuanto] = args
+    if (!aQuien) { responder('Usage: /tip <player> <amount>, for example /tip ana 5'); return }
+    // Por nombre o wallet EXACTOS, nunca "el primero de la lista": ahí se decide a quién se le
+    // manda dinero, y un parecido no basta.
+    const q = aQuien.toLowerCase()
+    const destino: UsuarioEncontrado | undefined = resultados.find(
+      (u) => (u.alias ?? '').toLowerCase() === q || u.wallet.toLowerCase() === q)
+    if (!destino) {
+      responder(`No player found for "${aQuien}". Pick one from the list while you type the name.`)
+      return
+    }
+    // El importe puede faltar, y entonces lo pide el modal, que es su trabajo. Lo que no vale es
+    // uno ESCRITO que no sea un número mayor que 0: abrir el modal con "mucho" dentro dejaría al
+    // jugador mirando un botón apagado sin saber por qué.
+    if (cuanto !== undefined) {
+      const n = Number(cuanto)
+      if (!Number.isFinite(n) || n <= 0) {
+        responder(`"${cuanto}" is not a valid amount. Use a number greater than 0, like /tip ${aQuien} 5`)
+        return
+      }
+    }
+    setTipTarget({ wallet: destino.wallet, alias: destino.alias, amount: cuanto })
+  }
+
+  /** Ejecuta el comando escrito. Nada de esto viaja al servidor. */
+  function ejecutarComando(cmd: ComandoEscrito) {
+    const def = buscarComando(cmd.nombre)
+    // Un comando apagado se contesta igual que uno inexistente: para el jugador no existe, y
+    // decirle "está apagado" solo le hablaría de una función que no puede usar.
+    if (!def?.disponible()) responder(`Unknown command "/${cmd.nombre}". ${textoComandos()}`)
+    else if (def.nombre === 'tip') ejecutarTip(cmd.args)
+    // Un comando registrado que nadie ejecuta es un fallo nuestro, no del jugador.
+    else responder(`/${def.nombre} is not available yet.`)
+    // El campo se limpia siempre, también tras un error: el comando ya está contestado en el
+    // chat, con su ejemplo, y dejarlo escrito invita a pulsar Enter otra vez para el mismo error.
+    setDraft('')
+  }
+
   function handleSend() {
     if (!draft.trim()) return
+    // Un texto que empieza por barra es un comando: se EJECUTA y no se envía, exista o no. Si se
+    // enviara, "/tip ana 5" saldría publicado en la sala, contando a quién y cuánto da dinero
+    // este jugador, y encima sin hacer lo que pedía.
+    const cmd = parseComando(draft, draft.length)
+    if (cmd) { ejecutarComando(cmd); return }
     // Las etiquetas se resuelven contra los conectados AHORA: si el mencionado se fue mientras
     // se escribía, el servidor la descartará igual.
     send(draft, resolverMenciones(draft, onlineUsers))
@@ -262,8 +408,8 @@ export function ChatDock({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    // Con la lista de menciones abierta, Enter es para ELEGIR (lo maneja el autocompletado) y no
-    // para enviar: si no, se mandaría el mensaje a medio escribir.
+    // Con la lista abierta (menciones o comandos), Enter es para ELEGIR (lo maneja el
+    // autocompletado) y no para enviar: si no, se mandaría el mensaje a medio escribir.
     if (e.key === 'Enter' && candidatos.length === 0) handleSend()
   }
 
@@ -675,12 +821,12 @@ export function ChatDock({
             gap: 11,
           }}
         >
-          {messages.length === 0 ? (
+          {lineas.length === 0 ? (
             <div style={{ fontSize: 11, color: COLORS.muted, fontFamily: FONTS.body, marginTop: 8 }}>
               Be the first to write…
             </div>
           ) : (
-            messages.map((msg, idx) => msg.kind === 'system' && (msg.event === 'created' || msg.event === 'hit' || msg.event === 'winner') ? (
+            lineas.map((msg, idx) => msg.kind === 'system' && (msg.event === 'created' || msg.event === 'hit' || msg.event === 'winner') ? (
               /* Structured system event — same inline look for all three:
                  icon/tag + "{who} {text}" + gold value (+ optional button).
                  created: "{creator} created a Pack Battle $50" [Join]
@@ -833,9 +979,24 @@ export function ChatDock({
             // espera al seguir escribiendo para filtrar.
             key={candidatos.map((u) => u.wallet).join(',')}
             candidatos={candidatos}
-            onElegir={elegirMencion}
-            onCerrar={() => setCursor(-1)}
+            onElegir={elegirCandidato}
+            onCerrar={() => setCerradaEn(draft)}
           />
+          {/* Sin comandos disponibles no hay lista que enseñar, y una lista vacía se lee como
+              "esto está roto". Se dice con todas las letras. */}
+          {sinComandos && (
+            <div
+              role="status"
+              style={{
+                position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6,
+                background: COLORS.panel2, border: `1px solid ${COLORS.border}`, borderRadius: 10,
+                padding: '8px 11px', boxShadow: '0 8px 24px #000a', zIndex: 5,
+                fontFamily: FONTS.body, fontSize: 11.5, color: COLORS.muted,
+              }}
+            >
+              No commands are available right now.
+            </div>
+          )}
           <input
             ref={inputRef}
             onSelect={(e) => setCursor(e.currentTarget.selectionStart ?? 0)}
@@ -879,7 +1040,13 @@ export function ChatDock({
       </div>
       {nameModal && <UsernameModal onClose={() => setNameModal(false)} />}
       {tipTarget && (
-        <TipModal open to={tipTarget} source="chat" onClose={() => setTipTarget(null)} />
+        <TipModal
+          open
+          to={{ wallet: tipTarget.wallet, alias: tipTarget.alias }}
+          amountInicial={tipTarget.amount}
+          source="chat"
+          onClose={() => setTipTarget(null)}
+        />
       )}
     </aside>
   )

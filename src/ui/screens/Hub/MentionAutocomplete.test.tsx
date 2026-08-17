@@ -53,6 +53,27 @@ describe('MentionAutocomplete', () => {
     expect(onElegir).toHaveBeenCalledWith(candidatos[1])
   })
 
+  it('marca a los conectados, y sin la marca la lista se ve igual que siempre', () => {
+    // La búsqueda de `/tip` ofrece a jugadores que pueden no estar en la sala; las menciones, solo
+    // a conectados. Si el punto saliera siempre, no distinguiría nada.
+    const { container } = render(
+      <MentionAutocomplete candidatos={candidatos} onElegir={vi.fn()} onCerrar={vi.fn()} />)
+    expect(container.querySelectorAll('[role="img"]')).toHaveLength(0)
+
+    render(<MentionAutocomplete
+      candidatos={[{ wallet: 'W1', name: 'ana', online: true }, { wallet: 'W2', name: 'Bea' }]}
+      onElegir={vi.fn()} onCerrar={vi.fn()} />)
+    expect(screen.getAllByRole('img', { name: /online now/i })).toHaveLength(1)
+  })
+
+  it('la segunda línea puede describir un comando en vez de una wallet', () => {
+    // Un comando no tiene wallet: acortar su descripción a "Send…ayer" sería basura.
+    render(<MentionAutocomplete
+      candidatos={[{ wallet: '/tip', name: '/tip', detalle: 'Send USDC to another player' }]}
+      onElegir={vi.fn()} onCerrar={vi.fn()} />)
+    expect(screen.getByText('Send USDC to another player')).toBeTruthy()
+  })
+
   it('sin candidatos no pinta nada', () => {
     const { container } = render(
       <MentionAutocomplete candidatos={[]} onElegir={vi.fn()} onCerrar={vi.fn()} />)

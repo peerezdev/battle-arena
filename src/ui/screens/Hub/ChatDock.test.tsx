@@ -8,6 +8,7 @@ interface CapturedTipModalProps {
   open: boolean
   to: { wallet: string; alias?: string | null }
   source: 'profile' | 'chat'
+  amountInicial?: string
   onClose: () => void
 }
 
@@ -16,15 +17,30 @@ interface CapturedTipModalProps {
 // the useEmbeddedSolanaAddress mock below, so tip tests can set "who am I" per test.
 // `tipModalCalls` records every prop set ChatDock hands to <TipModal>, so wiring tests can
 // assert on WHO the modal was opened for, not just that a tip button exists somewhere.
-const { chatState, tipModalCalls, toasts } = vi.hoisted(() => ({
+const { chatState, tipModalCalls, toasts, flags, busqueda } = vi.hoisted(() => ({
   chatState: { messages: [] as any[], ownWallet: null as string | null,
                canPost: false, onlineUsers: [] as { wallet: string; name: string }[],
                send: vi.fn() as ReturnType<typeof vi.fn> },
   tipModalCalls: [] as CapturedTipModalProps[],
   toasts: [] as string[],
+  flags: { tips: true },
+  busqueda: { resultados: [] as { wallet: string; alias: string | null; online: boolean }[],
+              llamadas: [] as { consulta: string; activo: boolean }[] },
 }))
-// Igual que en el perfil: aquí se prueba la pantalla con las propinas encendidas.
-vi.mock('../../../featureFlags', () => ({ TIPS_ENABLED: true }))
+// Igual que en el perfil: aquí se prueba la pantalla con las propinas encendidas. Es un GETTER y
+// no un valor fijo porque `/tip` es hoy el único comando: los dos tests de "propinas apagadas"
+// necesitan verlo en false, y `vi.mock` se iza una sola vez por fichero.
+vi.mock('../../../featureFlags', () => ({ get TIPS_ENABLED() { return flags.tips } }))
+vi.mock('@privy-io/react-auth', () => ({ useIdentityToken: () => ({ identityToken: 'tok' }) }))
+// La búsqueda de jugadores tiene sus propios tests (espera de 250 ms, caché, fallos): aquí solo
+// importa el CABLEADO, o sea con qué consulta se la llama, si se la deja activa, y qué hace el
+// ChatDock con lo que devuelve. Devolver nada cuando está inactiva imita al hook de verdad.
+vi.mock('../../../onchain/userSearch', () => ({
+  useUserSearch: (_token: string | null, consulta: string, activo: boolean) => {
+    busqueda.llamadas.push({ consulta, activo })
+    return { resultados: activo ? busqueda.resultados : [], cargando: false }
+  },
+}))
 vi.mock('../../../hooks/useChat', () => ({
   useChat: () => ({ messages: chatState.messages, send: chatState.send, canPost: chatState.canPost,
                     online: 0, onlineUsers: chatState.onlineUsers }),
@@ -55,6 +71,9 @@ beforeEach(() => {
   chatState.send = vi.fn()
   tipModalCalls.length = 0
   toasts.length = 0
+  flags.tips = true
+  busqueda.resultados = []
+  busqueda.llamadas.length = 0
 })
 
 describe('ChatDock live drops', () => {
@@ -356,6 +375,156 @@ describe('ChatDock · menciones', () => {
     const campo = escribir('hola @an')
     fireEvent.keyDown(campo, { key: 'Enter' })
     expect(chatState.send).not.toHaveBeenCalled()
+  })
+})
+
+describe('ChatDock · comandos', () => {
+  const ana = { wallet: 'WalletANA1111', alias: 'ana', online: true }
+  const bea = { wallet: 'WalletBEA2222', alias: 'bea', online: false }
+
+  function escribir(texto: string) {
+    const campo = screen.getByPlaceholderText(/type a message/i) as HTMLInputElement
+    fireEvent.change(campo, { target: { value: texto } })
+    return campo
+  }
+
+  it('escribir / abre la lista de comandos', () => {
+    chatState.canPost = true
+    renderDock()
+    escribir('/')
+    expect(screen.getByRole('listbox')).toBeTruthy()
+    expect(screen.getByText('/tip')).toBeTruthy()
+    expect(screen.getByText('Send USDC to another player')).toBeTruthy()
+  })
+
+  it('con las propinas apagadas, /tip no aparece', () => {
+    // El comando lo apaga la MISMA bandera que el botón TIP de cada mensaje: si se ofreciera,
+    // ejecutarlo acabaría en un 503 `tips_disabled` del backend.
+    flags.tips = false
+    chatState.canPost = true
+    renderDock()
+    escribir('/')
+    expect(screen.queryByText('/tip')).toBeNull()
+  })
+
+  it('con las propinas apagadas, escribir / DICE que no hay comandos', () => {
+    // `/tip` es hoy el único comando, así que con las propinas apagadas la lista queda vacía, y
+    // una lista vacía es indistinguible de "los comandos están rotos". Tiene que decirlo.
+    flags.tips = false
+    chatState.canPost = true
+    renderDock()
+    escribir('/')
+    expect(screen.queryByRole('listbox')).toBeNull()
+    expect(screen.getByText(/no commands are available right now/i)).toBeTruthy()
+  })
+
+  it('en el primer argumento de /tip ofrece usuarios', () => {
+    busqueda.resultados = [ana, bea]
+    chatState.canPost = true
+    renderDock()
+    escribir('/tip an')
+    expect(busqueda.llamadas[busqueda.llamadas.length - 1])
+      .toMatchObject({ consulta: 'an', activo: true })
+    expect(screen.getByRole('listbox')).toBeTruthy()
+    expect(screen.getByText('ana')).toBeTruthy()
+  })
+
+  it('en el nombre del comando NO se molesta al servidor buscando jugadores', () => {
+    // El freno de `useUserSearch` vive en su `activo`: escribir "/ti" no es buscar a nadie.
+    chatState.canPost = true
+    renderDock()
+    escribir('/ti')
+    expect(busqueda.llamadas.every((l) => l.activo === false)).toBe(true)
+  })
+
+  it('dentro de un comando, la @ no abre la lista de menciones', () => {
+    // Comando y mención son EXCLUYENTES, y manda el comando porque abre el mensaje.
+    chatState.canPost = true
+    chatState.onlineUsers = [{ wallet: 'WalletZZZ', name: 'zoe' }]
+    renderDock()
+    escribir('/tip @z')
+    expect(screen.queryByText('zoe')).toBeNull()
+  })
+
+  it('un texto que empieza por / NUNCA se envía como mensaje', () => {
+    // Ni el comando desconocido, ni el válido: publicar "/tip ana 5" en la sala enseñaría a
+    // quién y cuánto le da dinero el jugador, además de no hacer lo que pedía.
+    busqueda.resultados = [ana]
+    chatState.canPost = true
+    renderDock()
+
+    const campo = escribir('/loquesea hola')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+    expect(chatState.send).not.toHaveBeenCalled()
+
+    escribir('/tip ana 5')
+    fireEvent.click(screen.getByRole('button', { name: '➤' }))    // también por el botón
+    expect(chatState.send).not.toHaveBeenCalled()
+  })
+
+  it('Enter con la lista de comandos abierta elige, NO ejecuta ni envía', () => {
+    chatState.canPost = true
+    renderDock()
+    const campo = escribir('/t')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+    expect(campo.value).toBe('/tip ')
+    expect(chatState.send).not.toHaveBeenCalled()
+    // Y no se ha EJECUTADO "/t" por el camino: si Enter enviara además de elegir, el jugador
+    // vería un "Unknown command" por completar el comando que la lista le estaba ofreciendo.
+    expect(screen.queryByText(/unknown command/i)).toBeNull()
+  })
+
+  it('/tip ana 5 abre el modal con destinatario e importe', () => {
+    // `bea` va la PRIMERA a propósito: un cableado que coja `resultados[0]` mandaría el dinero a
+    // otra persona y pasaría igual un test que solo comprobara "se abrió el modal".
+    busqueda.resultados = [bea, ana]
+    chatState.canPost = true
+    renderDock()
+    const campo = escribir('/tip ana 5')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+
+    expect(tipModalCalls.length).toBeGreaterThan(0)
+    const ultima = tipModalCalls[tipModalCalls.length - 1]
+    expect(ultima.open).toBe(true)
+    expect(ultima.to.wallet).toBe(ana.wallet)
+    expect(ultima.to.alias).toBe('ana')
+    expect(ultima.amountInicial).toBe('5')
+    expect(ultima.source).toBe('chat')
+    expect(campo.value).toBe('')
+  })
+
+  it('/tip con un usuario que no existe lo dice y no abre el modal', () => {
+    busqueda.resultados = [bea]
+    chatState.canPost = true
+    renderDock()
+    const campo = escribir('/tip fantasma 5')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+
+    expect(tipModalCalls).toHaveLength(0)
+    expect(screen.getByText(/no player found for "fantasma"/i)).toBeTruthy()
+    expect(chatState.send).not.toHaveBeenCalled()
+  })
+
+  it('/tip con una cantidad que no es un número no abre el modal y lo dice', () => {
+    // Abrir el modal con "mucho" dentro dejaría al jugador mirando un botón apagado sin motivo.
+    busqueda.resultados = [ana]
+    chatState.canPost = true
+    renderDock()
+    const campo = escribir('/tip ana mucho')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+
+    expect(tipModalCalls).toHaveLength(0)
+    expect(screen.getByText(/not a valid amount/i)).toBeTruthy()
+  })
+
+  it('un comando desconocido responde sin llamar al servidor', () => {
+    chatState.canPost = true
+    renderDock()
+    const campo = escribir('/roll 20')
+    fireEvent.keyDown(campo, { key: 'Enter' })
+
+    expect(chatState.send).not.toHaveBeenCalled()
+    expect(screen.getByText(/unknown command "\/roll"/i)).toBeTruthy()
   })
 })
 
