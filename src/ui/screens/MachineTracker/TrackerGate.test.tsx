@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, cleanup } from '@testing-library/react'
 import { TrackerGate } from './TrackerGate'
 import type { TrackerAccess } from '../../../onchain/gachaClient'
 
@@ -127,6 +127,20 @@ describe('MachineTrackerPage', () => {
     render(<MachineTrackerPage />)
     expect(screen.queryByText(/to go/)).toBeNull()
     expect(mocks.fetchEv).not.toHaveBeenCalled()
+  })
+
+  it('el explicador está CON acceso y SIN él', async () => {
+    // Quien todavía no puede entrar merece saber qué es lo que le estamos pidiendo que se gane.
+    mocks.fetchAcceso.mockResolvedValue(acceso())
+    render(<MachineTrackerPage />)
+    await dejarResolver()
+    expect(screen.getByRole('button', { name: /How to read a card/i })).toBeTruthy()
+    cleanup()
+    mocks.fetchAcceso.mockResolvedValue(acceso({ allowed: true, missing_usd: 0 }))
+    mocks.fetchEv.mockResolvedValue({ rows: [FILA], updated_at: 0 })
+    render(<MachineTrackerPage />)
+    await dejarResolver()
+    expect(screen.getByRole('button', { name: /How to read a card/i })).toBeTruthy()
   })
 
   it('si no se puede preguntar, la puerta se queda CERRADA', async () => {

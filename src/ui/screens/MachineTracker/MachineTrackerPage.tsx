@@ -8,6 +8,7 @@ import { alternar, guardarOcultas, leerOcultas, visibles } from './hiddenMachine
 import { enModo, guardarModo, leerModo, type Modo } from './evModo'
 import { LENTO_MS, RAPIDO_MS, aplicarVivo } from './evVivo'
 import { TrackerGate } from './TrackerGate'
+import { TrackerHelp } from './TrackerHelp'
 import { estaRancio, horaActualizacion } from './actualizado'
 
 /**
@@ -48,6 +49,10 @@ export function MachineTrackerPage() {
           What every Collector Crypt machine is actually paying back, measured on the public feed.
         </p>
       </div>
+
+      {/* El explicador va con acceso o sin él: quien todavía no puede entrar merece saber qué es
+          lo que le estamos pidiendo que se gane. */}
+      <TrackerHelp />
 
       {/* Mientras no se sabe, no se enseña ninguna de las dos cosas: enseñar el panel y quitarlo
           medio segundo después sería peor que esperar, y enseñar el aviso a quien sí tiene acceso
