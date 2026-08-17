@@ -283,6 +283,17 @@ describe('Lobby · el aviso de la demo', () => {
       expect(screen.getByTestId('royale-demo')).toBeTruthy()
     })
 
+  it('la guía de los tres modos está en el Lobby, y arriba del aviso', () => {
+    // Contesta "¿qué es esto?", y esa pregunta llega antes que "no pagues sin ver el vídeo".
+    mocks.battles = []
+    pintar('all')
+    const guia = screen.getByText(/How each mode works/)
+    const demo = screen.getByTestId('royale-demo')
+    // Por posición en el DOM y no por índice en el texto: el aviso está doblado y no aporta texto,
+    // así que comparar cadenas daba una aserción que se cumplía sola.
+    expect(guia.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('sale incluso sin ninguna partida abierta', () => {
     // Es cuando más falta hace: no hay nada que mirar, así que el vídeo es lo único que explica a
     // qué se juega.

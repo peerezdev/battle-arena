@@ -6,6 +6,7 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import type { LiveBattle } from './hubMockData'
 import { QuickMatch } from './QuickMatch'
 import { LiveBattles } from './LiveBattles'
+import { ModeGuide } from './ModeGuide'
 import { RoyaleDemoNotice } from './RoyaleDemoNotice'
 import { showToast } from '../../toastBus'
 import { useBattles } from '../../../onchain/useBattles'
@@ -83,6 +84,11 @@ export function LobbyPage() {
 
   return (
     <div style={{ padding: '24px clamp(14px,2.4vw,28px) 44px', display: 'flex', flexDirection: 'column', gap: 26 }}>
+      {/* Arriba del todo: es lo que contesta "¿qué es esto?", y esa pregunta llega antes que
+          cualquier otra. Plegable y con memoria, así que quien ya lo sabe la cierra una vez y le
+          queda una sola línea. */}
+      <ModeGuide />
+
       {/* SIEMPRE, con cualquier filtro y se haya visto o no. El vídeo tiene que estar localizable
           en todo momento: el que vuelve semanas después a decidir si entra a una Royale de 250 $
           quiere repasarlo, y mandarle a buscarlo por el Help es perderlo. Por eso tampoco se
