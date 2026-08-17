@@ -144,3 +144,25 @@ describe('useUserSearch', () => {
     expect(result.current.resultados).toEqual([])
   })
 })
+
+describe('useUserSearch · el fallo no deja la búsqueda colgada', () => {
+  // Si `respondida` mirara SOLO la caché, tras un fallo —que a propósito ya no se cachea—
+  // `cargando` se quedaría en true PARA SIEMPRE: el efecto no se vuelve a disparar porque sus
+  // dependencias no cambian. El chat contestaría "todavía buscando" el resto de la sesión y ese
+  // jugador no podría recibir una propina por comando. Es el único invariante de este fichero que
+  // se podía romper sin que nada se pusiera rojo.
+  it('tras un 429 deja de estar cargando', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      { ok: false, status: 429, json: async () => ({}) }))
+    const { result } = renderHook(() => useUserSearch('tok', 'ana', true))
+    await act(async () => { await vi.advanceTimersByTimeAsync(ESPERA_MS + 10) })
+    expect(result.current.cargando).toBe(false)
+  })
+
+  it('tras un corte de red deja de estar cargando', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    const { result } = renderHook(() => useUserSearch('tok', 'ana', true))
+    await act(async () => { await vi.advanceTimersByTimeAsync(ESPERA_MS + 10) })
+    expect(result.current.cargando).toBe(false)
+  })
+})
