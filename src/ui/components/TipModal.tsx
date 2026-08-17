@@ -26,6 +26,9 @@ interface TipModalProps {
   open: boolean
   to: { wallet: string; alias?: string | null }
   source: 'profile' | 'chat'
+  /** Importe con el que abrir el campo, ya escrito. Lo usa el comando `/tip ana 5` del chat, que
+   *  llega con la cantidad puesta; desde el perfil no se pasa y el modal abre vacío. */
+  amountInicial?: string
   onClose: () => void
 }
 
@@ -54,7 +57,7 @@ const labelStyle: React.CSSProperties = {
   fontFamily: FONTS.mono, fontSize: 9.5, fontWeight: 700, letterSpacing: '.16em', color: COLORS.muted,
 }
 
-export function TipModal({ open, to, source, onClose }: TipModalProps) {
+export function TipModal({ open, to, source, amountInicial, onClose }: TipModalProps) {
   const reducedMotion = useReducedMotion()
   const { identityToken } = useIdentityToken()
   const gate = useDelegationGate()
@@ -62,7 +65,9 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
   const { reserved } = useReservedBalance()
   const available = availableUsd(usdc, reserved)
 
-  const [amount, setAmount] = useState('')
+  // Arranca ya con el importe inicial: el reset de más abajo solo actúa cuando la clave CAMBIA, y
+  // al montar el modal ya abierto (el caso de `/tip ana 5`) no ha cambiado nada todavía.
+  const [amount, setAmount] = useState(amountInicial ?? '')
   const [error, setError] = useState<string | null>(null)
   // `busy` arranca preguntando al registro de envíos vivos, no en `false`: en el chat este
   // componente se monta de cero cada vez que se abre el modal, así que su propio estado no sabe
@@ -84,13 +89,15 @@ export function TipModal({ open, to, source, onClose }: TipModalProps) {
   // anterior y, si cambió, ajustamos aquí mismo (el patrón que React recomienda para "resetear
   // estado cuando cambia una prop"). Un efecto que llama a setState de forma síncrona encadena
   // un render extra evitable, además de disparar la regla de lint react-hooks/set-state-in-effect.
-  const resetKey = `${open}:${to.wallet}`
+  // El importe inicial entra en la clave: si no, abrir el modal dos veces seguidas con importes
+  // distintos (dos `/tip` seguidos) rellenaría solo la primera, porque la clave no habría cambiado.
+  const resetKey = `${open}:${to.wallet}:${amountInicial ?? ''}`
   const [lastResetKey, setLastResetKey] = useState(resetKey)
   if (resetKey !== lastResetKey) {
     setLastResetKey(resetKey)
     gate.cancel()
     if (open) {
-      setAmount('')
+      setAmount(amountInicial ?? '')
       setError(null)
       // Ojo: NO es `setBusy(false)`. Si la propina anterior a ESTE destinatario sigue viva (el
       // jugador cerró el modal sin esperar), volver a habilitar el botón le deja mandar una

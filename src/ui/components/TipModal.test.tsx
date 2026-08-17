@@ -193,3 +193,41 @@ describe('TipModal', () => {
     await waitFor(() => expect(sendTip).toHaveBeenCalledWith('tok', BOB.wallet, 2, 'profile'))
   })
 })
+
+describe('TipModal · importe inicial', () => {
+  it('se abre con el importe puesto', () => {
+    render(<TipModal open to={TO} source="chat" amountInicial="5" onClose={() => {}} />)
+    expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('5')
+  })
+
+  it('cambiar el importe SIN cerrar el modal lo actualiza', () => {
+    // Este es el caso que justifica meter el importe en la clave del reset. Cerrando y volviendo a
+    // abrir, la clave ya cambia sola por el `open`, así que ese camino no prueba nada: lo
+    // comprobé mutando el código y los tests seguían verdes.
+    const { rerender } = render(
+      <TipModal open to={TO} source="chat" amountInicial="5" onClose={() => {}} />)
+    expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('5')
+
+    rerender(<TipModal open to={TO} source="chat" amountInicial="9" onClose={() => {}} />)
+    expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('9')
+  })
+
+  it('abrirlo dos veces con importes distintos rellena los dos', () => {
+    // El modal BORRA el importe cada vez que se abre, y ese reset no se puede quitar: existe
+    // porque sin él una propina pendiente de delegación se pagaba al destinatario anterior. Así
+    // que el importe inicial tiene que entrar en su clave, no saltárselo.
+    const { rerender } = render(
+      <TipModal open={false} to={TO} source="chat" amountInicial="5" onClose={() => {}} />)
+    rerender(<TipModal open to={TO} source="chat" amountInicial="5" onClose={() => {}} />)
+    expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('5')
+
+    rerender(<TipModal open={false} to={TO} source="chat" amountInicial="9" onClose={() => {}} />)
+    rerender(<TipModal open to={TO} source="chat" amountInicial="9" onClose={() => {}} />)
+    expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('9')
+  })
+
+  it('sin importe inicial sigue abriéndose vacío', () => {
+    render(<TipModal open to={TO} source="profile" onClose={() => {}} />)
+    expect((screen.getByLabelText(/amount/i) as HTMLInputElement).value).toBe('')
+  })
+})
