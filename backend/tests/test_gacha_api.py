@@ -1329,3 +1329,42 @@ def test_si_CC_no_contesta_la_lista_el_replay_sigue_saliendo():
     assert r.status_code == 200
     assert r.json()["nft_address"] == "NFT1"
     assert r.json()["buyback_pct"] is None
+
+
+# ── El tracker solo enseña máquinas que se pueden jugar AHORA ──────────────────────────────────
+
+def _ev_machines():
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": "viva", "name": "Viva", "price": 50, "odds": {}, "stock": {}, "ev": 1.0,
+         "image": None, "instantBuyback": 85},
+        {"code": "cerrada", "name": "Cerrada", "price": 50, "odds": {}, "stock": {}, "ev": 1.0,
+         "image": None, "instantBuyback": 85},
+    ]}))
+    # `available` sale de /api/status: CC manda `code` + `status`, y solo "open" cuenta como
+    # abierta. Lo que no aparece se asume abierto (ver `_availability`).
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={
+        "gachas": [{"code": "viva", "status": "open"},
+                   {"code": "cerrada", "status": "closed"}]}))
+
+
+@respx.mock
+def test_el_tracker_no_enseña_una_maquina_que_CC_tiene_cerrada():
+    """Medir el EV de una máquina a la que nadie puede tirar ocupa sitio y sugiere una decisión
+    que no se puede tomar."""
+    c, _ = _client()
+    _ev_machines()
+    codigos = [f["machine"] for f in c.get("/gacha/ev").json()["rows"]]
+    assert "viva" in codigos
+    assert "cerrada" not in codigos
+
+
+@respx.mock
+def test_el_tracker_no_enseña_una_maquina_que_hemos_apagado_nosotros():
+    """El mismo filtro que el catálogo: si no se ofrece para jugar, no se mide en pantalla."""
+    from app.services import machine_visibility
+    c, _ = _client()
+    _ev_machines()
+    with c.session_factory() as s:
+        machine_visibility.hide(s, "viva", reason="prueba")
+    codigos = [f["machine"] for f in c.get("/gacha/ev").json()["rows"]]
+    assert "viva" not in codigos

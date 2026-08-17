@@ -956,9 +956,19 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(502, str(e) or "gacha upstream unavailable")
         filas = []
         with session_factory() as s:
-            for m in maquinas:
+            # Solo las que se pueden jugar AHORA. Se descartan por dos motivos distintos y los dos
+            # cuentan: las que hemos apagado nosotros (`machine_visibility`, el mismo filtro que el
+            # catálogo) y las que Collector Crypt tiene cerradas (`available`). Medir el EV de una
+            # máquina a la que nadie puede tirar es peor que no medirlo: ocupa sitio y sugiere una
+            # decisión que no se puede tomar.
+            #
+            # Se filtra al PUBLICAR y no al ingerir: sus tiradas se siguen guardando, así que si
+            # vuelve a abrirse no arranca desde cero.
+            for m in machine_visibility.visible(s, maquinas):
                 code = m.get("code")
                 if not code or not m.get("price"):
+                    continue
+                if m.get("available") is False:
                     continue
                 f = fila_ev(s, code, precio=float(m["price"]),
                             buyback_pct=(m.get("instantBuyback") or 0) / 100.0 or None,

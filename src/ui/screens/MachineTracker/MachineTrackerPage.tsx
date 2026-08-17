@@ -8,6 +8,7 @@ import { alternar, guardarOcultas, leerOcultas, visibles } from './hiddenMachine
 import { enModo, guardarModo, leerModo, type Modo } from './evModo'
 import { LENTO_MS, RAPIDO_MS, aplicarVivo } from './evVivo'
 import { TrackerGate } from './TrackerGate'
+import { estaRancio, horaActualizacion } from './actualizado'
 
 /**
  * El Machine Tracker: cuánto paga de verdad cada máquina del gacha.
@@ -66,6 +67,15 @@ export function MachineTrackerPage() {
 function PanelEv() {
   const [filas, setFilas] = useState<EvRow[] | null>(null)
   const [fallo, setFallo] = useState(false)
+  // Cuándo se calculó lo que se está viendo. Del carril LENTO: es de donde salen el edge y el
+  // intervalo, que son los números grandes de la tarjeta.
+  const [sello, setSello] = useState<number | null>(null)
+  // Se refresca solo para poder decir "esto lleva rato parado" sin depender de que llegue nada.
+  const [ahoraSeg, setAhoraSeg] = useState(() => Math.floor(Date.now() / 1000))
+  useEffect(() => {
+    const t = setInterval(() => setAhoraSeg(Math.floor(Date.now() / 1000)), 15_000)
+    return () => clearInterval(t)
+  }, [])
   // Se lee una vez al montar: la preferencia no cambia sola, y releerla en cada render obligaría a
   // tocar localStorage constantemente.
   const [ocultas, setOcultas] = useState<Set<string>>(() => leerOcultas())
@@ -86,7 +96,7 @@ function PanelEv() {
     const lento = () => {
       if (dormido()) return
       fetchEvRows()
-        .then((d) => { if (!cancelado) { setFilas(d.rows); setFallo(false) } })
+        .then((d) => { if (!cancelado) { setFilas(d.rows); setSello(d.updated_at); setFallo(false) } })
         // Solo se da por fallida la PRIMERA carga: una vez hay tarjetas en pantalla, un sondeo que
         // falle no debe borrarlas, porque lo de antes sigue siendo cierto y vaciar la pantalla por
         // un fallo de red pasajero es peor que enseñarlo un minuto más viejo.
@@ -141,12 +151,21 @@ function PanelEv() {
   // La conversión es una vista, no otra medición: el backend mide el valor de la carta y aquí se
   // le aplica la recompra si el usuario quiere ver lo que recuperaría vendiendo.
   const mostradas = visibles(filas, ocultas).map((f) => enModo(f, modo))
+  const rancio = estaRancio(sello, ahoraSeg)
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.2em', color: COLORS.muted }}>
           RETURN PER DOLLAR · LAST 48H
+        </span>
+        {/* La hora de la última medición, con aviso si se queda parada. Ya pasó una vez: la ingesta
+            se quedó muda cinco horas aparentando estar bien, y esto lo habría dicho al minuto. */}
+        <span style={{
+          fontFamily: FONTS.mono, fontSize: 10, letterSpacing: '.1em',
+          color: rancio ? '#f5c542' : '#5d6774',
+        }}>
+          {rancio ? 'STALE · ' : 'UPDATED '}{horaActualizacion(sello)}
         </span>
         {/* Las dos lecturas de la MISMA medición. Se ofrece elegir porque las dos son ciertas: el
             coleccionista se queda las cartas buenas y el que juega por valor las revende. Sin este

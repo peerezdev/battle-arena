@@ -1,4 +1,4 @@
-import type { EvLive, EvRow } from '../../../onchain/gachaClient'
+import type { EvLive, EvRow, EvTier } from '../../../onchain/gachaClient'
 
 /**
  * Los dos carriles del refresco.
@@ -31,9 +31,32 @@ export const RAPIDO_MS = 10_000
 export function aplicarVivo(filas: EvRow[], vivas: EvLive[]): EvRow[] {
   const porMaquina = new Map(vivas.map((v) => [v.machine, v.tiers]))
   return filas.map((f) => {
-    const tiers = porMaquina.get(f.machine)
+    const nuevas = porMaquina.get(f.machine)
     // Una máquina que el carril rápido no trae se queda con lo que tenía; vaciarle la tabla sería
     // decir "no hay datos" cuando lo cierto es "no han llegado todavía".
-    return tiers ? { ...f, tiers } : f
+    if (!nuevas) return f
+    return { ...f, tiers: fundirTiers(f.tiers, nuevas) }
+  })
+}
+
+/**
+ * Las rachas nuevas SIN perder lo que el carril rápido no trae.
+ *
+ * Aquí estaba el fallo: se sustituía la tabla entera. El carril rápido solo lleva rachas —es su
+ * razón de ser, ser barato—, así que P, VALUE y GROSS se borraban en el primer tic de diez
+ * segundos. Volvían un instante con el refresco del minuto y se borraban otra vez, o sea que en la
+ * práctica desaparecían al entrar y no volvían.
+ *
+ * Se funde por rareza y no por posición: si algún día llegan en otro orden, cruzar por índice
+ * mezclaría el valor de un Common con la racha de un Epic sin que nada fallara.
+ */
+function fundirTiers(previas: EvTier[], nuevas: EvTier[]): EvTier[] {
+  const antes = new Map(previas.map((t) => [t.tier, t]))
+  return nuevas.map((n) => {
+    const p = antes.get(n.tier)
+    if (!p) return n
+    // Lo del modelo se conserva; lo observado se pisa con lo recién traído.
+    return { ...n, probability: p.probability, n_cards: p.n_cards, value: p.value,
+             gross: p.gross, min_value: p.min_value, max_value: p.max_value }
   })
 }

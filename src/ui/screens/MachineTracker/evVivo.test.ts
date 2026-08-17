@@ -53,6 +53,49 @@ describe('el carril rápido', () => {
       .toEqual(['a'])
   })
 
+  it('NO borra P, VALUE y GROSS al traer las rachas', () => {
+    // Era el fallo: el carril rápido sustituía la tabla entera y solo lleva rachas, así que las
+    // columnas del modelo desaparecían en el primer tic de diez segundos y no volvían.
+    const conModelo = tier({ current: 80, probability: 0.01, n_cards: 211, value: 160.22,
+                             gross: 1.6, min_value: 125, max_value: 223 })
+    const f = fila('pokemon_50', { tiers: [conModelo] })
+    // Lo que llega del carril rápido: rachas y nada más.
+    const soloRacha = { tier: 'Epic', current: 81, average: 165.7, seen: 12, sample: 2000,
+                        days_since: 0.1, cold: false }
+    const [d] = aplicarVivo([f], [{ machine: 'pokemon_50', tiers: [soloRacha] }])
+    expect(d.tiers[0].current).toBe(81)          // la racha se actualiza
+    expect(d.tiers[0].probability).toBe(0.01)    // y el modelo sigue ahí
+    expect(d.tiers[0].value).toBe(160.22)
+    expect(d.tiers[0].gross).toBe(1.6)
+    expect(d.tiers[0].n_cards).toBe(211)
+  })
+
+  it('funde por RAREZA y no por posición', () => {
+    // Si algún día llegan en otro orden, cruzar por índice pegaría el valor de un Common a la
+    // racha de un Epic sin que nada diera error.
+    const f = fila('m', { tiers: [
+      tier({ tier: 'Common', value: 40, gross: 32, current: 0 }),
+      tier({ tier: 'Epic', value: 528, gross: 5.28, current: 80 }),
+    ] })
+    const alReves = [
+      { tier: 'Epic', current: 81, average: 165, seen: 12, sample: 2000, days_since: 0, cold: false },
+      { tier: 'Common', current: 1, average: 0.2, seen: 1600, sample: 2000, days_since: 0, cold: false },
+    ]
+    const [d] = aplicarVivo([f], [{ machine: 'm', tiers: alReves }])
+    const epic = d.tiers.find((t) => t.tier === 'Epic')!
+    const common = d.tiers.find((t) => t.tier === 'Common')!
+    expect(epic.value).toBe(528)
+    expect(epic.current).toBe(81)
+    expect(common.value).toBe(40)
+    expect(common.current).toBe(1)
+  })
+
+  it('una rareza que antes no estaba se acepta tal cual', () => {
+    const f = fila('m', { tiers: [] })
+    const [d] = aplicarVivo([f], [{ machine: 'm', tiers: [tier({ current: 3 })] }])
+    expect(d.tiers[0].current).toBe(3)
+  })
+
   it('no muta las filas originales', () => {
     const filas = [fila('pokemon_50')]
     aplicarVivo(filas, [{ machine: 'pokemon_50', tiers: [tier({ current: 81 })] }])
