@@ -14,7 +14,9 @@ vi.mock('../../useMachines', () => ({
 }))
 vi.mock('../../components/useDelegationGate', () => ({ useDelegationGate: () => ({ open: false }) }))
 vi.mock('../../components/DelegationGate', () => ({ DelegationGate: () => null }))
-vi.mock('./RoyaleDemoNotice', () => ({ RoyaleDemoNotice: () => null }))
+vi.mock('./RoyaleDemoNotice', () => ({
+  RoyaleDemoNotice: () => <div data-testid="royale-demo" />,
+}))
 // jsdom no trae matchMedia, así que sin esto TODO se probaría contra la maqueta estrecha —
 // y la cabecera con los rótulos solo existe en la ancha.
 vi.mock('../../useIsWide', () => ({ useIsWide: () => mocks.wide }))
@@ -263,5 +265,33 @@ describe('Lobby · los dos modos en la MISMA lista', () => {
     pintar('none')
     expect(screen.getByText(/No modes selected/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /Show all games/ })).toBeTruthy()
+  })
+})
+
+// ── el aviso de la demo de Battle Royale ─────────────────────────────────────
+//
+// Vivía en la página de Royale, arriba del todo, para llegar antes que el precio y el botón de
+// unirse. En el Lobby unificado hay que decidir cuándo aparece, y eso lo decide esta pantalla.
+
+describe('Lobby · el aviso de la demo', () => {
+  it('sale con los DOS modos marcados, no solo filtrando Royale', () => {
+    // Con los dos a la vista el jugador también tiene plazas de Royale a un clic, así que el aviso
+    // sigue teniendo trabajo. Antes solo salía con el filtro puesto en Royale y ahí no llegaba.
+    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+    pintar('all')
+    expect(screen.getByTestId('royale-demo')).toBeTruthy()
+  })
+
+  it('NO sale mirando solo Pack Battle', () => {
+    // Quien mira solo Pack no está a punto de pagar una plaza de Royale: ahí no avisa de nada.
+    mocks.battles = [battle({ id: 'p', mode: 'pack', status: 'lobby' })]
+    pintar('pack')
+    expect(screen.queryByTestId('royale-demo')).toBeNull()
+  })
+
+  it('sale filtrando Royale', () => {
+    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+    pintar('royale')
+    expect(screen.getByTestId('royale-demo')).toBeTruthy()
   })
 })

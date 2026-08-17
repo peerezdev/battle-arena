@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { COLORS, FONTS } from '../../theme'
+import { marcarVisto, yaVisto } from './demoVisto'
 
 // Ruta del vídeo dentro de public/. Cambiar aquí si el fichero se renombra o se mueve.
 // Servido desde /srv/battlearena/media por Caddy, NO desde public/: un mp4 de 13 MB en git se
@@ -8,59 +9,91 @@ import { COLORS, FONTS } from '../../theme'
 export const DEMO_VIDEO_SRC = '/media/battleroyale-demo.mp4'
 
 const PINK = '#ff2e7e'
-const PINK_L = '#ff6ba4'
 
 /**
- * Aviso al principio de la página de Battle Royale: pide ver la demo ANTES de pagar una plaza.
- * Va arriba del todo a propósito — llega antes que el precio y el botón de unirse, que es lo que
- * le da sentido. El botón abre la demo en un modal en vez de navegar: el jugador no pierde el
- * sitio en la página ni el lobby que estaba mirando.
+ * Aviso de la demo de Battle Royale: pide verla ANTES de pagar una plaza.
+ *
+ * Vivía en la página de Battle Royale, arriba del todo, y llegaba antes que el precio y el botón de
+ * unirse. Al unirse las dos páginas en un solo Lobby había que decidir tres cosas, porque un banner
+ * a pantalla completa sobre UN modo en una página que ahora tiene DOS es otra cosa:
+ *
+ *  · COMPACTO. Una fila, no un bloque: el titular y la frase caben al lado del botón. En el Lobby
+ *    lo que se viene a hacer es mirar partidas, y lo de antes ocupaba media pantalla.
+ *  · SE VA CUANDO YA SE HA VISTO. Ver `demoVisto`: cumplido su trabajo, seguir enseñándolo es un
+ *    cartel fijo, y los carteles fijos se dejan de leer.
+ *  · SOLO SI HAY ROYALE DELANTE. Quien está mirando solo Pack Battle no está a punto de pagar una
+ *    plaza de Royale, así que el aviso no le avisa de nada. Lo decide quien lo pinta.
+ *
+ * El botón abre la demo en un modal en vez de navegar: el jugador no pierde el sitio en la página
+ * ni el lobby que estaba mirando.
  */
 export function RoyaleDemoNotice() {
   const [open, setOpen] = useState(false)
+  // Se lee una vez al montar; la preferencia no cambia sola desde fuera de esta pantalla.
+  const [visto, setVisto] = useState(() => yaVisto())
+
+  if (visto) return null
+
+  function abrir() {
+    // Se marca AL ABRIR, no al terminar: medir cuánto ha visto alguien pediría un umbral inventado,
+    // y abrirlo ya es la señal de que el aviso hizo su trabajo.
+    marcarVisto()
+    setOpen(true)
+  }
 
   return (
     <>
       <section style={{
-        position: 'relative', overflow: 'hidden', borderRadius: 18,
+        position: 'relative', overflow: 'hidden', borderRadius: 14,
         border: `1px solid rgba(255,46,126,.32)`,
-        background: `radial-gradient(560px 220px at 12% 0%,rgba(255,46,126,.14),transparent 65%),linear-gradient(160deg,#160a12,#0b0d13)`,
-        padding: 'clamp(20px,2.4vw,28px) clamp(18px,2.4vw,30px)',
-        display: 'flex', alignItems: 'center', gap: 'clamp(16px,2.4vw,32px)', flexWrap: 'wrap',
+        background: `radial-gradient(420px 140px at 8% 0%,rgba(255,46,126,.13),transparent 65%),linear-gradient(160deg,#160a12,#0b0d13)`,
+        padding: '13px clamp(14px,1.8vw,20px)',
+        display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
       }}>
-        <div style={{ flex: '1 1 420px', minWidth: 0 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: '.22em', color: PINK_L, textTransform: 'uppercase' }}>
-            Battle Royale
-          </div>
+        <div style={{ flex: '1 1 340px', minWidth: 0 }}>
           <h2 style={{
-            margin: '10px 0 8px', fontFamily: FONTS.display, fontWeight: 800,
-            fontSize: 'clamp(22px,2.6vw,30px)', letterSpacing: '-.02em', lineHeight: 1.12, color: COLORS.text,
+            margin: 0, fontFamily: FONTS.display, fontWeight: 800,
+            fontSize: 16, letterSpacing: '-.01em', lineHeight: 1.2, color: COLORS.text,
           }}>
-            Hold up. One thing first.
+            New to Battle Royale? Watch the demo first.
           </h2>
-          <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: '#aab3bf', maxWidth: 620 }}>
-            You shouldn't buy a Battle Royale spot before watching our demo.<br />
-            It's short. By the end, you'll know exactly how the game works and whether it's for you.
+          <p style={{ margin: '4px 0 0', fontSize: 13, lineHeight: 1.5, color: '#aab3bf' }}>
+            It's short, and by the end you'll know how the game works before paying for a spot.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={abrir}
           style={{
-            flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 9,
-            padding: '14px 26px', borderRadius: 13, border: 0, cursor: 'pointer',
-            fontFamily: FONTS.display, fontSize: 15, fontWeight: 800, color: '#fff',
+            flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '10px 18px', borderRadius: 11, border: 0, cursor: 'pointer', minHeight: 44,
+            fontFamily: FONTS.display, fontSize: 14, fontWeight: 800, color: '#fff',
             background: `linear-gradient(135deg,${PINK},#c2265e)`,
-            boxShadow: `0 14px 34px -12px ${PINK}`,
+            boxShadow: `0 10px 26px -12px ${PINK}`,
           }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5v14l11-7z" /></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5v14l11-7z" /></svg>
           Watch demo
+        </button>
+
+        {/* Poder quitarlo sin verlo. No todo el mundo lo necesita, y un aviso del que no se puede
+            salir se lee como publicidad. */}
+        <button
+          type="button"
+          aria-label="Dismiss"
+          onClick={() => { marcarVisto(); setVisto(true) }}
+          style={{
+            flex: 'none', width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
+            border: '1px solid rgba(255,255,255,.14)', background: 'transparent',
+            color: COLORS.muted, fontSize: 13, lineHeight: 1,
+          }}
+        >
+          ✕
         </button>
       </section>
 
-      {open && <DemoVideoModal onClose={() => setOpen(false)} />}
+      {open && <DemoVideoModal onClose={() => { setOpen(false); setVisto(true) }} />}
     </>
   )
 }

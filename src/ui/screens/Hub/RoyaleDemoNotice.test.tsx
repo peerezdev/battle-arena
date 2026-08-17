@@ -1,13 +1,17 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { RoyaleDemoNotice, DEMO_VIDEO_SRC } from './RoyaleDemoNotice'
 
+// El aviso se esconde en cuanto se marca como visto, así que sin esto un test contagiaría a los
+// siguientes: el segundo ya no encontraría ni el botón.
+beforeEach(() => localStorage.clear())
+
 describe('RoyaleDemoNotice', () => {
-  it('muestra el aviso completo', () => {
+  it('avisa de ver la demo ANTES de pagar una plaza', () => {
+    // Es su único trabajo, y por eso la frase habla del precio y no de la demo.
     render(<RoyaleDemoNotice />)
-    expect(screen.getByText('Battle Royale')).toBeTruthy()
-    expect(screen.getByText('Hold up. One thing first.')).toBeTruthy()
-    expect(screen.getByText(/shouldn't buy a Battle Royale spot/)).toBeTruthy()
+    expect(screen.getByText(/New to Battle Royale\? Watch the demo first\./)).toBeTruthy()
+    expect(screen.getByText(/before paying for a spot/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /watch demo/i })).toBeTruthy()
   })
 
@@ -25,22 +29,19 @@ describe('RoyaleDemoNotice', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  it('se cierra con el botón, con Escape y clicando fuera', () => {
+  // Un render por vía de cierre: al cerrar el modal el aviso ya se ha marcado como visto y
+  // desaparece, así que no se puede reabrir sobre el mismo montaje.
+  it.each([
+    ['el botón de cerrar', () => fireEvent.click(screen.getByRole('button', { name: /close/i }))],
+    ['Escape', () => fireEvent.keyDown(window, { key: 'Escape' })],
+    ['clicando fuera', () => fireEvent.click(screen.getByRole('dialog'))],
+  ])('el modal se cierra con %s', (_nombre, cerrar) => {
+    localStorage.clear()
     const { container } = render(<RoyaleDemoNotice />)
-    const open = () => fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
-    const isOpen = () => !!container.querySelector('video')
-
-    open()
-    fireEvent.click(screen.getByRole('button', { name: /close/i }))
-    expect(isOpen()).toBe(false)
-
-    open()
-    fireEvent.keyDown(window, { key: 'Escape' })
-    expect(isOpen()).toBe(false)
-
-    open()
-    fireEvent.click(screen.getByRole('dialog'))     // el overlay
-    expect(isOpen()).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
+    expect(container.querySelector('video')).toBeTruthy()
+    cerrar()
+    expect(container.querySelector('video')).toBeNull()
   })
 
   it('clicar DENTRO del modal no lo cierra', () => {
@@ -48,6 +49,33 @@ describe('RoyaleDemoNotice', () => {
     fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
     fireEvent.click(container.querySelector('video')!)
     expect(container.querySelector('video')).toBeTruthy()
+  })
+
+  it('una vez visto, NO vuelve a aparecer', () => {
+    // Cumplido su trabajo, seguir enseñándolo es un cartel fijo en la pantalla a la que más se
+    // vuelve, y los carteles fijos se dejan de leer — también el día que sí importe.
+    render(<RoyaleDemoNotice />)
+    fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
+    cleanup()
+    const { container } = render(<RoyaleDemoNotice />)
+    expect(container.innerHTML).toBe('')
+  })
+
+  it('se marca al ABRIR el vídeo, no al terminarlo', () => {
+    // Medir cuánto ha visto alguien pediría un umbral inventado. Abrirlo ya es la señal.
+    render(<RoyaleDemoNotice />)
+    fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
+    expect(localStorage.getItem('ba.royaleDemo.visto')).toBe('1')
+  })
+
+  it('se puede quitar sin verlo, y tampoco vuelve', () => {
+    // Un aviso del que no se puede salir se lee como publicidad.
+    render(<RoyaleDemoNotice />)
+    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
+    expect(screen.queryByRole('button', { name: /watch demo/i })).toBeNull()
+    cleanup()
+    const { container } = render(<RoyaleDemoNotice />)
+    expect(container.innerHTML).toBe('')
   })
 
   it('si el vídeo no carga, lo dice en vez de dejar un player roto', () => {

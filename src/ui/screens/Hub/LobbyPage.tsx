@@ -83,9 +83,12 @@ export function LobbyPage() {
 
   return (
     <div style={{ padding: '24px clamp(14px,2.4vw,28px) 44px', display: 'flex', flexDirection: 'column', gap: 26 }}>
-      {/* Solo cuando se está mirando Battle Royale: ver la demo ANTES de encontrarse con el precio
-          y el botón de unirse. Con los dos modos marcados sería un cartel sobre medio lobby. */}
-      {modos.has('royale') && modos.size === 1 && <RoyaleDemoNotice />}
+      {/* Siempre que haya Royale delante, no solo con el filtro puesto en Royale: el aviso tiene
+          que llegar antes que el precio y el botón de unirse, y con los dos modos marcados el
+          jugador también tiene plazas de Royale a un clic.
+          Quien está mirando SOLO Pack Battle no está a punto de pagar una plaza de Royale, así que
+          ahí no avisa de nada. El propio aviso decide además si ya se vio: ver `demoVisto`. */}
+      {modos.has('royale') && <RoyaleDemoNotice />}
 
       <QuickMatch
         mode={modos.size === 1 ? [...modos][0] : 'pack'}
