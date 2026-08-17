@@ -240,16 +240,24 @@ describe('Lobby · los dos modos en la MISMA lista', () => {
     expect(screen.getByRole('button', { name: /Battle Royale/ })).toBeTruthy()
   })
 
-  it('el desplegable trae una casilla por modo, con su cuenta', () => {
+  it('el desplegable trae una casilla por modo, solo con su nombre', () => {
     dos()
     pintar('all')
     fireEvent.click(screen.getByRole('button', { name: /All games/ }))
-    expect(screen.getByRole('checkbox', { name: /Pack Battle/ })).toBeTruthy()
-    expect(screen.getByRole('checkbox', { name: /Battle Royale/ })).toBeTruthy()
-    // La cuenta va también en cero: distingue "no hay nadie" de "no ha cargado". Se mira en el
-    // texto de la etiqueta y no en el nombre accesible, que no la incluye.
-    const fila = screen.getByRole('checkbox', { name: /Pack Battle/ }).closest('label')
-    expect(fila?.textContent).toContain('1')
+    expect(screen.getByRole('checkbox', { name: 'Pack Battle' })).toBeTruthy()
+    expect(screen.getByRole('checkbox', { name: 'Battle Royale' })).toBeTruthy()
+    // Sin cifras: la cuenta se quitó a petición. El nombre exacto lo comprueba: con un número
+    // detrás, el nombre accesible dejaría de coincidir.
+    const fila = screen.getByRole('checkbox', { name: 'Pack Battle' }).closest('label')
+    expect((fila?.textContent ?? '').trim()).toBe('Pack Battle')
+  })
+
+  it('el "Newest" decorativo ya no está', () => {
+    // Era otro `span` con flecha y cursor de mano sin manejador, igual que el "All games" de antes.
+    // Se retira en vez de dejarlo prometiendo un orden que no existe.
+    dos()
+    pintar('all')
+    expect(screen.queryByText(/Newest/i)).toBeNull()
   })
 
   it('desmarcar un modo lo saca de la lista', () => {

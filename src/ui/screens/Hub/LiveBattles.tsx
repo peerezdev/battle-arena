@@ -134,10 +134,6 @@ export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel
     () => sortForFilter(activeFilter, delModo.filter((b) => matchesFilter(b, activeFilter, meWallet))),
     [delModo, activeFilter, meWallet],
   )
-  const porModo = useMemo(() => ({
-    pack: battles.filter((b) => b.mode === 'pack').length,
-    royale: battles.filter((b) => b.mode === 'royale').length,
-  }), [battles])
   // Badge always reflects the count of active games (live or not started), not the current filter.
   const liveCount = useMemo(() => delModo.filter((b) => matchesFilter(b, 0, meWallet)).length, [delModo, meWallet])
 
@@ -180,19 +176,10 @@ export function LiveBattles({ battles, meWallet = null, onBattleAction, onCancel
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {/* Antes esto era un `span` decorativo: flecha, cursor de mano y ningún manejador, o
               sea un menú prometido que no existía. Ahora filtra de verdad. */}
-          <ModeFilterMenu modos={modos} onChange={onModos} cuenta={porModo} />
-          <span
-            style={{
-              fontSize: 11,
-              color: COLORS.muted,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 9,
-              padding: '7px 12px',
-              cursor: 'pointer',
-            }}
-          >
-            Newest ▾
-          </span>
+          {/* El "Newest ▾" que había al lado era otro `span` decorativo, igual que el "All games"
+              de antes: flecha, cursor de mano y ningún manejador. Se retira en vez de dejarlo
+              prometiendo un orden que no existe; cuando haya orden de verdad, volverá. */}
+          <ModeFilterMenu modos={modos} onChange={onModos} />
         </div>
       </div>
 

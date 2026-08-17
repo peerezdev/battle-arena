@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { COLORS, FONTS } from '../../theme'
+import { COLORS } from '../../theme'
 import { MODOS, alternar, etiquetaModos, type Modo } from './lobbyFilter'
 
 /**
@@ -12,11 +12,9 @@ import { MODOS, alternar, etiquetaModos, type Modo } from './lobbyFilter'
  * defensas que dejan al usuario peleándose con un control que no le obedece. Lo que hay que hacer
  * es que la lista vacía se explique y ofrezca volver, no impedir llegar a ella.
  */
-export function ModeFilterMenu({ modos, onChange, cuenta }: {
+export function ModeFilterMenu({ modos, onChange }: {
   modos: Set<Modo>
   onChange: (m: Set<Modo>) => void
-  /** Cuántas partidas hay de cada modo, para poder enseñarlo junto a su casilla. */
-  cuenta: Record<Modo, number>
 }) {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement | null>(null)
@@ -86,14 +84,6 @@ export function ModeFilterMenu({ modos, onChange, cuenta }: {
                   style={{ width: 15, height: 15, accentColor: COLORS.green, cursor: 'pointer' }}
                 />
                 <span style={{ flex: 1 }}>{m.label}</span>
-                {/* La cuenta va SIEMPRE, también en cero: es lo que distingue "no hay nadie" de
-                    "todavía no ha cargado", y en un lobby flojo esa duda es la que echa a la gente. */}
-                <span style={{
-                  fontFamily: FONTS.mono, fontSize: 11, color: COLORS.muted,
-                  fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {cuenta[m.id]}
-                </span>
               </label>
             )
           })}
