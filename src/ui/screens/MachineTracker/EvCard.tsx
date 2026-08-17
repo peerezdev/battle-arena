@@ -1,8 +1,7 @@
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import type { EvRow } from '../../../onchain/gachaClient'
-import { RATIO_MAX, RATIO_MIN, anguloAguja, esConcluyente, estadoDe, etiqueta, ratioDesdeEdge }
-  from './evDial'
-import { desdeHace } from './tierGap'
+import { RATIO_MAX, RATIO_MIN, anguloAguja, estadoDe, etiqueta, ratioDesdeEdge } from './evDial'
+import { ACENTO, acentoDe, afirma, colorRareza, fondoFila } from './evAcento'
 
 /**
  * Una máquina del gacha medida sobre el feed público de Collector Crypt.
@@ -20,33 +19,50 @@ import { desdeHace } from './tierGap'
  */
 export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
   const estado = estadoDe(fila.realized_verdict)
-  const concluyente = esConcluyente(estado)
   const ratio = ratioDesdeEdge(fila.realized_edge_pct)
   const lab = etiqueta(estado, fila)
 
-  const tinta = !concluyente ? COLORS.muted
-    : (fila.realized_edge_pct ?? 0) < 0 ? COLORS.red : COLORS.green
-  const ambar = '#f5c542'
-  const tintaEtiqueta = estado === 'construyendo' || estado === 'con_hueco' ? ambar : tinta
+  // UN solo acento por tarjeta, y de él sale todo lo demás. Ver `evAcento`: solo un veredicto
+  // confirmado se lleva verde o rosa; lo que no se puede concluir va en ámbar.
+  const acento = acentoDe(estado)
+  const confirmado = afirma(estado)
+  const edge = fila.realized_edge_pct
 
   return (
     <article style={{
-      background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 14,
-      boxShadow: '0 8px 24px #00000055', display: 'flex', flexDirection: 'column',
+      // El borde y el fondo también llevan el acento, muy desvaído: una tarjeta confirmada tiene
+      // que destacar en la rejilla sin tener que leerla.
+      background: confirmado
+        ? `linear-gradient(170deg,${acento}0d,transparent 42%),${COLORS.panel}`
+        : COLORS.panel,
+      border: `1px solid ${confirmado ? `${acento}59` : COLORS.border}`,
+      borderRadius: 16, boxShadow: '0 8px 24px #00000055',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
       <header style={{
-        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8,
-        padding: '13px 15px 11px', borderBottom: `1px solid ${COLORS.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        padding: '13px 15px', borderBottom: '1px solid #ffffff12',
+        background: `linear-gradient(90deg,${acento}14,transparent 70%)`,
       }}>
-        <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '-.01em' }}>{fila.name}</span>
-        <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted, whiteSpace: 'nowrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+          {/* El punto del acento: la señal más rápida de la tarjeta. Se ve antes que el título. */}
+          <span aria-hidden style={{
+            width: 9, height: 9, borderRadius: 3, background: acento,
+            boxShadow: `0 0 10px ${acento}66`, flex: 'none',
+          }} />
+          <span style={{
+            fontSize: 13.5, fontWeight: 700, letterSpacing: '-.01em',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>{fila.name}</span>
+        </span>
+        <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: COLORS.muted, whiteSpace: 'nowrap', flex: 'none' }}>
           ${fila.pack_price}
           {fila.buyback_pct ? ` · bb ${Math.round(fila.buyback_pct * 100)}%` : ''}
         </span>
       </header>
 
       <div style={{ padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <Dial ratio={ratio} tinta={tinta} modelo={fila.model_ratio} />
+        <Dial ratio={ratio} tinta={acento} modelo={fila.model_ratio} />
         <div style={{ minWidth: 0 }}>
           {/* Etiquetado a propósito: sin la palabra, el número grande y el del modelo son dos
               cifras parecidas sin nada que diga cuál es la medida y cuál lo esperado. */}
@@ -54,10 +70,24 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
             MEASURED
           </div>
           <div style={{
-            fontFamily: FONTS.mono, fontSize: 25, fontWeight: 700, lineHeight: 1, color: tinta,
+            fontFamily: FONTS.mono, fontSize: 25, fontWeight: 700, lineHeight: 1,
+            color: ratio == null ? ACENTO.sinDatos : acento,
+            // El halo solo cuando el color AFIRMA algo. En ámbar sería subrayar una duda.
+            textShadow: confirmado ? `0 0 16px ${acento}66` : 'none',
             fontVariantNumeric: 'tabular-nums', marginTop: 2,
+            display: 'flex', alignItems: 'baseline', gap: 8,
           }}>
             {ratio == null ? '—' : ratio.toFixed(3)}
+            {/* La pastilla del edge solo con veredicto confirmado: es la conclusión en una cifra, y
+                ponerla sobre un intervalo que cruza el cero la convertiría en una promesa. */}
+            {confirmado && edge != null && (
+              <span style={{
+                fontFamily: FONTS.mono, fontSize: 10, fontWeight: 700, color: '#06080b',
+                background: acento, borderRadius: 6, padding: '2px 7px',
+              }}>
+                {edge > 0 ? '+' : ''}{edge.toFixed(1)}%
+              </span>
+            )}
           </div>
           <div style={{ fontFamily: FONTS.mono, fontSize: 9.5, color: COLORS.muted, marginTop: 5, lineHeight: 1.55 }}>
             {fila.realized_edge_pct == null ? 'no measurement yet' : (
@@ -102,7 +132,7 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
                   {/* Izquierda lo ESPERADO (del pool de cartas), derecha lo OBSERVADO (del feed).
                       Separadas para que no se lean como una sola cosa: P y VALUE son lo que CC
                       declara, GAP y AGO son lo que ha pasado de verdad. */}
-                  {['TIER', 'P', 'VALUE', 'GROSS', 'GAP', 'AGO', 'AVG'].map((h, i) => (
+                  {['TIER', 'P', 'VALUE', 'GROSS', 'GAP', 'AVG'].map((h, i) => (
                     <th key={h} style={{
                       textAlign: i === 0 ? 'left' : 'right', fontWeight: 400, fontSize: 8.5,
                       letterSpacing: '.1em', color: '#5d6774', padding: '0 0 4px',
@@ -112,8 +142,11 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
               </thead>
               <tbody>
                 {fila.tiers.map((t) => (
-                  <tr key={t.tier}>
-                    <td style={{ color: colorTier(t.tier), padding: '2px 0' }}>{t.tier}</td>
+                  <tr key={t.tier} style={{ background: fondoFila(t.tier) }}>
+                    <td style={{
+                      color: colorRareza(t.tier), fontWeight: 700,
+                      padding: '4px 6px', borderRadius: '7px 0 0 7px',
+                    }}>{t.tier}</td>
                     {/* Un guion mientras no se haya barrido el pool de esa máquina. Nunca un 0:
                         diría que esa rareza no sale nunca o que no vale nada. */}
                     <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
@@ -129,12 +162,10 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
                       textAlign: 'right', fontVariantNumeric: 'tabular-nums',
                       color: t.cold ? '#f5c542' : COLORS.text,
                     }}>{t.current == null ? `${t.sample}+` : t.current}</td>
-                    {/* Sin el tiempo, la racha no se puede leer: el mismo "190" son tres horas en
-                        una máquina caliente y un mes en una lenta. */}
-                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
-                      {desdeHace(t.days_since)}
-                    </td>
-                    <td style={{ textAlign: 'right', color: COLORS.muted, fontVariantNumeric: 'tabular-nums' }}>
+                    <td style={{
+                      textAlign: 'right', color: colorRareza(t.tier), fontVariantNumeric: 'tabular-nums',
+                      padding: '4px 6px', borderRadius: '0 7px 7px 0',
+                    }}>
                       {t.average == null ? '—' : t.average}
                     </td>
                   </tr>
@@ -145,10 +176,12 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
         </div>
       )}
 
-      <div style={{ padding: '0 15px 13px' }}>
+      {/* El pie va en su propia banda, más oscura: separa la conclusión de los datos que la
+          sostienen, y así el veredicto no se lee como una fila más de la tabla. */}
+      <div style={{ marginTop: 'auto', padding: '11px 15px 13px', borderTop: '1px solid #ffffff12',
+                    background: 'rgba(0,0,0,.25)' }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-          borderTop: `1px solid ${COLORS.border}`, paddingTop: 10,
         }}>
           <span style={{ fontFamily: FONTS.mono, fontSize: 8.5, letterSpacing: '.14em', color: '#5d6774' }}>
             {fila.realized_window_hours}H · N={fila.realized_n_pulls.toLocaleString('en-US')}
@@ -156,7 +189,13 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
                 nadie sabría cuál está mirando. */}
             {nota ? ` · ${nota}` : ''}
           </span>
-          <span style={{ fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', color: tintaEtiqueta }}>
+          {/* En pastilla y con el acento: es la conclusión de la tarjeta y tiene que poder leerse
+              sin recorrer nada más. */}
+          <span style={{
+            fontFamily: FONTS.mono, fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+            color: acento, border: `1px solid ${acento}59`, borderRadius: 99,
+            padding: '3px 9px', whiteSpace: 'nowrap',
+          }}>
             {lab.texto}
           </span>
         </div>
@@ -172,11 +211,6 @@ export function EvCard({ fila, nota }: { fila: EvRow; nota?: string }) {
   )
 }
 
-/** Colores de rareza del tema, para que la tabla se lea igual que el resto de la app. */
-function colorTier(nombre: string): string {
-  return ({ Common: '#8b95a3', Uncommon: '#2fe28a', Rare: '#5ad1ff', Epic: '#a98bff' } as Record<string, string>)[nombre]
-    ?? COLORS.muted
-}
 
 /** Un punto del arco, en coordenadas del SVG. `r` es la distancia desde el eje de la aguja. */
 function punto(ratio: number, r: number): [number, number] {

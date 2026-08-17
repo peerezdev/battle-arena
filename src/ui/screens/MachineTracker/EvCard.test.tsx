@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
 
 import { EvCard } from './EvCard'
 import type { EvRow } from '../../../onchain/gachaClient'
+import { ACENTO } from './evAcento'
 
 const fila = (over: Partial<EvRow> = {}): EvRow => ({
   machine: 'pokemon_50', name: 'Elite Pokémon Gacha Pack', pack_price: 50, buyback_pct: 0.85,
@@ -50,7 +51,7 @@ describe('EvCard', () => {
     })} />)
     expect(screen.getByText(/BUILDING · 6h \/ 48h/)).toBeTruthy()
     expect(screen.getByText(/until the window is full/i)).toBeTruthy()
-    expect(container.innerHTML).not.toContain('#ff5e7a')      // la tinta de "malo confirmado"
+    expect(container.innerHTML).not.toContain(ACENTO.malo)   // la tinta de "malo confirmado"
   })
 
   it('con un hueco dentro de la ventana tampoco', () => {
@@ -58,7 +59,7 @@ describe('EvCard', () => {
       realized_verdict: 'GAP IN WINDOW', gaps: [['a', 'b']],
     })} />)
     expect(screen.getByText('GAP IN WINDOW')).toBeTruthy()
-    expect(container.innerHTML).not.toContain('#ff5e7a')
+    expect(container.innerHTML).not.toContain(ACENTO.malo)
   })
 
   it('sin medición no dibuja aguja', () => {
@@ -86,7 +87,7 @@ describe('EvCard', () => {
     })} />)
     expect(screen.getByText('CONFIRMED +EV')).toBeTruthy()
     expect(screen.getByText('1.042')).toBeTruthy()
-    expect(container.innerHTML).toContain('#00ffc4')
+    expect(container.innerHTML).toContain(ACENTO.bueno)
   })
 
   it('enseña la racha de cada rareza y su media', () => {
@@ -97,11 +98,42 @@ describe('EvCard', () => {
     expect(screen.getByText('19.4')).toBeTruthy()
   })
 
-  it('la racha viene con el tiempo que lleva, porque el número solo no se lee', () => {
-    // El mismo "61" son horas en una máquina caliente y semanas en una lenta. En `comic_25`, que
-    // hace tres tiradas al día, es la única forma de saber que la racha es de verdad larga.
+  it('el acento viste toda la tarjeta, no solo el número', () => {
+    // Un solo color por tarjeta es lo que hace que la rejilla se lea de un vistazo: el punto del
+    // título, el borde, el relleno del arco y la pastilla del veredicto van todos a la vez.
+    const { container } = render(<EvCard fila={fila()} />)   // CONFIDENT -EV
+    const html = container.innerHTML
+    // Aparece muchas veces porque lo llevan el punto, el borde, el arco, el número y la pastilla.
+    expect(html.split(ACENTO.malo).length - 1).toBeGreaterThan(3)
+  })
+
+  it('la pastilla del edge SOLO sale con veredicto confirmado', () => {
+    // Sobre un intervalo que cruza el cero, un "-6.2%" en pastilla se lee como una conclusión.
     render(<EvCard fila={fila()} />)
-    expect(screen.getByText('3d')).toBeTruthy()          // Rare: 2.6 días
+    expect(screen.getByText('-6.2%')).toBeTruthy()
+    cleanup()
+    render(<EvCard fila={fila({ realized_verdict: 'unclear (CI crosses zero)' })} />)
+    expect(screen.queryByText('-6.2%')).toBeNull()
+  })
+
+  it('cada fila se tinta con el color de SU rareza', () => {
+    // Se comprueba que sean distintas y no un hex concreto: jsdom convierte el hex de 8 dígitos a
+    // `rgba(...)`, así que buscar el literal pasaría o fallaría por el entorno y no por el código.
+    const { container } = render(<EvCard fila={fila()} />)
+    const fondos = [...container.querySelectorAll('tbody tr')]
+      .map((tr) => tr.getAttribute('style') ?? '')
+    expect(fondos).toHaveLength(4)
+    expect(fondos.every((f) => f.includes('linear-gradient'))).toBe(true)
+    // Cuatro rarezas, cuatro tintes distintos.
+    expect(new Set(fondos).size).toBe(4)
+  })
+
+  it('la columna AGO ya no está', () => {
+    // Se quitó a petición: la tabla tenía siete columnas y el tiempo de la racha era la menos
+    // usada. El dato sigue llegando del backend, simplemente no se pinta.
+    render(<EvCard fila={fila()} />)
+    expect(screen.queryByText('AGO')).toBeNull()
+    expect(screen.queryByText('3d')).toBeNull()
   })
 
   it('una rareza que no salió dice "327+" y no "327"', () => {
