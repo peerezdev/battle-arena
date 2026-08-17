@@ -30,7 +30,7 @@ El **ELO es informativo/aviso**, no una cola de emparejamiento.
 | GET | `/auth/privy/me` | ✓ (Bearer identity token) | sub del usuario de Privy |
 | POST | `/users/me/alias {alias}` | ✓ | fija alias |
 | GET | `/users/search?q=&limit=` | ✓ | jugadores cuyo alias o wallet EMPIEZA por `q`; con `q` vacía, los conectados primero y luego los que tienen alias. Tope duro de 8 y throttle propio. Alimenta el autocompletado de `/tip` en el chat |
-| POST | `/users/me/tip` | ✓ | propina en USDC a otro jugador registrado, mínimo MIN_TIP_USDC, limitada por TIP_RATE_LIMIT, respeta saldo reservado, bloqueada mientras juegas una royale, sin comisión |
+| POST | `/users/me/tip` | ✓ | propina en USDC a otro jugador registrado, mínimo MIN_TIP_USDC, limitada por TIP_RATE_LIMIT, respeta saldo reservado, bloqueada mientras juegas una royale, sin comisión. Al terminar avisa al destinatario por su websocket (`type: "tip"`), dirigido y nunca por broadcast: quién le da dinero a quién no se publica. Si el aviso falla, se registra y la propina sigue siendo un 200, porque el dinero ya se movió. |
 | GET | `/users/{wallet}` | — | perfil (lectura pura; default 1200 si no existe) |
 | GET | `/users/{wallet}/history` | — | historial de rating |
 | POST | `/matches {battle_pubkey, min_elo?, max_elo?}` | ✓ | registra partida abierta (verificada on-chain) |

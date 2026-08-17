@@ -1,7 +1,7 @@
 # Aviso al recibir una propina — design
 
 Date: 2026-08-17
-Status: approved-pending-review
+Status: implemented
 
 ## Objetivo
 
