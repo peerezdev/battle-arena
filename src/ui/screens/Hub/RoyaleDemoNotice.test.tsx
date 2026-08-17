@@ -1,10 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { RoyaleDemoNotice, DEMO_VIDEO_SRC } from './RoyaleDemoNotice'
-
-// El aviso se esconde en cuanto se marca como visto, así que sin esto un test contagiaría a los
-// siguientes: el segundo ya no encontraría ni el botón.
-beforeEach(() => localStorage.clear())
 
 describe('RoyaleDemoNotice', () => {
   it('avisa de ver la demo ANTES de pagar una plaza', () => {
@@ -29,14 +25,11 @@ describe('RoyaleDemoNotice', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
-  // Un render por vía de cierre: al cerrar el modal el aviso ya se ha marcado como visto y
-  // desaparece, así que no se puede reabrir sobre el mismo montaje.
   it.each([
     ['el botón de cerrar', () => fireEvent.click(screen.getByRole('button', { name: /close/i }))],
     ['Escape', () => fireEvent.keyDown(window, { key: 'Escape' })],
     ['clicando fuera', () => fireEvent.click(screen.getByRole('dialog'))],
   ])('el modal se cierra con %s', (_nombre, cerrar) => {
-    localStorage.clear()
     const { container } = render(<RoyaleDemoNotice />)
     fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
     expect(container.querySelector('video')).toBeTruthy()
@@ -51,31 +44,34 @@ describe('RoyaleDemoNotice', () => {
     expect(container.querySelector('video')).toBeTruthy()
   })
 
-  it('una vez visto, NO vuelve a aparecer', () => {
-    // Cumplido su trabajo, seguir enseñándolo es un cartel fijo en la pantalla a la que más se
-    // vuelve, y los carteles fijos se dejan de leer — también el día que sí importe.
+  it('SIGUE ahí después de ver el vídeo', () => {
+    // Decisión tomada a propósito: el vídeo tiene que estar localizable siempre. El que vuelve
+    // semanas después a decidir si entra a una Royale de 250 $ quiere repasarlo, y mandarle a
+    // buscarlo por el Help es perderlo.
     render(<RoyaleDemoNotice />)
     fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
-    cleanup()
-    const { container } = render(<RoyaleDemoNotice />)
-    expect(container.innerHTML).toBe('')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: /watch demo/i })).toBeTruthy()
   })
 
-  it('se marca al ABRIR el vídeo, no al terminarlo', () => {
-    // Medir cuánto ha visto alguien pediría un umbral inventado. Abrirlo ya es la señal.
+  it('no se puede descartar, y no recuerda nada', () => {
+    // Sin botón de descartar y sin estado guardado: volver a montarlo lo enseña igual.
     render(<RoyaleDemoNotice />)
-    fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
-    expect(localStorage.getItem('ba.royaleDemo.visto')).toBe('1')
+    expect(screen.queryByRole('button', { name: /dismiss/i })).toBeNull()
+    cleanup()
+    render(<RoyaleDemoNotice />)
+    expect(screen.getByRole('button', { name: /watch demo/i })).toBeTruthy()
   })
 
-  it('se puede quitar sin verlo, y tampoco vuelve', () => {
-    // Un aviso del que no se puede salir se lee como publicidad.
-    render(<RoyaleDemoNotice />)
-    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }))
-    expect(screen.queryByRole('button', { name: /watch demo/i })).toBeNull()
-    cleanup()
+  it('se puede abrir VARIAS veces', () => {
+    // Es lo que significa "por si acaso": repasarlo cuando haga falta, no una sola vez.
     const { container } = render(<RoyaleDemoNotice />)
-    expect(container.innerHTML).toBe('')
+    for (let i = 0; i < 3; i++) {
+      fireEvent.click(screen.getByRole('button', { name: /watch demo/i }))
+      expect(container.querySelector('video')).toBeTruthy()
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(container.querySelector('video')).toBeNull()
+    }
   })
 
   it('si el vídeo no carga, lo dice en vez de dejar un player roto', () => {

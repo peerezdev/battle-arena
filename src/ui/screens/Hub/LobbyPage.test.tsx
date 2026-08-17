@@ -274,24 +274,20 @@ describe('Lobby · los dos modos en la MISMA lista', () => {
 // unirse. En el Lobby unificado hay que decidir cuándo aparece, y eso lo decide esta pantalla.
 
 describe('Lobby · el aviso de la demo', () => {
-  it('sale con los DOS modos marcados, no solo filtrando Royale', () => {
-    // Con los dos a la vista el jugador también tiene plazas de Royale a un clic, así que el aviso
-    // sigue teniendo trabajo. Antes solo salía con el filtro puesto en Royale y ahí no llegaba.
-    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+  it.each(['all', 'pack', 'royale', 'none'] as const)(
+    'sale con el filtro en %s: el vídeo tiene que estar localizable siempre', (filtro) => {
+      // Incluso filtrando solo Pack Battle. Esconderlo ahí ahorraría una fila y a cambio obligaría
+      // a cambiar de filtro para encontrar el vídeo, que es justo lo que no se quiere.
+      mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
+      pintar(filtro)
+      expect(screen.getByTestId('royale-demo')).toBeTruthy()
+    })
+
+  it('sale incluso sin ninguna partida abierta', () => {
+    // Es cuando más falta hace: no hay nada que mirar, así que el vídeo es lo único que explica a
+    // qué se juega.
+    mocks.battles = []
     pintar('all')
-    expect(screen.getByTestId('royale-demo')).toBeTruthy()
-  })
-
-  it('NO sale mirando solo Pack Battle', () => {
-    // Quien mira solo Pack no está a punto de pagar una plaza de Royale: ahí no avisa de nada.
-    mocks.battles = [battle({ id: 'p', mode: 'pack', status: 'lobby' })]
-    pintar('pack')
-    expect(screen.queryByTestId('royale-demo')).toBeNull()
-  })
-
-  it('sale filtrando Royale', () => {
-    mocks.battles = [battle({ id: 'r', mode: 'royale', status: 'lobby' })]
-    pintar('royale')
     expect(screen.getByTestId('royale-demo')).toBeTruthy()
   })
 })

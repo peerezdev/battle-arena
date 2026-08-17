@@ -83,12 +83,11 @@ export function LobbyPage() {
 
   return (
     <div style={{ padding: '24px clamp(14px,2.4vw,28px) 44px', display: 'flex', flexDirection: 'column', gap: 26 }}>
-      {/* Siempre que haya Royale delante, no solo con el filtro puesto en Royale: el aviso tiene
-          que llegar antes que el precio y el botón de unirse, y con los dos modos marcados el
-          jugador también tiene plazas de Royale a un clic.
-          Quien está mirando SOLO Pack Battle no está a punto de pagar una plaza de Royale, así que
-          ahí no avisa de nada. El propio aviso decide además si ya se vio: ver `demoVisto`. */}
-      {modos.has('royale') && <RoyaleDemoNotice />}
+      {/* SIEMPRE, con cualquier filtro y se haya visto o no. El vídeo tiene que estar localizable
+          en todo momento: el que vuelve semanas después a decidir si entra a una Royale de 250 $
+          quiere repasarlo, y mandarle a buscarlo por el Help es perderlo. Por eso tampoco se
+          esconde filtrando solo Pack Battle. */}
+      <RoyaleDemoNotice />
 
       <QuickMatch
         mode={modos.size === 1 ? [...modos][0] : 'pack'}

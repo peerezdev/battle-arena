@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { COLORS, FONTS } from '../../theme'
-import { marcarVisto, yaVisto } from './demoVisto'
 
 // Ruta del vídeo dentro de public/. Cambiar aquí si el fichero se renombra o se mueve.
 // Servido desde /srv/battlearena/media por Caddy, NO desde public/: un mp4 de 13 MB en git se
@@ -14,32 +13,20 @@ const PINK = '#ff2e7e'
  * Aviso de la demo de Battle Royale: pide verla ANTES de pagar una plaza.
  *
  * Vivía en la página de Battle Royale, arriba del todo, y llegaba antes que el precio y el botón de
- * unirse. Al unirse las dos páginas en un solo Lobby había que decidir tres cosas, porque un banner
- * a pantalla completa sobre UN modo en una página que ahora tiene DOS es otra cosa:
+ * unirse. Al unir las dos páginas en un solo Lobby se hizo COMPACTO: una fila en vez de un bloque,
+ * porque aquí lo que se viene a hacer es mirar partidas y el de antes ocupaba media pantalla.
  *
- *  · COMPACTO. Una fila, no un bloque: el titular y la frase caben al lado del botón. En el Lobby
- *    lo que se viene a hacer es mirar partidas, y lo de antes ocupaba media pantalla.
- *  · SE VA CUANDO YA SE HA VISTO. Ver `demoVisto`: cumplido su trabajo, seguir enseñándolo es un
- *    cartel fijo, y los carteles fijos se dejan de leer.
- *  · SOLO SI HAY ROYALE DELANTE. Quien está mirando solo Pack Battle no está a punto de pagar una
- *    plaza de Royale, así que el aviso no le avisa de nada. Lo decide quien lo pinta.
+ * ES PERMANENTE, y es una decisión tomada a propósito contra lo que yo había hecho primero. Lo puse
+ * desapareciendo al verlo, con el argumento de que un cartel fijo se deja de leer. La decisión fue
+ * la contraria: el vídeo tiene que estar SIEMPRE localizable, porque el que vuelve tres semanas
+ * después a decidir si entra a una Royale de 250 $ quiere repasarlo, y mandarle a buscarlo por el
+ * Help es perderlo. Por eso tampoco hay botón de descartar, ni se recuerda nada.
  *
  * El botón abre la demo en un modal en vez de navegar: el jugador no pierde el sitio en la página
  * ni el lobby que estaba mirando.
  */
 export function RoyaleDemoNotice() {
   const [open, setOpen] = useState(false)
-  // Se lee una vez al montar; la preferencia no cambia sola desde fuera de esta pantalla.
-  const [visto, setVisto] = useState(() => yaVisto())
-
-  if (visto) return null
-
-  function abrir() {
-    // Se marca AL ABRIR, no al terminar: medir cuánto ha visto alguien pediría un umbral inventado,
-    // y abrirlo ya es la señal de que el aviso hizo su trabajo.
-    marcarVisto()
-    setOpen(true)
-  }
 
   return (
     <>
@@ -64,7 +51,7 @@ export function RoyaleDemoNotice() {
 
         <button
           type="button"
-          onClick={abrir}
+          onClick={() => setOpen(true)}
           style={{
             flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 8,
             padding: '10px 18px', borderRadius: 11, border: 0, cursor: 'pointer', minHeight: 44,
@@ -77,23 +64,9 @@ export function RoyaleDemoNotice() {
           Watch demo
         </button>
 
-        {/* Poder quitarlo sin verlo. No todo el mundo lo necesita, y un aviso del que no se puede
-            salir se lee como publicidad. */}
-        <button
-          type="button"
-          aria-label="Dismiss"
-          onClick={() => { marcarVisto(); setVisto(true) }}
-          style={{
-            flex: 'none', width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
-            border: '1px solid rgba(255,255,255,.14)', background: 'transparent',
-            color: COLORS.muted, fontSize: 13, lineHeight: 1,
-          }}
-        >
-          ✕
-        </button>
       </section>
 
-      {open && <DemoVideoModal onClose={() => { setOpen(false); setVisto(true) }} />}
+      {open && <DemoVideoModal onClose={() => setOpen(false)} />}
     </>
   )
 }
