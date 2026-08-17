@@ -12,6 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -958,27 +959,41 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream unavailable")
-        filas = []
-        with session_factory() as s:
-            # Solo las que se pueden jugar AHORA. Se descartan por dos motivos distintos y los dos
-            # cuentan: las que hemos apagado nosotros (`machine_visibility`, el mismo filtro que el
-            # catálogo) y las que Collector Crypt tiene cerradas (`available`). Medir el EV de una
-            # máquina a la que nadie puede tirar es peor que no medirlo: ocupa sitio y sugiere una
-            # decisión que no se puede tomar.
-            #
-            # Se filtra al PUBLICAR y no al ingerir: sus tiradas se siguen guardando, así que si
-            # vuelve a abrirse no arranca desde cero.
-            for m in machine_visibility.visible(s, maquinas):
-                code = m.get("code")
-                if not code or not m.get("price"):
-                    continue
-                if m.get("available") is False:
-                    continue
-                f = fila_ev(s, code, precio=float(m["price"]),
-                            buyback_pct=(m.get("instantBuyback") or 0) / 100.0 or None,
-                            horas=hours)
-                f["name"] = m.get("name") or code
-                filas.append(f)
+        def _calcular_filas() -> list:
+            filas = []
+            with session_factory() as s:
+                # Solo las que se pueden jugar AHORA. Se descartan por dos motivos distintos y los dos
+                # cuentan: las que hemos apagado nosotros (`machine_visibility`, el mismo filtro que el
+                # catálogo) y las que Collector Crypt tiene cerradas (`available`). Medir el EV de una
+                # máquina a la que nadie puede tirar es peor que no medirlo: ocupa sitio y sugiere una
+                # decisión que no se puede tomar.
+                #
+                # Se filtra al PUBLICAR y no al ingerir: sus tiradas se siguen guardando, así que si
+                # vuelve a abrirse no arranca desde cero.
+                for m in machine_visibility.visible(s, maquinas):
+                    code = m.get("code")
+                    if not code or not m.get("price"):
+                        continue
+                    if m.get("available") is False:
+                        continue
+                    f = fila_ev(s, code, precio=float(m["price"]),
+                                buyback_pct=(m.get("instantBuyback") or 0) / 100.0 or None,
+                                horas=hours)
+                    f["name"] = m.get("name") or code
+                    filas.append(f)
+            return filas
+
+        # FUERA DEL BUCLE DE EVENTOS, y no por elegancia. `fila_ev` hace 4.000 remuestreos por
+        # máquina: medido sobre pokemon_50 con sus 16.000 tiradas de 48 h, 1.000 remuestreos cuestan
+        # 27 s, o sea ~108 s los 4.000 — de UNA máquina. El backend corre en UN proceso, así que
+        # ejecutar eso aquí dentro deja al resto del mundo sin backend durante ese rato: ni saldo,
+        # ni máquinas, ni chat, ni liquidar una batalla en curso. Es el mismo cuelgue del 11/08,
+        # solo que aquel fue una ráfaga accidental y este vendría cada vez que caduque la caché.
+        #
+        # `run_in_threadpool` lo aparta a un hilo: sigue costando lo mismo, pero lo paga quien pidió
+        # la página y no todos los demás. El trabajo de base va dentro del hilo a propósito — la
+        # sesión se abre y se cierra ahí, sin cruzar la frontera.
+        filas = await run_in_threadpool(_calcular_filas)
         filas.sort(key=lambda f: (f["realized_edge_pct"] is None, -(f["realized_edge_pct"] or 0)))
         if hours == 48:
             _ev_cache.update(t=ahora, filas=filas)
@@ -1031,9 +1046,15 @@ def create_app(session_factory, chain: ChainSource,
         ahora = _time.time()
         if _ev_vivo_cache["filas"] and ahora - _ev_vivo_cache["t"] < _EV_VIVO_TTL:
             return {"rows": _ev_vivo_cache["filas"], "updated_at": int(_ev_vivo_cache["t"])}
-        with session_factory() as s:
-            filas = [{"machine": code, "tiers": rachas_por_tier(s, code)}
-                     for code in winners_store.maquinas_con_datos(s)]
+        def _rachas() -> list:
+            with session_factory() as s:
+                return [{"machine": code, "tiers": rachas_por_tier(s, code)}
+                        for code in winners_store.maquinas_con_datos(s)]
+
+        # También a un hilo, aunque aquí sea una consulta por máquina y no 4.000 remuestreos: son
+        # tantas consultas como máquinas con datos, la página lo pide cada pocos segundos, y el
+        # backend es un solo proceso. Lo barato repetido a menudo también bloquea.
+        filas = await run_in_threadpool(_rachas)
         _ev_vivo_cache.update(t=ahora, filas=filas)
         return {"rows": filas, "updated_at": int(ahora)}
 
