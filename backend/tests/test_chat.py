@@ -277,3 +277,65 @@ def test_menciones_basura_no_tumban_el_mensaje():
 
     assert _menciones_validas(crudas, conectados) == [{"wallet": "W1", "label": "ana"}]
     assert _menciones_validas(None, conectados) == []
+
+
+# ── Envío dirigido a una wallet ──────────────────────────────────────────────────
+
+
+class _WsFalso:
+    """Socket de mentira: guarda lo que se le manda. `revienta` simula uno ya muerto."""
+    def __init__(self, revienta: bool = False):
+        self.enviados: list[dict] = []
+        self.revienta = revienta
+
+    async def send_json(self, msg: dict) -> None:
+        if self.revienta:
+            raise RuntimeError("socket cerrado")
+        self.enviados.append(msg)
+
+
+async def test_send_to_wallet_llega_a_todas_las_pestanas_y_a_nadie_mas():
+    """Lo importante NO es que llegue: es que no llegue a los demás.
+
+    Un aviso de propina dice quién le da dinero a quién y cuánto. Si esto se colara al resto de
+    la sala, estaríamos publicando por la puerta de atrás lo que se decidió no publicar.
+    """
+    from app.chat import ConnectionManager
+    m = ConnectionManager()
+    a1, a2, b, anon = _WsFalso(), _WsFalso(), _WsFalso(), _WsFalso()
+    for ws in (a1, a2, b, anon):
+        m._active[ws] = None
+    m.identify(a1, "WalletA", "Ana")
+    m.identify(a2, "WalletA", "Ana")
+    m.identify(b, "WalletB", "Bea")
+
+    llegados = await m.send_to_wallet("WalletA", {"type": "tip", "amount": 2})
+
+    assert llegados == 2
+    assert a1.enviados == a2.enviados == [{"type": "tip", "amount": 2}]
+    assert b.enviados == []
+    assert anon.enviados == []
+
+
+async def test_send_to_wallet_con_un_socket_roto_sigue_avisando_al_resto():
+    """Una pestaña muerta no puede dejar sin aviso a la que sigue abierta, y se descarta."""
+    from app.chat import ConnectionManager
+    m = ConnectionManager()
+    roto, vivo = _WsFalso(revienta=True), _WsFalso()
+    m._active[roto] = None
+    m._active[vivo] = None
+    m.identify(roto, "WalletA", "Ana")
+    m.identify(vivo, "WalletA", "Ana")
+
+    llegados = await m.send_to_wallet("WalletA", {"type": "tip"})
+
+    assert llegados == 1
+    assert vivo.enviados == [{"type": "tip"}]
+    assert roto not in m._active      # se descarta, igual que en broadcast
+
+
+async def test_send_to_wallet_a_alguien_desconectado_devuelve_cero_sin_reventar():
+    """Recibir una propina estando desconectado es normal: el dinero ya está en su wallet."""
+    from app.chat import ConnectionManager
+    m = ConnectionManager()
+    assert await m.send_to_wallet("NadieAqui", {"type": "tip"}) == 0

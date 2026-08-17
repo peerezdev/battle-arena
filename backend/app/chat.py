@@ -146,3 +146,24 @@ class ConnectionManager:
                 await ws.send_json(msg)
             except Exception:
                 self._active.pop(ws, None)
+
+    async def send_to_wallet(self, wallet: str, msg: dict) -> int:
+        """Manda `msg` SOLO a los sockets de esa wallet, y devuelve a cuántos llegó.
+
+        Existe porque `broadcast` no vale para avisos privados: un aviso de propina dice quién le
+        da dinero a quién y cuánto, y difundirlo publicaría justo lo que se decidió no publicar al
+        dejar los `/tip` fuera del chat.
+
+        Puede llegar a varios: un jugador con dos pestañas tiene dos sockets. Los que fallan se
+        descartan, igual que en `broadcast`: un socket muerto no puede dejar sin aviso al resto.
+        """
+        enviados = 0
+        for ws, quien in list(self._active.items()):
+            if not quien or quien["wallet"] != wallet:
+                continue
+            try:
+                await ws.send_json(msg)
+                enviados += 1
+            except Exception:
+                self._active.pop(ws, None)
+        return enviados
