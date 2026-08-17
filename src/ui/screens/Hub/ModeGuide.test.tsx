@@ -21,6 +21,40 @@ describe('ModeGuide', () => {
     expect(screen.getByText(/every card on the table/)).toBeTruthy()
   })
 
+  it('el rótulo dice qué es la caja, y no "Get Started"', () => {
+    render(<MemoryRouter><ModeGuide /></MemoryRouter>)
+    expect(screen.getByRole('heading', { name: 'How each mode works' })).toBeTruthy()
+    expect(screen.queryByText(/get started/i)).toBeNull()
+  })
+
+  it('no repite en prosa lo que ya dicen las tarjetas', () => {
+    // Se quitaron el titular y el párrafo de introducción: las tres tarjetas explican los modos, y
+    // contarlo antes en texto era decir dos veces lo mismo antes de que se leyera una.
+    render(<MemoryRouter><ModeGuide /></MemoryRouter>)
+    expect(screen.queryByText(/New here/i)).toBeNull()
+    expect(screen.queryByText(/Three ways to play/i)).toBeNull()
+  })
+
+  it('los botones van arriba, junto al rótulo', () => {
+    // "Got it" tiene que estar donde se mira al llegar, no al final de un bloque que ya se decidió
+    // no leer.
+    render(<MemoryRouter><ModeGuide /></MemoryRouter>)
+    const rotulo = screen.getByRole('heading', { name: 'How each mode works' })
+    const gotIt = screen.getByRole('button', { name: /got it/i })
+    const primeraTarjeta = screen.getByText('Pack Battle')
+    // Por posición en el DOM: el botón va antes que las tarjetas.
+    expect(gotIt.compareDocumentPosition(primeraTarjeta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Y comparte fila con el rótulo.
+    expect(rotulo.parentElement).toBe(gotIt.parentElement?.parentElement)
+  })
+
+  it('plegada tampoco dice "New here"', () => {
+    render(<MemoryRouter><ModeGuide /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /got it/i }))
+    expect(screen.getByText('How each mode works')).toBeTruthy()
+    expect(screen.queryByText(/New here/i)).toBeNull()
+  })
+
   it('plegada deja una forma de volver, no desaparece', () => {
     // Es la diferencia con el aviso de la demo: eso es permanente porque hay un vídeo que repasar;
     // esto es texto, y quien ya lo leyó necesita poder volver, no verlo siempre.

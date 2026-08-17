@@ -36,7 +36,7 @@ export function ModeGuide() {
   if (!open) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '12px 18px', borderRadius: 14, background: 'rgba(255,255,255,.022)', border: `1px solid ${COLORS.border}` }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#cdd4dd' }}>New here? How each mode works</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#cdd4dd' }}>How each mode works</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={() => set(true)} style={pillBtn}>Show</button>
           <Link to="/help" style={{ ...pillBtn, display: 'inline-flex', alignItems: 'center', color: COLORS.green, borderColor: '#00ffc455', background: '#00ffc414' }}>Help →</Link>
@@ -47,13 +47,18 @@ export function ModeGuide() {
 
   return (
     <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 'clamp(20px,2.4vw,28px)', background: 'linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.008))', border: `1px solid ${COLORS.border}` }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
-        <div style={{ flex: '1 1 320px', minWidth: 0 }}>
-          <div style={{ fontFamily: FONTS.mono, fontSize: 11, letterSpacing: '.26em', color: COLORS.green, marginBottom: 10 }}>GET STARTED</div>
-          <h3 style={{ margin: '0 0 6px', fontFamily: FONTS.display, fontSize: 'clamp(22px,2.8vw,28px)', fontWeight: 700, letterSpacing: '-.02em' }}>New here? How each mode works</h3>
-          <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, color: '#9aa4b2', maxWidth: 520 }}>Three ways to play with your graded cards. The quick version below — the full guide covers rules, odds and every feature.</p>
-        </div>
-        <div style={{ flex: 'none', display: 'flex', gap: 10 }}>
+      {/* Solo el rótulo y los botones. Se fueron el titular y el párrafo: las tres tarjetas de
+          abajo ya explican los modos, y repetirlo arriba en prosa era decir dos veces lo mismo
+          antes de que se leyera una. Los botones suben a la esquina, alineados con el rótulo. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
+        <h3 style={{
+          margin: 0, flex: '1 1 auto', minWidth: 0,
+          fontFamily: FONTS.mono, fontSize: 11, fontWeight: 400, letterSpacing: '.26em',
+          color: COLORS.green,
+        }}>
+          How each mode works
+        </h3>
+        <div style={{ flex: 'none', display: 'flex', gap: 10, marginLeft: 'auto' }}>
           <Link to="/help" style={{ ...pillBtn, display: 'inline-flex', alignItems: 'center', color: COLORS.green, borderColor: '#00ffc466', background: '#00ffc41a' }}>Open Help guide →</Link>
           <button onClick={() => set(false)} style={pillBtn}>Got it ✓</button>
         </div>
