@@ -46,19 +46,6 @@ export function LobbyPage() {
   // Warm the machine catalogue so Create Battle opens with machines ready.
   useEffect(() => { void loadMachineList() }, [])
 
-  // `?create=1` abre el modal al llegar. Lo usa el atajo de la puerta del tracker cuando no hay
-  // ninguna sala abierta: mandar al Lobby y que el jugador busque el botón sería perderlo justo
-  // cuando se le acaba de decir qué hacer.
-  //
-  // El parámetro se CONSUME: sin quitarlo, cerrar el modal y recargar lo volvería a abrir, y el
-  // botón de atrás también.
-  useEffect(() => {
-    if (params.get('create') !== '1') return
-    setCreateOpen(true)
-    const limpio = new URLSearchParams(params)
-    limpio.delete('create')
-    setParams(limpio, { replace: true })
-  }, [params, setParams])
 
   // Se le pasan TODAS a LiveBattles: el filtro de modo lo aplica él, que es quien tiene el
   // desplegable. Aquí solo se decide qué entra en el lobby y qué va a "Recent".

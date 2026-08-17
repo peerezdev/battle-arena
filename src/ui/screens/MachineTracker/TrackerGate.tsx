@@ -1,17 +1,10 @@
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { COLORS, FONTS, formatUsd } from '../../theme'
 import type { TrackerAccess } from '../../../onchain/gachaClient'
-import type { OpenBattle } from '../../../onchain/packBattleClient'
-import { useOpenBattles } from '../../../onchain/useOpenBattles'
-import { useEmbeddedSolanaAddress } from '../../../wallet/embedded'
-import { siguienteLobby } from '../battle/siguienteLobby'
-import { openBattleToLive } from '../Hub/openBattleToLive'
-import { hrefLobby } from './trackerRutas'
 import { FANTASMAS } from './trackerFantasmas'
 
 const VERDE = '#3ce8a8'
 const ROSA = '#ff2e7e'
-const ROSA_L = '#ff6ba4'
 const AMBAR = '#ffd166'
 
 /**
@@ -28,10 +21,6 @@ const AMBAR = '#ffd166'
  * NO se disfraza de error. No se ha roto nada y el jugador no ha hecho nada mal: le falta jugar.
  */
 export function TrackerGate({ acceso }: { acceso: TrackerAccess }) {
-  const navigate = useNavigate()
-  const meWallet = useEmbeddedSolanaAddress()
-  const { battles } = useOpenBattles()
-
   const hecho = acceso.required_usd > 0
     ? Math.min(1, acceso.wagered_usd / acceso.required_usd)
     : 1
@@ -126,16 +115,22 @@ export function TrackerGate({ acceso }: { acceso: TrackerAccess }) {
           </div>
 
           {/* Por dónde seguir. No es adorno: sin esto el aviso dice "te faltan 40" y deja al
-              jugador buscándose la vida para gastarlos. */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))',
-            gap: 10, marginTop: 18,
-          }}>
-            <AtajoModo modo="pack" battles={battles} meWallet={meWallet} navigate={navigate}
-              acento={VERDE} acentoTexto={VERDE} />
-            <AtajoModo modo="royale" battles={battles} meWallet={meWallet} navigate={navigate}
-              acento={ROSA} acentoTexto={ROSA_L} />
-          </div>
+              jugador buscándose la vida para gastarlos.
+
+              UN SOLO botón al Lobby, y no uno por modo. Los dos llevaban al mismo sitio, así que
+              eran dos caminos para una decisión que se toma igual: mirar qué hay abierto y elegir.
+              Ahí están las dos listas juntas y el filtro por modo. */}
+          <Link
+            to="/play/lobby"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              marginTop: 18, minHeight: 46, borderRadius: 12, textDecoration: 'none',
+              fontFamily: FONTS.display, fontSize: 14.5, fontWeight: 800, color: '#06120c',
+              background: `linear-gradient(135deg,${ROSA},${VERDE})`,
+            }}
+          >
+            Find a match →
+          </Link>
 
           <div style={{
             marginTop: 14, paddingTop: 14, borderTop: '1px solid #ffffff14',
@@ -147,60 +142,6 @@ export function TrackerGate({ acceso }: { acceso: TrackerAccess }) {
         </div>
       </div>
     </div>
-  )
-}
-
-/**
- * El atajo de un modo: qué hay abierto ahí y a dónde lleva.
- *
- * La sala se elige con `siguienteLobby`, la MISMA que recomienda el resultado de una partida: la
- * que está más cerca de arrancar, sin contar las que el jugador ya ocupa.
- *
- * LLEVA AL LOBBY, no a la sala. Entrar cuesta dinero y esa decisión se toma mirando la partida, no
- * desde un aviso; por eso el botón dice "View lobby" y no "Join". Y cuando no hay nada abierto pasa
- * a crear, que es la única forma de que ese modo avance.
- */
-function AtajoModo({ modo, battles, meWallet, navigate, acento, acentoTexto }: {
-  modo: 'pack' | 'royale'
-  battles: OpenBattle[]
-  meWallet: string | null
-  navigate: (to: string) => void
-  acento: string
-  acentoTexto: string
-}) {
-  const etiqueta = modo === 'pack' ? 'Pack Battle' : 'Battle Royale'
-  const siguiente = siguienteLobby(battles, { mode: modo, meWallet })
-
-  // Royale todavía no se puede crear (ver la etiqueta SOON del modal), así que sin salas abiertas
-  // el atajo NO promete crear una: llevaría a un modal donde la opción está bloqueada.
-  const puedeCrear = modo === 'pack'
-  const crear = !siguiente && puedeCrear
-
-  const entrada = siguiente ? openBattleToLive(siguiente).entry : null
-  const libres = siguiente ? siguiente.max_players - siguiente.players : 0
-
-  const titulo = siguiente
-    ? `${etiqueta} · ${formatUsd(entrada ?? 0)}`
-    : crear ? `Create a ${etiqueta}` : `No ${etiqueta} open`
-
-  const detalle = siguiente
-    ? `${libres} seat${libres === 1 ? '' : 's'} left · view lobby`
-    : crear ? 'Be the first one in' : 'View lobby'
-
-  return (
-    <button
-      type="button"
-      onClick={() => navigate(crear ? `${hrefLobby(modo)}&create=1` : hrefLobby(modo))}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3,
-        padding: '13px 16px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-        minHeight: 44, fontFamily: 'inherit',
-        border: `1px solid ${acento}66`, background: `${acento}0f`, color: COLORS.text,
-      }}
-    >
-      <span style={{ fontSize: 13.5, fontWeight: 700, color: acentoTexto }}>{titulo}</span>
-      <span style={{ fontFamily: FONTS.mono, fontSize: 10, color: '#7d8794' }}>{detalle}</span>
-    </button>
   )
 }
 

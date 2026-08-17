@@ -1,24 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, act, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, act, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { TrackerAccess } from '../../../onchain/gachaClient'
-import type { OpenBattle } from '../../../onchain/packBattleClient'
-
-// La puerta consulta las salas abiertas para poder ofrecer a qué entrar, y navega al Lobby.
-const salas = vi.hoisted(() => ({ lista: [] as OpenBattle[], nav: vi.fn() }))
-vi.mock('../../../onchain/useOpenBattles', () => ({ useOpenBattles: () => ({ battles: salas.lista }) }))
-vi.mock('../../../wallet/embedded', () => ({ useEmbeddedSolanaAddress: () => 'ME' }))
-vi.mock('react-router-dom', async (orig) => ({
-  ...(await orig<typeof import('react-router-dom')>()),
-  useNavigate: () => salas.nav,
-}))
 
 const { TrackerGate } = await import('./TrackerGate')
-
-const sala = (over: Partial<OpenBattle> = {}): OpenBattle => ({
-  id: 'b1', mode: 'pack', machine_code: 'pokemon_50', price: 50_000_000, buyin: 50_000_000,
-  max_players: 4, players: 1, creator_wallet: 'OTRO', player_wallets: ['OTRO'], ...over,
-} as OpenBattle)
 
 const pintar = (a: TrackerAccess) =>
   render(<MemoryRouter><TrackerGate acceso={a} /></MemoryRouter>)
@@ -106,54 +91,29 @@ describe('el aviso del Machine Tracker', () => {
   })
 })
 
-// ── los atajos: a qué se puede entrar ────────────────────────────────────────
+// ── por dónde seguir ─────────────────────────────────────────────────────────
 
-describe('los atajos de la puerta', () => {
-  beforeEach(() => { salas.lista = []; salas.nav.mockClear() })
-
-  it('con una sala abierta enseña su entrada y las plazas libres', () => {
-    // La elige `siguienteLobby`, la misma que recomienda el resultado de una partida.
-    salas.lista = [sala({ players: 3, max_players: 4 })]
+describe('el botón de la puerta', () => {
+  it('es UNO solo y lleva al Lobby', () => {
+    // Antes eran dos, uno por modo, y los dos llevaban al mismo sitio: dos caminos para una
+    // decisión que se toma igual, mirando qué hay abierto. En el Lobby están las dos listas.
     pintar(acceso())
-    expect(screen.getByText(/Pack Battle · \$50/)).toBeTruthy()
-    expect(screen.getByText(/1 seat left · view lobby/)).toBeTruthy()
+    const botones = screen.getAllByRole('link')
+    expect(botones).toHaveLength(1)
+    expect(botones[0].getAttribute('href')).toBe('/play/lobby')
+    expect(botones[0].textContent).toMatch(/Find a match/)
   })
 
-  it('no recomienda una sala en la que ya estoy sentado', () => {
-    salas.lista = [sala({ player_wallets: ['ME'], players: 1 })]
+  it('no lleva a un modo concreto', () => {
+    // Filtrar por él desde aquí decidiría por el jugador algo que se decide viendo las partidas.
     pintar(acceso())
-    expect(screen.getByText(/Create a Pack Battle/)).toBeTruthy()
+    expect(screen.getByRole('link').getAttribute('href')).not.toContain('mode=')
   })
 
-  it('lleva al LOBBY, no a la sala: entrar cuesta dinero', () => {
-    salas.lista = [sala()]
-    pintar(acceso())
-    fireEvent.click(screen.getByText(/Pack Battle · \$50/))
-    expect(salas.nav).toHaveBeenCalledWith('/play/lobby?mode=pack')
-  })
-
-  it('sin salas de pack, el atajo pasa a CREAR una', () => {
-    pintar(acceso())
-    fireEvent.click(screen.getByText(/Create a Pack Battle/))
-    expect(salas.nav).toHaveBeenCalledWith('/play/lobby?mode=pack&create=1')
-  })
-
-  it('sin salas de royale NO promete crear una: todavía no se puede', () => {
-    // El modal la tiene bloqueada con su etiqueta SOON, así que ofrecer crearla llevaría a un
-    // callejón. Se dice que no hay ninguna abierta y se lleva al Lobby.
-    pintar(acceso())
-    expect(screen.getByText(/No Battle Royale open/)).toBeTruthy()
-    fireEvent.click(screen.getByText(/No Battle Royale open/))
-    expect(salas.nav).toHaveBeenCalledWith('/play/lobby?mode=royale')
-  })
-
-  it('la royale que se enseña es la más cerca de empezar', () => {
-    salas.lista = [
-      sala({ id: 'lejos', mode: 'royale', players: 1, max_players: 10, buyin: 20_000_000 }),
-      sala({ id: 'cerca', mode: 'royale', players: 9, max_players: 10, buyin: 70_000_000 }),
-    ]
-    pintar(acceso())
-    expect(screen.getByText(/1 seat left · view lobby/)).toBeTruthy()
+  it('sale también con cero apostado', () => {
+    // Es cuando más falta hace: el que no ha jugado nada es justo el que necesita saber por dónde.
+    pintar(acceso({ wagered_usd: 0, missing_usd: 100 }))
+    expect(screen.getByRole('link', { name: /Find a match/ })).toBeTruthy()
   })
 })
 
@@ -187,13 +147,13 @@ const dejarResolver = async () => {
   for (let i = 0; i < 3; i++) await act(async () => { await Promise.resolve() })
 }
 
-beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); salas.lista = [] })
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks() })
 
 describe('MachineTrackerPage', () => {
   it('con acceso enseña el panel y NO el aviso', async () => {
     mocks.fetchAcceso.mockResolvedValue(acceso({ allowed: true, missing_usd: 0 }))
     mocks.fetchEv.mockResolvedValue({ rows: [FILA], updated_at: 0 })
-    render(<MachineTrackerPage />)
+    render(<MemoryRouter><MachineTrackerPage /></MemoryRouter>)
     await dejarResolver()
     expect(screen.queryByText(/to go/)).toBeNull()
     // Y el panel está de verdad ahí: se comprueba por su interruptor de valoración, no solo por
@@ -206,7 +166,7 @@ describe('MachineTrackerPage', () => {
     // Pedirlos daría igual para la seguridad —el endpoint es público— pero sería trabajo tirado:
     // el bootstrap de 48 máquinas para no enseñar nada.
     mocks.fetchAcceso.mockResolvedValue(acceso())
-    render(<MachineTrackerPage />)
+    render(<MemoryRouter><MachineTrackerPage /></MemoryRouter>)
     await dejarResolver()
     expect(screen.getByText('$40 to go')).toBeTruthy()
     expect(mocks.fetchEv).not.toHaveBeenCalled()
@@ -216,7 +176,7 @@ describe('MachineTrackerPage', () => {
     // Enseñar el panel y quitarlo medio segundo después es peor que esperar; y enseñar el aviso a
     // quien sí tiene acceso es acusarle de algo que no es verdad.
     mocks.fetchAcceso.mockReturnValue(new Promise(() => {}))
-    render(<MachineTrackerPage />)
+    render(<MemoryRouter><MachineTrackerPage /></MemoryRouter>)
     expect(screen.queryByText(/to go/)).toBeNull()
     expect(mocks.fetchEv).not.toHaveBeenCalled()
   })
@@ -224,13 +184,13 @@ describe('MachineTrackerPage', () => {
   it('el explicador está CON acceso y SIN él', async () => {
     // Quien todavía no puede entrar merece saber qué es lo que le estamos pidiendo que se gane.
     mocks.fetchAcceso.mockResolvedValue(acceso())
-    render(<MachineTrackerPage />)
+    render(<MemoryRouter><MachineTrackerPage /></MemoryRouter>)
     await dejarResolver()
     expect(screen.getByRole('button', { name: /How to read a card/i })).toBeTruthy()
     cleanup()
     mocks.fetchAcceso.mockResolvedValue(acceso({ allowed: true, missing_usd: 0 }))
     mocks.fetchEv.mockResolvedValue({ rows: [FILA], updated_at: 0 })
-    render(<MachineTrackerPage />)
+    render(<MemoryRouter><MachineTrackerPage /></MemoryRouter>)
     await dejarResolver()
     expect(screen.getByRole('button', { name: /How to read a card/i })).toBeTruthy()
   })
@@ -238,7 +198,7 @@ describe('MachineTrackerPage', () => {
   it('si no se puede preguntar, la puerta se queda CERRADA', async () => {
     // Una puerta que se cae abierta ante un fallo de red no es una puerta.
     mocks.fetchAcceso.mockRejectedValue(new Error('sin red'))
-    render(<MachineTrackerPage />)
+    render(<MemoryRouter><MachineTrackerPage /></MemoryRouter>)
     await dejarResolver()
     expect(screen.getByText('$100 to go')).toBeTruthy()
     expect(mocks.fetchEv).not.toHaveBeenCalled()
