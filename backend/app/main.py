@@ -1020,11 +1020,19 @@ def create_app(session_factory, chain: ChainSource,
         """
         svc = _gacha_or_503()
         _replay_throttle(request.client.host if request.client else "?")
+        # De qué máquina salió. Hace falta de verdad: sin esto la pantalla no puede saber la
+        # recompra de ESTA tirada y acababa enseñando la de la máquina que el jugador tuviera
+        # abierta —una tirada del 90% se veía al 85%—, o ninguna si no tenía ninguna abierta.
         with session_factory() as s:
-            nuestro = (s.get(GachaPack, memo) is not None
-                       or s.query(BattlePull).filter_by(memo=memo).first() is not None)
-        if not nuestro:
-            raise HTTPException(404, "unknown pull")
+            pack = s.get(GachaPack, memo)
+            codigo = pack.pack_type if pack else None
+            if pack is None:
+                tirada = s.query(BattlePull).filter_by(memo=memo).first()
+                if tirada is None:
+                    raise HTTPException(404, "unknown pull")
+                # Las tiradas de batalla no guardan la máquina: se llega por la partida.
+                batalla = s.get(PackBattle, tirada.battle_id)
+                codigo = batalla.machine_code if batalla else None
         try:
             out = await svc.open_pack(memo=memo)
         except GachaDisabled:
@@ -1035,6 +1043,23 @@ def create_app(session_factory, chain: ChainSource,
             # Un sobre generado y nunca abierto no tiene nada que repetir. Se distingue de "no
             # existe" porque son cosas distintas para quien abrió el enlace.
             raise HTTPException(409, "this pull was never opened")
+        # La máquina viaja con la tirada. Si no se puede resolver, va a `None` y la pantalla no
+        # enseña recompra: mejor no decir nada que decir el número de otra máquina.
+        out["machine"] = codigo
+        out["buyback_pct"] = None
+        out["machine_name"] = None
+        out["pack_price"] = None
+        if codigo:
+            try:
+                m = next((x for x in await svc.machines() if x.get("code") == codigo), None)
+            except Exception:
+                # La carta es lo que importa; la recompra es un extra. Cualquier problema al
+                # resolverla se traga y se devuelve `None`, que la pantalla ya sabe leer.
+                m = None
+            if m:
+                out["buyback_pct"] = m.get("instantBuyback")
+                out["machine_name"] = m.get("shortName") or m.get("name")
+                out["pack_price"] = m.get("price")
         return out
 
     @app.post("/gacha/open-pack")

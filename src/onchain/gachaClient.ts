@@ -323,7 +323,19 @@ export function openPack(token: string, memo: string): Promise<OpenPackResult> {
  * No vuelve a abrir nada: `openPack` de Collector Crypt es idempotente, así que esto es una
  * lectura aunque al otro lado sea un POST.
  */
-export function replayPull(memo: string): Promise<Exclude<OpenPackResult, { pending: true }>> {
+export interface ReplayPull extends Exclude<OpenPackResult, { pending: true }> {
+  /** De qué máquina salió ESTA tirada. Va con la tirada porque la pantalla no tiene otra forma de
+   *  saberlo: antes usaba la máquina que el jugador tuviera abierta, así que un replay de una
+   *  máquina al 90% se veía al 85%, o sin recompra si no tenía ninguna abierta. */
+  machine: string | null
+  machine_name: string | null
+  /** 0-100, como el `instantBuyback` de CC. `null` = no se pudo resolver, y entonces la pantalla
+   *  NO enseña recompra: mejor no decir nada que decir el número de otra máquina. */
+  buyback_pct: number | null
+  pack_price: number | null
+}
+
+export function replayPull(memo: string): Promise<ReplayPull> {
   return gachaFetch(`/gacha/replay/${encodeURIComponent(memo)}`)
 }
 

@@ -44,6 +44,7 @@ import { GachaCardReveal } from './GachaCardReveal'
 import { GachaPackTilt, packTitle, priceFromCode } from './GachaPackTilt'
 import { pendingPackToResult } from './pendingToResult'
 import { enTanda } from '../../tanda'
+import { recompraDe, recompraMostrada } from './recompra'
 import { CardPoolGrid } from './CardPoolGrid'
 
 // Live Drops are no longer recorded locally on open — the backend broadcasts
@@ -60,7 +61,9 @@ type YoloResult = Extract<OpenPackResult, { pending: false }>
 type Phase =
   | { kind: 'machines' }
   | { kind: 'opening'; step: 'firmando' | 'enviando' | 'abriendo' }
-  | { kind: 'result'; result: YoloResult }
+  // `buybackPct` VIAJA CON LA FASE y no se lee de `selected`: en un replay o en un sobre
+  // pendiente no hay máquina abierta, y usar la que hubiera enseñaba la recompra de otra.
+  | { kind: 'result'; result: YoloResult; buybackPct?: number | null }
   | { kind: 'pending'; memo: string }
   // `results` null = todavía generando; no-null = listos, esperando a que el usuario abra.
   // Es UNA sola fase a propósito: si "generando" y "listo" fueran fases distintas, React
@@ -71,8 +74,11 @@ type Phase =
   // máquina elegida en pantalla en vez de la del sobre.
   | { kind: 'yolo'; step: 'firmando' | 'enviando' | 'abriendo'; done: number; total: number
       machineCode: string; price: number; results: YoloResult[] | null }
-  | { kind: 'yolo-reveal'; results: YoloResult[]; index: number }
-  | { kind: 'yolo-summary'; results: YoloResult[] }
+  // `machineCode` llega hasta aquí por lo mismo que en `yolo`: es la máquina DEL SOBRE, no la que
+  // esté abierta en la vault. Sin él, la recompra que se enseñaba al revelar era la de `selected`,
+  // así que abrir un pendiente de una máquina al 90% lo mostraba al 85%.
+  | { kind: 'yolo-reveal'; results: YoloResult[]; index: number; machineCode: string }
+  | { kind: 'yolo-summary'; results: YoloResult[]; machineCode: string }
 
 const STEP_LABEL: Record<'firmando' | 'enviando' | 'abriendo', string> = {
   firmando: 'Sign the transaction in your wallet…',
@@ -111,7 +117,11 @@ export default function GachaVault() {
     if (!replayMemo) return
     let cancelado = false
     replayPull(replayMemo)
-      .then((result) => { if (!cancelado) setPhase({ kind: 'result', result }) })
+      .then((r) => {
+        if (cancelado) return
+        // La recompra sale de la propia tirada, que ya la trae del backend.
+        setPhase({ kind: 'result', result: r, buybackPct: r.buyback_pct })
+      })
       .catch(() => { /* enlace inválido: se queda en las máquinas */ })
     return () => { cancelado = true }
   }, [replayMemo])
@@ -704,7 +714,12 @@ export default function GachaVault() {
           <RevealOverlay
             phase={phase}
             reduced={reduced}
-            buybackPct={selected?.instantBuyback ?? null}
+            /* Manda la de la TIRADA; `selected` es solo el respaldo del caso normal. Ver
+               `recompra`: usarlo al revés era el fallo del 90% enseñado como 85%. */
+            buybackPct={recompraMostrada(
+              phase.kind === 'result' ? phase.buybackPct : undefined,
+              selected?.instantBuyback,
+            )}
             onRetry={(memo) => void retryOpen(memo)}
             onClose={() => setPhase({ kind: 'machines' })}
           />
@@ -724,7 +739,7 @@ export default function GachaVault() {
               reduced={reduced}
               onOpen={() => {
                 const r = phase.results
-                if (r) setPhase({ kind: 'yolo-reveal', results: r, index: 0 })
+                if (r) setPhase({ kind: 'yolo-reveal', results: r, index: 0, machineCode: phase.machineCode })
               }}
             />
           </motion.div>
@@ -734,18 +749,18 @@ export default function GachaVault() {
             results={phase.results}
             index={phase.index}
             reduced={reduced}
-            buybackPct={selected?.instantBuyback ?? null}
+            buybackPct={recompraDe(phase.machineCode, machines)}
             onAdvance={() => setPhase((p) => {
               if (p.kind !== 'yolo-reveal') return p
-              if (p.index + 1 < p.results.length) return { kind: 'yolo-reveal', results: p.results, index: p.index + 1 }
+              if (p.index + 1 < p.results.length) return { kind: 'yolo-reveal', results: p.results, index: p.index + 1, machineCode: p.machineCode }
               // last pack: single open closes straight to the vault (no summary); multi → summary
-              return p.results.length === 1 ? { kind: 'machines' } : { kind: 'yolo-summary', results: p.results }
+              return p.results.length === 1 ? { kind: 'machines' } : { kind: 'yolo-summary', results: p.results, machineCode: p.machineCode }
             })}
-            onSkipAll={() => setPhase((p) => p.kind === 'yolo-reveal' ? { kind: 'yolo-summary', results: p.results } : p)}
+            onSkipAll={() => setPhase((p) => p.kind === 'yolo-reveal' ? { kind: 'yolo-summary', results: p.results, machineCode: p.machineCode } : p)}
           />
         )}
         {phase.kind === 'yolo-summary' && (
-          <YoloSummaryOverlay results={phase.results} machineCodes={phase.results.map(() => selected?.code ?? '')} buybackPct={selected?.instantBuyback ?? null} onClose={() => setPhase({ kind: 'machines' })} />
+          <YoloSummaryOverlay results={phase.results} machineCodes={phase.results.map(() => phase.machineCode)} buybackPct={recompraDe(phase.machineCode, machines)} onClose={() => setPhase({ kind: 'machines' })} />
         )}
         {confirm && selected && (
           <ConfirmOpenModal

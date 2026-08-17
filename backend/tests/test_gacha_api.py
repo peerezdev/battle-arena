@@ -1252,3 +1252,80 @@ def test_replay_limitado_por_ip():
     codigos = [c.get("/gacha/replay/cc-replay-1").status_code for _ in range(5)]
     assert codigos[:3] == [200, 200, 200]
     assert codigos[3] == 429 and codigos[4] == 429
+
+# ── El replay tiene que traer SU máquina, no la que el jugador tenga abierta ───────────────────
+#
+# Era el fallo: el replay solo devolvía la carta, así que la pantalla no podía saber la recompra de
+# esa tirada y usaba la de `selected`. Un replay de una máquina al 90% se veía al 85%.
+
+def _maquinas_mock(*, code="pokemon_250", buyback=90):
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(200, json={"machines": [
+        {"code": code, "name": "Elite", "shortName": "ELITE", "price": 250, "odds": {},
+         "stock": {}, "ev": 1.0, "image": None, "instantBuyback": buyback},
+        {"code": "pokemon_50", "name": "P50", "price": 50, "odds": {}, "stock": {},
+         "ev": 1.0, "image": None, "instantBuyback": 85},
+    ]}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+
+
+@respx.mock
+def test_replay_trae_la_recompra_de_SU_maquina():
+    """Y no la de otra: es exactamente el fallo que se vio, un 90% enseñado como 85%."""
+    c, _ = _client()
+    _pack_abierto(c, memo="cc-r90")
+    with c.session_factory() as s:
+        from app.models import GachaPack
+        s.get(GachaPack, "cc-r90").pack_type = "pokemon_250"
+        s.commit()
+    _maquinas_mock()
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    d = c.get("/gacha/replay/cc-r90").json()
+    assert d["machine"] == "pokemon_250"
+    assert d["buyback_pct"] == 90            # NO 85, que es el de pokemon_50
+    assert d["pack_price"] == 250
+
+
+@respx.mock
+def test_una_maquina_que_no_se_puede_resolver_NO_inventa_recompra():
+    """Mejor no enseñar recompra que enseñar la de otra máquina."""
+    c, _ = _client()
+    _pack_abierto(c, memo="cc-rara")
+    with c.session_factory() as s:
+        from app.models import GachaPack
+        s.get(GachaPack, "cc-rara").pack_type = "maquina_retirada"
+        s.commit()
+    _maquinas_mock()
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    d = c.get("/gacha/replay/cc-rara").json()
+    assert d["machine"] == "maquina_retirada"
+    assert d["buyback_pct"] is None
+
+
+@respx.mock
+def test_el_replay_de_una_batalla_saca_la_maquina_de_la_partida():
+    """Las tiradas de batalla no guardan la máquina: se llega por la partida."""
+    from app.models import BattlePull, PackBattle
+    c, _ = _client()
+    with c.session_factory() as s:
+        s.add(PackBattle(id="b9", mode="royale", machine_code="pokemon_250", status="settled",
+                         price=250_000_000, max_players=5))
+        s.add(BattlePull(battle_id="b9", player_wallet=WALLET_A, memo="cc-b9", nft_address="NFT1"))
+        s.commit()
+    _maquinas_mock()
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    d = c.get("/gacha/replay/cc-b9").json()
+    assert d["machine"] == "pokemon_250" and d["buyback_pct"] == 90
+
+
+@respx.mock
+def test_si_CC_no_contesta_la_lista_el_replay_sigue_saliendo():
+    """La carta es lo importante; la recompra es un extra y no puede tumbar el replay."""
+    c, _ = _client()
+    _pack_abierto(c, memo="cc-sinlista")
+    respx.get(f"{BASE}/api/machines").mock(return_value=Response(502, json={}))
+    respx.get(f"{BASE}/api/status").mock(return_value=Response(200, json={"gachas": []}))
+    respx.post(f"{BASE}/api/openPack").mock(return_value=Response(200, json=_CARTA))
+    r = c.get("/gacha/replay/cc-sinlista")
+    assert r.status_code == 200
+    assert r.json()["nft_address"] == "NFT1"
+    assert r.json()["buyback_pct"] is None
