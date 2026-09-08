@@ -93,3 +93,25 @@ def test_un_fichero_corrupto_devuelve_vacio(tmp_path):
     f = tmp_path / "roto.json"
     f.write_text("{esto no es json")
     assert cargar_asignaciones(str(f)) == {}
+
+
+def test_json_valido_pero_lista_devuelve_vacio(tmp_path):
+    # JSON válido que no es un dict es tan inutilizable como uno roto. No puede pasar
+    # que un fichero mal formado acabe diciéndole a un jugador elegible que no lo es.
+    f = tmp_path / "lista.json"
+    f.write_text(json.dumps([1, 2, 3]))
+    assert cargar_asignaciones(str(f)) == {}
+
+
+def test_json_valido_pero_string_devuelve_vacio(tmp_path):
+    # JSON válido que no es un dict es tan inutilizable como uno roto.
+    f = tmp_path / "string.json"
+    f.write_text(json.dumps("hello"))
+    assert cargar_asignaciones(str(f)) == {}
+
+
+def test_json_valido_pero_numero_devuelve_vacio(tmp_path):
+    # JSON válido que no es un dict es tan inutilizable como uno roto.
+    f = tmp_path / "numero.json"
+    f.write_text(json.dumps(42))
+    assert cargar_asignaciones(str(f)) == {}

@@ -77,7 +77,14 @@ def cargar_asignaciones(path: str) -> dict[str, dict]:
         return {}
     try:
         with open(path, encoding="utf8") as f:
-            return json.load(f)
+            data = json.load(f)
+            # Un fichero bien formado pero con forma equivocada es tan inutilizable
+            # como uno que no parsa: no puede pasar que un fichero roto le diga a un
+            # jugador elegible que no lo es.
+            if not isinstance(data, dict):
+                logger.exception("airdrop: el fichero de asignaciones no es un dict %s", path)
+                return {}
+            return data
     except (OSError, ValueError):
         logger.exception("airdrop: no se pudo leer el fichero de asignaciones %s", path)
         return {}
