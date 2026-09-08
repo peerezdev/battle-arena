@@ -1,5 +1,10 @@
 import { Link } from 'react-router-dom'
 import { COLORS, FONTS } from '../../theme'
+
+/** El naranja de $CARDS, el mismo de la pantalla /claim y del claim oficial de Collector Crypt.
+ *  El camino entero (banner -> pantalla) va del mismo color a propósito: es el token el que se
+ *  presenta, no nosotros, y un salto de paleta a mitad de camino lo haría parecer otra cosa. */
+const NARANJA = '#f97316'
 import { config } from '../../../onchain/config'
 
 /**
@@ -24,8 +29,8 @@ export function ClaimBanner() {
   return (
     <section style={{
       position: 'relative', overflow: 'hidden', borderRadius: 14,
-      border: `1px solid rgba(0,255,196,.28)`,
-      background: `radial-gradient(420px 140px at 8% 0%,rgba(0,255,196,.12),transparent 65%),linear-gradient(160deg,#07161a,#0b0d13)`,
+      border: `1px solid rgba(249,115,22,.3)`,
+      background: `radial-gradient(420px 140px at 8% 0%,rgba(249,115,22,.14),transparent 65%),linear-gradient(160deg,#1a0f06,#0b0d13)`,
       padding: '13px clamp(14px,1.8vw,20px)',
       display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
     }}>
@@ -47,9 +52,9 @@ export function ClaimBanner() {
           flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '10px 18px', borderRadius: 11, minHeight: 44, boxSizing: 'border-box',
           textDecoration: 'none',
-          fontFamily: FONTS.display, fontSize: 14, fontWeight: 800, color: '#05221c',
-          background: `linear-gradient(135deg,${COLORS.green},#00c39a)`,
-          boxShadow: `0 10px 26px -12px ${COLORS.green}`,
+          fontFamily: FONTS.display, fontSize: 14, fontWeight: 800, color: '#fff',
+          background: `linear-gradient(135deg,${NARANJA},#ea580c)`,
+          boxShadow: `0 10px 26px -12px ${NARANJA}`,
         }}
       >
         Check my claim

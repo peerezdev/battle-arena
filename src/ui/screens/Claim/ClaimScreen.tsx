@@ -6,8 +6,113 @@ import { useIdentityToken } from '@privy-io/react-auth'
 import { config } from '../../../onchain/config'
 import { fetchAirdrop, claimAirdrop, AirdropError } from '../../../onchain/airdropClient'
 import type { AirdropStatus } from '../../../onchain/airdropClient'
+import { FONTS } from '../../theme'
 
 const CARDS = (base: number): string => (base / 1_000_000).toLocaleString('en-US')
+
+/**
+ * Paleta de la propia página de claim de Collector Crypt, a propósito y no la del juego.
+ *
+ * Esta pantalla enseña un token que no es nuestro: el naranja de $CARDS es lo que hace que la
+ * cifra se lea de un vistazo como "esto son tus CARDS" para quien ya ha visto el claim oficial.
+ * El acento se gasta UNA vez, en el símbolo del token; el resto de la tarjeta calla.
+ */
+const CC = {
+  card: '#111820', cardBorde: '#1e2a38',
+  texto: '#ffffff', apagado: '#94a3b8',
+  naranja: '#f97316', naranjaOscuro: '#ea580c',
+  verde: '#22c55e', rojo: '#ef4444', azul: '#38bdf8',
+} as const
+
+/** La tarjeta centrada: el único contenedor de esta pantalla, en todos sus estados. */
+function Tarjeta({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '60vh', padding: 24,
+    }}>
+      <div style={{
+        background: CC.card, borderRadius: 20, border: `1px solid ${CC.cardBorde}`,
+        padding: 'clamp(28px,4vw,40px)', width: 'min(480px, 100%)', textAlign: 'center',
+        boxShadow: '0 8px 32px rgba(0,0,0,.4)', fontFamily: FONTS.display,
+      }}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Titulo({ children }: { children: React.ReactNode }) {
+  return (
+    <h1 style={{
+      margin: 0, color: CC.texto, fontSize: 26, fontWeight: 700,
+      letterSpacing: '-.01em', lineHeight: 1.2,
+    }}>{children}</h1>
+  )
+}
+
+/** Banner de estado. El color ES la información: verde ya está, rojo no te toca, naranja te falta algo. */
+function Aviso({ tono, children }: { tono: 'ok' | 'mal' | 'aviso'; children: React.ReactNode }) {
+  const color = tono === 'ok' ? CC.verde : tono === 'mal' ? CC.rojo : CC.naranja
+  return (
+    <div style={{
+      marginTop: 24, padding: '14px 18px', borderRadius: 12,
+      background: `${color}1a`, border: `1px solid ${color}4d`,
+      color, fontSize: 14.5, lineHeight: 1.5,
+    }}>{children}</div>
+  )
+}
+
+/** El bloque de la cifra: es la protagonista de la pantalla y por eso lleva el único acento. */
+function Cifra({ etiqueta, base }: { etiqueta: string; base: number }) {
+  return (
+    <div style={{
+      marginTop: 24, padding: '24px 28px', borderRadius: 16,
+      background: `linear-gradient(135deg, ${CC.naranja}1a 0%, ${CC.azul}1a 100%)`,
+      border: `1px solid ${CC.naranja}33`,
+    }}>
+      <div style={{ color: CC.apagado, fontSize: 13.5, marginBottom: 8 }}>{etiqueta}</div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ color: CC.texto, fontSize: 'clamp(30px,6vw,38px)', fontWeight: 800, letterSpacing: '-.02em' }}>
+          {CARDS(base)}
+        </span>
+        <span style={{ color: CC.naranja, fontSize: 'clamp(22px,4.5vw,30px)', fontWeight: 800 }}>$CARDS</span>
+      </div>
+    </div>
+  )
+}
+
+function Boton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        marginTop: 24, width: '100%', minHeight: 52, borderRadius: 12, border: 0,
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? .7 : 1,
+        fontFamily: FONTS.display, fontSize: 17, fontWeight: 700, color: '#fff',
+        background: disabled
+          ? 'linear-gradient(135deg,#374151,#1f2937)'
+          : `linear-gradient(135deg,${CC.naranja},${CC.naranjaOscuro})`,
+      }}
+    >{children}</button>
+  )
+}
+
+function EnlaceTx({ firma }: { firma: string }) {
+  return (
+    <a
+      href={`https://solscan.io/tx/${firma}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'inline-block', marginTop: 18, color: CC.azul, fontSize: 13,
+        wordBreak: 'break-all', textDecoration: 'underline',
+      }}
+    >{firma}</a>
+  )
+}
 
 type CargaFase = 'cargando' | 'listo' | 'error'
 
@@ -60,26 +165,49 @@ export function ClaimScreen() {
   }
 
   if (config.isDevnet) {
-    return <p>The $CARDS airdrop only exists on mainnet.</p>
+    return (
+      <Tarjeta>
+        <Titulo>$CARDS airdrop</Titulo>
+        <Aviso tono="aviso">The $CARDS airdrop only exists on mainnet.</Aviso>
+      </Tarjeta>
+    )
   }
   if (!identityToken) {
-    return <p>Log in to check your $CARDS airdrop.</p>
+    return (
+      <Tarjeta>
+        <Titulo>$CARDS airdrop</Titulo>
+        <p style={{ margin: '10px 0 0', color: CC.apagado, fontSize: 15, lineHeight: 1.5 }}>
+          Log in to check your $CARDS airdrop.
+        </p>
+      </Tarjeta>
+    )
   }
   if (cargaFase === 'cargando') {
-    return <p>Checking your airdrop…</p>
+    return (
+      <Tarjeta>
+        <Titulo>$CARDS airdrop</Titulo>
+        <p style={{ margin: '10px 0 0', color: CC.apagado, fontSize: 15 }}>Checking your airdrop…</p>
+      </Tarjeta>
+    )
   }
   if (cargaFase === 'error') {
     return (
-      <div>
-        <p>{avisoCarga}</p>
-        <button onClick={reintentar} disabled={reintentando}>
+      <Tarjeta>
+        <Titulo>$CARDS airdrop</Titulo>
+        <Aviso tono="aviso">{avisoCarga}</Aviso>
+        <Boton onClick={reintentar} disabled={reintentando}>
           {reintentando ? 'Retrying…' : 'Try again'}
-        </button>
-      </div>
+        </Boton>
+      </Tarjeta>
     )
   }
   if (!estado?.eligible) {
-    return <p>This wallet is not eligible for the $CARDS airdrop.</p>
+    return (
+      <Tarjeta>
+        <Titulo>$CARDS airdrop</Titulo>
+        <Aviso tono="mal">This wallet is not eligible for the $CARDS airdrop.</Aviso>
+      </Tarjeta>
+    )
   }
 
   // Solo la cadena decide si ya se reclamó. `firma` es contabilidad de una tabla local que
@@ -120,28 +248,26 @@ export function ClaimScreen() {
   }
 
   return (
-    <div>
-      <h1>$CARDS airdrop</h1>
-      <p>
-        <strong>{CARDS(estado.amount)}</strong> $CARDS
-      </p>
+    <Tarjeta>
+      <Titulo>$CARDS airdrop</Titulo>
       {yaEsta ? (
         <>
-          <p>Already claimed.</p>
-          {firma && (
-            <a href={`https://solscan.io/tx/${firma}`} target="_blank" rel="noopener noreferrer">
-              {firma}
-            </a>
-          )}
+          <Aviso tono="ok">You have already claimed your $CARDS airdrop.</Aviso>
+          <Cifra etiqueta="Amount claimed" base={estado.amount} />
+          {firma && <EnlaceTx firma={firma} />}
         </>
       ) : (
         <>
-          {avisoReclamo && <p>{avisoReclamo}</p>}
-          <button onClick={() => void reclamar()} disabled={reclamando}>
+          <p style={{ margin: '10px 0 0', color: CC.apagado, fontSize: 15, lineHeight: 1.5 }}>
+            Claim it below. We pay the network fee, so you don't need any SOL.
+          </p>
+          <Cifra etiqueta="Your airdrop" base={estado.amount} />
+          {avisoReclamo && <Aviso tono="aviso">{avisoReclamo}</Aviso>}
+          <Boton onClick={() => void reclamar()} disabled={reclamando}>
             {reclamando ? 'Claiming…' : 'Claim $CARDS'}
-          </button>
+          </Boton>
         </>
       )}
-    </div>
+    </Tarjeta>
   )
 }
