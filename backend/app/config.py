@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     # withdraw. Sin un mínimo + rate-limit, un atacante haría miles de retiros de 1 unidad a
     # direcciones nuevas para drenar el SOL del operador (renta de ATA ~0.002 SOL c/u).
     min_withdraw_usdc: float = 1.0        # retiro mínimo (USDC); env: MIN_WITHDRAW_USDC
+    # Mismo mínimo pero para retirar CARDS (airdrop de Collector Crypt): aunque ese retiro no
+    # cobra comisión de plataforma —el CARDS nunca entró en la economía de la plataforma—, el
+    # operador SIGUE pagando la renta de la ATA destino en cada retiro, así que el mismo ataque
+    # de dust-a-direcciones-nuevas aplica igual y necesita su propio mínimo.
+    min_withdraw_cards: float = 1.0       # retiro mínimo (CARDS); env: MIN_WITHDRAW_CARDS
     withdraw_rate_limit: int = 5          # nº máx. de retiros por wallet y ventana
     withdraw_rate_window_s: float = 60.0  # ventana del rate-limit de retiros (segundos)
     # Tips entre jugadores. El mínimo existe por lo mismo que el del withdraw: si el destinatario

@@ -6,7 +6,7 @@ import logging
 import math
 import time as _time
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Literal, Optional
 from fastapi import FastAPI, Depends, Header, HTTPException, Path, Request, Query, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -136,7 +136,10 @@ class WithdrawAddressBody(BaseModel):
 
 class WithdrawBody(BaseModel):
     address: str = Field(pattern=r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")  # destination Solana wallet
-    amount: float = Field(gt=0)  # USDC (dollars)
+    amount: float = Field(gt=0)  # USDC (dollars), o CARDS si token="cards"
+    # Qué token retirar. Literal ya deja que FastAPI/Pydantic devuelvan 422 solos ante
+    # cualquier otro valor, sin necesidad de comprobarlo a mano en el endpoint.
+    token: Literal["usdc", "cards"] = "usdc"
 
 
 class TipBody(BaseModel):
@@ -266,6 +269,7 @@ def create_app(session_factory, chain: ChainSource,
                escrow_seed_lamports: int = 10_000_000,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
+               min_withdraw_cards: float = 1.0,
                tips_enabled: bool = False,
                min_tip_usdc: float = 1.0,
                tip_rate_limit: int = 10,
@@ -378,6 +382,18 @@ def create_app(session_factory, chain: ChainSource,
         # by /users/me/balance and subtracted client-side, matching the previous behavior.
         base_units = await usdc_balance_base_units(solana_rpc_url, wallet, cc_usdc_mint)
         return {"base_units": base_units, "usdc": base_units / 1e6}
+
+    @app.get("/users/me/cards")
+    async def me_cards(wallet: str = Depends(current_user)):
+        # Igual que /users/me/usdc y por la misma razón (el browser no puede leer el RPC de
+        # mainnet directamente: el endpoint público devuelve 403 a los Origins de navegador, y
+        # apuntar el cliente a la red equivocada no devuelve nada). Aquí se lee el mint del
+        # airdrop $CARDS en vez del de USDC; usdc_balance_base_units ya toma el mint como
+        # parámetro, así que sirve tal cual (ver services/pack_orchestration.py).
+        if not cards_airdrop_mint:
+            raise HTTPException(503, "cards_unavailable")
+        base_units = await usdc_balance_base_units(solana_rpc_url, wallet, cards_airdrop_mint)
+        return {"base_units": base_units, "cards": base_units / 1e6}
 
     @app.get("/users/search")
     def users_search(q: str = "", limit: int = 8, wallet: str = Depends(current_user),
@@ -1676,12 +1692,51 @@ def create_app(session_factory, chain: ChainSource,
             s.commit()
         return {"memo": out["memo"], "remaining_points": out.get("remaining_points")}
 
+    async def _withdraw_cards(body: WithdrawBody, wallet: str, wallet_id: str) -> dict:
+        """Retiro de CARDS (airdrop de Collector Crypt), rama deliberadamente distinta a la de
+        USDC — ver el detalle de cada diferencia en los comentarios de abajo."""
+        # Sin mint configurado no hay nada que mover. Mismo criterio que en los endpoints del
+        # claim: no configurado es "todavía no", no "no" — de ahí 503 y no un 404/422.
+        if not cards_airdrop_mint:
+            raise HTTPException(503, "withdrawals_unavailable")
+        amount = int(round(body.amount * 1_000_000))   # CARDS también son 6 decimales, como USDC
+        if amount <= 0:
+            raise HTTPException(422, "amount must be > 0")
+        # Mínimo PROPIO (min_withdraw_cards): el operador paga la renta de la ATA destino igual
+        # que en USDC, así que el mismo ataque de dust a direcciones nuevas aplica igual.
+        min_base = int(round(min_withdraw_cards * 1_000_000))
+        if amount < min_base:
+            raise HTTPException(422, f"the minimum withdrawal is {min_withdraw_cards} CARDS")
+        _withdraw_throttle(wallet)  # el operador sigue pagando la renta de ATA aquí también
+        # Sin bloqueo por partida en curso: CARDS no se apuesta en ninguna batalla (a diferencia
+        # de USDC, que sí es lo que se juega), así que una partida abierta no le da destino a
+        # este saldo y bloquearlo castigaría al jugador sin motivo que aplique a este token.
+        # Sin resta de reservado: `reserved_total` cuenta holds de pack battle, que son en USDC.
+        # El saldo disponible de CARDS es directamente el saldo on-chain, sin resta ninguna.
+        bal = await usdc_balance_base_units(solana_rpc_url, wallet, cards_airdrop_mint)
+        if bal < amount:
+            raise HTTPException(402, "not enough available CARDS")
+        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        # Sin comisión de plataforma: el fee del withdraw grava dinero que SALE de la economía de
+        # la plataforma, y este CARDS nunca entró en ella (llegó directo del airdrop de CC).
+        try:
+            sig = await withdraw_usdc(solana_rpc_url, privy_signer, wallet_id, wallet,
+                                      privy_operator_wallet_id, privy_operator_address,
+                                      body.address, cards_airdrop_mint, amount, blockhash)
+        except Exception as exc:
+            raise HTTPException(502, f"withdraw failed: {exc}")
+        return {"signature": sig, "amount": body.amount, "net": amount / 1_000_000,
+                "fee": 0.0, "address": body.address}
+
     @app.post("/users/me/withdraw")
     async def me_withdraw(body: WithdrawBody, wallet: str = Depends(current_user),
                           wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
-        # Move USDC from the player's (delegated) wallet to an external address; operator pays gas.
+        # Move USDC (or CARDS, ver _withdraw_cards) from the player's (delegated) wallet to an
+        # external address; operator pays gas.
         if privy_signer is None or not (privy_operator_wallet_id and privy_operator_address):
             raise HTTPException(503, "withdrawals_unavailable")
+        if body.token == "cards":
+            return await _withdraw_cards(body, wallet, wallet_id)
         amount = int(round(body.amount * 1_000_000))   # USDC base units
         if amount <= 0:
             raise HTTPException(422, "amount must be > 0")
@@ -2844,6 +2899,7 @@ def build_default_app() -> FastAPI:
                       dev_endpoints_enabled=s.dev_endpoints_enabled,
                       gacha_rate_limit=s.gacha_rate_limit,
                       min_withdraw_usdc=s.min_withdraw_usdc,
+                      min_withdraw_cards=s.min_withdraw_cards,
                       tips_enabled=s.tips_enabled,
                       min_tip_usdc=s.min_tip_usdc,
                       tip_rate_limit=s.tip_rate_limit,
