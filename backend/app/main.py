@@ -37,7 +37,7 @@ from .services.ev_view import fila_ev
 from .services.tier_gaps import rachas_por_tier
 from .services.privy_signer import PrivySigner, PrivyNoVerificable
 from .services import escrow_pool, machine_visibility
-from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull, Tip, User
+from .models import GachaPack, PackBattle, BattlePlayer, BattlePack, BattlePull, Tip, User, AirdropClaim
 from .chat import (ConnectionManager, ChatBuffer, abbreviate, save_chat_message,
                    recent_chat_messages, big_hit_multiple)
 from .services.pack_lobby import (
@@ -53,13 +53,26 @@ from .services.pack_orchestration import (
 )
 from .services.solana_tx import build_memo_tx, build_free_pack_proof_tx
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
-from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard
+from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard, leer_cuenta
+from .services.cards_airdrop import build_claim_tx, claim_status_pda
 from .services.reservations import (reserve, reserved_total, royale_locked_total,
                                      release_reservations, battle_in_progress, royale_in_progress)
 from .services import emotes as emote_service
 from .services.bots import load_bots, pick_bot
 
 logger = logging.getLogger(__name__)
+
+
+async def _airdrop_cuenta(rpc_url: str, pubkey: str):
+    """¿Existe esta cuenta en la cadena? Devuelve la cuenta o None.
+
+    Vive AQUÍ y no dentro de `create_app` a propósito: un closure no se puede sustituir
+    desde un test, y esta es la única llamada a la red de todo el airdrop. A nivel de
+    módulo, `monkeypatch.setattr("app.main._airdrop_cuenta", ...)` funciona porque
+    Python resuelve el global en el momento de la llamada.
+    """
+    return await leer_cuenta(rpc_url, pubkey)
+
 
 # Tope de menciones por mensaje. Con la lista de conectados en la mano, sin tope bastaría un
 # mensaje para avisar a toda la sala: un `@todos` que nadie ha decidido ofrecer.
@@ -244,6 +257,11 @@ def create_app(session_factory, chain: ChainSource,
                cc_usdc_mint: str = "",
                privy_operator_wallet_id: str = "",
                privy_operator_address: str = "",
+               cards_airdrop: dict | None = None,
+               cards_airdrop_distributor: str = "",
+               cards_airdrop_vault: str = "",
+               cards_airdrop_mint: str = "",
+               cards_airdrop_round: str = "",
                escrow_seed_lamports: int = 10_000_000,
                dev_endpoints_enabled: bool = False,
                min_withdraw_usdc: float = 1.0,
@@ -808,6 +826,40 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "gacha_disabled")
         except GachaUpstreamError as e:
             raise HTTPException(502, str(e) or "gacha upstream unavailable")
+
+    _airdrop = cards_airdrop or {}
+
+    def _airdrop_o_503() -> None:
+        """Apagado y averiado se responden igual, con 503, y por la misma razón: en
+        ninguno de los dos casos sabemos si el jugador es elegible."""
+        if not (_airdrop and cards_airdrop_distributor and cards_airdrop_vault and cards_airdrop_mint):
+            raise HTTPException(503, "airdrop_unavailable")
+        if not (privy_operator_wallet_id and privy_operator_address):
+            raise HTTPException(503, "airdrop_unavailable")
+        if privy_signer is None:
+            raise HTTPException(503, "airdrop_unavailable")
+
+    async def _ya_reclamado(index: int) -> bool:
+        pda, _ = claim_status_pda(index, cards_airdrop_distributor)
+        try:
+            return await _airdrop_cuenta(solana_rpc_url, str(pda)) is not None
+        except Exception as exc:
+            # Reintentable a propósito. Si el RPC no contesta no sabemos si reclamó, y
+            # contestar "no" haría que le saliera el botón para reclamar dos veces.
+            raise HTTPException(502, f"airdrop check failed: {exc}")
+
+    @app.get("/users/me/airdrop/cards")
+    async def me_airdrop_cards(wallet: str = Depends(current_user), s: Session = Depends(db)):
+        _airdrop_o_503()
+        e = _airdrop.get(wallet)
+        if e is None:
+            return {"eligible": False, "amount": 0, "claimed": False, "signature": None}
+        reclamado = await _ya_reclamado(int(e["i"]))
+        fila = s.query(AirdropClaim).filter(
+            AirdropClaim.wallet == wallet, AirdropClaim.ronda == cards_airdrop_round
+        ).first()
+        return {"eligible": True, "amount": int(e["a"]), "claimed": reclamado,
+                "signature": fila.signature if fila else None}
 
     @app.post("/gacha/submit-tx")
     async def gacha_submit(body: SubmitTxBody, wallet: str = Depends(current_user),
