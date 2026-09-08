@@ -115,3 +115,85 @@ def test_json_valido_pero_numero_devuelve_vacio(tmp_path):
     f = tmp_path / "numero.json"
     f.write_text(json.dumps(42))
     assert cargar_asignaciones(str(f)) == {}
+
+
+import base64
+
+from solders.transaction import Transaction as SoldersTx
+
+from app.services.cards_airdrop import ata, build_claim_tx, instrucciones_claim
+
+VAULT = "5TBR7KQHbPsf3wHZ11dyL9iifztCnN9Ccr6rzoCvYqW7"
+OPERADOR = "3q6Ucr1s7Knkp5nRQKQe3dYPzoh72XQGnn2oCgSS9S34"
+BLOCKHASH = "11111111111111111111111111111111"
+
+GUMDROP = "gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a"
+SYS = "11111111111111111111111111111111"
+TOKEN = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+
+
+def _ixs(crear_ata=True):
+    return instrucciones_claim(
+        claimant=WALLET, index=INDEX, amount=AMOUNT, proof=PROOF,
+        distributor=DISTRIBUTOR, vault=VAULT, mint=MINT,
+        operador=OPERADOR, crear_ata=crear_ata,
+    )
+
+
+def test_las_cuentas_del_claim_van_en_el_orden_del_idl():
+    ix = _ixs()[-1]
+    assert str(ix.program_id) == GUMDROP
+    cuentas = [str(a.pubkey) for a in ix.accounts]
+    claim_status, _ = claim_status_pda(INDEX, DISTRIBUTOR)
+    assert cuentas == [
+        DISTRIBUTOR, str(claim_status), VAULT,
+        str(ata(Pubkey.from_string(WALLET), Pubkey.from_string(MINT))),
+        WALLET, OPERADOR, SYS, TOKEN,
+    ]
+
+
+def test_firma_el_jugador_como_temporal_y_el_operador_como_payer():
+    # Es LA decisión del diseño: Gumdrop admite que `payer` sea otro, y por eso el
+    # jugador no necesita SOL. Comprobado por simulación contra mainnet.
+    ix = _ixs()[-1]
+    assert [a.is_signer for a in ix.accounts] == [False, False, False, False, True, True, False, False]
+    assert str(ix.accounts[4].pubkey) == WALLET      # temporal
+    assert str(ix.accounts[5].pubkey) == OPERADOR    # payer, y es quien suelta el rent
+
+
+def test_los_argumentos_llevan_discriminador_bump_index_amount_wallet_y_proof():
+    import hashlib
+    ix = _ixs()[-1]
+    d = bytes(ix.data)
+    _, bump = claim_status_pda(INDEX, DISTRIBUTOR)
+    assert d[:8] == hashlib.sha256(b"global:claim").digest()[:8]
+    assert d[8] == bump
+    assert d[9:17] == INDEX.to_bytes(8, "little")
+    assert d[17:25] == AMOUNT.to_bytes(8, "little")
+    assert d[25:57] == bytes(Pubkey.from_string(WALLET))
+    assert d[57:61] == len(PROOF).to_bytes(4, "little")
+    assert len(d) == 61 + 32 * len(PROOF)
+
+
+def test_la_ata_la_paga_el_operador_y_la_posee_el_jugador():
+    ix = _ixs()[0]
+    assert bytes(ix.data) == bytes([1])              # CreateIdempotent
+    assert str(ix.accounts[0].pubkey) == OPERADOR and ix.accounts[0].is_signer
+    assert str(ix.accounts[2].pubkey) == WALLET
+
+
+def test_sin_crear_ata_solo_va_la_instruccion_del_claim():
+    ixs = _ixs(crear_ata=False)
+    assert len(ixs) == 1
+    assert str(ixs[0].program_id) == GUMDROP
+
+
+def test_el_fee_payer_de_la_transaccion_es_el_operador():
+    b64 = build_claim_tx(
+        claimant=WALLET, index=INDEX, amount=AMOUNT, proof=PROOF,
+        distributor=DISTRIBUTOR, vault=VAULT, mint=MINT,
+        operador=OPERADOR, blockhash=BLOCKHASH, crear_ata=True,
+    )
+    msg = SoldersTx.from_bytes(base64.b64decode(b64)).message
+    assert str(msg.account_keys[0]) == OPERADOR
+    assert msg.header.num_required_signatures == 2
