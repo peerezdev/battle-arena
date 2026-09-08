@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { StrictMode } from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({ fetchAirdrop: vi.fn(), claimAirdrop: vi.fn(), isDevnet: false }))
@@ -136,5 +137,36 @@ describe('ClaimScreen', () => {
     expect(btn).toHaveProperty('disabled', true)
     resolver?.({ eligible: true, amount: 1483000000, claimed: false, signature: null })
     expect(await screen.findByText('1,483')).toBeTruthy()
+  })
+})
+
+describe('ClaimScreen bajo StrictMode', () => {
+  // React monta, limpia y vuelve a montar. Un flag de "sigo montado" que solo se pone a false
+  // en el cleanup se queda en false para siempre, y entonces TODA continuación asíncrona se cae
+  // en silencio: el claim funciona en la cadena y la pantalla no se entera. Reportado en uso real.
+  it('tras reclamar con éxito, la pantalla pasa a "ya reclamado" sin recargar', async () => {
+    mocks.fetchAirdrop.mockResolvedValue(
+      { eligible: true, amount: 1483000000, claimed: false, signature: null })
+    mocks.claimAirdrop.mockResolvedValue({ signature: 'sig-strict', amount: 1483000000 })
+
+    render(<StrictMode><ClaimScreen /></StrictMode>)
+    fireEvent.click(await screen.findByRole('button', { name: /claim/i }))
+
+    await waitFor(() => expect(screen.getByText(/already claimed/i)).toBeTruthy())
+    expect(screen.getByText(/sig-strict/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^claim/i })).toBeNull()
+  })
+
+  it('el botón no se queda colgado en "Claiming…" si el claim falla', async () => {
+    mocks.fetchAirdrop.mockResolvedValue(
+      { eligible: true, amount: 1483000000, claimed: false, signature: null })
+    mocks.claimAirdrop.mockRejectedValue(new Error('boom'))
+
+    render(<StrictMode><ClaimScreen /></StrictMode>)
+    fireEvent.click(await screen.findByRole('button', { name: /claim/i }))
+
+    await waitFor(() => expect(screen.getByText(/could not be completed/i)).toBeTruthy())
+    const boton = screen.getByRole('button', { name: /claim/i })
+    expect(boton).toHaveProperty('disabled', false)
   })
 })

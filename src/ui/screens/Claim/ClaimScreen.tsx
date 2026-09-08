@@ -128,8 +128,15 @@ export function ClaimScreen() {
 
   // Guarda contra setState tras desmontar: reintentar() y reclamar() son promesas que pueden
   // resolver después de que el jugador navegue fuera de /claim.
+  // OJO con este par: la asignación a `true` en el cuerpo del efecto NO es redundante con el
+  // valor inicial del ref. Con StrictMode React monta, limpia y vuelve a montar, así que sin
+  // ella el cleanup deja el ref en false PARA SIEMPRE y toda continuación asíncrona se cae en
+  // silencio: el claim se ejecuta en la cadena y la pantalla nunca se entera. Pasó en uso real.
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
+  useEffect(() => {
+    montado.current = true
+    return () => { montado.current = false }
+  }, [])
 
   // Nunca "no eres elegible" por un fallo nuestro: eso se lo diría a gente que sí lo es. Y el
   // error nunca es un callejón sin salida: reintentar() repite esta misma llamada.
