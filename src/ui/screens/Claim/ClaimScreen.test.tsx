@@ -61,7 +61,7 @@ describe('ClaimScreen', () => {
     const { AirdropError } = await import('../../../onchain/airdropClient')
     mocks.fetchAirdrop.mockRejectedValue(new AirdropError('chain'))
     render(<ClaimScreen />)
-    expect(await screen.findByText(/try again/i)).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /try again/i })).toBeTruthy()
     expect(screen.queryByText(/not eligible/i)).toBeNull()
   })
 
@@ -74,5 +74,39 @@ describe('ClaimScreen', () => {
     fireEvent.click(await screen.findByRole('button', { name: /claim/i }))
     expect(await screen.findByText(/signing access/i)).toBeTruthy()
     expect(screen.queryByText(/already claimed/i)).toBeNull()
+  })
+
+  it('un fallo al reclamar deja el botón activo para reintentar', async () => {
+    const { AirdropError } = await import('../../../onchain/airdropClient')
+    mocks.fetchAirdrop.mockResolvedValue(
+      { eligible: true, amount: 1483000000, claimed: false, signature: null })
+    mocks.claimAirdrop.mockRejectedValue(new AirdropError('failed'))
+    render(<ClaimScreen />)
+    fireEvent.click(await screen.findByRole('button', { name: /claim/i }))
+    expect(await screen.findByText(/try again in a moment/i)).toBeTruthy()
+    const btn = screen.getByRole('button', { name: /claim/i })
+    expect(btn).toHaveProperty('disabled', false)
+  })
+
+  it('si otra pestaña ya reclamó, lo dice y no como fallo genérico', async () => {
+    const { AirdropError } = await import('../../../onchain/airdropClient')
+    mocks.fetchAirdrop.mockResolvedValue(
+      { eligible: true, amount: 1483000000, claimed: false, signature: null })
+    mocks.claimAirdrop.mockRejectedValue(new AirdropError('already_claimed'))
+    render(<ClaimScreen />)
+    fireEvent.click(await screen.findByRole('button', { name: /claim/i }))
+    expect(await screen.findByText(/already claimed/i)).toBeTruthy()
+    expect(screen.queryByText(/could not be completed/i)).toBeNull()
+  })
+
+  it('tras un fallo de la carga inicial, reintentar vuelve a llamar y enseña la cantidad', async () => {
+    const { AirdropError } = await import('../../../onchain/airdropClient')
+    mocks.fetchAirdrop
+      .mockRejectedValueOnce(new AirdropError('chain'))
+      .mockResolvedValueOnce({ eligible: true, amount: 1483000000, claimed: false, signature: null })
+    render(<ClaimScreen />)
+    fireEvent.click(await screen.findByRole('button', { name: /try again/i }))
+    expect(await screen.findByText('1,483')).toBeTruthy()
+    expect(mocks.fetchAirdrop).toHaveBeenCalledTimes(2)
   })
 })
