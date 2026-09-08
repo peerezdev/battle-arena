@@ -1,13 +1,6 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { COLORS, FONTS } from '../../theme'
 import { config } from '../../../onchain/config'
-
-/**
- * Clave del descarte. NO se cambia a la ligera: cambiarla resucita el banner para todo el que ya
- * lo había cerrado, que es exactamente lo que este banner no debe hacer.
- */
-export const CLAIM_BANNER_KEY = 'ba.claimBanner.dismissed'
 
 /**
  * Aviso del airdrop de $CARDS, arriba del Lobby, con enlace a /claim.
@@ -17,24 +10,16 @@ export const CLAIM_BANNER_KEY = 'ba.claimBanner.dismissed'
  * llamada por CADA carga de la página. La pantalla de /claim ya sabe decirle a cada uno lo suyo,
  * así que el banner solo tiene que llevarle hasta ella.
  *
- * Y por eso mismo SE PUEDE DESCARTAR, al revés que RoyaleDemoNotice, que es permanente. La demo
- * de Royale le sirve a cualquiera que vuelva meses después; esto le sirve a una minoría y UNA
- * sola vez, así que sin una forma de cerrarlo sería ruido fijo para casi todos. El descarte se
- * recuerda en localStorage, igual que el plegado de ModeGuide.
+ * ES PERMANENTE, igual que RoyaleDemoNotice y por la misma razón. Lo puse descartable primero,
+ * con el argumento de que a quien no tiene nada que reclamar se le convierte en ruido fijo. La
+ * decisión fue la contraria: mientras la ronda siga abierta, quien tenga tokens sin reclamar
+ * tiene que poder tropezarse con esto, y el que lo cierra un martes sin mirar es justo el que
+ * los pierde. No hay botón de descartar ni se recuerda nada.
  *
  * En devnet no se pinta: el airdrop solo existe en mainnet y el enlace no llevaría a nada útil.
  */
 export function ClaimBanner() {
-  const [oculto, setOculto] = useState<boolean>(() => {
-    try { return localStorage.getItem(CLAIM_BANNER_KEY) === '1' } catch { return false }
-  })
-
-  if (config.isDevnet || oculto) return null
-
-  const descartar = () => {
-    setOculto(true)
-    try { localStorage.setItem(CLAIM_BANNER_KEY, '1') } catch { /* almacenamiento bloqueado: se cierra solo por esta sesión */ }
-  }
+  if (config.isDevnet) return null
 
   return (
     <section style={{
@@ -70,18 +55,6 @@ export function ClaimBanner() {
         Check my claim
       </Link>
 
-      <button
-        type="button"
-        onClick={descartar}
-        aria-label="Dismiss"
-        style={{
-          flex: 'none', width: 30, height: 30, borderRadius: 9, cursor: 'pointer',
-          border: '1px solid rgba(255,255,255,.14)', background: 'transparent',
-          color: COLORS.muted, fontSize: 13, lineHeight: 1,
-        }}
-      >
-        ✕
-      </button>
     </section>
   )
 }
