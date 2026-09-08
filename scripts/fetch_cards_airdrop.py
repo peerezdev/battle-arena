@@ -69,9 +69,12 @@ def lista_del_bundle() -> list[dict]:
         raise SystemExit("no se encontró la lista de asignaciones dentro del bundle")
     ini = bundle.index("'", ini)
     fin = ini + 1
-    while True:  # el cierre es la primera comilla simple NO escapada
+    while True:  # el cierre es la primera comilla precedida por una racha PAR de backslashes
         fin = bundle.index("'", fin)
-        if bundle[fin - 1] != "\\":
+        racha = 0
+        while bundle[fin - 1 - racha] == "\\":
+            racha += 1
+        if racha % 2 == 0:
             break
         fin += 1
     crudo = bundle[ini + 1:fin].replace("\\'", "'").replace("\\\\", "\\")
@@ -93,6 +96,16 @@ def main() -> None:
         proof = [bytes(Pubkey.from_string(p)) for p in proof_b58]
         if not verificar_proof(hoja(index, e["handle"], MINT, amount), proof, root):
             raise SystemExit(f"ABORTADO: la hoja de {e['handle']} (index {index}) no casa con la root")
+        if e["handle"] in salida:
+            # el árbol de Gumdrop está indexado por index, no por wallet: nada impide que una
+            # wallet tenga dos hojas. Como el fichero de salida SÍ está indexado por wallet, un
+            # duplicado silencioso pisaría una de las dos asignaciones sin que la validación
+            # merkle lo detecte, porque las dos hojas son individualmente válidas.
+            raise SystemExit(
+                f"ABORTADO: {e['handle']} aparece dos veces en la lista de CC "
+                f"(índices {salida[e['handle']]['i']} y {index}). El fichero va "
+                f"indexado por wallet y perdería una de las dos asignaciones."
+            )
         salida[e["handle"]] = {"i": index, "a": amount, "p": proof_b58}
         total += amount
 
