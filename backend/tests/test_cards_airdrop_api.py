@@ -137,3 +137,96 @@ def test_si_el_rpc_falla_es_502_y_no_no_elegible(monkeypatch):
     c, priv, _ = _cliente()
     r = c.get("/users/me/airdrop/cards", headers=_headers(priv))
     assert r.status_code == 502
+
+
+@pytest.fixture
+def cadena_falsa(monkeypatch):
+    """Sin red: blockhash fijo, la ATA no existe, y el submit devuelve una firma."""
+    async def _bh(rpc_url):
+        return "11111111111111111111111111111111"
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+
+    enviadas = []
+
+    async def _submit(rpc_url, tx_b64):
+        enviadas.append(tx_b64)
+        return "firma-de-mentira-1"
+    monkeypatch.setattr("app.main.submit_signed_tx", _submit)
+    return enviadas
+
+
+def test_el_claim_firma_primero_el_jugador_y_luego_el_operador(sin_pda, cadena_falsa):
+    c, priv, kw = _cliente()
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 200
+    assert r.json() == {"signature": "firma-de-mentira-1", "amount": 1_483_000_000}
+    # El orden importa: el dueño autoriza y el operador paga, nunca al revés.
+    firmantes = [w for w, _ in kw["privy_signer"].firmas]
+    assert firmantes == [WALLET_ID, "op-wallet-id"]
+
+
+def test_el_claim_deja_constancia_en_la_tabla(sin_pda, cadena_falsa):
+    from app.models import AirdropClaim
+    c, priv, _ = _cliente()
+    c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    r = c.get("/users/me/airdrop/cards", headers=_headers(priv))
+    assert r.json()["signature"] == "firma-de-mentira-1"
+
+
+def test_reclamar_dos_veces_da_409(cadena_falsa, monkeypatch):
+    async def _cuenta(rpc_url, pubkey, **kw):
+        return {"lamports": 1}
+    monkeypatch.setattr("app.main._airdrop_cuenta", _cuenta)
+    c, priv, _ = _cliente()
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 409
+
+
+def test_un_no_elegible_no_puede_reclamar(sin_pda, cadena_falsa):
+    c, priv, _ = _cliente()
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv, addr=AJENA, wallet_id="otro"))
+    assert r.status_code == 403
+
+
+def test_sin_operador_no_se_reclama(sin_pda, cadena_falsa):
+    c, priv, _ = _cliente(privy_operator_wallet_id="", privy_operator_address="")
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 503
+
+
+def test_sin_delegar_es_409_con_instrucciones_y_no_un_502_pelado(sin_pda, cadena_falsa):
+    # Sin delegación no podemos firmar por él. Que se entere con el mensaje que ya usa el
+    # juego, y no con un 502 que no le dice qué hacer.
+    firmante = FakeSigner()
+
+    async def _no(wallet_id):
+        return False
+    firmante.podemos_firmar = _no
+
+    c, priv, _ = _cliente(privy_signer=firmante)
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 409
+
+
+def test_si_otra_pestana_se_adelanta_sale_ya_reclamado(sin_pda, monkeypatch):
+    # La PDA no existía al comprobar, pero para cuando llega la tx sí. La cadena responde
+    # "already in use" y para el jugador eso NO es un fallo: sus tokens están en su sitio.
+    async def _bh(rpc_url):
+        return "11111111111111111111111111111111"
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+
+    async def _submit(rpc_url, tx_b64):
+        raise RuntimeError("Allocate: account Address { ... } already in use")
+    monkeypatch.setattr("app.main.submit_signed_tx", _submit)
+
+    c, priv, _ = _cliente()
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 409
+
+
+def test_pubkey_de_configuracion_invalida_da_503_no_500(sin_pda, cadena_falsa):
+    # Un typo en CARDS_AIRDROP_VAULT/MINT no puede tumbar el endpoint con un 500: es un
+    # problema de configuración, no del jugador, y como tal debe ser reintentable.
+    c, priv, _ = _cliente(cards_airdrop_vault="esto-no-es-una-pubkey")
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 503

@@ -54,7 +54,8 @@ from .services.pack_orchestration import (
 from .services.solana_tx import build_memo_tx, build_free_pack_proof_tx
 from .services.royale_funding import royale_buyin, collect_buyin, distribute_usdc, refund_buyin, withdraw_usdc, withdraw_usdc_with_fee
 from .services.nft_transfer import submit_signed_tx, build_transfer, nft_in_owner, UnsupportedNftStandard, leer_cuenta
-from .services.cards_airdrop import build_claim_tx, claim_status_pda
+from .services.cards_airdrop import ata, build_claim_tx, cargar_asignaciones, claim_status_pda
+from solders.pubkey import Pubkey
 from .services.reservations import (reserve, reserved_total, royale_locked_total,
                                      release_reservations, battle_in_progress, royale_in_progress)
 from .services import emotes as emote_service
@@ -1882,6 +1883,68 @@ def create_app(session_factory, chain: ChainSource,
         except PrivyNoVerificable:
             raise HTTPException(503, "could not verify your wallet right now; try again in a moment")
 
+    @app.post("/users/me/airdrop/cards/claim")
+    async def me_airdrop_cards_claim(wallet: str = Depends(current_user),
+                                     wallet_id: str = Depends(current_user_id),
+                                     s: Session = Depends(db)):
+        """Reclama el airdrop del jugador. La wallet sale del identity token, así que
+        nadie puede reclamar lo de otro ni aunque se invente el cuerpo de la petición.
+
+        Dos firmas: el jugador autoriza como `temporal` y el operador paga. Es el mismo
+        reparto que en /users/me/nft/withdraw.
+        """
+        _airdrop_o_503()
+        # Antes que nada: sin delegación no podemos firmar por él, y más vale decírselo con
+        # el mensaje que ya conoce del juego que dejarle chocar contra un 502 de Privy.
+        await _exigir_delegacion(wallet_id)
+        e = _airdrop.get(wallet)
+        if e is None:
+            raise HTTPException(403, "not eligible for this airdrop")
+        index, amount = int(e["i"]), int(e["a"])
+        if await _ya_reclamado(index):
+            raise HTTPException(409, "already claimed")
+
+        # Las pubkeys de CONFIGURACIÓN (vault/mint/distributor) se validan aparte de la
+        # firma y el submit: un typo en el .env no es un fallo del jugador ni algo que se
+        # arregle reintentando la firma, así que no puede salir como 500 ni como 502 — es
+        # 503, igual que el resto de "no sabemos si esto funciona ahora mismo".
+        try:
+            destino = ata(Pubkey.from_string(wallet), Pubkey.from_string(cards_airdrop_mint))
+        except ValueError as exc:
+            logger.error("airdrop: pubkey de configuración inválida (mint): %s", exc)
+            raise HTTPException(503, "airdrop_unavailable")
+        try:
+            crear_ata = await _airdrop_cuenta(solana_rpc_url, str(destino)) is None
+        except Exception as exc:
+            raise HTTPException(502, f"airdrop check failed: {exc}")
+
+        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        try:
+            tx = build_claim_tx(
+                claimant=wallet, index=index, amount=amount, proof=list(e["p"]),
+                distributor=cards_airdrop_distributor, vault=cards_airdrop_vault,
+                mint=cards_airdrop_mint, operador=privy_operator_address,
+                blockhash=blockhash, crear_ata=crear_ata,
+            )
+        except ValueError as exc:
+            logger.error("airdrop: pubkey de configuración inválida (vault/distributor): %s", exc)
+            raise HTTPException(503, "airdrop_unavailable")
+        try:
+            firmada = await privy_signer.sign_solana(wallet_id, tx)                 # el dueño autoriza
+            firmada = await privy_signer.sign_solana(privy_operator_wallet_id, firmada)  # el operador paga
+            sig = await submit_signed_tx(solana_rpc_url, firmada)
+        except Exception as exc:
+            # "already in use" = otra pestaña se adelantó y la PDA ya existe. Para el
+            # jugador eso no es un fallo: sus tokens están donde tienen que estar.
+            if "already in use" in str(exc):
+                raise HTTPException(409, "already claimed")
+            raise HTTPException(502, f"airdrop claim failed: {exc}")
+
+        s.add(AirdropClaim(wallet=wallet, ronda=cards_airdrop_round, amount=amount, signature=sig))
+        s.commit()
+        logger.info("airdrop: %s reclamó %s unidades, sig=%s", wallet, amount, sig)
+        return {"signature": sig, "amount": amount}
+
     @app.post("/pack-battles")
     async def create_pack_battle(body: CreateBattleBody, wallet: str = Depends(current_user),
                                  wallet_id: str = Depends(current_user_id), s: Session = Depends(db)):
@@ -2741,7 +2804,12 @@ def build_default_app() -> FastAPI:
                       hit_announce_mult=s.hit_announce_mult,
                       winner_announce_mult=s.winner_announce_mult,
                       royale_creator_allowlist=s.royale_creator_allowlist_set,
-                      tracker_access_allowlist=s.tracker_access_allowlist_set)
+                      tracker_access_allowlist=s.tracker_access_allowlist_set,
+                      cards_airdrop=cargar_asignaciones(s.cards_airdrop_file),
+                      cards_airdrop_distributor=s.cards_airdrop_distributor,
+                      cards_airdrop_vault=s.cards_airdrop_vault,
+                      cards_airdrop_mint=s.cards_airdrop_mint,
+                      cards_airdrop_round=s.cards_airdrop_round)
 
 
 app = build_default_app()
