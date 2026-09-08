@@ -208,20 +208,49 @@ def test_sin_delegar_es_409_con_instrucciones_y_no_un_502_pelado(sin_pda, cadena
     assert r.status_code == 409
 
 
-def test_si_otra_pestana_se_adelanta_sale_ya_reclamado(sin_pda, monkeypatch):
-    # La PDA no existía al comprobar, pero para cuando llega la tx sí. La cadena responde
-    # "already in use" y para el jugador eso NO es un fallo: sus tokens están en su sitio.
+def test_si_otra_pestana_se_adelanta_sale_ya_reclamado(monkeypatch):
+    # La PDA no existía al comprobar, pero para cuando llega la tx sí. No nos fiamos del
+    # TEXTO del error del submit para saberlo —eso ataría el comportamiento a cómo redacte
+    # su mensaje el proveedor de RPC de turno—: se le vuelve a preguntar a la cadena, y
+    # esta vez dice que la PDA existe. Para el jugador eso NO es un fallo: sus tokens
+    # están en su sitio.
+    estado = {"reclamado": False}
+
+    async def _cuenta(rpc_url, pubkey, **kw):
+        return {"lamports": 1} if estado["reclamado"] else None
+    monkeypatch.setattr("app.main._airdrop_cuenta", _cuenta)
+
     async def _bh(rpc_url):
         return "11111111111111111111111111111111"
     monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
 
     async def _submit(rpc_url, tx_b64):
-        raise RuntimeError("Allocate: account Address { ... } already in use")
+        estado["reclamado"] = True   # la tx de la OTRA pestaña ya cuajó justo antes que esta
+        raise RuntimeError("cualquier error de RPC — el texto no debe importarle al endpoint")
     monkeypatch.setattr("app.main.submit_signed_tx", _submit)
 
     c, priv, _ = _cliente()
     r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
     assert r.status_code == 409
+
+
+def test_si_el_submit_falla_y_la_pda_sigue_sin_existir_es_502(sin_pda, monkeypatch):
+    # Compañero del test anterior: si al volver a preguntar la cadena sigue diciendo que
+    # la PDA NO existe, no es una carrera ganada por otra pestaña, es un fallo real, y
+    # tiene que seguir siendo 502 y no un falso "ya reclamado". De paso comprueba que el
+    # cuerpo del 502 no repite el texto crudo del RPC (podría traer su api-key).
+    async def _bh(rpc_url):
+        return "11111111111111111111111111111111"
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+
+    async def _submit(rpc_url, tx_b64):
+        raise RuntimeError("fallo real — url secreta: https://rpc.example.com/?api-key=zzz")
+    monkeypatch.setattr("app.main.submit_signed_tx", _submit)
+
+    c, priv, _ = _cliente()
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 502
+    assert "api-key=zzz" not in r.text
 
 
 def test_pubkey_de_configuracion_invalida_da_503_no_500(sin_pda, cadena_falsa):
@@ -230,3 +259,40 @@ def test_pubkey_de_configuracion_invalida_da_503_no_500(sin_pda, cadena_falsa):
     c, priv, _ = _cliente(cards_airdrop_vault="esto-no-es-una-pubkey")
     r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
     assert r.status_code == 503
+
+
+def test_si_falla_la_fila_igual_se_responde_200(sin_pda, cadena_falsa, monkeypatch, caplog):
+    # El dinero ya se movió on-chain cuando llegamos a guardar la fila: que esa escritura
+    # falle no puede volverse un error para el jugador, la misma decisión que ya existe en
+    # /tip. Se responde 200 con la firma y se deja constancia a voces en el log.
+    def _roto(*a, **kw):
+        raise RuntimeError("db caída")
+    monkeypatch.setattr("app.main.AirdropClaim", _roto)
+
+    c, priv, _ = _cliente()
+    with caplog.at_level("ERROR"):
+        r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 200
+    assert r.json() == {"signature": "firma-de-mentira-1", "amount": 1_483_000_000}
+    assert any(rec.levelname == "ERROR" for rec in caplog.records)
+
+
+def test_502_del_check_de_ata_no_incluye_el_texto_crudo_del_error(monkeypatch):
+    # Un 429/401 del proveedor de RPC puede traer la URL entera, api-key incluida, en el
+    # texto de la excepción. Esa cadena no puede llegar nunca al cuerpo de la respuesta.
+    # La PRIMERA llamada a _airdrop_cuenta es la de _ya_reclamado (debe decir "no, todavía
+    # no"); la SEGUNDA es el check de si hace falta crear la ATA, y es la que se rompe —
+    # ese es el sitio que toca esta tarea.
+    llamadas = {"n": 0}
+
+    async def _cuenta(rpc_url, pubkey, **kw):
+        llamadas["n"] += 1
+        if llamadas["n"] == 1:
+            return None
+        raise RuntimeError("429 from https://rpc.example.com/?api-key=secreto-de-verdad")
+    monkeypatch.setattr("app.main._airdrop_cuenta", _cuenta)
+
+    c, priv, _ = _cliente()
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 502
+    assert "secreto-de-verdad" not in r.text

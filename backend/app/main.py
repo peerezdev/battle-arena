@@ -1915,8 +1915,12 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "airdrop_unavailable")
         try:
             crear_ata = await _airdrop_cuenta(solana_rpc_url, str(destino)) is None
-        except Exception as exc:
-            raise HTTPException(502, f"airdrop check failed: {exc}")
+        except Exception:
+            # El cuerpo del 502 nunca lleva la excepción cruda: en mainnet `solana_rpc_url`
+            # lleva un ?api-key= del proveedor, y volcarla en la respuesta se la mandaría al
+            # navegador del jugador. El detalle completo se queda en el log del servidor.
+            logger.exception("airdrop: check de la ATA falló para %s", wallet)
+            raise HTTPException(502, "airdrop check failed")
 
         blockhash = await fetch_latest_blockhash(solana_rpc_url)
         try:
@@ -1933,16 +1937,30 @@ def create_app(session_factory, chain: ChainSource,
             firmada = await privy_signer.sign_solana(wallet_id, tx)                 # el dueño autoriza
             firmada = await privy_signer.sign_solana(privy_operator_wallet_id, firmada)  # el operador paga
             sig = await submit_signed_tx(solana_rpc_url, firmada)
-        except Exception as exc:
-            # "already in use" = otra pestaña se adelantó y la PDA ya existe. Para el
-            # jugador eso no es un fallo: sus tokens están donde tienen que estar.
-            if "already in use" in str(exc):
+        except Exception:
+            # No nos fiamos del TEXTO del error para saber si "otra pestaña se adelantó":
+            # eso ata el comportamiento a cómo redacte su mensaje el proveedor de RPC de
+            # turno. Se le pregunta a la cadena, la única fuente de verdad de si la PDA ya
+            # existe. Si _ya_reclamado tampoco puede contestar, propaga su propio 502 — la
+            # respuesta correcta también en ese caso, porque tampoco sabemos qué pasó.
+            # El cuerpo del 502 no lleva la excepción cruda por la misma razón que arriba:
+            # puede traer la URL del RPC con su api-key. El detalle se queda en el log.
+            logger.exception("airdrop: submit falló para %s", wallet)
+            if await _ya_reclamado(index):
                 raise HTTPException(409, "already claimed")
-            raise HTTPException(502, f"airdrop claim failed: {exc}")
+            raise HTTPException(502, "airdrop claim failed")
 
-        s.add(AirdropClaim(wallet=wallet, ronda=cards_airdrop_round, amount=amount, signature=sig))
-        s.commit()
-        logger.info("airdrop: %s reclamó %s unidades, sig=%s", wallet, amount, sig)
+        # El dinero ya se movió on-chain llegados aquí: fallar la respuesta por no poder
+        # guardar esta fila sería mentir sobre lo que pasó, la misma decisión que en /tip.
+        # Se deja constancia a voces —con la firma, para poder reconstruirlo a mano— y se
+        # responde igual que si hubiera ido bien, porque para el jugador ha ido bien.
+        try:
+            s.add(AirdropClaim(wallet=wallet, ronda=cards_airdrop_round, amount=amount, signature=sig))
+            s.commit()
+            logger.info("airdrop: %s reclamó %s unidades, sig=%s", wallet, amount, sig)
+        except Exception:
+            logger.exception("airdrop: %s reclamó %s unidades (sig=%s) pero no se pudo guardar la fila",
+                             wallet, amount, sig)
         return {"signature": sig, "amount": amount}
 
     @app.post("/pack-battles")
