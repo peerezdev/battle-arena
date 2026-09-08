@@ -82,7 +82,11 @@ export function ClaimScreen() {
     return <p>This wallet is not eligible for the $CARDS airdrop.</p>
   }
 
-  const yaEsta = estado.claimed || firma !== null
+  // Solo la cadena decide si ya se reclamó. `firma` es contabilidad de una tabla local que
+  // el backend escribe al MANDAR la transacción, antes de que confirme (no es autoritativa):
+  // si se sumara aquí, una fila cuya transacción nunca llegó a cuajar dejaría al jugador
+  // viendo "Already claimed" con un enlace a una tx inexistente y sin botón, para siempre.
+  const yaEsta = estado.claimed
 
   async function reclamar() {
     if (!identityToken) return

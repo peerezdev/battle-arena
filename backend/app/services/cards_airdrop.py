@@ -92,7 +92,7 @@ def cargar_asignaciones(path: str) -> dict[str, dict]:
             # como uno que no parsa: no puede pasar que un fichero roto le diga a un
             # jugador elegible que no lo es.
             if not isinstance(data, dict):
-                logger.exception("airdrop: el fichero de asignaciones no es un dict %s", path)
+                logger.error("airdrop: el fichero de asignaciones no es un dict %s", path)
                 return {}
             return data
     except (OSError, ValueError):

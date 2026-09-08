@@ -833,7 +833,8 @@ def create_app(session_factory, chain: ChainSource,
     def _airdrop_o_503() -> None:
         """Apagado y averiado se responden igual, con 503, y por la misma razón: en
         ninguno de los dos casos sabemos si el jugador es elegible."""
-        if not (_airdrop and cards_airdrop_distributor and cards_airdrop_vault and cards_airdrop_mint):
+        if not (_airdrop and cards_airdrop_distributor and cards_airdrop_vault
+                and cards_airdrop_mint and cards_airdrop_round):
             raise HTTPException(503, "airdrop_unavailable")
         if not (privy_operator_wallet_id and privy_operator_address):
             raise HTTPException(503, "airdrop_unavailable")
@@ -841,13 +842,24 @@ def create_app(session_factory, chain: ChainSource,
             raise HTTPException(503, "airdrop_unavailable")
 
     async def _ya_reclamado(index: int) -> bool:
-        pda, _ = claim_status_pda(index, cards_airdrop_distributor)
+        try:
+            pda, _ = claim_status_pda(index, cards_airdrop_distributor)
+        except ValueError as exc:
+            # Un typo en CARDS_AIRDROP_DISTRIBUTOR: problema de configuración, no del
+            # jugador ni de la cadena, así que 503 y no el 500 que se llevaba antes.
+            logger.error("airdrop: pubkey de configuración inválida (distributor): %s", exc)
+            raise HTTPException(503, "airdrop_unavailable")
         try:
             return await _airdrop_cuenta(solana_rpc_url, str(pda)) is not None
-        except Exception as exc:
+        except Exception:
             # Reintentable a propósito. Si el RPC no contesta no sabemos si reclamó, y
-            # contestar "no" haría que le saliera el botón para reclamar dos veces.
-            raise HTTPException(502, f"airdrop check failed: {exc}")
+            # contestar "no" haría que le saliera el botón para reclamar dos veces. El
+            # cuerpo del 502 no lleva la excepción cruda: en mainnet `solana_rpc_url`
+            # lleva un ?api-key= del proveedor, y volcarla en la respuesta se la mandaría
+            # al navegador del jugador. Este es el camino que se dispara en CADA carga de
+            # /claim, así que es el más probable de todos de llegar a disparar esto de verdad.
+            logger.exception("airdrop: check de ya-reclamado falló para index=%s", index)
+            raise HTTPException(502, "airdrop check failed")
 
     @app.get("/users/me/airdrop/cards")
     async def me_airdrop_cards(wallet: str = Depends(current_user), s: Session = Depends(db)):
@@ -1894,6 +1906,10 @@ def create_app(session_factory, chain: ChainSource,
         reparto que en /users/me/nft/withdraw.
         """
         _airdrop_o_503()
+        # Mismo freno que en /withdraw y /nft/withdraw, y por la misma razón: el operador es
+        # quien paga la renta de la ATA nueva (y el gas) de cada claim, así que sin límite un
+        # jugador podría vaciarle el SOL a base de reclamar en bucle.
+        _withdraw_throttle(wallet)
         # Antes que nada: sin delegación no podemos firmar por él, y más vale decírselo con
         # el mensaje que ya conoce del juego que dejarle chocar contra un 502 de Privy.
         # Atrapamos un 409 de delegación y lo etiquetamos para que el cliente lo distinga:
@@ -1919,7 +1935,10 @@ def create_app(session_factory, chain: ChainSource,
         try:
             destino = ata(Pubkey.from_string(wallet), Pubkey.from_string(cards_airdrop_mint))
         except ValueError as exc:
-            logger.error("airdrop: pubkey de configuración inválida (mint): %s", exc)
+            # El try cubre dos pubkeys, no solo el mint: si algún día `wallet` llega
+            # deformada, este mensaje tiene que decirlo, o mandaría a quien depura a
+            # revisar CARDS_AIRDROP_MINT en el .env cuando el problema es otro.
+            logger.error("airdrop: pubkey inválida al calcular la ATA de destino (wallet o mint): %s", exc)
             raise HTTPException(503, "airdrop_unavailable")
         try:
             crear_ata = await _airdrop_cuenta(solana_rpc_url, str(destino)) is None
@@ -1930,7 +1949,13 @@ def create_app(session_factory, chain: ChainSource,
             logger.exception("airdrop: check de la ATA falló para %s", wallet)
             raise HTTPException(502, "airdrop check failed")
 
-        blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        try:
+            blockhash = await fetch_latest_blockhash(solana_rpc_url)
+        except Exception:
+            # Mismo trato que el resto de fallos de RPC de este endpoint: 502 y sin el
+            # texto crudo, que puede traer la url con api-key incluida.
+            logger.exception("airdrop: no se pudo obtener el blockhash para %s", wallet)
+            raise HTTPException(502, "airdrop claim failed")
         try:
             tx = build_claim_tx(
                 claimant=wallet, index=index, amount=amount, proof=list(e["p"]),
@@ -1939,7 +1964,10 @@ def create_app(session_factory, chain: ChainSource,
                 blockhash=blockhash, crear_ata=crear_ata,
             )
         except ValueError as exc:
-            logger.error("airdrop: pubkey de configuración inválida (vault/distributor): %s", exc)
+            # El try cubre las CUATRO pubkeys de configuración (distributor/vault/mint/
+            # operador), no solo vault y distributor: nombrarlas todas evita mandar a quien
+            # depura a mirar el .env equivocado.
+            logger.error("airdrop: pubkey de configuración inválida (distributor/vault/mint/operador): %s", exc)
             raise HTTPException(503, "airdrop_unavailable")
         try:
             firmada = await privy_signer.sign_solana(wallet_id, tx)                 # el dueño autoriza

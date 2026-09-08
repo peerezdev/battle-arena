@@ -49,6 +49,18 @@ describe('ClaimScreen', () => {
     await waitFor(() => expect(screen.getByText(/sig-abc/)).toBeTruthy())
   })
 
+  it('una firma sin confirmar en la cadena no bloquea el botón de reclamar', async () => {
+    // El backend escribe la fila (con firma) al mandar la transacción, ANTES de que
+    // confirme. `claimed` lo decide solo la cadena, así que una firma sola —sin
+    // `claimed: true`— no puede convertirse en "ya reclamado": eso dejaría al jugador sin
+    // botón para siempre, mirando un enlace a una transacción que quizá nunca cuajó.
+    mocks.fetchAirdrop.mockResolvedValue(
+      { eligible: true, amount: 1483000000, claimed: false, signature: 'sig-sin-confirmar' })
+    render(<ClaimScreen />)
+    expect(await screen.findByRole('button', { name: /claim/i })).toBeTruthy()
+    expect(screen.queryByText(/already claimed/i)).toBeNull()
+  })
+
   it('si ya estaba reclamado no ofrece reclamar otra vez', async () => {
     mocks.fetchAirdrop.mockResolvedValue(
       { eligible: true, amount: 1483000000, claimed: true, signature: 'sig-vieja' })

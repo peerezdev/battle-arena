@@ -130,6 +130,14 @@ def test_sin_operador_es_503(sin_pda):
     assert r.status_code == 503
 
 
+def test_sin_ronda_es_503(sin_pda):
+    # Las filas de AirdropClaim se escriben y se leen con la ronda como parte de la clave:
+    # una ronda vacía es una configuración a medias, igual que si faltara el fichero.
+    c, priv, _ = _cliente(cards_airdrop_round="")
+    r = c.get("/users/me/airdrop/cards", headers=_headers(priv))
+    assert r.status_code == 503
+
+
 def test_si_el_rpc_falla_es_502_y_no_no_elegible(monkeypatch):
     async def _cuenta(rpc_url, pubkey, **kw):
         raise RuntimeError("rpc caído")
@@ -292,6 +300,54 @@ def test_si_falla_la_fila_igual_se_responde_200(sin_pda, cadena_falsa, monkeypat
     assert r.status_code == 200
     assert r.json() == {"signature": "firma-de-mentira-1", "amount": 1_483_000_000}
     assert any(rec.levelname == "ERROR" for rec in caplog.records)
+
+
+def test_502_de_ya_reclamado_no_incluye_el_texto_crudo_del_error(monkeypatch):
+    # _ya_reclamado la dispara CADA carga de /claim, para todo jugador elegible: es el
+    # camino con más probabilidad real de disparar un 429/401 del proveedor de RPC, y su
+    # texto puede traer la URL entera con el ?api-key= puesto.
+    async def _cuenta(rpc_url, pubkey, **kw):
+        raise RuntimeError("429 from https://rpc.example.com/?api-key=fugado-de-verdad")
+    monkeypatch.setattr("app.main._airdrop_cuenta", _cuenta)
+
+    c, priv, _ = _cliente()
+    r = c.get("/users/me/airdrop/cards", headers=_headers(priv))
+    assert r.status_code == 502
+    assert "fugado-de-verdad" not in r.text
+
+
+def test_distributor_invalido_da_503_no_500(sin_pda):
+    # Un typo en CARDS_AIRDROP_DISTRIBUTOR hace que claim_status_pda reviente con ValueError.
+    # Antes de esta comprobación eso salía como 500 porque la llamada vivía fuera del try de
+    # _ya_reclamado; es un problema de configuración, así que tiene que ser 503, reintentable.
+    c, priv, _ = _cliente(cards_airdrop_distributor="esto-no-es-una-pubkey")
+    r = c.get("/users/me/airdrop/cards", headers=_headers(priv))
+    assert r.status_code == 503
+
+
+def test_si_falla_el_blockhash_del_claim_es_502_no_500(sin_pda, monkeypatch):
+    # fetch_latest_blockhash no llevaba ninguna guarda: un fallo de RPC ahí tumbaba el
+    # endpoint entero con un 500. Tiene que ser 502 (problema de cadena, reintentable) y sin
+    # el texto crudo de la excepción, que puede traer la url con api-key.
+    async def _bh(rpc_url):
+        raise RuntimeError("rpc caído — url secreta: https://rpc.example.com/?api-key=otro-mas")
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+
+    c, priv, _ = _cliente()
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 502
+    assert "otro-mas" not in r.text
+
+
+def test_el_claim_reusa_el_throttle_del_withdraw(sin_pda, cadena_falsa):
+    # El operador paga la renta de la ATA nueva en cada claim, igual que en /withdraw, así
+    # que sin límite un jugador podría vaciarle el SOL a base de reclamar en bucle (aquí la
+    # PDA nunca "se marca" en la cadena falsa, así que sin throttle esto pasaría siempre).
+    c, priv, _ = _cliente(withdraw_rate_limit=1, withdraw_rate_window_s=60.0)
+    r1 = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r1.status_code == 200, r1.text
+    r2 = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r2.status_code == 429
 
 
 def test_502_del_check_de_ata_no_incluye_el_texto_crudo_del_error(monkeypatch):
