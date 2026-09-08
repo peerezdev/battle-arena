@@ -64,3 +64,32 @@ def test_la_pda_de_claim_status_es_la_de_la_cadena():
     pda, bump = claim_status_pda(INDEX, DISTRIBUTOR)
     assert str(pda) == "E1frLrGw1V1mVN6R7KcTwvBYD87ezWZKrspbs5dWJH6g"
     assert bump == 255
+
+
+import json
+
+from app.services.cards_airdrop import cargar_asignaciones
+
+
+def test_carga_el_fichero_de_asignaciones(tmp_path):
+    f = tmp_path / "a.json"
+    f.write_text(json.dumps({WALLET: {"i": INDEX, "a": AMOUNT, "p": PROOF}}))
+    d = cargar_asignaciones(str(f))
+    assert d[WALLET]["i"] == INDEX
+
+
+def test_sin_ruta_devuelve_vacio_en_vez_de_reventar():
+    # Es el estado normal en devnet: la función está apagada, no rota.
+    assert cargar_asignaciones("") == {}
+
+
+def test_un_fichero_que_no_existe_devuelve_vacio(tmp_path):
+    assert cargar_asignaciones(str(tmp_path / "no-esta.json")) == {}
+
+
+def test_un_fichero_corrupto_devuelve_vacio(tmp_path):
+    # Vacío hace que los endpoints respondan 503. Lo que NO puede pasar es que un
+    # fichero ilegible acabe diciéndole a un jugador elegible que no lo es.
+    f = tmp_path / "roto.json"
+    f.write_text("{esto no es json")
+    assert cargar_asignaciones(str(f)) == {}

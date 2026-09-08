@@ -6,10 +6,14 @@ mainnet sin abrir un socket.
 """
 from __future__ import annotations
 
+import json
+import logging
 import struct
 
 from Crypto.Hash import keccak
 from solders.pubkey import Pubkey
+
+logger = logging.getLogger(__name__)
 
 GUMDROP_PROGRAM = Pubkey.from_string("gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a")
 
@@ -59,3 +63,21 @@ def claim_status_pda(index: int, distributor: str) -> tuple[Pubkey, int]:
         [b"ClaimStatus", struct.pack("<Q", index), bytes(Pubkey.from_string(distributor))],
         GUMDROP_PROGRAM,
     )
+
+
+def cargar_asignaciones(path: str) -> dict[str, dict]:
+    """Lee el fichero de asignaciones una sola vez, al arrancar.
+
+    Devuelve un dict vacío ante cualquier problema, y eso hace que los endpoints
+    respondan 503. La alternativa —seguir con media lista— sería peor: le diría a un
+    jugador elegible que no lo es, que es exactamente el error que no nos podemos
+    permitir aquí.
+    """
+    if not path:
+        return {}
+    try:
+        with open(path, encoding="utf8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        logger.exception("airdrop: no se pudo leer el fichero de asignaciones %s", path)
+        return {}

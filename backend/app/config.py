@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     # / FEE_WALLET_ADDRESS
     battle_fee_pct_per_player: float = 0.005
     battle_fee_pct_cap: float = 0.03
+    # Claim del airdrop $CARDS de Collector Crypt. Vacías = apagado, que es el estado en
+    # devnet y en cualquier entorno sin configurar. La ronda se identifica por la dirección
+    # del distribuidor y no por un trimestre: el criterio con el que CC repartió no lo
+    # sabemos, y la única suposición que hicimos al respecto resultó falsa.
+    # env: CARDS_AIRDROP_FILE / _DISTRIBUTOR / _VAULT / _MINT / _ROUND
+    cards_airdrop_file: str = ""
+    cards_airdrop_distributor: str = ""
+    cards_airdrop_vault: str = ""
+    cards_airdrop_mint: str = ""
+    cards_airdrop_round: str = ""
     # Mínimo para que un referidor pueda reclamar su rev-share. Agrega el polvo de muchas
     # batallas en un solo pago: sin mínimo, cada claim costaría más en fees de red que el importe.
     referral_claim_min_base_units: int = 5_000_000  # $5; env: REFERRAL_CLAIM_MIN_BASE_UNITS
