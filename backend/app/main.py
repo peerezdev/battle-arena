@@ -1724,7 +1724,11 @@ def create_app(session_factory, chain: ChainSource,
                                       privy_operator_wallet_id, privy_operator_address,
                                       body.address, cards_airdrop_mint, amount, blockhash)
         except Exception as exc:
-            raise HTTPException(502, f"withdraw failed: {exc}")
+            # El detalle va al log y NO al cuerpo de la respuesta: el str() de un error de httpx
+            # incluye la URL completa del RPC, que en mainnet lleva la api-key en la query. Un 429
+            # del proveedor le entregaría esa clave al navegador del jugador.
+            logger.exception("airdrop: retiro de CARDS falló para %s", wallet)
+            raise HTTPException(502, "withdraw failed")
         return {"signature": sig, "amount": body.amount, "net": amount / 1_000_000,
                 "fee": 0.0, "address": body.address}
 

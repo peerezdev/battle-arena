@@ -1847,3 +1847,32 @@ def test_sin_privy_configurado_no_se_comprueba_nada(monkeypatch):
     r = c.post("/pack-battles", json={"machine_code": "pokemon_50", "max_players": 2},
                headers=_auth_headers(priv, WALLET_A, WALLET_ID_A))
     assert r.status_code == 200, r.text
+
+
+def test_el_502_del_retiro_de_cards_no_filtra_la_url_del_rpc(monkeypatch):
+    """El str() de un error de httpx incluye la URL del RPC, y en mainnet esa URL lleva la
+    api-key en la query. Un 429 del proveedor no puede acabar entregándole la clave al
+    navegador del jugador."""
+    SECRETO = "https://mainnet.helius-rpc.com/?api-key=NO-DEBE-SALIR"
+
+    async def _high_balance(*a, **k):
+        return 1_000_000_000
+
+    async def _bh(*a, **k):
+        return "11111111111111111111111111111111"
+
+    async def _revienta(*a, **k):
+        raise RuntimeError(f"Client error '429 Too Many Requests' for url '{SECRETO}'")
+
+    monkeypatch.setattr("app.main.usdc_balance_base_units", _high_balance)
+    monkeypatch.setattr("app.main.fetch_latest_blockhash", _bh)
+    monkeypatch.setattr("app.main.withdraw_usdc", _revienta)
+
+    c, priv = _build_client(signer=object(), cards_airdrop_mint=DUMMY_CARDS_MINT)
+    hdrs = _auth_headers(priv, WALLET_A, WALLET_ID_A)
+    r = c.post("/users/me/withdraw", json={"address": WALLET_B, "amount": 10.0, "token": "cards"},
+               headers=hdrs)
+
+    assert r.status_code == 502
+    assert "NO-DEBE-SALIR" not in r.text
+    assert "api-key" not in r.text
