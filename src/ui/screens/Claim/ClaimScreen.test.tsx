@@ -88,7 +88,7 @@ describe('ClaimScreen', () => {
     expect(btn).toHaveProperty('disabled', false)
   })
 
-  it('si otra pestaña ya reclamó, lo dice y no como fallo genérico', async () => {
+  it('si otra pestaña ya reclamó, pasa a la vista de ya reclamado en vez de dejar Claim activo', async () => {
     const { AirdropError } = await import('../../../onchain/airdropClient')
     mocks.fetchAirdrop.mockResolvedValue(
       { eligible: true, amount: 1483000000, claimed: false, signature: null })
@@ -97,6 +97,9 @@ describe('ClaimScreen', () => {
     fireEvent.click(await screen.findByRole('button', { name: /claim/i }))
     expect(await screen.findByText(/already claimed/i)).toBeTruthy()
     expect(screen.queryByText(/could not be completed/i)).toBeNull()
+    // No debe quedar un botón Claim activo: la pantalla no puede decir "ya reclamado" y
+    // debajo invitar a reclamar otra vez.
+    expect(screen.queryByRole('button', { name: /^claim/i })).toBeNull()
   })
 
   it('tras un fallo de la carga inicial, reintentar vuelve a llamar y enseña la cantidad', async () => {
@@ -108,5 +111,18 @@ describe('ClaimScreen', () => {
     fireEvent.click(await screen.findByRole('button', { name: /try again/i }))
     expect(await screen.findByText('1,483')).toBeTruthy()
     expect(mocks.fetchAirdrop).toHaveBeenCalledTimes(2)
+  })
+
+  it('el botón de reintentar se deshabilita mientras la llamada está en curso', async () => {
+    const { AirdropError } = await import('../../../onchain/airdropClient')
+    mocks.fetchAirdrop.mockRejectedValueOnce(new AirdropError('chain'))
+    let resolver: ((s: { eligible: boolean; amount: number; claimed: boolean; signature: string | null }) => void) | undefined
+    mocks.fetchAirdrop.mockImplementationOnce(() => new Promise((resolve) => { resolver = resolve }))
+    render(<ClaimScreen />)
+    fireEvent.click(await screen.findByRole('button', { name: /try again/i }))
+    const btn = await screen.findByRole('button', { name: /retrying/i })
+    expect(btn).toHaveProperty('disabled', true)
+    resolver?.({ eligible: true, amount: 1483000000, claimed: false, signature: null })
+    expect(await screen.findByText('1,483')).toBeTruthy()
   })
 })

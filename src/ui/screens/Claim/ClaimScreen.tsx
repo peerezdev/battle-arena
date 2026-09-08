@@ -17,6 +17,7 @@ export function ClaimScreen() {
   const [estado, setEstado] = useState<AirdropStatus | null>(null)
   const [firma, setFirma] = useState<string | null>(null)
   const [avisoCarga, setAvisoCarga] = useState('')
+  const [reintentando, setReintentando] = useState(false)
   const [reclamando, setReclamando] = useState(false)
   const [avisoReclamo, setAvisoReclamo] = useState('')
 
@@ -45,13 +46,17 @@ export function ClaimScreen() {
 
   // El botón "Try again" del estado de error: no depende del efecto (solo repite la
   // llamada con el identityToken actual), así no hace falta esperar a que cambie ese token.
+  // No pasa cargaFase a 'cargando': eso reemplazaría toda la vista de error por "Checking your
+  // airdrop…" y el botón desaparecería antes de poder mostrarse deshabilitado. En vez de eso se
+  // queda en la misma vista y solo el botón cambia, igual que reclamando hace con Claim.
   function reintentar() {
     if (!identityToken) return
-    setCargaFase('cargando')
+    setReintentando(true)
     setAvisoCarga('')
     fetchAirdrop(identityToken)
       .then((s) => { if (montado.current) { setEstado(s); setFirma(s.signature); setCargaFase('listo') } })
       .catch((e) => { if (montado.current) aplicarErrorCarga(e) })
+      .finally(() => { if (montado.current) setReintentando(false) })
   }
 
   if (config.isDevnet) {
@@ -67,7 +72,9 @@ export function ClaimScreen() {
     return (
       <div>
         <p>{avisoCarga}</p>
-        <button onClick={reintentar}>Try again</button>
+        <button onClick={reintentar} disabled={reintentando}>
+          {reintentando ? 'Retrying…' : 'Try again'}
+        </button>
       </div>
     )
   }
@@ -89,14 +96,17 @@ export function ClaimScreen() {
     } catch (e) {
       if (!montado.current) return
       // needs_delegation NO es already_claimed: decirle a alguien sin firma delegada que ya
-      // reclamó sería mentirle sobre su propio dinero y lo dejaría sin saber qué hacer. Y en
-      // los tres casos el botón se queda activo: un fallo de firma o de red no es "no elegible",
-      // y convertirlo aquí en un callejón sin salida tiraría la misma distinción que ya hace
-      // el backend (502/503 frente a 403) al último paso.
+      // reclamó sería mentirle sobre su propio dinero y lo dejaría sin saber qué hacer. Ambos
+      // son reintentables (firma o red), así que el botón se queda activo. already_claimed en
+      // cambio no lo es: perdimos la carrera contra otra pestaña, así que ya es el estado real
+      // y no un fallo nuestro. Dejar el botón activo aquí sería la pantalla contradiciéndose a
+      // sí misma (dice "ya reclamado" y debajo invita a clicar Claim otra vez), así que se pasa
+      // a la misma vista de "ya reclamado" que produce el GET, con la firma que tengamos (puede
+      // no haber ninguna, y la vista ya tolera signature: null).
       if (e instanceof AirdropError && e.kind === 'needs_delegation') {
         setAvisoReclamo('Grant signing access (session signer) so the game can claim for you, then try again. You can revoke it anytime in Privy.')
       } else if (e instanceof AirdropError && e.kind === 'already_claimed') {
-        setAvisoReclamo('You have already claimed your $CARDS airdrop.')
+        setEstado((s) => (s ? { ...s, claimed: true } : s))
       } else {
         setAvisoReclamo('The claim could not be completed. Please try again in a moment.')
       }
