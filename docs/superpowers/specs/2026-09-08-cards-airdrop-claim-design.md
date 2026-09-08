@@ -14,9 +14,14 @@ reclamarlo **desde nuestra app y sin tener SOL**, en vez de tener que ir a
 Todo lo de esta sección está verificado contra mainnet el 2026-09-08, no deducido.
 
 - El airdrop es un **Metaplex Gumdrop** (programa `gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a`).
-- Distribuidor `H6k7zSjCn2w5Q4em3b3E7iaPQfLrxVsF6u1bK6kD1Bhq`; su vault
-  `5TBR7KQHbPsf3wHZ11dyL9iifztCnN9Ccr6rzoCvYqW7` guardaba 10.635.067 CARDS de los 14.999.777
-  repartidos, o sea que va reclamado un 29%.
+- Distribuidor `H6k7zSjCn2w5Q4em3b3E7iaPQfLrxVsF6u1bK6kD1Bhq`, **creado el 2026-09-07 a las 19:11
+  UTC**, o sea que el airdrop se abrió el día antes de escribir esto. Su vault
+  `5TBR7KQHbPsf3wHZ11dyL9iifztCnN9Ccr6rzoCvYqW7` bajó de 10.635.067 a 4.938.420 CARDS en unas
+  horas del mismo 2026-09-08: de los 14.999.777 repartidos ya va reclamado un 67%. **Esto corre.**
+- La autoridad del airdrop es `mUvPrVBWAuk4MBdH8CFwysXvtnrhxpFMQaz44xEbv6y`: es el campo `base`
+  del distribuidor y el dueño del vault, no una cuenta de distribuidor (ni siquiera existe en la
+  cadena). Posee **una sola** cuenta de token, la del vault, así que no hay otra ronda escondida
+  detrás de ella.
 - La web de CC **empotra la lista entera en su bundle**: 4.453 entradas con wallet, cantidad,
   índice y proof. Los 4.453 proofs validan contra la root que está en la cuenta del distribuidor.
 - El IDL vive en la cadena. La instrucción `claim` es:
