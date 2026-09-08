@@ -208,6 +208,23 @@ def test_sin_delegar_es_409_con_instrucciones_y_no_un_502_pelado(sin_pda, cadena
     assert r.status_code == 409
 
 
+def test_sin_delegar_lleva_detail_needs_delegation(sin_pda, cadena_falsa):
+    # El cliente tiene que diferenciar entre "ya reclamaste" (409 con otro detail) y
+    # "no autorizaste firma" (409 con detail needs_delegation), porque la pantalla tiene que
+    # contar historias completamente diferentes: una es "tu dinero ya se movió" y la otra es
+    # "nos di permiso para firmar tus tiradas, ahora hazlo también para tu airdrop".
+    firmante = FakeSigner()
+
+    async def _no(wallet_id):
+        return False
+    firmante.podemos_firmar = _no
+
+    c, priv, _ = _cliente(privy_signer=firmante)
+    r = c.post("/users/me/airdrop/cards/claim", headers=_headers(priv))
+    assert r.status_code == 409
+    assert r.json()["detail"] == "needs_delegation"
+
+
 def test_si_otra_pestana_se_adelanta_sale_ya_reclamado(monkeypatch):
     # La PDA no existía al comprobar, pero para cuando llega la tx sí. No nos fiamos del
     # TEXTO del error del submit para saberlo —eso ataría el comportamiento a cómo redacte

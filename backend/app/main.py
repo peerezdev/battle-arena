@@ -1896,7 +1896,15 @@ def create_app(session_factory, chain: ChainSource,
         _airdrop_o_503()
         # Antes que nada: sin delegación no podemos firmar por él, y más vale decírselo con
         # el mensaje que ya conoce del juego que dejarle chocar contra un 502 de Privy.
-        await _exigir_delegacion(wallet_id)
+        # Atrapamos un 409 de delegación y lo etiquetamos para que el cliente lo distinga:
+        # los dos 409s que salen de aquí significan cosas diferentes, y decirle al jugador
+        # "ya reclamaste" cuando en realidad "no autorizaste la firma" es mentirle sobre su dinero.
+        try:
+            await _exigir_delegacion(wallet_id)
+        except HTTPException as e:
+            if e.status_code == 409:
+                raise HTTPException(409, "needs_delegation")
+            raise
         e = _airdrop.get(wallet)
         if e is None:
             raise HTTPException(403, "not eligible for this airdrop")

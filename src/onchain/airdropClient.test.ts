@@ -46,4 +46,33 @@ describe('airdropClient', () => {
     vi.mocked(fetch).mockResolvedValue(ok({ signature: 'sig-1', amount: 1483000000 }) as never)
     expect(await claimAirdrop('tok')).toEqual({ signature: 'sig-1', amount: 1483000000 })
   })
+
+  it('traduce el 409 con needs_delegation a needs_delegation', async () => {
+    // Dos razones producen 409: ya reclamó, o no autorizó firma. El cliente tiene que
+    // diferenciarlas para contar historias completamente diferentes: una es "tu dinero se movió",
+    // la otra es "nos diste permiso para Pack, ahora dámelo también para Airdrop".
+    vi.mocked(fetch).mockReturnValue(Promise.resolve({
+      ok: false, status: 409, json: async () => ({ detail: 'needs_delegation' })
+    }) as never)
+    await expect(claimAirdrop('tok')).rejects.toMatchObject({ kind: 'needs_delegation' })
+  })
+
+  it('409 con otro detail es still already_claimed', async () => {
+    vi.mocked(fetch).mockReturnValue(Promise.resolve({
+      ok: false, status: 409, json: async () => ({ detail: 'algo_más' })
+    }) as never)
+    await expect(claimAirdrop('tok')).rejects.toMatchObject({ kind: 'already_claimed' })
+  })
+
+  it('409 sin body parseable sigue siendo already_claimed', async () => {
+    vi.mocked(fetch).mockReturnValue(Promise.resolve({
+      ok: false, status: 409, json: async () => { throw new Error('unparseable') }
+    }) as never)
+    await expect(claimAirdrop('tok')).rejects.toMatchObject({ kind: 'already_claimed' })
+  })
+
+  it('traduce el 503 a unavailable en claim también', async () => {
+    vi.mocked(fetch).mockResolvedValue(ko(503) as never)
+    await expect(claimAirdrop('tok')).rejects.toMatchObject({ kind: 'unavailable' })
+  })
 })
