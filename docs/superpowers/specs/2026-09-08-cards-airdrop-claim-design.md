@@ -14,6 +14,10 @@ reclamarlo **desde nuestra app y sin tener SOL**, en vez de tener que ir a
 Todo lo de esta sección está verificado contra mainnet el 2026-09-08, no deducido.
 
 - El airdrop es un **Metaplex Gumdrop** (programa `gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a`).
+- **La ronda se identifica por la dirección del distribuidor, no por un trimestre.** No se le pone
+  etiqueta de "Q2" ni parecida: el criterio con el que CC repartió no lo sabemos y la única
+  suposición que hicimos al respecto resultó falsa (hay wallets en la lista cuya actividad empieza
+  en agosto de 2026, así que no es un corte de abril a junio). Lo verificable es la dirección.
 - Distribuidor `H6k7zSjCn2w5Q4em3b3E7iaPQfLrxVsF6u1bK6kD1Bhq`, **creado el 2026-09-07 a las 19:11
   UTC**, o sea que el airdrop se abrió el día antes de escribir esto. Su vault
   `5TBR7KQHbPsf3wHZ11dyL9iifztCnN9Ccr6rzoCvYqW7` bajó de 10.635.067 a 4.938.420 CARDS en unas
@@ -61,7 +65,7 @@ Todo lo de esta sección está verificado contra mainnet el 2026-09-08, no deduc
 | Dónde vive la lista | Fichero commiteado en `backend/data/`, cargado en memoria |
 | Dónde se ve | Ruta propia `/claim`, fuera de la barra lateral |
 | Redes | Solo mainnet |
-| Rondas | Una, la Q2 2026. Otra ronda = fichero y variables nuevas |
+| Rondas | Una, la abierta el 2026-09-07. Otra ronda = fichero y variables nuevas |
 
 ### Por qué la transacción la construye el backend y no el navegador
 
@@ -103,7 +107,7 @@ puede pagar cómodamente. Las externas que hemos visto elegibles ya reclamaron p
 cada hoja contra la root on-chain** y aborta sin escribir si una sola falla. Salida:
 
 ```
-backend/data/cards_airdrop_q2_2026.json     # { wallet: { "i": index, "a": amount, "p": [proof…] } }
+backend/data/cards_airdrop_2026-09.json     # { wallet: { "i": index, "a": amount, "p": [proof…] } }
 ```
 
 Unos 2,9 MB. El backend lo carga una vez al arrancar en un dict. Si el fichero no está o no se
@@ -197,7 +201,7 @@ Ningún test toca mainnet ni gasta SOL.
 - Que pague el jugador.
 - Reclamar en lote por todos los elegibles desde el operador.
 
-## Anexo: valores de la ronda Q2 2026
+## Anexo: valores de la ronda abierta el 2026-09-07
 
 ```
 programa     gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a
