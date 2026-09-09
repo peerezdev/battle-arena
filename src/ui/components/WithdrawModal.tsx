@@ -125,16 +125,30 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
 
   return (
     <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 200 }} />
+      {/* El overlay es el que centra Y el que scrollea. Antes el panel se centraba con
+          `top:50% + translate(-50%,-50%)`, y ese truco falla justo cuando el contenido pasa de
+          alto: la mitad de arriba se va por encima de `top:0` y queda INALCANZABLE, porque un
+          elemento `fixed` no se puede scrollear. Al añadir el selector de token el modal creció
+          y en un móvil dejó de caber, así que el selector y el título desaparecían sin forma de
+          llegar a ellos.
+          `margin:auto` dentro de un contenedor con `overflow-y:auto` centra cuando sobra sitio y
+          deja scrollear cuando falta, que es lo que el transform no sabe hacer. */}
       <div
-        onClick={(e) => e.stopPropagation()}
+        onClick={onClose}
         style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 201,
-          background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 18,
-          padding: '26px 26px 22px', width: 'min(420px, calc(100vw - 32px))', boxShadow: SHADOW.panel,
-          display: 'flex', flexDirection: 'column', gap: 18,
+          position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)',
+          display: 'flex', overflowY: 'auto', padding: 16, overscrollBehavior: 'contain',
         }}
       >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            margin: 'auto',
+            background: COLORS.panel, border: `1px solid ${COLORS.border}`, borderRadius: 18,
+            padding: '26px 26px 22px', width: 'min(420px, 100%)', boxShadow: SHADOW.panel,
+            display: 'flex', flexDirection: 'column', gap: 18,
+          }}
+        >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: FONTS.display, fontWeight: 800, fontSize: 18, color: COLORS.text, letterSpacing: '-0.01em' }}>
@@ -222,6 +236,7 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
         >
           {busy ? 'Withdrawing…' : 'Withdraw'}
         </button>
+        </div>
       </div>
       <DelegationGate gate={gate} />
     </>

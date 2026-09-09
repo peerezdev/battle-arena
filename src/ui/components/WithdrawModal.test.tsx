@@ -140,3 +140,31 @@ describe('WithdrawModal · selector USDC / CARDS', () => {
 function container_text_has(_scr: typeof screen, text: string): boolean {
   return document.body.textContent?.includes(text) === true
 }
+
+describe('WithdrawModal en pantallas bajas', () => {
+  // jsdom no hace layout, así que no puede reproducir el recorte. Lo que sí se puede fijar es la
+  // propiedad que lo causaba: centrar un `fixed` con `translate(-50%,-50%)` manda la mitad de
+  // arriba por encima de top:0 en cuanto el contenido no cabe, y ahí ya no hay forma de llegar a
+  // ella. Pasó de verdad en un móvil: al añadir el selector de token, el selector y el título
+  // quedaron fuera de la pantalla.
+  const panel = () => screen.getByLabelText('Close').closest('div[style]')!.parentElement as HTMLElement
+
+  it('el panel no se centra con el truco del transform', () => {
+    render(<WithdrawModal open onClose={() => {}} />)
+    expect(panel().style.transform).toBe('')
+  })
+
+  it('el contenedor deja scrollear cuando el modal no cabe', () => {
+    render(<WithdrawModal open onClose={() => {}} />)
+    const overlay = panel().parentElement as HTMLElement
+    expect(overlay.style.position).toBe('fixed')
+    expect(overlay.style.overflowY).toBe('auto')
+    expect(panel().style.margin).toBe('auto')   // centra si cabe, no recorta si no
+  })
+
+  it('el selector de token sigue estando al abrir', () => {
+    render(<WithdrawModal open onClose={() => {}} />)
+    expect(screen.getByLabelText('Select USDC')).toBeTruthy()
+    expect(screen.getByLabelText('Select CARDS')).toBeTruthy()
+  })
+})
