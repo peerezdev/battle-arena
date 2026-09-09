@@ -162,6 +162,17 @@ describe('WithdrawModal en pantallas bajas', () => {
     expect(panel().style.margin).toBe('auto')   // centra si cabe, no recorta si no
   })
 
+  it('se monta en document.body y no en el árbol donde lo pintan', () => {
+    // Es LA causa del bug, y no una preferencia: AuthButtons monta este modal dentro de la barra
+    // superior, que lleva backdrop-filter. Un ancestro con backdrop-filter se vuelve el marco de
+    // referencia de todo `position:fixed` que tenga dentro, así que sin el portal el overlay se
+    // posiciona respecto a la barra y no respecto a la pantalla.
+    const { container } = render(<WithdrawModal open onClose={() => {}} />)
+    const overlay = panel().parentElement as HTMLElement
+    expect(container.contains(overlay)).toBe(false)
+    expect(document.body.contains(overlay)).toBe(true)
+  })
+
   it('el selector de token sigue estando al abrir', () => {
     render(<WithdrawModal open onClose={() => {}} />)
     expect(screen.getByLabelText('Select USDC')).toBeTruthy()

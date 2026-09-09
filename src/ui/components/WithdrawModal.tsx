@@ -11,8 +11,9 @@
  * as battles).
  */
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useIdentityToken } from '@privy-io/react-auth'
-import { COLORS, GRADIENT, FONTS, SHADOW } from '../theme'
+import { COLORS, GRADIENT, FONTS, SHADOW, Z } from '../theme'
 import { useReducedMotion } from '../useReducedMotion'
 import { useUsdcBalance, useCardsBalance } from '../../wallet/useUsdcBalance'
 import { useReservedBalance, availableUsd } from '../../wallet/useReservedBalance'
@@ -125,18 +126,21 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
 
   return (
     <>
-      {/* El overlay es el que centra Y el que scrollea. Antes el panel se centraba con
-          `top:50% + translate(-50%,-50%)`, y ese truco falla justo cuando el contenido pasa de
-          alto: la mitad de arriba se va por encima de `top:0` y queda INALCANZABLE, porque un
-          elemento `fixed` no se puede scrollear. Al añadir el selector de token el modal creció
-          y en un móvil dejó de caber, así que el selector y el título desaparecían sin forma de
-          llegar a ellos.
-          `margin:auto` dentro de un contenedor con `overflow-y:auto` centra cuando sobra sitio y
-          deja scrollear cuando falta, que es lo que el transform no sabe hacer. */}
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)',
+      {/* VA EN UN PORTAL A document.body, Y NO ES OPCIONAL. Este modal lo monta AuthButtons,
+          que vive dentro de la barra superior, y esa barra lleva `backdrop-filter: blur(14px)`.
+          Un ancestro con backdrop-filter (o transform, o perspective, o contain) se convierte en
+          el marco de referencia de TODO `position:fixed` que tenga dentro, así que el overlay no
+          se posicionaba respecto a la pantalla sino respecto a la barra: aparecía pegado arriba
+          y recortado, no centrado. El portal lo saca de ahí y también de su stacking context.
+          Dentro ya sí: el overlay centra y scrollea. `margin:auto` en un contenedor con
+          `overflow-y:auto` centra cuando sobra sitio y deja subir cuando falta, cosa que el
+          `top:50% + translate(-50%,-50%)` de antes no hacía: con el contenido más alto que la
+          pantalla, su mitad superior quedaba por encima de top:0 e inalcanzable. */}
+      {createPortal(
+        <div
+          onClick={onClose}
+          style={{
+            position: 'fixed', inset: 0, zIndex: Z.overlay, background: 'rgba(0,0,0,0.65)',
           display: 'flex', overflowY: 'auto', padding: 16, overscrollBehavior: 'contain',
         }}
       >
@@ -237,7 +241,9 @@ export function WithdrawModal({ open, onClose }: WithdrawModalProps) {
           {busy ? 'Withdrawing…' : 'Withdraw'}
         </button>
         </div>
-      </div>
+        </div>,
+        document.body,
+      )}
       <DelegationGate gate={gate} />
     </>
   )
