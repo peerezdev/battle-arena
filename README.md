@@ -127,13 +127,17 @@ cd backend && PYTHONPATH=. .venv/bin/python -m pytest -q
 
 ## Documentation
 
-Engineering notes live in `docs/`. They are currently written in Spanish.
+Engineering notes live in `docs/`.
 
 - `docs/COLLECTOR-CRYPT-API.md`: what we learned about the Collector Crypt API, including undocumented
   behavior.
 - `docs/ESCROW-WALLETS.md`: how battle escrow wallets work.
-- `docs/ONCHAIN.md`: the Anchor program.
+- `docs/COMMANDS.md`: every operational command, from the gacha catalog to recovering stuck funds.
 - `docs/STARTUP.md`: running every service locally.
+- `docs/ONCHAIN.md`: the earlier on-chain mode built around the Anchor program.
+
+`docs/superpowers/` keeps the internal design specs and implementation plans as they were written
+during development, in Spanish.
 
 ---
 
